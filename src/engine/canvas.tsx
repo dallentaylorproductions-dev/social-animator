@@ -1,6 +1,6 @@
 "use client";
 
-import { useEffect, useRef } from "react";
+import { useEffect, useRef, forwardRef } from "react";
 import type { Timeline } from "./timeline";
 
 interface CanvasProps {
@@ -14,22 +14,34 @@ interface CanvasProps {
   onComplete?: () => void;
 }
 
-export function Canvas({
-  width,
-  height,
-  timeline,
-  background = "#000000",
-  loop = false,
-  playKey,
-  onTick,
-  onComplete,
-}: CanvasProps) {
+export const Canvas = forwardRef<HTMLCanvasElement, CanvasProps>(function Canvas(
+  {
+    width,
+    height,
+    timeline,
+    background = "#000000",
+    loop = false,
+    playKey,
+    onTick,
+    onComplete,
+  },
+  forwardedRef
+) {
   const canvasRef = useRef<HTMLCanvasElement>(null);
   const onTickRef = useRef(onTick);
   const onCompleteRef = useRef(onComplete);
 
   onTickRef.current = onTick;
   onCompleteRef.current = onComplete;
+
+  const setRef = (el: HTMLCanvasElement | null) => {
+    canvasRef.current = el;
+    if (typeof forwardedRef === "function") {
+      forwardedRef(el);
+    } else if (forwardedRef) {
+      forwardedRef.current = el;
+    }
+  };
 
   useEffect(() => {
     const canvas = canvasRef.current;
@@ -51,14 +63,12 @@ export function Canvas({
       if (startTs === null) startTs = ts;
       let currentTime = (ts - startTs) / 1000;
 
-      // Canvas-level loop: restart when we hit timeline.duration
       if (loop && timeline.duration > 0 && currentTime >= timeline.duration) {
         startTs = ts;
         currentTime = 0;
         completedFired = false;
       }
 
-      // Finite playback (no looping tracks, no loop prop): clamp at duration, fire onComplete once
       if (finite && currentTime >= timeline.duration) {
         currentTime = timeline.duration;
         if (!completedFired) {
@@ -67,7 +77,6 @@ export function Canvas({
         }
       }
 
-      // Render
       ctx.setTransform(dpr, 0, 0, dpr, 0, 0);
       ctx.fillStyle = background;
       ctx.fillRect(0, 0, width, height);
@@ -75,7 +84,6 @@ export function Canvas({
 
       onTickRef.current?.(currentTime);
 
-      // Keep rendering unless we've reached the end of a finite timeline
       const shouldContinue = !finite || currentTime < timeline.duration;
       if (shouldContinue) {
         rafId = requestAnimationFrame(frame);
@@ -88,7 +96,7 @@ export function Canvas({
 
   return (
     <canvas
-      ref={canvasRef}
+      ref={setRef}
       style={{
         display: "block",
         width: "100%",
@@ -97,4 +105,4 @@ export function Canvas({
       }}
     />
   );
-}
+});

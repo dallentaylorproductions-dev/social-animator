@@ -1,6 +1,6 @@
 "use client";
 
-import { useMemo, useState } from "react";
+import { useMemo, useRef, useState } from "react";
 import { Canvas } from "@/engine/canvas";
 import { qaCardTemplate } from "@/templates/qa-card";
 import {
@@ -8,12 +8,14 @@ import {
   getDefaultState,
   type TemplateSize,
 } from "@/templates/types";
+import { ExportButton } from "@/components/ExportButton";
 
 export default function QACardEditorPage() {
   const template = qaCardTemplate;
   const [state, setState] = useState(() => getDefaultState(template));
   const [sizeKey, setSizeKey] = useState<TemplateSize>("1080x1350");
   const [playKey, setPlayKey] = useState(0);
+  const canvasRef = useRef<HTMLCanvasElement>(null);
 
   const size = SIZE_PRESETS.find((s) => s.key === sizeKey)!;
 
@@ -40,7 +42,6 @@ export default function QACardEditorPage() {
         </header>
 
         <div className="grid lg:grid-cols-[360px_1fr] gap-10">
-          {/* Left: form */}
           <aside className="space-y-5">
             <div>
               <label className="block text-[10px] uppercase tracking-[0.15em] text-neutral-500 mb-2">
@@ -109,12 +110,22 @@ export default function QACardEditorPage() {
             >
               Replay animation
             </button>
+
+            <div className="pt-5 border-t border-neutral-800">
+              <ExportButton
+                canvasRef={canvasRef}
+                duration={template.duration}
+                size={{ width: size.width, height: size.height }}
+                filename={`${template.id}-${size.shortLabel.toLowerCase()}`}
+                onStartRecording={() => setPlayKey((k) => k + 1)}
+              />
+            </div>
           </aside>
 
-          {/* Right: preview */}
           <section className="flex items-start justify-center">
             <div className="w-full max-w-sm">
               <Canvas
+                ref={canvasRef}
                 width={size.width}
                 height={size.height}
                 timeline={timeline}
