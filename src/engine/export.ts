@@ -135,7 +135,12 @@ export async function webmToMp4(
     if (typeof data === "string") {
       throw new Error("Unexpected text data from ffmpeg output.");
     }
-    return new Blob([data], { type: "video/mp4" });
+    // Copy into a fresh ArrayBuffer. TypeScript 5.7+ tightened DOM types
+    // and Uint8Array<ArrayBufferLike> is no longer directly assignable to
+    // BlobPart — re-wrapping sidesteps that without a type cast.
+    const buffer = new ArrayBuffer(data.byteLength);
+    new Uint8Array(buffer).set(data);
+    return new Blob([buffer], { type: "video/mp4" });
   } finally {
     ffmpeg.off("progress", progressHandler);
     // Best-effort cleanup; ignore if files don't exist.
