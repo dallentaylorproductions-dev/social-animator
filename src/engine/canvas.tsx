@@ -28,7 +28,6 @@ export function Canvas({
   const onTickRef = useRef(onTick);
   const onCompleteRef = useRef(onComplete);
 
-  // Keep callback refs fresh without re-triggering the animation effect
   onTickRef.current = onTick;
   onCompleteRef.current = onComplete;
 
@@ -46,39 +45,38 @@ export function Canvas({
     let startTs: number | null = null;
     let completedFired = false;
     const hasLoopingTrack = timeline.tracks.some((t) => t.loop);
+    const finite = !loop && !hasLoopingTrack && timeline.duration > 0;
 
     const frame = (ts: DOMHighResTimeStamp) => {
       if (startTs === null) startTs = ts;
       let currentTime = (ts - startTs) / 1000;
 
-      if (timeline.duration > 0 && currentTime >= timeline.duration) {
-        if (loop) {
-          startTs = ts;
-          currentTime = 0;
-          completedFired = false;
-        } else {
-          currentTime = timeline.duration;
-          if (!completedFired) {
-            completedFired = true;
-            onCompleteRef.current?.();
-          }
+      // Canvas-level loop: restart when we hit timeline.duration
+      if (loop && timeline.duration > 0 && currentTime >= timeline.duration) {
+        startTs = ts;
+        currentTime = 0;
+        completedFired = false;
+      }
+
+      // Finite playback (no looping tracks, no loop prop): clamp at duration, fire onComplete once
+      if (finite && currentTime >= timeline.duration) {
+        currentTime = timeline.duration;
+        if (!completedFired) {
+          completedFired = true;
+          onCompleteRef.current?.();
         }
       }
 
+      // Render
       ctx.setTransform(dpr, 0, 0, dpr, 0, 0);
       ctx.fillStyle = background;
       ctx.fillRect(0, 0, width, height);
-
       timeline.render(currentTime, ctx);
 
       onTickRef.current?.(currentTime);
 
-      const shouldContinue =
-        loop ||
-        hasLoopingTrack ||
-        timeline.duration === 0 ||
-        currentTime < timeline.duration;
-
+      // Keep rendering unless we've reached the end of a finite timeline
+      const shouldContinue = !finite || currentTime < timeline.duration;
       if (shouldContinue) {
         rafId = requestAnimationFrame(frame);
       }
