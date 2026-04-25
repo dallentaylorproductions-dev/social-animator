@@ -168,6 +168,7 @@ export const gridComparisonTemplate: TemplateConfig = {
 
           ctx.fillStyle = state.cardBodyColor;
           ctx.font = `400 26px Inter, system-ui, sans-serif`;
+          ctx.textAlign = "left";
           ctx.textBaseline = "top";
           drawWrappedText(
             ctx,
