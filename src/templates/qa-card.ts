@@ -7,7 +7,7 @@ export const qaCardTemplate: TemplateConfig = {
   id: "qa-card",
   name: "Q&A Card",
   description: "Pose a question, reveal the answer. Great for market tips and buyer FAQs.",
-  duration: 6,
+  duration: 10,
   fields: [
     { key: "titleText", label: "Title", type: "text", default: "Q&A" },
     {
@@ -134,7 +134,7 @@ export const qaCardTemplate: TemplateConfig = {
       {
         id: "hold",
         start: 2.45,
-        duration: 3.55,
+        duration: 7.55,
         onUpdate: () => {
           /* no-op; just pads timeline.duration */
         },
