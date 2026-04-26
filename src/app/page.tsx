@@ -5,15 +5,23 @@ export default function HomePage() {
   return (
     <main className="min-h-screen bg-neutral-950 text-white">
       <div className="max-w-5xl mx-auto px-6 py-12 lg:py-20">
-        <header className="mb-12">
-          <p className="text-xs uppercase tracking-[0.2em] text-[#4ef2d9]">
-            Social Animator
-          </p>
-          <h1 className="text-3xl font-bold mt-1">Aaron Thomas Home Team</h1>
-          <p className="text-sm text-neutral-400 mt-3 max-w-lg">
-            Pick a template, fill in your content, hit Export. Instagram-ready
-            MP4s in three sizes.
-          </p>
+        <header className="mb-12 flex items-start justify-between gap-6">
+          <div>
+            <p className="text-xs uppercase tracking-[0.2em] text-[#4ef2d9]">
+              Social Animator
+            </p>
+            <h1 className="text-3xl font-bold mt-1">Aaron Thomas Home Team</h1>
+            <p className="text-sm text-neutral-400 mt-3 max-w-lg">
+              Pick a template, fill in your content, hit Export. Instagram-ready
+              MP4s in three sizes.
+            </p>
+          </div>
+          <Link
+            href="/brand"
+            className="text-xs uppercase tracking-[0.15em] text-neutral-400 hover:text-[#4ef2d9] transition whitespace-nowrap"
+          >
+            Brand →
+          </Link>
         </header>
 
         <div className="grid md:grid-cols-2 gap-4">

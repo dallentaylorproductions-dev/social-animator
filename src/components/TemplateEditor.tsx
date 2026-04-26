@@ -12,6 +12,7 @@ import {
 } from "@/templates/types";
 import { ExportButton } from "@/components/ExportButton";
 import { ImageField } from "@/components/ImageField";
+import { useBrandSettings } from "@/lib/brand";
 
 interface TemplateEditorProps {
   template: TemplateConfig;
@@ -80,6 +81,7 @@ export function TemplateEditor({ template }: TemplateEditorProps) {
   const [playKey, setPlayKey] = useState(0);
   const [duration, setDuration] = useState<number>(template.duration);
   const canvasRef = useRef<HTMLCanvasElement>(null);
+  const { settings: brandSettings, logoImg: brandLogo } = useBrandSettings();
 
   const size = SIZE_PRESETS.find((s) => s.key === sizeKey)!;
 
@@ -261,6 +263,8 @@ export function TemplateEditor({ template }: TemplateEditorProps) {
                 timeline={timeline}
                 background={state.background ?? "#000000"}
                 playKey={`${sizeKey}-${playKey}-${duration}`}
+                brandLogo={brandLogo}
+                brandName={brandSettings.agentName}
               />
               <p className="text-xs text-neutral-500 mt-3 text-center">
                 Preview · {size.label} · {duration}s
