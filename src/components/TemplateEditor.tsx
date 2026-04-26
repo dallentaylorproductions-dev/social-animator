@@ -7,8 +7,10 @@ import {
   getDefaultState,
   type TemplateConfig,
   type TemplateSize,
+  type TemplateAssets,
 } from "@/templates/types";
 import { ExportButton } from "@/components/ExportButton";
+import { ImageField } from "@/components/ImageField";
 
 interface TemplateEditorProps {
   template: TemplateConfig;
@@ -16,6 +18,7 @@ interface TemplateEditorProps {
 
 export function TemplateEditor({ template }: TemplateEditorProps) {
   const [state, setState] = useState(() => getDefaultState(template));
+  const [assets, setAssets] = useState<TemplateAssets>({});
   const [sizeKey, setSizeKey] = useState<TemplateSize>("1080x1350");
   const [playKey, setPlayKey] = useState(0);
   const [duration, setDuration] = useState<number>(template.duration);
@@ -24,13 +27,21 @@ export function TemplateEditor({ template }: TemplateEditorProps) {
   const size = SIZE_PRESETS.find((s) => s.key === sizeKey)!;
 
   const timeline = useMemo(() => {
-    const t = template.build(state, { width: size.width, height: size.height });
-    t.duration = duration; // override natural duration with user's choice
+    const t = template.build(
+      state,
+      { width: size.width, height: size.height },
+      assets
+    );
+    t.duration = duration;
     return t;
-  }, [template, state, size, duration]);
+  }, [template, state, size, duration, assets]);
 
   const updateField = (key: string, value: string) => {
     setState((prev) => ({ ...prev, [key]: value }));
+  };
+
+  const updateAsset = (key: string, img: HTMLImageElement | null) => {
+    setAssets((prev) => ({ ...prev, [key]: img }));
   };
 
   const resetColors = () => {
@@ -61,7 +72,6 @@ export function TemplateEditor({ template }: TemplateEditorProps) {
 
         <div className="grid lg:grid-cols-[360px_1fr] gap-10">
           <aside className="space-y-5">
-            {/* Size */}
             <div>
               <label className="block text-[10px] uppercase tracking-[0.15em] text-neutral-500 mb-2">
                 Size
@@ -83,7 +93,6 @@ export function TemplateEditor({ template }: TemplateEditorProps) {
               </div>
             </div>
 
-            {/* Duration */}
             <div>
               <label className="block text-[10px] uppercase tracking-[0.15em] text-neutral-500 mb-2">
                 Duration · {duration}s
@@ -103,7 +112,6 @@ export function TemplateEditor({ template }: TemplateEditorProps) {
               </div>
             </div>
 
-            {/* Replay (moved up) */}
             <button
               onClick={() => setPlayKey((k) => k + 1)}
               className="w-full bg-neutral-800 hover:bg-neutral-700 text-white rounded-md px-4 py-2.5 text-sm font-medium transition"
@@ -111,7 +119,6 @@ export function TemplateEditor({ template }: TemplateEditorProps) {
               Replay animation
             </button>
 
-            {/* Reset colors */}
             <button
               onClick={resetColors}
               className="w-full text-[11px] text-neutral-500 hover:text-neutral-300 transition py-1"
@@ -119,7 +126,6 @@ export function TemplateEditor({ template }: TemplateEditorProps) {
               ↺ Reset colors to brand defaults
             </button>
 
-            {/* Form fields */}
             <div className="space-y-5 pt-2 border-t border-neutral-800/60">
               {template.fields.map((field) => (
                 <div key={field.key}>
@@ -158,11 +164,16 @@ export function TemplateEditor({ template }: TemplateEditorProps) {
                       />
                     </div>
                   )}
+                  {field.type === "image" && (
+                    <ImageField
+                      value={assets[field.key] ?? null}
+                      onChange={(img) => updateAsset(field.key, img)}
+                    />
+                  )}
                 </div>
               ))}
             </div>
 
-            {/* Export */}
             <div className="pt-5 border-t border-neutral-800">
               <p className="text-[11px] text-neutral-500 leading-snug mb-3">
                 ⓘ Keep this tab focused and visible while recording. Switching

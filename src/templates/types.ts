@@ -16,7 +16,7 @@ export const SIZE_PRESETS: SizePreset[] = [
   { key: "1080x1080", width: 1080, height: 1080, label: "Square (1080 × 1080)", shortLabel: "Square" },
 ];
 
-export type FieldType = "text" | "textarea" | "color";
+export type FieldType = "text" | "textarea" | "color" | "image";
 
 export interface FieldDef {
   key: string;
@@ -26,17 +26,18 @@ export interface FieldDef {
 }
 
 export type TemplateState = Record<string, string>;
+export type TemplateAssets = Record<string, HTMLImageElement | null>;
 
 export interface TemplateConfig {
   id: string;
   name: string;
   description: string;
-  /** Total animation duration in seconds (for export + hold-at-end). */
   duration: number;
   fields: FieldDef[];
   build: (
     state: TemplateState,
-    size: { width: number; height: number }
+    size: { width: number; height: number },
+    assets?: TemplateAssets
   ) => Timeline;
 }
 
