@@ -58,7 +58,7 @@ export const gridComparisonTemplate: TemplateConfig = {
     const gridGap = 36;
     const sideMargin = 70;
     const cardWidth = (width - sideMargin * 2 - gridGap) / 2;
-    const cardHeight = 480;
+    const cardHeight = 420;
     const gridX = sideMargin;
     const gridY = Math.max(240, (height - (cardHeight * 2 + gridGap)) / 2 + 60);
 
