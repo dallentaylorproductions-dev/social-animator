@@ -1,6 +1,6 @@
 import type { Timeline } from "@/engine/timeline";
 
-export type TemplateSize = "1080x1350" | "1080x1920" | "1080x1080";
+export type TemplateSize = "1080x1350" | "1080x1080";
 
 export interface SizePreset {
   key: TemplateSize;
@@ -12,7 +12,6 @@ export interface SizePreset {
 
 export const SIZE_PRESETS: SizePreset[] = [
   { key: "1080x1350", width: 1080, height: 1350, label: "Feed (1080 × 1350)", shortLabel: "Feed" },
-  { key: "1080x1920", width: 1080, height: 1920, label: "Reel / Story (1080 × 1920)", shortLabel: "Reel" },
   { key: "1080x1080", width: 1080, height: 1080, label: "Square (1080 × 1080)", shortLabel: "Square" },
 ];
 
