@@ -55,7 +55,7 @@ export function ExportButton({
 
       setState({ kind: "converting", progress: 0 });
       await ffmpegPromise; // wait for ffmpeg to be loaded if it wasn't already
-      const mp4 = await webmToMp4(webm, size, (progress) =>
+      const mp4 = await webmToMp4(webm, size, duration, (progress) =>
         setState({ kind: "converting", progress })
       );
 

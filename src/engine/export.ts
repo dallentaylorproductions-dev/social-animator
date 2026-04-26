@@ -96,6 +96,7 @@ export async function recordCanvas(
 export async function webmToMp4(
   webmBlob: Blob,
   targetSize: { width: number; height: number },
+  durationSec: number,
   onProgress?: (progress: number) => void
 ): Promise<Blob> {
   const ffmpeg = await getFFmpeg();
@@ -111,11 +112,18 @@ export async function webmToMp4(
     // Scale to target size (forces exact output dimensions for Instagram).
     // -pix_fmt yuv420p ensures compatibility with all players including Instagram.
     // -movflags +faststart puts metadata at the start so the file streams well.
+    // Force exact output duration regardless of input WebM length:
+    //  - fps=30 normalizes input framerate to 30fps
+    //  - tpad clones the last frame for durationSec extra seconds
+    //  - -t trims output to exactly durationSec
+    // This compensates for Chrome dropping frames when canvas rendering is heavy.
     await ffmpeg.exec([
       "-i",
       "input.webm",
       "-vf",
-      `scale=${targetSize.width}:${targetSize.height}:force_original_aspect_ratio=decrease,pad=${targetSize.width}:${targetSize.height}:(ow-iw)/2:(oh-ih)/2:color=black`,
+      `fps=30,tpad=stop_mode=clone:stop_duration=${durationSec},scale=${targetSize.width}:${targetSize.height}:force_original_aspect_ratio=decrease,pad=${targetSize.width}:${targetSize.height}:(ow-iw)/2:(oh-ih)/2:color=black`,
+      "-t",
+      String(durationSec),
       "-c:v",
       "libx264",
       "-preset",
@@ -126,8 +134,6 @@ export async function webmToMp4(
       "yuv420p",
       "-movflags",
       "+faststart",
-      "-r",
-      "30",
       "output.mp4",
     ]);
 
