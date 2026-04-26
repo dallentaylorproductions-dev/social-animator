@@ -79,7 +79,7 @@ export const numberedProcessTemplate: TemplateConfig = {
     const badgeRadius = 56;
     const badgeX = 130;
     const stepStartY = 290;
-    const stepEndY = height - 100;
+    const stepEndY = height - 240;
     const stepSpacing =
       stepCount > 1 ? Math.min(220, (stepEndY - stepStartY) / (stepCount - 1)) : 0;
 

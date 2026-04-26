@@ -2,6 +2,7 @@
 
 import { useEffect, useRef, forwardRef } from "react";
 import type { Timeline } from "./timeline";
+import { drawBrandOverlay } from "@/lib/brand";
 
 interface CanvasProps {
   width: number;
@@ -12,6 +13,8 @@ interface CanvasProps {
   playKey?: number | string;
   onTick?: (time: number) => void;
   onComplete?: () => void;
+  brandLogo?: HTMLImageElement | null;
+  brandName?: string;
 }
 
 export const Canvas = forwardRef<HTMLCanvasElement, CanvasProps>(function Canvas(
@@ -24,6 +27,8 @@ export const Canvas = forwardRef<HTMLCanvasElement, CanvasProps>(function Canvas
     playKey,
     onTick,
     onComplete,
+    brandLogo,
+    brandName,
   },
   forwardedRef
 ) {
@@ -33,6 +38,11 @@ export const Canvas = forwardRef<HTMLCanvasElement, CanvasProps>(function Canvas
 
   onTickRef.current = onTick;
   onCompleteRef.current = onComplete;
+
+  const brandLogoRef = useRef(brandLogo);
+  const brandNameRef = useRef(brandName);
+  brandLogoRef.current = brandLogo;
+  brandNameRef.current = brandName;
 
   const setRef = (el: HTMLCanvasElement | null) => {
     canvasRef.current = el;
@@ -88,6 +98,17 @@ export const Canvas = forwardRef<HTMLCanvasElement, CanvasProps>(function Canvas
       // the visible animation goes static (e.g. during a long hold-at-end).
       ctx.fillStyle = `rgba(0,0,0,${((currentTime * 1000) % 1) * 0.001 + 0.0005})`;
       ctx.fillRect(0, 0, 1, 1);
+
+      // Brand overlay (fades in over the first 0.5s of any timeline)
+      const brandAlpha = Math.min(1, currentTime / 0.5);
+      drawBrandOverlay(
+        ctx,
+        width,
+        height,
+        brandLogoRef.current ?? null,
+        brandNameRef.current ?? "",
+        brandAlpha
+      );
 
       onTickRef.current?.(currentTime);
 
