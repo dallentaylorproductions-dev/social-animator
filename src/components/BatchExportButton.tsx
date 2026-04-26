@@ -136,11 +136,11 @@ export function BatchExportButton({
         disabled={isBusy}
         className="w-full bg-neutral-800 hover:bg-neutral-700 text-neutral-200 rounded-md px-4 py-2.5 text-sm font-medium transition disabled:opacity-60 disabled:cursor-not-allowed"
       >
-        {state.kind === "idle" && "Export all 3 sizes"}
+        {state.kind === "idle" && "Export all sizes"}
         {state.kind === "running" &&
           `${phaseLabel(state.phase)} ${state.sizeLabel}… (${state.currentIndex + 1} of ${state.total})`}
-        {state.kind === "done" && "All 3 sizes ✓ downloaded"}
-        {state.kind === "error" && "Try again — Export all 3 sizes"}
+        {state.kind === "done" && "All sizes ✓ downloaded"}
+        {state.kind === "error" && "Try again — Export all sizes"}
       </button>
 
       {state.kind === "running" && (
