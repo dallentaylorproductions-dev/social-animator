@@ -82,6 +82,13 @@ export const Canvas = forwardRef<HTMLCanvasElement, CanvasProps>(function Canvas
       ctx.fillRect(0, 0, width, height);
       timeline.render(currentTime, ctx);
 
+      // Heartbeat pixel: writes a near-zero-alpha 1px rect at (0,0) every frame
+      // to force canvas.captureStream() to register a content change. Without
+      // this, exports come out shorter than the requested duration whenever
+      // the visible animation goes static (e.g. during a long hold-at-end).
+      ctx.fillStyle = `rgba(0,0,0,${((currentTime * 1000) % 1) * 0.001 + 0.0005})`;
+      ctx.fillRect(0, 0, 1, 1);
+
       onTickRef.current?.(currentTime);
 
       const shouldContinue = !finite || currentTime < timeline.duration;
