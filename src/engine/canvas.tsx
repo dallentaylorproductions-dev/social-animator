@@ -59,7 +59,13 @@ export const Canvas = forwardRef<HTMLCanvasElement, CanvasProps>(function Canvas
     const ctx = canvas.getContext("2d");
     if (!ctx) return;
 
-    const dpr = typeof window !== "undefined" ? window.devicePixelRatio || 1 : 1;
+    // Cap DPR at 1 to keep the canvas buffer at logical resolution (e.g.
+    // 1080×1920 instead of 2160×3840 on retina). MediaRecorder's H.264 encoder
+    // chokes on the larger buffer for taller canvases like Reel, dropping
+    // frames and producing frozen-looking exports. Output quality is
+    // unaffected because ffmpeg scales the final MP4 to the target dimensions
+    // anyway — the DPR oversampling was wasted work.
+    const dpr = 1;
     canvas.width = width * dpr;
     canvas.height = height * dpr;
 
