@@ -1,6 +1,6 @@
 "use client";
 
-import { useMemo, useRef, useState } from "react";
+import { useEffect, useMemo, useRef, useState } from "react";
 import { Canvas } from "@/engine/canvas";
 import {
   SIZE_PRESETS,
@@ -8,6 +8,7 @@ import {
   type TemplateConfig,
   type TemplateSize,
   type TemplateAssets,
+  type TemplateState,
 } from "@/templates/types";
 import { ExportButton } from "@/components/ExportButton";
 import { ImageField } from "@/components/ImageField";
@@ -16,8 +17,64 @@ interface TemplateEditorProps {
   template: TemplateConfig;
 }
 
+const SAVED_COLORS_KEY_PREFIX = "socanim_colors_";
+
+function loadSavedColors(template: TemplateConfig): TemplateState {
+  if (typeof window === "undefined") return {};
+  try {
+    const raw = window.localStorage.getItem(
+      SAVED_COLORS_KEY_PREFIX + template.id
+    );
+    if (!raw) return {};
+    const parsed = JSON.parse(raw) as Record<string, unknown>;
+    const colorKeys = new Set(
+      template.fields.filter((f) => f.type === "color").map((f) => f.key)
+    );
+    const result: TemplateState = {};
+    for (const key of Object.keys(parsed)) {
+      if (colorKeys.has(key) && typeof parsed[key] === "string") {
+        result[key] = parsed[key] as string;
+      }
+    }
+    return result;
+  } catch {
+    return {};
+  }
+}
+
+function saveColors(template: TemplateConfig, state: TemplateState): void {
+  if (typeof window === "undefined") return;
+  try {
+    const colorState: Record<string, string> = {};
+    for (const f of template.fields) {
+      if (f.type === "color" && state[f.key]) {
+        colorState[f.key] = state[f.key];
+      }
+    }
+    window.localStorage.setItem(
+      SAVED_COLORS_KEY_PREFIX + template.id,
+      JSON.stringify(colorState)
+    );
+  } catch {
+    // localStorage disabled (private browsing) or full — silently skip
+  }
+}
+
+function clearSavedColors(template: TemplateConfig): void {
+  if (typeof window === "undefined") return;
+  try {
+    window.localStorage.removeItem(SAVED_COLORS_KEY_PREFIX + template.id);
+  } catch {
+    // ignore
+  }
+}
+
 export function TemplateEditor({ template }: TemplateEditorProps) {
-  const [state, setState] = useState(() => getDefaultState(template));
+  const [state, setState] = useState<TemplateState>(() => {
+    const defaults = getDefaultState(template);
+    const saved = loadSavedColors(template);
+    return { ...defaults, ...saved };
+  });
   const [assets, setAssets] = useState<TemplateAssets>({});
   const [sizeKey, setSizeKey] = useState<TemplateSize>("1080x1350");
   const [playKey, setPlayKey] = useState(0);
@@ -25,6 +82,11 @@ export function TemplateEditor({ template }: TemplateEditorProps) {
   const canvasRef = useRef<HTMLCanvasElement>(null);
 
   const size = SIZE_PRESETS.find((s) => s.key === sizeKey)!;
+
+  // Persist color values to localStorage whenever state changes
+  useEffect(() => {
+    saveColors(template, state);
+  }, [template, state]);
 
   const timeline = useMemo(() => {
     const t = template.build(
@@ -45,6 +107,7 @@ export function TemplateEditor({ template }: TemplateEditorProps) {
   };
 
   const resetColors = () => {
+    clearSavedColors(template);
     setState((prev) => {
       const next = { ...prev };
       for (const f of template.fields) {
