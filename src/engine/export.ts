@@ -112,18 +112,21 @@ export async function webmToMp4(
     // Scale to target size (forces exact output dimensions for Instagram).
     // -pix_fmt yuv420p ensures compatibility with all players including Instagram.
     // -movflags +faststart puts metadata at the start so the file streams well.
-    // Force exact output duration regardless of input WebM length:
-    //  - fps=30 normalizes input framerate to 30fps
+    // Force exact output duration:
     //  - tpad clones the last frame for durationSec extra seconds
     //  - -t trims output to exactly durationSec
-    // This compensates for Chrome dropping frames when canvas rendering is heavy.
+    //  - -r 30 normalizes output framerate at the output stage (instead of the
+    //    input fps filter, which can introduce playback jank when the WebM has
+    //    even slight timing wobble)
     await ffmpeg.exec([
       "-i",
       "input.webm",
       "-vf",
-      `fps=30,tpad=stop_mode=clone:stop_duration=${durationSec},scale=${targetSize.width}:${targetSize.height}:force_original_aspect_ratio=decrease,pad=${targetSize.width}:${targetSize.height}:(ow-iw)/2:(oh-ih)/2:color=black`,
+      `tpad=stop_mode=clone:stop_duration=${durationSec},scale=${targetSize.width}:${targetSize.height}:force_original_aspect_ratio=decrease,pad=${targetSize.width}:${targetSize.height}:(ow-iw)/2:(oh-ih)/2:color=black`,
       "-t",
       String(durationSec),
+      "-r",
+      "30",
       "-c:v",
       "libx264",
       "-preset",
