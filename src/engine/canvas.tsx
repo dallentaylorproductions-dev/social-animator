@@ -66,6 +66,13 @@ export const Canvas = forwardRef<HTMLCanvasElement, CanvasProps>(function Canvas
     const ctx = canvas.getContext("2d");
     if (!ctx) return;
 
+    // High-quality downsampling for offscreen→main canvas blits (used by
+    // drawImageCover / drawImageContain which cache at supersampled size).
+    // Set once: setTransform doesn't reset these; track-level ctx.save/restore
+    // protects against accidental in-track mutation.
+    ctx.imageSmoothingEnabled = true;
+    ctx.imageSmoothingQuality = "high";
+
     // Cap DPR at 1 to keep the canvas buffer at logical resolution (e.g.
     // 1080×1920 instead of 2160×3840 on retina). MediaRecorder's H.264 encoder
     // chokes on the larger buffer for taller canvases like Reel, dropping
