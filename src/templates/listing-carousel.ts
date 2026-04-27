@@ -15,6 +15,18 @@ export const listingCarouselTemplate: TemplateConfig = {
   description:
     "Animated photo tour with coverflow-style transitions — next and previous photos peek in from the sides, hinting at what's coming.",
   duration: 10,
+  sampleAssets: {
+    photo1: "/sample-assets/exterior.webp",
+    photo2: "/sample-assets/kitchen.webp",
+    photo3: "/sample-assets/living-room.webp",
+    photo4: "/sample-assets/bedroom.webp",
+    photo5: "/sample-assets/bathroom.webp",
+    photo6: "/sample-assets/backyard.webp",
+  },
+  sampleState: {
+    title: "Open House Saturday",
+    subtitle: "1:00–4:00pm",
+  },
   fields: [
     { key: "title", label: "Title (optional)", type: "text", default: "123 Maple Street" },
     { key: "titleColor", label: "Title color", type: "color", default: "#ffffff" },

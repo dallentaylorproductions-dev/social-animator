@@ -9,6 +9,16 @@ export const listingCardTemplate: TemplateConfig = {
   description:
     "Showcase a property with photo, status, address, and price. Perfect for new listings, just-solds, and open houses.",
   duration: 8,
+  sampleAssets: { heroPhoto: "/sample-assets/exterior.webp" },
+  sampleState: {
+    status: "Just Listed",
+    address: "1247 Maple Heights Dr",
+    cityState: "Beaverton, OR",
+    price: "$685,000",
+    beds: "4",
+    baths: "3",
+    sqft: "2,840",
+  },
   fields: [
     { key: "heroPhoto", label: "Listing photo", type: "image", default: "" },
     {

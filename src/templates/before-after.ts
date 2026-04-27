@@ -9,6 +9,10 @@ export const beforeAfterTemplate: TemplateConfig = {
   description:
     "Two photos side by side with a staggered reveal. Perfect for staging, renovations, or curb-appeal transformations.",
   duration: 8,
+  sampleAssets: {
+    beforePhoto: "/sample-assets/before-room.webp",
+    afterPhoto: "/sample-assets/living-room.webp",
+  },
   fields: [
     { key: "title", label: "Title", type: "text", default: "Staging Magic" },
     { key: "beforePhoto", label: "Before photo", type: "image", default: "" },

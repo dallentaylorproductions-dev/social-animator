@@ -42,6 +42,12 @@ export interface TemplateConfig {
     size: { width: number; height: number },
     assets?: TemplateAssets
   ) => Timeline;
+  /** Preview-only: text/color overrides for the live picker preview. Does not
+   * affect editor defaults — that's still controlled by each FieldDef.default. */
+  sampleState?: TemplateState;
+  /** Preview-only: image-field key → public path. Loaded by TemplatePreview
+   * and passed as the `assets` arg to build() for the picker preview only. */
+  sampleAssets?: Record<string, string>;
 }
 
 export function getDefaultState(template: TemplateConfig): TemplateState {
