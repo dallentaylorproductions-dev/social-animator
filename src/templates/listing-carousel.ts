@@ -18,6 +18,8 @@ export const listingCarouselTemplate: TemplateConfig = {
   fields: [
     { key: "title", label: "Title (optional)", type: "text", default: "123 Maple Street" },
     { key: "titleColor", label: "Title color", type: "color", default: "#ffffff" },
+    { key: "subtitle", label: "Subtitle (optional)", type: "text", default: "Open House Sat 1–4pm" },
+    { key: "subtitleColor", label: "Subtitle color", type: "color", default: "#9ca3af" },
     { key: "photo1", label: "Photo 1", type: "image", default: "" },
     { key: "photo2", label: "Photo 2", type: "image", default: "" },
     { key: "photo3", label: "Photo 3", type: "image", default: "" },
@@ -83,6 +85,50 @@ export const listingCarouselTemplate: TemplateConfig = {
           const startY = titleY - totalHeight / 2 + titleLineHeight / 2;
           lines.forEach((line, i) => {
             ctx.fillText(line, width / 2, startY + i * titleLineHeight);
+          });
+        },
+      });
+    }
+
+    // Subtitle (optional — only renders if user provided one). Stacks below
+    // the title block, accounting for title wrap so it doesn't overlap.
+    if (state.subtitle && state.subtitle.trim()) {
+      tracks.push({
+        id: "subtitle",
+        start: 0.15,
+        duration: 0.35,
+        easing: easeOutCubic,
+        onUpdate: (p, ctx) => {
+          ctx.globalAlpha = p;
+          ctx.translate(0, (1 - p) * 12);
+
+          // Re-measure the title's wrapped line count so subtitle anchors
+          // below the actual rendered title block.
+          ctx.font = `bold ${titleFontSize}px Inter, system-ui, sans-serif`;
+          const titleMaxWidth = width - 120;
+          const titleLineHeight = titleFontSize * 1.15;
+          const titleLines = wrapText(ctx, state.title ?? "", titleMaxWidth);
+
+          const subtitleAnchorY =
+            titleY + 90 + (titleLines.length - 1) * titleLineHeight;
+
+          ctx.fillStyle = state.subtitleColor || "#9ca3af";
+          ctx.font = `600 32px Inter, system-ui, sans-serif`;
+          ctx.textAlign = "center";
+          ctx.textBaseline = "middle";
+
+          const subtitleMaxWidth = width - 160;
+          const subtitleLineHeight = 32 * 1.2;
+          const subtitleLines = wrapText(
+            ctx,
+            state.subtitle,
+            subtitleMaxWidth
+          );
+          const totalH = subtitleLines.length * subtitleLineHeight;
+          const startY =
+            subtitleAnchorY - totalH / 2 + subtitleLineHeight / 2;
+          subtitleLines.forEach((line, i) => {
+            ctx.fillText(line, width / 2, startY + i * subtitleLineHeight);
           });
         },
       });
@@ -173,7 +219,7 @@ export const listingCarouselTemplate: TemplateConfig = {
         onUpdate: (p, ctx) => {
           // Entry fade: ease the whole carousel in over the first 0.4s of the
           // track so photos don't pop in abruptly.
-          const entrySeconds = 0.4;
+          const entrySeconds = 0.22;
           const entryFraction = Math.min(
             0.5,
             entrySeconds / naturalCarouselDuration
