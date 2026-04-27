@@ -4,6 +4,7 @@ import { numberedProcessTemplate } from "./numbered-process";
 import { gridComparisonTemplate } from "./grid-comparison";
 import { statHighlightTemplate } from "./stat-highlight";
 import { testimonialCardTemplate } from "./testimonial-card";
+import { marketUpdateTemplate } from "./market-update";
 import type { TemplateConfig } from "./types";
 
 export const ALL_TEMPLATES: TemplateConfig[] = [
@@ -13,4 +14,5 @@ export const ALL_TEMPLATES: TemplateConfig[] = [
   numberedProcessTemplate,
   gridComparisonTemplate,
   statHighlightTemplate,
+  marketUpdateTemplate,
 ];
