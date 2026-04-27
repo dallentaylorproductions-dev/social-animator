@@ -5,15 +5,17 @@ import { Canvas } from "@/engine/canvas";
 import {
   SIZE_PRESETS,
   getDefaultState,
+  EXTRA_BACKGROUND_FIELDS,
   type TemplateConfig,
   type TemplateSize,
   type TemplateAssets,
   type TemplateState,
+  type FieldDef,
 } from "@/templates/types";
 import { ExportButton } from "@/components/ExportButton";
-import { BatchExportButton } from "@/components/BatchExportButton";
 import { ImageField } from "@/components/ImageField";
 import { useBrandSettings } from "@/lib/brand";
+import { BatchExportButton } from "@/components/BatchExportButton";
 import { getFFmpeg } from "@/engine/export";
 
 interface TemplateEditorProps {
@@ -21,6 +23,12 @@ interface TemplateEditorProps {
 }
 
 const SAVED_COLORS_KEY_PREFIX = "socanim_colors_";
+
+/** All color fields a template + extras provide — used for save/load helpers. */
+function colorFieldsFor(template: TemplateConfig): FieldDef[] {
+  const all = [...template.fields, ...EXTRA_BACKGROUND_FIELDS];
+  return all.filter((f) => f.type === "color");
+}
 
 function loadSavedColors(template: TemplateConfig): TemplateState {
   if (typeof window === "undefined") return {};
@@ -30,9 +38,7 @@ function loadSavedColors(template: TemplateConfig): TemplateState {
     );
     if (!raw) return {};
     const parsed = JSON.parse(raw) as Record<string, unknown>;
-    const colorKeys = new Set(
-      template.fields.filter((f) => f.type === "color").map((f) => f.key)
-    );
+    const colorKeys = new Set(colorFieldsFor(template).map((f) => f.key));
     const result: TemplateState = {};
     for (const key of Object.keys(parsed)) {
       if (colorKeys.has(key) && typeof parsed[key] === "string") {
@@ -49,17 +55,15 @@ function saveColors(template: TemplateConfig, state: TemplateState): void {
   if (typeof window === "undefined") return;
   try {
     const colorState: Record<string, string> = {};
-    for (const f of template.fields) {
-      if (f.type === "color" && state[f.key]) {
-        colorState[f.key] = state[f.key];
-      }
+    for (const f of colorFieldsFor(template)) {
+      if (state[f.key]) colorState[f.key] = state[f.key];
     }
     window.localStorage.setItem(
       SAVED_COLORS_KEY_PREFIX + template.id,
       JSON.stringify(colorState)
     );
   } catch {
-    // localStorage disabled (private browsing) or full — silently skip
+    // ignore
   }
 }
 
@@ -72,9 +76,52 @@ function clearSavedColors(template: TemplateConfig): void {
   }
 }
 
+/** Build the form's fields list with EXTRA_BACKGROUND_FIELDS injected right
+ *  after the template's existing "background" color field, so background
+ *  controls are grouped. If no "background" field exists, extras append. */
+function buildRenderedFields(template: TemplateConfig): FieldDef[] {
+  const out: FieldDef[] = [];
+  let injected = false;
+  for (const f of template.fields) {
+    out.push(f);
+    if (f.key === "background" && !injected) {
+      out.push(...EXTRA_BACKGROUND_FIELDS);
+      injected = true;
+    }
+  }
+  if (!injected) out.push(...EXTRA_BACKGROUND_FIELDS);
+  return out;
+}
+
+/** From the current state, produce a paintBackground function for Canvas — or
+ *  undefined if the style is solid (Canvas will fall back to solid fillRect). */
+function makePaintBackground(
+  state: TemplateState,
+  width: number,
+  height: number
+): ((ctx: CanvasRenderingContext2D, t: number) => void) | undefined {
+  const style = state.backgroundStyle ?? "solid";
+  const bg1 = state.background ?? "#000000";
+  const bg2 = state.backgroundColor2 ?? bg1;
+
+  if (style === "gradient") {
+    return (ctx) => {
+      const grad = ctx.createLinearGradient(0, 0, 0, height);
+      grad.addColorStop(0, bg1);
+      grad.addColorStop(1, bg2);
+      ctx.fillStyle = grad;
+      ctx.fillRect(0, 0, width, height);
+    };
+  }
+  return undefined;
+}
+
 export function TemplateEditor({ template }: TemplateEditorProps) {
   const [state, setState] = useState<TemplateState>(() => {
-    const defaults = getDefaultState(template);
+    // Layer order: extra-field defaults → template defaults → saved colors
+    const defaults: TemplateState = {};
+    for (const f of EXTRA_BACKGROUND_FIELDS) defaults[f.key] = f.default;
+    Object.assign(defaults, getDefaultState(template));
     const saved = loadSavedColors(template);
     return { ...defaults, ...saved };
   });
@@ -83,20 +130,18 @@ export function TemplateEditor({ template }: TemplateEditorProps) {
   const [playKey, setPlayKey] = useState(0);
   const [duration, setDuration] = useState<number>(template.duration);
   const canvasRef = useRef<HTMLCanvasElement>(null);
+
   const { settings: brandSettings, logoImg: brandLogo } = useBrandSettings();
 
   const size = SIZE_PRESETS.find((s) => s.key === sizeKey)!;
 
-  // Persist color values to localStorage whenever state changes
   useEffect(() => {
     saveColors(template, state);
   }, [template, state]);
 
-  // Pre-load ffmpeg.wasm in the background when the editor mounts so the first
-  // export doesn't have to wait for the ~30MB WASM download.
   useEffect(() => {
     getFFmpeg().catch(() => {
-      // Silent — the actual export will retry if this fails
+      // Silent — actual export will retry if this fails
     });
   }, []);
 
@@ -110,6 +155,13 @@ export function TemplateEditor({ template }: TemplateEditorProps) {
     return t;
   }, [template, state, size, duration, assets]);
 
+  const paintBackground = useMemo(
+    () => makePaintBackground(state, size.width, size.height),
+    [state, size.width, size.height]
+  );
+
+  const renderedFields = useMemo(() => buildRenderedFields(template), [template]);
+
   const updateField = (key: string, value: string) => {
     setState((prev) => ({ ...prev, [key]: value }));
   };
@@ -122,11 +174,18 @@ export function TemplateEditor({ template }: TemplateEditorProps) {
     clearSavedColors(template);
     setState((prev) => {
       const next = { ...prev };
-      for (const f of template.fields) {
-        if (f.type === "color") next[f.key] = f.default;
+      for (const f of colorFieldsFor(template)) {
+        next[f.key] = f.default;
       }
+      // Also reset backgroundStyle to default (solid)
+      next.backgroundStyle = "solid";
       return next;
     });
+  };
+
+  const isFieldVisible = (field: FieldDef): boolean => {
+    if (!field.showWhen) return true;
+    return state[field.showWhen.key] === field.showWhen.value;
   };
 
   return (
@@ -202,51 +261,67 @@ export function TemplateEditor({ template }: TemplateEditorProps) {
             </button>
 
             <div className="space-y-5 pt-2 border-t border-neutral-800/60">
-              {template.fields.map((field) => (
-                <div key={field.key}>
-                  <label className="block text-[10px] uppercase tracking-[0.15em] text-neutral-500 mb-2">
-                    {field.label}
-                  </label>
-                  {field.type === "text" && (
-                    <input
-                      type="text"
-                      value={state[field.key] ?? ""}
-                      onChange={(e) => updateField(field.key, e.target.value)}
-                      className="w-full bg-neutral-900 border border-neutral-800 rounded-md px-3 py-2 text-sm focus:outline-none focus:border-[#4ef2d9]"
-                    />
-                  )}
-                  {field.type === "textarea" && (
-                    <textarea
-                      value={state[field.key] ?? ""}
-                      onChange={(e) => updateField(field.key, e.target.value)}
-                      rows={3}
-                      className="w-full bg-neutral-900 border border-neutral-800 rounded-md px-3 py-2 text-sm focus:outline-none focus:border-[#4ef2d9] resize-none"
-                    />
-                  )}
-                  {field.type === "color" && (
-                    <div className="flex items-center gap-2">
-                      <input
-                        type="color"
-                        value={state[field.key] ?? "#000000"}
-                        onChange={(e) => updateField(field.key, e.target.value)}
-                        className="w-12 h-10 rounded cursor-pointer bg-transparent border border-neutral-800 p-0.5"
-                      />
+              {renderedFields.map((field) => {
+                if (!isFieldVisible(field)) return null;
+                return (
+                  <div key={field.key}>
+                    <label className="block text-[10px] uppercase tracking-[0.15em] text-neutral-500 mb-2">
+                      {field.label}
+                    </label>
+                    {field.type === "text" && (
                       <input
                         type="text"
                         value={state[field.key] ?? ""}
                         onChange={(e) => updateField(field.key, e.target.value)}
-                        className="flex-1 bg-neutral-900 border border-neutral-800 rounded-md px-3 py-2 text-sm font-mono focus:outline-none focus:border-[#4ef2d9]"
+                        className="w-full bg-neutral-900 border border-neutral-800 rounded-md px-3 py-2 text-sm focus:outline-none focus:border-[#4ef2d9]"
                       />
-                    </div>
-                  )}
-                  {field.type === "image" && (
-                    <ImageField
-                      value={assets[field.key] ?? null}
-                      onChange={(img) => updateAsset(field.key, img)}
-                    />
-                  )}
-                </div>
-              ))}
+                    )}
+                    {field.type === "textarea" && (
+                      <textarea
+                        value={state[field.key] ?? ""}
+                        onChange={(e) => updateField(field.key, e.target.value)}
+                        rows={3}
+                        className="w-full bg-neutral-900 border border-neutral-800 rounded-md px-3 py-2 text-sm focus:outline-none focus:border-[#4ef2d9] resize-none"
+                      />
+                    )}
+                    {field.type === "color" && (
+                      <div className="flex items-center gap-2">
+                        <input
+                          type="color"
+                          value={state[field.key] ?? "#000000"}
+                          onChange={(e) => updateField(field.key, e.target.value)}
+                          className="w-12 h-10 rounded cursor-pointer bg-transparent border border-neutral-800 p-0.5"
+                        />
+                        <input
+                          type="text"
+                          value={state[field.key] ?? ""}
+                          onChange={(e) => updateField(field.key, e.target.value)}
+                          className="flex-1 bg-neutral-900 border border-neutral-800 rounded-md px-3 py-2 text-sm font-mono focus:outline-none focus:border-[#4ef2d9]"
+                        />
+                      </div>
+                    )}
+                    {field.type === "image" && (
+                      <ImageField
+                        value={assets[field.key] ?? null}
+                        onChange={(img) => updateAsset(field.key, img)}
+                      />
+                    )}
+                    {field.type === "select" && (
+                      <select
+                        value={state[field.key] ?? field.default}
+                        onChange={(e) => updateField(field.key, e.target.value)}
+                        className="w-full bg-neutral-900 border border-neutral-800 rounded-md px-3 py-2 text-sm focus:outline-none focus:border-[#4ef2d9]"
+                      >
+                        {field.options?.map((opt) => (
+                          <option key={opt.value} value={opt.value}>
+                            {opt.label}
+                          </option>
+                        ))}
+                      </select>
+                    )}
+                  </div>
+                );
+              })}
             </div>
 
             <div className="pt-5 border-t border-neutral-800">
@@ -281,6 +356,7 @@ export function TemplateEditor({ template }: TemplateEditorProps) {
                 height={size.height}
                 timeline={timeline}
                 background={state.background ?? "#000000"}
+                paintBackground={paintBackground}
                 playKey={`${sizeKey}-${playKey}-${duration}`}
                 brandLogo={brandLogo}
                 brandName={brandSettings.agentName}

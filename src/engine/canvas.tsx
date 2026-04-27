@@ -15,6 +15,9 @@ interface CanvasProps {
   onComplete?: () => void;
   brandLogo?: HTMLImageElement | null;
   brandName?: string;
+  /** If provided, called every frame to paint the background instead of the
+   * default solid fillRect with `background`. Useful for gradients, etc. */
+  paintBackground?: (ctx: CanvasRenderingContext2D, currentTime: number) => void;
 }
 
 export const Canvas = forwardRef<HTMLCanvasElement, CanvasProps>(function Canvas(
@@ -29,6 +32,7 @@ export const Canvas = forwardRef<HTMLCanvasElement, CanvasProps>(function Canvas
     onComplete,
     brandLogo,
     brandName,
+    paintBackground,
   },
   forwardedRef
 ) {
@@ -43,6 +47,9 @@ export const Canvas = forwardRef<HTMLCanvasElement, CanvasProps>(function Canvas
   const brandNameRef = useRef(brandName);
   brandLogoRef.current = brandLogo;
   brandNameRef.current = brandName;
+
+  const paintBackgroundRef = useRef(paintBackground);
+  paintBackgroundRef.current = paintBackground;
 
   const setRef = (el: HTMLCanvasElement | null) => {
     canvasRef.current = el;
@@ -94,8 +101,12 @@ export const Canvas = forwardRef<HTMLCanvasElement, CanvasProps>(function Canvas
       }
 
       ctx.setTransform(dpr, 0, 0, dpr, 0, 0);
-      ctx.fillStyle = background;
-      ctx.fillRect(0, 0, width, height);
+      if (paintBackgroundRef.current) {
+        paintBackgroundRef.current(ctx, currentTime);
+      } else {
+        ctx.fillStyle = background;
+        ctx.fillRect(0, 0, width, height);
+      }
       timeline.render(currentTime, ctx);
 
       // Heartbeat pixel: writes a near-zero-alpha 1px rect at (0,0) every frame
