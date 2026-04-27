@@ -185,12 +185,14 @@ export function downloadBlob(blob: Blob, filename: string): void {
  * If the user cancels the share sheet, we respect that and don't fall through
  * to a download — they explicitly dismissed.
  */
+export type SaveResult = "shared" | "downloaded" | "cancelled";
+
 export async function shareOrDownload(
   blob: Blob,
   filename: string
-): Promise<void> {
+): Promise<SaveResult> {
   if (typeof navigator === "undefined") {
-    return;
+    return "cancelled";
   }
 
   const isMobile = /iPhone|iPad|iPod|Android/.test(navigator.userAgent);
@@ -204,14 +206,20 @@ export async function shareOrDownload(
       const file = new File([blob], filename, { type: blob.type });
       if (navigator.canShare({ files: [file] })) {
         await navigator.share({ files: [file] });
-        return;
+        return "shared";
       }
     } catch (err) {
-      // AbortError = user explicitly cancelled the share. Respect that.
-      if (err instanceof Error && err.name === "AbortError") return;
-      // Any other error: fall through to download
+      if (err instanceof Error && err.name === "AbortError") return "cancelled";
+      // Other errors fall through to download
     }
   }
 
   downloadBlob(blob, filename);
+  return "downloaded";
+}
+
+/** Detect mobile devices for UX branching. */
+export function isMobileDevice(): boolean {
+  if (typeof navigator === "undefined") return false;
+  return /iPhone|iPad|iPod|Android/.test(navigator.userAgent);
 }
