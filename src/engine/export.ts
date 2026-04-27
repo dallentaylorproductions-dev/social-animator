@@ -176,3 +176,50 @@ export function downloadBlob(blob: Blob, filename: string): void {
   document.body.removeChild(a);
   setTimeout(() => URL.revokeObjectURL(url), 1000);
 }
+
+/**
+ * On mobile (iOS Safari, Android Chrome), prefer the Web Share API so users can
+ * save the file directly to Camera Roll / Photos via the native share sheet.
+ * On desktop, or if Share isn't supported, falls back to a regular download.
+ *
+ * If the user cancels the share sheet, we respect that and don't fall through
+ * to a download — they explicitly dismissed.
+ */
+export type SaveResult = "shared" | "downloaded" | "cancelled";
+
+export async function shareOrDownload(
+  blob: Blob,
+  filename: string
+): Promise<SaveResult> {
+  if (typeof navigator === "undefined") {
+    return "cancelled";
+  }
+
+  const isMobile = /iPhone|iPad|iPod|Android/.test(navigator.userAgent);
+
+  if (
+    isMobile &&
+    typeof navigator.share === "function" &&
+    typeof navigator.canShare === "function"
+  ) {
+    try {
+      const file = new File([blob], filename, { type: blob.type });
+      if (navigator.canShare({ files: [file] })) {
+        await navigator.share({ files: [file] });
+        return "shared";
+      }
+    } catch (err) {
+      if (err instanceof Error && err.name === "AbortError") return "cancelled";
+      // Other errors fall through to download
+    }
+  }
+
+  downloadBlob(blob, filename);
+  return "downloaded";
+}
+
+/** Detect mobile devices for UX branching. */
+export function isMobileDevice(): boolean {
+  if (typeof navigator === "undefined") return false;
+  return /iPhone|iPad|iPod|Android/.test(navigator.userAgent);
+}
