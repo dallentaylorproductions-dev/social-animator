@@ -14,6 +14,7 @@ import { ExportButton } from "@/components/ExportButton";
 import { BatchExportButton } from "@/components/BatchExportButton";
 import { ImageField } from "@/components/ImageField";
 import { useBrandSettings } from "@/lib/brand";
+import { getFFmpeg } from "@/engine/export";
 
 interface TemplateEditorProps {
   template: TemplateConfig;
@@ -91,6 +92,14 @@ export function TemplateEditor({ template }: TemplateEditorProps) {
     saveColors(template, state);
   }, [template, state]);
 
+  // Pre-load ffmpeg.wasm in the background when the editor mounts so the first
+  // export doesn't have to wait for the ~30MB WASM download.
+  useEffect(() => {
+    getFFmpeg().catch(() => {
+      // Silent — the actual export will retry if this fails
+    });
+  }, []);
+
   const timeline = useMemo(() => {
     const t = template.build(
       state,
@@ -136,7 +145,7 @@ export function TemplateEditor({ template }: TemplateEditorProps) {
           </p>
         </header>
 
-        <div className="grid lg:grid-cols-[360px_1fr] gap-10">
+        <div className="flex flex-col-reverse gap-6 lg:grid lg:grid-cols-[360px_1fr] lg:gap-10">
           <aside className="space-y-5">
             <div>
               <label className="block text-[10px] uppercase tracking-[0.15em] text-neutral-500 mb-2">
@@ -264,8 +273,8 @@ export function TemplateEditor({ template }: TemplateEditorProps) {
             </div>
           </aside>
 
-          <section className="flex items-start justify-center">
-            <div className="w-full max-w-sm">
+          <section className="sticky top-0 z-20 -mx-6 lg:mx-0 px-6 lg:px-0 pt-3 pb-3 lg:py-0 bg-neutral-950 lg:bg-transparent border-b border-neutral-800/60 lg:border-0 lg:static flex items-start justify-center">
+            <div className="w-full max-w-[200px] lg:max-w-sm">
               <Canvas
                 ref={canvasRef}
                 width={size.width}
@@ -276,7 +285,7 @@ export function TemplateEditor({ template }: TemplateEditorProps) {
                 brandLogo={brandLogo}
                 brandName={brandSettings.agentName}
               />
-              <p className="text-xs text-neutral-500 mt-3 text-center">
+              <p className="text-[10px] lg:text-xs text-neutral-500 mt-2 lg:mt-3 text-center">
                 Preview · {size.label} · {duration}s
               </p>
             </div>
