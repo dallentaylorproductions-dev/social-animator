@@ -33,17 +33,17 @@ export default function HomePage() {
             <Link
               key={template.id}
               href={`/templates/${template.id}`}
-              className="group block p-4 rounded-xl bg-neutral-900 hover:bg-neutral-800 transition border border-neutral-800 hover:border-[#4ef2d9]/50"
+              className="group flex items-start gap-4 p-4 rounded-xl bg-neutral-900 hover:bg-neutral-800 transition border border-neutral-800 hover:border-[#4ef2d9]/50"
             >
-              <div className="rounded-md overflow-hidden mb-4">
+              <div className="flex-shrink-0 w-28 md:w-36 rounded-md overflow-hidden">
                 <TemplateThumbnail templateId={template.id} />
               </div>
-              <div className="px-2 pb-2">
-                <h2 className="text-lg font-semibold">{template.name}</h2>
-                <p className="text-sm text-neutral-400 mt-2 leading-relaxed">
+              <div className="flex-1 min-w-0 py-1">
+                <h2 className="text-base md:text-lg font-semibold">{template.name}</h2>
+                <p className="text-xs md:text-sm text-neutral-400 mt-1.5 leading-relaxed line-clamp-3">
                   {template.description}
                 </p>
-                <p className="text-xs uppercase tracking-wider text-[#4ef2d9] mt-4 group-hover:translate-x-0.5 transition-transform">
+                <p className="text-xs uppercase tracking-wider text-[#4ef2d9] mt-3 group-hover:translate-x-0.5 transition-transform">
                   Open editor →
                 </p>
               </div>
