@@ -1,6 +1,6 @@
 import { Timeline, type Track } from "@/engine/timeline";
 import { easeOutCubic } from "@/engine/easing";
-import { drawImageCover } from "@/engine/draw";
+import { drawImageCover, wrapText } from "@/engine/draw";
 import type { TemplateConfig } from "./types";
 
 /**
@@ -73,7 +73,17 @@ export const listingCarouselTemplate: TemplateConfig = {
           ctx.font = `bold ${titleFontSize}px Inter, system-ui, sans-serif`;
           ctx.textAlign = "center";
           ctx.textBaseline = "middle";
-          ctx.fillText(state.title, width / 2, titleY);
+
+          // Wrap long titles so they don't overflow the canvas. Vertically
+          // center the wrapped block on titleY.
+          const titleMaxWidth = width - 120;
+          const titleLineHeight = titleFontSize * 1.15;
+          const lines = wrapText(ctx, state.title, titleMaxWidth);
+          const totalHeight = lines.length * titleLineHeight;
+          const startY = titleY - totalHeight / 2 + titleLineHeight / 2;
+          lines.forEach((line, i) => {
+            ctx.fillText(line, width / 2, startY + i * titleLineHeight);
+          });
         },
       });
     }
@@ -85,11 +95,12 @@ export const listingCarouselTemplate: TemplateConfig = {
     const renderPhoto = (
       ctx: CanvasRenderingContext2D,
       photo: HTMLImageElement,
-      rel: number
+      rel: number,
+      entryAlpha: number = 1
     ) => {
       const absRel = Math.abs(rel);
       const scale = Math.max(0.4, 1 - absRel * 0.3);
-      const alpha = Math.max(0, 1 - absRel * 0.5);
+      const alpha = Math.max(0, 1 - absRel * 0.5) * entryAlpha;
       const blur = absRel * 6;
       const xOffset = rel * sideOffset;
 
@@ -160,9 +171,19 @@ export const listingCarouselTemplate: TemplateConfig = {
         start: carouselStart,
         duration: naturalCarouselDuration,
         onUpdate: (p, ctx) => {
+          // Entry fade: ease the whole carousel in over the first 0.4s of the
+          // track so photos don't pop in abruptly.
+          const entrySeconds = 0.4;
+          const entryFraction = Math.min(
+            0.5,
+            entrySeconds / naturalCarouselDuration
+          );
+          const entryAlpha =
+            p < entryFraction ? easeOutCubic(p / entryFraction) : 1;
+
           // Single-photo case: just render it centered, no animation
           if (photoCount === 1) {
-            renderPhoto(ctx, photos[0], 0);
+            renderPhoto(ctx, photos[0], 0, entryAlpha);
             return;
           }
 
@@ -193,7 +214,7 @@ export const listingCarouselTemplate: TemplateConfig = {
             .sort((a, b) => b.absRel - a.absRel);
 
           for (const { photo, rel } of ordered) {
-            renderPhoto(ctx, photo, rel);
+            renderPhoto(ctx, photo, rel, entryAlpha);
           }
         },
       });
