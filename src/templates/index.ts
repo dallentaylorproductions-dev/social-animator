@@ -3,11 +3,13 @@ import { listingCardTemplate } from "./listing-card";
 import { numberedProcessTemplate } from "./numbered-process";
 import { gridComparisonTemplate } from "./grid-comparison";
 import { statHighlightTemplate } from "./stat-highlight";
+import { testimonialCardTemplate } from "./testimonial-card";
 import type { TemplateConfig } from "./types";
 
 export const ALL_TEMPLATES: TemplateConfig[] = [
   qaCardTemplate,
   listingCardTemplate,
+  testimonialCardTemplate,
   numberedProcessTemplate,
   gridComparisonTemplate,
   statHighlightTemplate,
