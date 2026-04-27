@@ -26,6 +26,11 @@ const FULL_H = 1350;
 // mobile compared to native 60fps.
 const TARGET_FRAME_MS = 1000 / 24;
 
+// After the timeline finishes, hold the final frame for this long before
+// restarting at t=0. Reduces the "wall of motion" feel when many previews
+// are visible.
+const REST_SECONDS = 1.5;
+
 const SKELETON_BG = "#1a1a1a";
 
 /** Replicates TemplateEditor's gradient logic so previews match what the
@@ -125,7 +130,11 @@ export function TemplatePreview({
       lastRenderTime = now;
 
       const elapsed = (now - mountTime) / 1000 + timeOffset;
-      const t = elapsed % timeline.duration;
+      // Cycle = animation duration + rest hold. During rest, render the final
+      // frame so the timeline reads as "finished, paused" before restarting.
+      const cycleLength = timeline.duration + REST_SECONDS;
+      const cycleT = elapsed % cycleLength;
+      const t = cycleT <= timeline.duration ? cycleT : timeline.duration;
 
       // Background
       if (paintBackground) {
@@ -157,9 +166,10 @@ export function TemplatePreview({
       if (rafId === 0 || !timeline) return;
       cancelAnimationFrame(rafId);
       rafId = 0;
-      // Save current t into timeOffset so resume picks up here
+      // Save current cycle position into timeOffset so resume picks up here
+      // (preserves position during the rest hold, not just the animated part)
       const elapsed = (performance.now() - mountTime) / 1000 + timeOffset;
-      timeOffset = elapsed % timeline.duration;
+      timeOffset = elapsed % (timeline.duration + REST_SECONDS);
     };
 
     // ── Asset loading ────────────────────────────────────────────────────
