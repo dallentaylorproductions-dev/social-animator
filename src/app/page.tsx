@@ -1,6 +1,6 @@
 import Link from "next/link";
 import { ALL_TEMPLATES } from "@/templates";
-import { TemplateThumbnail } from "@/components/TemplateThumbnail";
+import { TemplatePreview } from "@/components/TemplatePreview";
 
 export default function HomePage() {
   return (
@@ -29,14 +29,17 @@ export default function HomePage() {
         </header>
 
         <div className="grid md:grid-cols-2 gap-4">
-          {ALL_TEMPLATES.map((template) => (
+          {ALL_TEMPLATES.map((template, index) => (
             <Link
               key={template.id}
               href={`/templates/${template.id}`}
               className="group flex items-start gap-4 p-4 rounded-xl bg-neutral-900 hover:bg-neutral-800 transition border border-neutral-800 hover:border-[#4ef2d9]/50"
             >
               <div className="flex-shrink-0 w-28 md:w-36 rounded-md overflow-hidden">
-                <TemplateThumbnail templateId={template.id} />
+                <TemplatePreview
+                  templateId={template.id}
+                  startOffsetMs={index * 500}
+                />
               </div>
               <div className="flex-1 min-w-0 py-1">
                 <h2 className="text-base md:text-lg font-semibold">{template.name}</h2>
