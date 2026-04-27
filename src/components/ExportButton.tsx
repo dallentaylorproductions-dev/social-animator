@@ -1,7 +1,7 @@
 "use client";
 
 import { useState, type RefObject } from "react";
-import { recordCanvas, webmToMp4, downloadBlob, getFFmpeg } from "@/engine/export";
+import { recordCanvas, webmToMp4, getFFmpeg, shareOrDownload } from "@/engine/export";
 
 interface ExportButtonProps {
   canvasRef: RefObject<HTMLCanvasElement | null>;
@@ -59,7 +59,7 @@ export function ExportButton({
         setState({ kind: "converting", progress })
       );
 
-      downloadBlob(mp4, `${filename}.mp4`);
+      await shareOrDownload(mp4, `${filename}.mp4`);
       setState({ kind: "ready" });
     } catch (err) {
       console.error("MP4 export failed:", err);
@@ -74,7 +74,7 @@ export function ExportButton({
     try {
       setState({ kind: "recording", progress: 0 });
       const webm = await doRecord();
-      downloadBlob(webm, `${filename}.webm`);
+      await shareOrDownload(webm, `${filename}.webm`);
       setState({ kind: "ready" });
     } catch (err) {
       console.error("WebM export failed:", err);

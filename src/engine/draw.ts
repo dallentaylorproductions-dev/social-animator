@@ -128,3 +128,54 @@ export function drawImageCover(
   // Fast path on subsequent frames: blit the pre-rendered canvas
   ctx.drawImage(cached, x, y);
 }
+
+/**
+ * Draw an image to fit (contain) within a rectangular box, like CSS object-fit: contain.
+ * Preserves the image's aspect ratio without cropping — letterboxes if image and
+ * box ratios differ. Use this for logos and other images where cropping would
+ * damage meaning (e.g. cutting off letters in a wordmark).
+ */
+export function drawImageContain(
+  ctx: CanvasRenderingContext2D,
+  img: HTMLImageElement,
+  x: number,
+  y: number,
+  w: number,
+  h: number,
+  cornerRadius = 0
+): void {
+  if (!img.complete || img.naturalWidth === 0) return;
+
+  const imgRatio = img.naturalWidth / img.naturalHeight;
+  const boxRatio = w / h;
+
+  let drawW: number;
+  let drawH: number;
+  let drawX: number;
+  let drawY: number;
+
+  if (imgRatio > boxRatio) {
+    // Image wider than box — fit width, center vertically
+    drawW = w;
+    drawH = w / imgRatio;
+    drawX = x;
+    drawY = y + (h - drawH) / 2;
+  } else {
+    // Image taller than box — fit height, center horizontally
+    drawH = h;
+    drawW = h * imgRatio;
+    drawX = x + (w - drawW) / 2;
+    drawY = y;
+  }
+
+  ctx.save();
+  if (cornerRadius > 0) {
+    ctx.beginPath();
+    ctx.roundRect(x, y, w, h, cornerRadius);
+    ctx.clip();
+  }
+  ctx.imageSmoothingEnabled = true;
+  ctx.imageSmoothingQuality = "high";
+  ctx.drawImage(img, drawX, drawY, drawW, drawH);
+  ctx.restore();
+}

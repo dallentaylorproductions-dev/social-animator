@@ -1,7 +1,7 @@
 "use client";
 
 import { useEffect, useState } from "react";
-import { drawImageCover } from "@/engine/draw";
+import { drawImageContain } from "@/engine/draw";
 
 export interface BrandSettings {
   logoDataUrl: string | null;
@@ -85,20 +85,28 @@ export function drawBrandOverlay(
   if (!logoImg && !agentName) return;
   if (alpha <= 0) return;
 
-  const logoSize = 80;
+  const logoHeight = 80;
   const margin = 40;
   const gap = 16;
   const fontSize = 26;
 
+  // Compute logo width from natural aspect ratio so wordmarks display wide,
+  // square logos stay square, etc. Cap at 60-220 to keep brand area sensible.
+  let logoWidth = logoHeight;
+  if (logoImg && logoImg.complete && logoImg.naturalWidth > 0) {
+    const aspect = logoImg.naturalWidth / logoImg.naturalHeight;
+    logoWidth = Math.max(60, Math.min(220, logoHeight * aspect));
+  }
+
   ctx.save();
   ctx.globalAlpha = alpha;
 
-  const logoX = width - margin - logoSize;
-  const logoY = height - margin - logoSize;
+  const logoX = width - margin - logoWidth;
+  const logoY = height - margin - logoHeight;
 
-  // Logo (uses drawImageCover so it benefits from the offscreen cache)
+  // Logo: use contain (no cropping) so any logo aspect renders fully
   if (logoImg && logoImg.complete && logoImg.naturalWidth > 0) {
-    drawImageCover(ctx, logoImg, logoX, logoY, logoSize, logoSize, 12);
+    drawImageContain(ctx, logoImg, logoX, logoY, logoWidth, logoHeight, 0);
   }
 
   // Agent name to the left of the logo (or pinned to right edge if no logo)
@@ -111,7 +119,7 @@ export function drawBrandOverlay(
     ctx.shadowBlur = 6;
     ctx.shadowOffsetY = 1;
     const nameX = logoImg ? logoX - gap : width - margin;
-    ctx.fillText(agentName, nameX, logoY + logoSize / 2);
+    ctx.fillText(agentName, nameX, logoY + logoHeight / 2);
   }
 
   ctx.restore();
