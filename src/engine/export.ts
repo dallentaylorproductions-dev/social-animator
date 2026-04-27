@@ -45,10 +45,14 @@ export async function recordCanvas(
     "video/webm;codecs=vp9",
     "video/webm;codecs=vp8",
     "video/webm",
+    "video/mp4;codecs=avc1.42E01E", // Safari/iOS native
+    "video/mp4",
   ];
   const mimeType = mimeCandidates.find((m) => MediaRecorder.isTypeSupported(m));
   if (!mimeType) {
-    throw new Error("This browser does not support WebM recording.");
+    throw new Error(
+      "This browser does not support video recording. Please use Chrome, Safari 14.1+, or Edge."
+    );
   }
 
   const recorder = new MediaRecorder(stream, {
@@ -106,21 +110,22 @@ export async function webmToMp4(
   };
   ffmpeg.on("progress", progressHandler);
 
-  try {
-    await ffmpeg.writeFile("input.webm", await fetchFile(webmBlob));
+  // Detect input format from blob type (Safari produces MP4, Chrome produces WebM)
+  const inputExt = webmBlob.type.includes("mp4") ? "mp4" : "webm";
+  const inputName = `input.${inputExt}`;
 
-    // Scale to target size (forces exact output dimensions for Instagram).
-    // -pix_fmt yuv420p ensures compatibility with all players including Instagram.
-    // -movflags +faststart puts metadata at the start so the file streams well.
+  try {
+    await ffmpeg.writeFile(inputName, await fetchFile(webmBlob));
+
     // Force exact output duration:
     //  - tpad clones the last frame for durationSec extra seconds
     //  - -t trims output to exactly durationSec
-    //  - -r 30 normalizes output framerate at the output stage (instead of the
-    //    input fps filter, which can introduce playback jank when the WebM has
-    //    even slight timing wobble)
+    //  - -r 30 normalizes output framerate at the output stage
+    //  - ultrafast preset trades file size for speed (Instagram re-encodes
+    //    anyway, so file size doesn't matter; speed shaves ~30-50% off conversion)
     await ffmpeg.exec([
       "-i",
-      "input.webm",
+      inputName,
       "-vf",
       `tpad=stop_mode=clone:stop_duration=${durationSec},scale=${targetSize.width}:${targetSize.height}:force_original_aspect_ratio=decrease,pad=${targetSize.width}:${targetSize.height}:(ow-iw)/2:(oh-ih)/2:color=black`,
       "-t",
@@ -130,7 +135,7 @@ export async function webmToMp4(
       "-c:v",
       "libx264",
       "-preset",
-      "fast",
+      "ultrafast",
       "-crf",
       "22",
       "-pix_fmt",
@@ -144,17 +149,13 @@ export async function webmToMp4(
     if (typeof data === "string") {
       throw new Error("Unexpected text data from ffmpeg output.");
     }
-    // Copy into a fresh ArrayBuffer. TypeScript 5.7+ tightened DOM types
-    // and Uint8Array<ArrayBufferLike> is no longer directly assignable to
-    // BlobPart — re-wrapping sidesteps that without a type cast.
     const buffer = new ArrayBuffer(data.byteLength);
     new Uint8Array(buffer).set(data);
     return new Blob([buffer], { type: "video/mp4" });
   } finally {
     ffmpeg.off("progress", progressHandler);
-    // Best-effort cleanup; ignore if files don't exist.
     try {
-      await ffmpeg.deleteFile("input.webm");
+      await ffmpeg.deleteFile(inputName);
     } catch {}
     try {
       await ffmpeg.deleteFile("output.mp4");
