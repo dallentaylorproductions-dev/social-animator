@@ -15,7 +15,7 @@ export const testimonialCardTemplate: TemplateConfig = {
       label: "Quote",
       type: "textarea",
       default:
-        "Aaron made us feel like we were his only clients. He answered every late-night text and we closed on our dream home in 24 days.",
+        "Our agent answered every late-night text and made us feel like we were her only clients. We closed on our dream home in 24 days.",
     },
     {
       key: "attribution",

@@ -10,10 +10,13 @@ export default function HomePage() {
             <p className="text-xs uppercase tracking-[0.2em] text-[#4ef2d9]">
               Social Animator
             </p>
-            <h1 className="text-3xl font-bold mt-1">Aaron Thomas Home Team</h1>
+            <h1 className="text-3xl font-bold mt-1">
+              Animated Instagram posts for real estate.
+            </h1>
             <p className="text-sm text-neutral-400 mt-3 max-w-lg">
-              Pick a template, fill in your content, hit Export. Instagram-ready
-              MP4s in three sizes.
+              Pick a template, fill in your content, hit Export. MP4s render
+              right in your browser — no design skills needed, nothing uploaded
+              to a server.
             </p>
           </div>
           <Link

@@ -20,7 +20,8 @@ const inter = Inter({
 
 export const metadata: Metadata = {
   title: "Social Animator",
-  description: "Instagram-ready animation tool for Aaron Thomas Home Team",
+  description:
+    "Animated Instagram posts for real estate. Pick a template, fill it in, export.",
 };
 
 export default function RootLayout({
