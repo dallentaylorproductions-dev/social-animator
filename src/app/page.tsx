@@ -1,5 +1,6 @@
 import Link from "next/link";
 import { ALL_TEMPLATES } from "@/templates";
+import { TemplateThumbnail } from "@/components/TemplateThumbnail";
 
 export default function HomePage() {
   return (
@@ -32,15 +33,20 @@ export default function HomePage() {
             <Link
               key={template.id}
               href={`/templates/${template.id}`}
-              className="group block p-6 rounded-xl bg-neutral-900 hover:bg-neutral-800 transition border border-neutral-800 hover:border-[#4ef2d9]/50"
+              className="group block p-4 rounded-xl bg-neutral-900 hover:bg-neutral-800 transition border border-neutral-800 hover:border-[#4ef2d9]/50"
             >
-              <h2 className="text-lg font-semibold">{template.name}</h2>
-              <p className="text-sm text-neutral-400 mt-2 leading-relaxed">
-                {template.description}
-              </p>
-              <p className="text-xs uppercase tracking-wider text-[#4ef2d9] mt-5 group-hover:translate-x-0.5 transition-transform">
-                Open editor →
-              </p>
+              <div className="rounded-md overflow-hidden mb-4">
+                <TemplateThumbnail templateId={template.id} />
+              </div>
+              <div className="px-2 pb-2">
+                <h2 className="text-lg font-semibold">{template.name}</h2>
+                <p className="text-sm text-neutral-400 mt-2 leading-relaxed">
+                  {template.description}
+                </p>
+                <p className="text-xs uppercase tracking-wider text-[#4ef2d9] mt-4 group-hover:translate-x-0.5 transition-transform">
+                  Open editor →
+                </p>
+              </div>
             </Link>
           ))}
         </div>
