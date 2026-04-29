@@ -6,14 +6,31 @@ import { drawImageContain } from "@/engine/draw";
 export interface BrandSettings {
   logoDataUrl: string | null;
   agentName: string;
+  primaryColor: string;
+  accentColor: string;
+  contactEmail: string;
+  contactPhone: string;
+  licenseNumber: string;
+  brokerage: string;
 }
 
+// Storage key kept as `socanim_*` for backwards compatibility with users who
+// already have brand settings saved from before the Studio refactor.
 const STORAGE_KEY = "socanim_brand_settings";
 
 const DEFAULT_BRAND: BrandSettings = {
   logoDataUrl: null,
   agentName: "",
+  primaryColor: "#4ef2d9",
+  accentColor: "#ffffff",
+  contactEmail: "",
+  contactPhone: "",
+  licenseNumber: "",
+  brokerage: "",
 };
+
+const str = (v: unknown, fallback = ""): string =>
+  typeof v === "string" ? v : fallback;
 
 export function loadBrandSettings(): BrandSettings {
   if (typeof window === "undefined") return DEFAULT_BRAND;
@@ -24,8 +41,13 @@ export function loadBrandSettings(): BrandSettings {
     return {
       logoDataUrl:
         typeof parsed.logoDataUrl === "string" ? parsed.logoDataUrl : null,
-      agentName:
-        typeof parsed.agentName === "string" ? parsed.agentName : "",
+      agentName: str(parsed.agentName),
+      primaryColor: str(parsed.primaryColor, DEFAULT_BRAND.primaryColor),
+      accentColor: str(parsed.accentColor, DEFAULT_BRAND.accentColor),
+      contactEmail: str(parsed.contactEmail),
+      contactPhone: str(parsed.contactPhone),
+      licenseNumber: str(parsed.licenseNumber),
+      brokerage: str(parsed.brokerage),
     };
   } catch {
     return DEFAULT_BRAND;

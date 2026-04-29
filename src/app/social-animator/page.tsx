@@ -21,10 +21,10 @@ export default function HomePage() {
             </p>
           </div>
           <Link
-            href="/brand"
+            href="/settings"
             className="text-xs uppercase tracking-[0.15em] text-neutral-400 hover:text-[#4ef2d9] transition whitespace-nowrap"
           >
-            Brand →
+            Settings →
           </Link>
         </header>
 
