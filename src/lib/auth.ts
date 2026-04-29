@@ -1,9 +1,21 @@
 import NextAuth from "next-auth";
 import Resend from "next-auth/providers/resend";
+import { UpstashRedisAdapter } from "@auth/upstash-redis-adapter";
+import { Redis } from "@upstash/redis";
 
 const resendKey = process.env.AUTH_RESEND_KEY;
 const fromAddress =
   process.env.AUTH_EMAIL_FROM ?? "login@send.simplyeditpro.com";
+
+// Auth.js v5's Email/Resend provider requires an adapter to persist
+// verification tokens (and minimal user/account stubs) — even with JWT
+// sessions. We reuse the same Upstash KV that backs the paywall ledger,
+// so no new infrastructure is provisioned. Sessions remain JWT (stateless);
+// only token-exchange records and account stubs live in Redis (TTL'd).
+const redis = new Redis({
+  url: process.env.KV_REST_API_URL!,
+  token: process.env.KV_REST_API_TOKEN!,
+});
 
 /**
  * Auth.js v5 config.
@@ -17,6 +29,7 @@ const fromAddress =
  * configured locally.
  */
 export const { handlers, signIn, signOut, auth } = NextAuth({
+  adapter: UpstashRedisAdapter(redis),
   providers: [
     Resend({
       from: fromAddress,
