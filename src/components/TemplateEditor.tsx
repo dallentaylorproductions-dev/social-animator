@@ -193,7 +193,7 @@ export function TemplateEditor({ template }: TemplateEditorProps) {
       <div className="max-w-6xl mx-auto p-6 lg:p-10">
         <header className="mb-8">
           <a
-            href="/"
+            href="/social-animator"
             className="text-xs uppercase tracking-[0.2em] text-[#4ef2d9] hover:underline"
           >
             ← Social Animator
