@@ -44,7 +44,7 @@ export default function ImageTestPage() {
     <main className="min-h-screen bg-neutral-950 text-white p-8">
       <div className="max-w-5xl mx-auto">
         <a
-          href="/"
+          href="/social-animator"
           className="text-xs uppercase tracking-[0.2em] text-[#4ef2d9] hover:underline"
         >
           ← Social Animator

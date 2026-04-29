@@ -26,7 +26,7 @@ export default function BrandPage() {
     <main className="min-h-screen bg-neutral-950 text-white">
       <div className="max-w-2xl mx-auto px-6 py-12 lg:py-20">
         <a
-          href="/"
+          href="/social-animator"
           className="text-xs uppercase tracking-[0.2em] text-[#4ef2d9] hover:underline"
         >
           ← Social Animator
