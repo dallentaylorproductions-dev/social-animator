@@ -196,9 +196,12 @@ export const listingShowcaseTemplate: TemplateConfig = {
     const logoSize = isShort ? 48 : 64;
     const logoToNameGap = 12;
     const agentNameSize = isShort ? 26 : 34;
-    const agentBrokerageSize = isShort ? 18 : 22;
-    const agentPhoneSize = isShort ? 18 : 22;
-    const agentLicenseSize = isShort ? 14 : 18;
+    // Secondary agent text was visibly small on mobile (where Reels/Stories
+    // are watched). +22% across the board raises the floor on legibility
+    // while keeping the agent name dominant.
+    const agentBrokerageSize = isShort ? 22 : 27;
+    const agentPhoneSize = isShort ? 22 : 27;
+    const agentLicenseSize = isShort ? 17 : 22;
     const agentRowGap = isShort ? 4 : 6;
 
     // ── Parse features ──────────────────────────────────────────────────

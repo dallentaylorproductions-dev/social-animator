@@ -75,11 +75,11 @@ export function FlyerPreview({ draft, photos, brand }: FlyerPreviewProps) {
           <p className="text-[10px] font-semibold truncate">
             {brand.agentName || "Your name"}
           </p>
-          <p className="text-[8px] opacity-70 truncate">
+          <p className="text-[10px] opacity-70 truncate">
             {brand.brokerage || "Brokerage"}
           </p>
         </div>
-        <div className="text-right text-[8px] opacity-80 leading-tight">
+        <div className="text-right text-[10px] opacity-80 leading-tight">
           {brand.contactPhone && <div>{brand.contactPhone}</div>}
           {brand.contactEmail && <div>{brand.contactEmail}</div>}
         </div>
@@ -191,7 +191,7 @@ export function FlyerPreview({ draft, photos, brand }: FlyerPreviewProps) {
 
       {/* Footer band */}
       <div
-        className="absolute-not-really mt-auto px-5 py-2 text-white text-[7px] flex items-center justify-between"
+        className="absolute-not-really mt-auto px-5 py-2 text-white text-[9px] flex items-center justify-between"
         style={{ backgroundColor: brand.accentColor || "#0a0a0a" }}
       >
         <span className="truncate">

@@ -81,11 +81,11 @@ const styles = StyleSheet.create({
     fontFamily: "Helvetica-Bold",
   },
   headerBrokerage: {
-    fontSize: 9,
+    fontSize: 11,
     opacity: 0.7,
   },
   headerRight: {
-    fontSize: 8,
+    fontSize: 10,
     textAlign: "right",
     opacity: 0.85,
   },
@@ -185,11 +185,11 @@ const styles = StyleSheet.create({
     color: "#fff",
   },
   footerLeft: {
-    fontSize: 8,
+    fontSize: 10,
     fontFamily: "Helvetica-Bold",
   },
   footerRight: {
-    fontSize: 8,
+    fontSize: 10,
     opacity: 0.8,
   },
 });
