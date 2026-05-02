@@ -148,25 +148,42 @@ export function FlyerPreview({ draft, photos, brand }: FlyerPreviewProps) {
           </p>
         )}
 
-        {/* Features — horizontal chip row to mirror the PDF layout */}
-        {draft.features.filter((f) => f.trim()).length > 0 && (
-          <div className="mt-3 flex flex-wrap gap-1.5">
-            {draft.features
-              .filter((f) => f.trim())
-              .map((feature, i) => (
-                <span
-                  key={i}
-                  className="text-[9px] font-semibold px-2 py-1 rounded-full"
-                  style={{
-                    backgroundColor: `${primary}2e`,
-                    color: textPrimary,
-                  }}
+        {/* Features — 2-column bulleted grid mirroring the PDF layout */}
+        {(() => {
+          const cleaned = draft.features.filter((f) => f.trim());
+          if (cleaned.length === 0) return null;
+          const useTwoCols = cleaned.length >= 4;
+          const splitAt = useTwoCols
+            ? Math.ceil(cleaned.length / 2)
+            : cleaned.length;
+          const leftFeatures = cleaned.slice(0, splitAt);
+          const rightFeatures = cleaned.slice(splitAt);
+
+          const renderColumn = (items: string[], keyPrefix: string) => (
+            <ul className="space-y-1 flex-1">
+              {items.map((feature, i) => (
+                <li
+                  key={`${keyPrefix}-${i}`}
+                  className="text-[9px] flex items-start gap-2"
+                  style={{ color: textPrimary }}
                 >
-                  {feature}
-                </span>
+                  <span
+                    className="mt-0.5 inline-block w-1.5 h-1.5 rounded-full flex-shrink-0"
+                    style={{ backgroundColor: primary }}
+                  />
+                  <span className="flex-1">{feature}</span>
+                </li>
               ))}
-          </div>
-        )}
+            </ul>
+          );
+
+          return (
+            <div className="mt-3 flex gap-6">
+              {renderColumn(leftFeatures, "l")}
+              {useTwoCols && renderColumn(rightFeatures, "r")}
+            </div>
+          );
+        })()}
 
         {/* Photo grid */}
         {additionalPhotos.length > 0 && (
