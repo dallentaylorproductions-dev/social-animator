@@ -10,6 +10,7 @@ import {
 } from "@react-pdf/renderer";
 import { type FlyerDraft } from "../engine/types";
 import { type BrandSettings } from "@/lib/brand";
+import { pickContrastText, pickContrastMuted } from "../engine/contrast";
 
 interface FlyerDocumentProps {
   draft: FlyerDraft;
@@ -180,6 +181,15 @@ export function FlyerDocument({ draft, photoUrls, brand }: FlyerDocumentProps) {
   const additionalUrls = photoUrls.slice(1);
   const primary = brand.primaryColor || "#4ef2d9";
   const accent = brand.accentColor || "#0a0a0a";
+  const background = brand.backgroundColor || "#ffffff";
+
+  // Auto-flip text colors based on background luminance so the page remains
+  // readable across light/dark backgrounds. Same formula used by FlyerPreview
+  // so the on-screen preview matches the PDF.
+  const textPrimary = pickContrastText(background);
+  const textMuted = pickContrastMuted(background);
+  // Status badge sits on `primary`, not the page bg — separate contrast check.
+  const badgeTextColor = pickContrastText(primary);
 
   const statsParts: string[] = [];
   if (draft.beds)
@@ -195,7 +205,10 @@ export function FlyerDocument({ draft, photoUrls, brand }: FlyerDocumentProps) {
       title={`Listing Flyer — ${draft.addressLine1 || "Untitled"}`}
       author={brand.agentName || undefined}
     >
-      <Page size="LETTER" style={styles.page}>
+      <Page
+        size="LETTER"
+        style={[styles.page, { backgroundColor: background, color: textPrimary }]}
+      >
         {/* Header band */}
         <View style={[styles.header, { backgroundColor: accent, color: "#fff" }]}>
           {brand.logoDataUrl ? (
@@ -232,7 +245,12 @@ export function FlyerDocument({ draft, photoUrls, brand }: FlyerDocumentProps) {
         {/* Body */}
         <View style={styles.body}>
           {draft.status ? (
-            <Text style={[styles.statusBadge, { backgroundColor: primary }]}>
+            <Text
+              style={[
+                styles.statusBadge,
+                { backgroundColor: primary, color: badgeTextColor },
+              ]}
+            >
               {draft.status}
             </Text>
           ) : null}
@@ -245,7 +263,9 @@ export function FlyerDocument({ draft, photoUrls, brand }: FlyerDocumentProps) {
                 {draft.addressLine1 || "Street address"}
               </Text>
               {draft.addressLine2 ? (
-                <Text style={styles.addressLine2}>{draft.addressLine2}</Text>
+                <Text style={[styles.addressLine2, { color: textMuted }]}>
+                  {draft.addressLine2}
+                </Text>
               ) : null}
             </View>
             <Text style={[styles.price, { color: primary }]}>
@@ -254,7 +274,9 @@ export function FlyerDocument({ draft, photoUrls, brand }: FlyerDocumentProps) {
           </View>
 
           {statsParts.length > 0 ? (
-            <Text style={styles.stats}>{statsParts.join("    •    ")}</Text>
+            <Text style={[styles.stats, { color: textPrimary }]}>
+              {statsParts.join("    •    ")}
+            </Text>
           ) : null}
 
           {features.length > 0 ? (
@@ -267,7 +289,9 @@ export function FlyerDocument({ draft, photoUrls, brand }: FlyerDocumentProps) {
                       { backgroundColor: primary },
                     ]}
                   />
-                  <Text style={styles.featureText}>{feature}</Text>
+                  <Text style={[styles.featureText, { color: textPrimary }]}>
+                    {feature}
+                  </Text>
                 </View>
               ))}
             </View>

@@ -65,13 +65,23 @@ export function FlyerForm({
   };
 
   // Per-flyer color overrides — empty draft value falls through to brand.
+  // Background falls back to white (brand profile doesn't expose one yet).
   const effectivePrimary = draft.primaryColor || brand.primaryColor;
   const effectiveAccent = draft.accentColor || brand.accentColor;
+  const effectiveBackground =
+    draft.backgroundColor || brand.backgroundColor || "#ffffff";
   const hasColorOverride =
-    !!draft.primaryColor || !!draft.accentColor;
+    !!draft.primaryColor ||
+    !!draft.accentColor ||
+    !!draft.backgroundColor;
 
   const resetColors = () =>
-    onChange({ ...draft, primaryColor: "", accentColor: "" });
+    onChange({
+      ...draft,
+      primaryColor: "",
+      accentColor: "",
+      backgroundColor: "",
+    });
 
   return (
     <div className="space-y-6">
@@ -90,7 +100,7 @@ export function FlyerForm({
             </button>
           )}
         </div>
-        <div className="grid grid-cols-2 gap-3">
+        <div className="grid grid-cols-3 gap-3">
           <ColorInput
             label="Primary"
             value={effectivePrimary}
@@ -100,6 +110,11 @@ export function FlyerForm({
             label="Accent"
             value={effectiveAccent}
             onChange={(v) => update("accentColor", v)}
+          />
+          <ColorInput
+            label="Background"
+            value={effectiveBackground}
+            onChange={(v) => update("backgroundColor", v)}
           />
         </div>
         <p className="text-[10px] text-neutral-600 mt-2 leading-relaxed">

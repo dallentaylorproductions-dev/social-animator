@@ -122,11 +122,14 @@ export default function ListingFlyerPage() {
 
   // Effective brand: per-flyer color overrides merged into the brand profile.
   // Empty draft colors fall through to brand colors. Downstream code (form,
-  // preview, exports) just reads brand.primaryColor / brand.accentColor.
+  // preview, exports) just reads brand.primaryColor / brand.accentColor /
+  // brand.backgroundColor. backgroundColor's tool-default is white (brand
+  // profile doesn't expose a background color yet).
   const effectiveBrand = {
     ...brand,
     primaryColor: draft.primaryColor || brand.primaryColor,
     accentColor: draft.accentColor || brand.accentColor,
+    backgroundColor: draft.backgroundColor || brand.backgroundColor || "#ffffff",
   };
 
   return (

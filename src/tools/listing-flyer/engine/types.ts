@@ -21,6 +21,12 @@ export interface FlyerDraft {
    */
   primaryColor: string;
   accentColor: string;
+  /**
+   * Per-flyer PDF background color override. Empty string means "use white"
+   * (brand profile doesn't currently expose a background color, so the
+   * fallback is the tool default rather than a brand value).
+   */
+  backgroundColor: string;
 }
 
 /** Photo entry held in component state only (NOT persisted to localStorage). */
@@ -46,6 +52,7 @@ export const EMPTY_DRAFT: FlyerDraft = {
   features: [],
   primaryColor: "",
   accentColor: "",
+  backgroundColor: "",
 };
 
 export const MAX_PHOTOS = 5;

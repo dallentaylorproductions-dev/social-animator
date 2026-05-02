@@ -30,6 +30,7 @@ export function loadDraft(): FlyerDraft {
         : [],
       primaryColor: str(parsed.primaryColor),
       accentColor: str(parsed.accentColor),
+      backgroundColor: str(parsed.backgroundColor),
     };
   } catch {
     return EMPTY_DRAFT;
