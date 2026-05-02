@@ -12,6 +12,29 @@ import { type FlyerDraft } from "../engine/types";
 import { type BrandSettings } from "@/lib/brand";
 import { pickContrastText, pickContrastMuted } from "../engine/contrast";
 
+/** Alpha-blend a foreground hex over a background hex into an opaque hex.
+ * Used so chip text contrast is computed against the chip's *effective*
+ * (rendered-against-page-bg) color, not the raw primary. */
+function blendHex(fgHex: string, alpha: number, bgHex: string): string {
+  const parse = (h: string) => {
+    const x = h.replace(/^#/, "");
+    return {
+      r: parseInt(x.substring(0, 2), 16),
+      g: parseInt(x.substring(2, 4), 16),
+      b: parseInt(x.substring(4, 6), 16),
+    };
+  };
+  const f = parse(fgHex);
+  const b = parse(bgHex);
+  const mix = (a: number, c: number) =>
+    Math.round(a * alpha + c * (1 - alpha));
+  const r = mix(f.r, b.r);
+  const g = mix(f.g, b.g);
+  const bl = mix(f.b, b.b);
+  const toHex = (n: number) => n.toString(16).padStart(2, "0");
+  return `#${toHex(r)}${toHex(g)}${toHex(bl)}`;
+}
+
 interface FlyerDocumentProps {
   draft: FlyerDraft;
   /** Photo URLs (object URLs or data URLs). First entry is the hero. */
@@ -69,7 +92,9 @@ const styles = StyleSheet.create({
   body: {
     paddingHorizontal: MARGIN,
     paddingTop: 12,
-    paddingBottom: 12,
+    // Bottom padding clears the absolute-positioned footer band (~32pt) plus
+    // breathing room so the photo grid never visually collides with it.
+    paddingBottom: 60,
   },
   statusBadge: {
     alignSelf: "flex-start",
@@ -122,25 +147,18 @@ const styles = StyleSheet.create({
     marginTop: 8,
   },
   features: {
+    flexDirection: "row",
+    flexWrap: "wrap",
     marginTop: 14,
   },
-  featureRow: {
-    flexDirection: "row",
-    marginBottom: 4,
-    alignItems: "flex-start",
-  },
-  featureBullet: {
-    width: 5,
-    height: 5,
-    borderRadius: 2.5,
-    marginTop: 4,
-    marginRight: 8,
-  },
-  featureText: {
+  featureChip: {
     fontSize: 10,
-    color: "#262626",
-    lineHeight: 1.4,
-    flex: 1,
+    fontFamily: "Helvetica-Bold",
+    paddingHorizontal: 12,
+    paddingVertical: 6,
+    borderRadius: 999,
+    marginRight: 6,
+    marginBottom: 6,
   },
   photoGrid: {
     flexDirection: "row",
@@ -190,6 +208,12 @@ export function FlyerDocument({ draft, photoUrls, brand }: FlyerDocumentProps) {
   const textMuted = pickContrastMuted(background);
   // Status badge sits on `primary`, not the page bg — separate contrast check.
   const badgeTextColor = pickContrastText(primary);
+
+  // Feature chips: subtle primary tint over the page bg. Compute the visible
+  // (alpha-blended) hex once so the contrast helper picks chip text against
+  // what the eye actually sees, not the raw primary.
+  const chipBg = blendHex(primary, 0.18, background);
+  const chipTextColor = pickContrastText(chipBg);
 
   const statsParts: string[] = [];
   if (draft.beds)
@@ -282,17 +306,15 @@ export function FlyerDocument({ draft, photoUrls, brand }: FlyerDocumentProps) {
           {features.length > 0 ? (
             <View style={styles.features}>
               {features.map((feature, i) => (
-                <View key={i} style={styles.featureRow}>
-                  <View
-                    style={[
-                      styles.featureBullet,
-                      { backgroundColor: primary },
-                    ]}
-                  />
-                  <Text style={[styles.featureText, { color: textPrimary }]}>
-                    {feature}
-                  </Text>
-                </View>
+                <Text
+                  key={i}
+                  style={[
+                    styles.featureChip,
+                    { backgroundColor: chipBg, color: chipTextColor },
+                  ]}
+                >
+                  {feature}
+                </Text>
               ))}
             </View>
           ) : null}

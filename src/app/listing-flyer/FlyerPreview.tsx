@@ -148,25 +148,24 @@ export function FlyerPreview({ draft, photos, brand }: FlyerPreviewProps) {
           </p>
         )}
 
-        {/* Features */}
+        {/* Features — horizontal chip row to mirror the PDF layout */}
         {draft.features.filter((f) => f.trim()).length > 0 && (
-          <ul className="mt-3 space-y-1">
+          <div className="mt-3 flex flex-wrap gap-1.5">
             {draft.features
               .filter((f) => f.trim())
               .map((feature, i) => (
-                <li
+                <span
                   key={i}
-                  className="text-[9px] flex items-start gap-2"
-                  style={{ color: textPrimary }}
+                  className="text-[9px] font-semibold px-2 py-1 rounded-full"
+                  style={{
+                    backgroundColor: `${primary}2e`,
+                    color: textPrimary,
+                  }}
                 >
-                  <span
-                    className="mt-0.5 inline-block w-1.5 h-1.5 rounded-full flex-shrink-0"
-                    style={{ backgroundColor: primary }}
-                  />
                   {feature}
-                </li>
+                </span>
               ))}
-          </ul>
+          </div>
         )}
 
         {/* Photo grid */}
