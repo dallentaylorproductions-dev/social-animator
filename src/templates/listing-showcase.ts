@@ -178,12 +178,16 @@ export const listingShowcaseTemplate: TemplateConfig = {
     const featureLineHeight = isShort ? 38 : 50;
     const featureBulletRadius = isShort ? 6 : 8;
 
-    // Agent info (right column) — vertical stack
-    const logoMaxSize = isShort ? 56 : 88;
-    const agentNameSize = isShort ? 28 : 38;
-    const agentBrokerageSize = isShort ? 18 : 24;
-    const agentPhoneSize = isShort ? 18 : 24;
+    // Agent info (right column) — header row (logo + name side-by-side) on
+    // top, then a tight stack of brokerage / phone / license below. Header
+    // row height = logo size; logo and name are vertical-center-aligned.
+    const logoSize = isShort ? 48 : 64;
+    const logoToNameGap = 12;
+    const agentNameSize = isShort ? 26 : 34;
+    const agentBrokerageSize = isShort ? 18 : 22;
+    const agentPhoneSize = isShort ? 18 : 22;
     const agentLicenseSize = isShort ? 14 : 18;
+    const agentRowGap = isShort ? 4 : 6;
 
     // ── Parse features ──────────────────────────────────────────────────
     const featureLines = (state.features ?? "")
@@ -420,56 +424,96 @@ export const listingShowcaseTemplate: TemplateConfig = {
           ctx.globalAlpha = p;
           ctx.translate(0, (1 - p) * 20);
 
+          // Top-anchored: same Y as the first feature line so both columns
+          // start at the same horizontal level. No bottom-of-frame anchoring.
           let cursorY = bottomSectionY;
 
-          // Logo
+          // ── Header row: logo + name side-by-side ─────────────────────
+          // Logo and name are vertically centered on each other so they
+          // read as one unit ("[LOGO] Aaron Thomas Home Team"), not as
+          // logo-stacked-above-name.
+          const headerRowHeight = state.agentName?.trim() || agentLogoImg
+            ? logoSize
+            : 0;
+          const headerCenterY = cursorY + logoSize / 2;
+          let textStartX = rightColX;
+
           if (agentLogoImg) {
-            const logoH = logoMaxSize;
-            // Use contain so wordmarks don't get crushed; cap aspect at 2.5.
             const aspect =
-              agentLogoImg.naturalWidth / Math.max(1, agentLogoImg.naturalHeight);
-            const logoW = Math.min(columnW, logoH * Math.min(2.5, aspect));
-            drawImageContain(ctx, agentLogoImg, rightColX, cursorY, logoW, logoH, 0);
-            cursorY += logoH + (isShort ? 12 : 18);
+              agentLogoImg.naturalWidth /
+              Math.max(1, agentLogoImg.naturalHeight);
+            const logoW = Math.min(columnW * 0.45, logoSize * Math.min(2.2, aspect));
+            drawImageContain(
+              ctx,
+              agentLogoImg,
+              rightColX,
+              cursorY,
+              logoW,
+              logoSize,
+              0
+            );
+            textStartX = rightColX + logoW + logoToNameGap;
           }
 
-          // Agent name
           if (state.agentName?.trim()) {
             ctx.fillStyle = state.agentNameColor;
             ctx.font = `700 ${agentNameSize}px Inter, system-ui, sans-serif`;
             ctx.textAlign = "left";
-            ctx.textBaseline = "top";
-            ctx.fillText(state.agentName, rightColX, cursorY);
-            cursorY += agentNameSize + (isShort ? 8 : 12);
+            ctx.textBaseline = "middle";
+            ctx.fillText(state.agentName, textStartX, headerCenterY);
           }
 
-          // Brokerage
+          if (headerRowHeight > 0) {
+            cursorY += headerRowHeight + agentRowGap * 2;
+          }
+
+          // ── Brokerage ────────────────────────────────────────────────
           if (state.agentBrokerage?.trim()) {
             ctx.fillStyle = state.agentMutedColor;
             ctx.font = `500 ${agentBrokerageSize}px Inter, system-ui, sans-serif`;
             ctx.textAlign = "left";
             ctx.textBaseline = "top";
             ctx.fillText(state.agentBrokerage, rightColX, cursorY);
-            cursorY += agentBrokerageSize + (isShort ? 4 : 6);
+            cursorY += agentBrokerageSize + agentRowGap;
           }
 
-          // Phone
-          if (state.agentPhone?.trim()) {
+          // ── Phone (with optional inline license #) ───────────────────
+          // Format license as "License #1234" so it doesn't read as a
+          // stray number. Inline with phone if it fits in the column,
+          // else fall through to its own line.
+          const phoneText = state.agentPhone?.trim() ?? "";
+          const licenseText = state.agentLicense?.trim()
+            ? `License #${state.agentLicense.trim().replace(/^#/, "")}`
+            : "";
+
+          if (phoneText) {
             ctx.fillStyle = state.agentNameColor;
             ctx.font = `500 ${agentPhoneSize}px Inter, system-ui, sans-serif`;
             ctx.textAlign = "left";
             ctx.textBaseline = "top";
-            ctx.fillText(state.agentPhone, rightColX, cursorY);
-            cursorY += agentPhoneSize + (isShort ? 4 : 6);
-          }
 
-          // License
-          if (state.agentLicense?.trim()) {
+            const combined = licenseText
+              ? `${phoneText}  ·  ${licenseText}`
+              : phoneText;
+            const combinedWidth = ctx.measureText(combined).width;
+
+            if (licenseText && combinedWidth > columnW) {
+              // Won't fit on one line — render phone now, license below.
+              ctx.fillText(phoneText, rightColX, cursorY);
+              cursorY += agentPhoneSize + agentRowGap;
+              ctx.fillStyle = state.agentMutedColor;
+              ctx.font = `400 ${agentLicenseSize}px Inter, system-ui, sans-serif`;
+              ctx.fillText(licenseText, rightColX, cursorY);
+            } else {
+              ctx.fillText(combined, rightColX, cursorY);
+            }
+          } else if (licenseText) {
+            // No phone, license alone
             ctx.fillStyle = state.agentMutedColor;
             ctx.font = `400 ${agentLicenseSize}px Inter, system-ui, sans-serif`;
             ctx.textAlign = "left";
             ctx.textBaseline = "top";
-            ctx.fillText(state.agentLicense, rightColX, cursorY);
+            ctx.fillText(licenseText, rightColX, cursorY);
           }
         },
       });
