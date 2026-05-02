@@ -310,7 +310,9 @@ export function FlyerDocument({ draft, photoUrls, brand }: FlyerDocumentProps) {
         <View style={[styles.footer, { backgroundColor: accent }]}>
           <Text style={styles.footerLeft}>
             {brand.agentName || "Your name"}
-            {brand.licenseNumber ? `  ·  ${brand.licenseNumber}` : ""}
+            {brand.licenseNumber
+              ? `  ·  License #${brand.licenseNumber.replace(/^#/, "")}`
+              : ""}
           </Text>
           <Text style={styles.footerRight}>
             {[brand.contactPhone, brand.contactEmail]
