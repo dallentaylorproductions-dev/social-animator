@@ -1,5 +1,6 @@
 import { qaCardTemplate } from "./qa-card";
 import { listingCardTemplate } from "./listing-card";
+import { listingShowcaseTemplate } from "./listing-showcase";
 import { listingCarouselTemplate } from "./listing-carousel";
 import { numberedProcessTemplate } from "./numbered-process";
 import { gridComparisonTemplate } from "./grid-comparison";
@@ -12,6 +13,7 @@ import type { TemplateConfig } from "./types";
 export const ALL_TEMPLATES: TemplateConfig[] = [
   qaCardTemplate,
   listingCardTemplate,
+  listingShowcaseTemplate,
   listingCarouselTemplate,
   beforeAfterTemplate,
   testimonialCardTemplate,
