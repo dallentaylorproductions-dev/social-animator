@@ -4,19 +4,24 @@ import {
   type TemplateState,
   type TemplateAssets,
 } from "@/templates/types";
+import { pickContrastText, pickContrastMuted } from "./contrast";
 
-/**
- * Bridge from the listing-flyer form shape (FlyerDraft + photos + brand
- * profile) to the listing-showcase template's (state, assets) input. Used by
- * the MP4 export path so we don't have two competing data models for the
- * same listing.
- */
 /**
  * Maps the flyer form shape to the listing-showcase template's input.
  *
  * `brand` here is expected to be the EFFECTIVE brand (per-flyer color
- * overrides already merged in by the caller). The mapper just reads
- * brand.primaryColor / brand.accentColor — no separate override args.
+ * overrides already merged in by the caller in page.tsx). The mapper just
+ * reads brand.primaryColor / brand.accentColor / brand.backgroundColor
+ * directly — no separate override args.
+ *
+ * Color flow:
+ *   - background           → brand.backgroundColor (flyer override or default)
+ *   - primary brand fills  → brand.primaryColor (status badge, price, feature
+ *     bullets, accent items)
+ *   - text colors          → auto-flipped against background luminance, same
+ *     formula as the PDF, so light text auto-applies on dark backgrounds and
+ *     vice versa
+ *   - status badge text    → contrast-flipped against primary (the badge fill)
  */
 export function mapFlyerToShowcase(
   draft: FlyerDraft,
@@ -25,6 +30,14 @@ export function mapFlyerToShowcase(
   brandLogoImg: HTMLImageElement | null
 ): { state: TemplateState; assets: TemplateAssets } {
   const primary = brand.primaryColor || "#4ef2d9";
+  const background = brand.backgroundColor || "#0a0a0a";
+
+  // Auto-flip text colors based on background luminance — exactly the same
+  // helpers the PDF uses, so PDF and MP4 stay visually consistent under any
+  // background choice.
+  const textPrimary = pickContrastText(background);
+  const textMuted = pickContrastMuted(background);
+  const badgeTextColor = pickContrastText(primary);
 
   const state: TemplateState = {
     // Image keys are present-but-empty — assets passed separately via build()
@@ -49,17 +62,17 @@ export function mapFlyerToShowcase(
     agentPhone: brand.contactPhone || "",
     agentLicense: brand.licenseNumber || "",
 
-    background: "#0a0a0a",
+    background,
     statusColor: primary,
-    statusTextColor: "#0a0a0a",
-    addressColor: "#ffffff",
-    cityStateColor: "#9ca3af",
+    statusTextColor: badgeTextColor,
+    addressColor: textPrimary,
+    cityStateColor: textMuted,
     priceColor: primary,
-    statsColor: "#ffffff",
+    statsColor: textPrimary,
     featureColor: primary,
-    featureTextColor: "#ffffff",
-    agentNameColor: "#ffffff",
-    agentMutedColor: "#9ca3af",
+    featureTextColor: textPrimary,
+    agentNameColor: textPrimary,
+    agentMutedColor: textMuted,
   };
 
   const assets: TemplateAssets = {
