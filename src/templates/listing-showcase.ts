@@ -372,6 +372,13 @@ export const listingShowcaseTemplate: TemplateConfig = {
     });
 
     // ── 7. Features (left column, max 3, no fade-out) ───────────────────
+    // First-feature optical center anchors to the agent column's header row
+    // center (bottomSectionY + logoSize/2). Without this, features sat at
+    // bottomSectionY + featureLineHeight/2 (e.g. y=+25) while the agent
+    // header centered at bottomSectionY + logoSize/2 (e.g. y=+32) — visibly
+    // off by a few pixels even though both columns "started" at the same Y.
+    const firstFeatureCenterY = bottomSectionY + logoSize / 2;
+
     featureLines.forEach((line, i) => {
       tracks.push({
         id: `feature-${i}`,
@@ -382,8 +389,7 @@ export const listingShowcaseTemplate: TemplateConfig = {
           ctx.globalAlpha = p;
           ctx.translate(0, (1 - p) * 14);
 
-          const y =
-            bottomSectionY + featureLineHeight / 2 + i * featureLineHeight;
+          const y = firstFeatureCenterY + i * featureLineHeight;
           // Bullet
           ctx.fillStyle = state.featureColor;
           ctx.beginPath();
@@ -488,7 +494,10 @@ export const listingShowcaseTemplate: TemplateConfig = {
           }
 
           if (headerRowHeight > 0) {
-            cursorY += headerRowHeight + agentRowGap * 2;
+            // Same gap below the header as between body lines — uniform
+            // spacing reads as one tight group rather than "header, then
+            // a paragraph below".
+            cursorY += headerRowHeight + agentRowGap;
           }
 
           // ── Brokerage ────────────────────────────────────────────────
