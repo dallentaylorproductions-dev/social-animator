@@ -58,12 +58,14 @@ export function ExportButtons({ draft, photos, brand }: ExportButtonsProps) {
     if (!canExport) return;
     setPdfState({ kind: "generating" });
     try {
-      // Convert each photo File to a base64 data URL BEFORE invoking pdf().
-      // @react-pdf/renderer races against blob: object URLs — sometimes only
-      // the first photo decodes in time and the rest render as empty boxes.
-      // Data URLs are inlined and decoded synchronously, sidestepping the race.
+      // Downsample + re-encode every photo to a small JPEG data URL before
+      // invoking pdf(). Original phone photos (4-10MB each, base64 = 5-13MB
+      // strings) overload @react-pdf/renderer's image processor — symptom is
+      // that only one Image renders and the rest fall through to their
+      // backgroundColor placeholder. At 1600px max edge / JPEG q=0.85 each
+      // photo is ~150-300KB, and a 5×3.5" hero at print size is still ~150dpi.
       const photoDataUrls = await Promise.all(
-        photos.map((p) => fileToDataUrl(p.file))
+        photos.map((p) => fileToCompressedDataUrl(p.file))
       );
       const blob = await pdf(
         <FlyerDocument draft={draft} photoUrls={photoDataUrls} brand={brand} />
@@ -245,16 +247,58 @@ export function ExportButtons({ draft, photos, brand }: ExportButtonsProps) {
 }
 
 /**
- * Read a File as a base64 data URL. Used by PDF export so @react-pdf/renderer
- * gets fully-decoded image bytes instead of racing against blob: object URLs.
+ * Decode an image File, downsample to maxEdge on the longest side, and
+ * re-encode as a compressed JPEG data URL.
+ *
+ * Used by PDF export. Phone photos at 4000×3000 = 4-10MB; base64 inflates by
+ * ~33%; 4 photos = 20-50MB of string going into pdf().toBlob(). Empirically
+ * this overwhelms @react-pdf/renderer — only the last image renders, the
+ * rest fall through to their View backgroundColor.
+ *
+ * 1600px max edge at JPEG q=0.85 produces ~150-300KB per photo. A 5×3.5"
+ * hero at print size is still ~150dpi (well above print-quality threshold).
  */
-function fileToDataUrl(file: File): Promise<string> {
+function fileToCompressedDataUrl(
+  file: File,
+  maxEdge: number = 1600,
+  quality: number = 0.85
+): Promise<string> {
   return new Promise((resolve, reject) => {
-    const reader = new FileReader();
-    reader.onload = () => resolve(reader.result as string);
-    reader.onerror = () =>
-      reject(new Error(`Could not read ${file.name}`));
-    reader.readAsDataURL(file);
+    const blobUrl = URL.createObjectURL(file);
+    const img = new Image();
+    img.onload = () => {
+      try {
+        const w = img.naturalWidth;
+        const h = img.naturalHeight;
+        const scale = Math.min(1, maxEdge / Math.max(w, h));
+        const targetW = Math.max(1, Math.round(w * scale));
+        const targetH = Math.max(1, Math.round(h * scale));
+
+        const canvas = document.createElement("canvas");
+        canvas.width = targetW;
+        canvas.height = targetH;
+        const ctx = canvas.getContext("2d");
+        if (!ctx) {
+          URL.revokeObjectURL(blobUrl);
+          reject(new Error("Canvas 2D context unavailable"));
+          return;
+        }
+        ctx.imageSmoothingEnabled = true;
+        ctx.imageSmoothingQuality = "high";
+        ctx.drawImage(img, 0, 0, targetW, targetH);
+        const dataUrl = canvas.toDataURL("image/jpeg", quality);
+        URL.revokeObjectURL(blobUrl);
+        resolve(dataUrl);
+      } catch (err) {
+        URL.revokeObjectURL(blobUrl);
+        reject(err);
+      }
+    };
+    img.onerror = () => {
+      URL.revokeObjectURL(blobUrl);
+      reject(new Error(`Could not load ${file.name}`));
+    };
+    img.src = blobUrl;
   });
 }
 
