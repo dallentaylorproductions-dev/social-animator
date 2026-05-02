@@ -168,7 +168,11 @@ const styles = StyleSheet.create({
   },
   gridPhoto: {
     width: "49%",
-    height: 110,
+    // Cells are sized against (pageHeight − header − footer − bodyPad −
+    // contentAboveGrid), not pageHeight alone. At 4-5 photos in a 2×2 grid
+    // with 5 chip features above, 110pt overflowed onto a phantom page 2;
+    // 95pt clears comfortably across the worst-case test matrix.
+    height: 95,
     objectFit: "cover",
     borderRadius: 3,
     backgroundColor: "#e5e5e5",
