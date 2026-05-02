@@ -343,16 +343,53 @@ export const listingShowcaseTemplate: TemplateConfig = {
       });
     });
 
-    // 7. Features — one by one starting at t=8s, 0.4s apart
+    // 7. Features — one by one starting at t=8s, 0.4s apart. Each track
+    //    extends to the end of the timeline so we can run a fade-out phase
+    //    just before the contact card slides in (otherwise the card visually
+    //    covers the feature bullets at its final resting position).
+    //
+    //    Phases per feature:
+    //      [start, start+0.4]                  fade in (rise + alpha)
+    //      [start+0.4, DURATION-2.5]           hold visible
+    //      [DURATION-2.5, DURATION-2.0]        fade out
+    //      [DURATION-2.0, DURATION]            invisible (card slides in)
+    const fadeInDur = 0.4;
+    const fadeOutStartT = DURATION - 2.5;
+    const fadeOutEndT = DURATION - 2.0;
+
     featureLines.forEach((line, i) => {
+      const featureStartT = 8.0 + i * 0.4;
+      const trackDuration = Math.max(0.001, DURATION - featureStartT);
+
       tracks.push({
         id: `feature-${i}`,
-        start: 8.0 + i * 0.4,
-        duration: 0.4,
-        easing: easeOutCubic,
+        start: featureStartT,
+        duration: trackDuration,
+        // No track-level easing; we apply easing per-phase inside onUpdate.
         onUpdate: (p, ctx) => {
-          ctx.globalAlpha = p;
-          ctx.translate(0, (1 - p) * 12);
+          // Recover absolute time from track-relative progress.
+          const t = featureStartT + p * trackDuration;
+
+          let alpha: number;
+          let translateY = 0;
+          if (t < featureStartT + fadeInDur) {
+            const inP = (t - featureStartT) / fadeInDur;
+            alpha = easeOutCubic(inP);
+            translateY = (1 - inP) * 12;
+          } else if (t < fadeOutStartT) {
+            alpha = 1;
+          } else if (t < fadeOutEndT) {
+            const outP = (t - fadeOutStartT) / (fadeOutEndT - fadeOutStartT);
+            alpha = 1 - easeOutCubic(outP);
+          } else {
+            return; // fully invisible — skip painting
+          }
+
+          if (alpha <= 0) return;
+
+          ctx.globalAlpha = alpha;
+          if (translateY !== 0) ctx.translate(0, translateY);
+
           const y = featuresStartY + i * featureLineHeight;
           // Bullet
           ctx.fillStyle = state.featureColor;
@@ -364,7 +401,6 @@ export const listingShowcaseTemplate: TemplateConfig = {
           ctx.font = `500 ${featureFontSize}px Inter, system-ui, sans-serif`;
           ctx.textAlign = "left";
           ctx.textBaseline = "middle";
-          // Wrap if needed (rare for short features, but safe)
           const maxW = width - contentX - 80;
           const lines = wrapText(ctx, line, maxW);
           lines.forEach((wrapped, lineIdx) => {
@@ -389,8 +425,8 @@ export const listingShowcaseTemplate: TemplateConfig = {
 
       tracks.push({
         id: "agentCard",
-        start: 12.0,
-        duration: 1.0,
+        start: DURATION - 2.0,
+        duration: 2.0,
         easing: easeOutCubic,
         onUpdate: (p, ctx) => {
           // Slide up from below the bottom edge
