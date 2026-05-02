@@ -116,12 +116,20 @@ export const listingShowcaseTemplate: TemplateConfig = {
     // Square (1:1) is height-constrained — compress vertical sizing.
     const isShort = height < 1300;
 
-    const horizontalMargin = 60;
+    // Square (1:1) gets a slightly tighter horizontal margin so the hero box
+    // has more horizontal room to work with. With center-cropping a typical
+    // landscape phone photo (4:3) into a wider box, more of the photo's
+    // useful content (the front door, key features) stays visible.
+    const horizontalMargin = isShort ? 40 : 60;
     const topMargin = isShort ? 60 : 80;
     const bottomMargin = isShort ? 50 : 60;
 
-    // Hero: fixed proportion of canvas height (gives 1:1 a usable hero
-    // instead of the 300px sliver the previous min-height math produced).
+    // Hero: fixed proportion of canvas height. Pre-H-1.5 the height was
+    // computed as "whatever's left after the content stack" and squashed to
+    // a 300px sliver at 1:1 — center-cropping that thin band lost the front
+    // of the house. Anchoring to a canvas-height proportion keeps the hero
+    // usably tall at every aspect, and drawImageCover then center-crops both
+    // axes to keep the subject framed.
     const heroH = Math.floor(height * (isShort ? 0.42 : 0.46));
     const heroX = horizontalMargin;
     const heroY = topMargin;
