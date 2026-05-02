@@ -120,6 +120,15 @@ export default function ListingFlyerPage() {
   const brandConfigured =
     !!brand.agentName || !!brand.logoDataUrl || !!brand.brokerage;
 
+  // Effective brand: per-flyer color overrides merged into the brand profile.
+  // Empty draft colors fall through to brand colors. Downstream code (form,
+  // preview, exports) just reads brand.primaryColor / brand.accentColor.
+  const effectiveBrand = {
+    ...brand,
+    primaryColor: draft.primaryColor || brand.primaryColor,
+    accentColor: draft.accentColor || brand.accentColor,
+  };
+
   return (
     <main className="min-h-screen bg-neutral-950 text-white">
       <div className="max-w-6xl mx-auto p-6 lg:p-10">
@@ -151,6 +160,7 @@ export default function ListingFlyerPage() {
               onRemovePhoto={handleRemovePhoto}
               onMovePhoto={handleMovePhoto}
               uploadError={uploadError}
+              brand={brand}
             />
           </section>
 
@@ -159,13 +169,17 @@ export default function ListingFlyerPage() {
               Live preview
             </p>
             <div className="mx-auto max-w-[150px] lg:max-w-none">
-              <FlyerPreview draft={draft} photos={photos} brand={brand} />
+              <FlyerPreview
+                draft={draft}
+                photos={photos}
+                brand={effectiveBrand}
+              />
             </div>
             <div className="hidden lg:block mt-5 pt-5 border-t border-neutral-800/60">
               <ExportButtons
                 draft={draft}
                 photos={photos}
-                brand={brand}
+                brand={effectiveBrand}
                 brandLogoImg={brandLogoImg}
               />
             </div>
@@ -178,7 +192,7 @@ export default function ListingFlyerPage() {
               <ExportButtons
                 draft={draft}
                 photos={photos}
-                brand={brand}
+                brand={effectiveBrand}
                 brandLogoImg={brandLogoImg}
               />
             </div>

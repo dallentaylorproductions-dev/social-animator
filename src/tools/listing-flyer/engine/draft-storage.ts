@@ -28,6 +28,8 @@ export function loadDraft(): FlyerDraft {
       features: Array.isArray(parsed.features)
         ? parsed.features.filter((f): f is string => typeof f === "string")
         : [],
+      primaryColor: str(parsed.primaryColor),
+      accentColor: str(parsed.accentColor),
     };
   } catch {
     return EMPTY_DRAFT;
