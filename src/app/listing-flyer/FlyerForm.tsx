@@ -15,6 +15,8 @@ interface FlyerFormProps {
   onAddPhotos: (files: File[]) => void;
   onRemovePhoto: (id: string) => void;
   onMovePhoto: (id: string, direction: "up" | "down") => void;
+  /** Transient error from photo upload (file too large, wrong type, etc). */
+  uploadError?: string | null;
 }
 
 export function FlyerForm({
@@ -24,6 +26,7 @@ export function FlyerForm({
   onAddPhotos,
   onRemovePhoto,
   onMovePhoto,
+  uploadError,
 }: FlyerFormProps) {
   const photoInputRef = useRef<HTMLInputElement>(null);
 
@@ -221,6 +224,12 @@ export function FlyerForm({
               ? "Click to upload photos (up to 5)"
               : `+ Add another photo (${MAX_PHOTOS - photos.length} left)`}
           </button>
+        )}
+
+        {uploadError && (
+          <p className="mt-2 text-[11px] text-red-400 leading-snug">
+            {uploadError}
+          </p>
         )}
       </Field>
     </div>

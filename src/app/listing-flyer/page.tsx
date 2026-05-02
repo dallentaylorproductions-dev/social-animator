@@ -23,9 +23,11 @@ const SAVE_DEBOUNCE_MS = 1500;
 export default function ListingFlyerPage() {
   const [draft, setDraft] = useState<FlyerDraft>(EMPTY_DRAFT);
   const [photos, setPhotos] = useState<FlyerPhoto[]>([]);
+  const [uploadError, setUploadError] = useState<string | null>(null);
   const [hydrated, setHydrated] = useState(false);
   const { settings: brand } = useBrandSettings();
   const saveTimerRef = useRef<ReturnType<typeof setTimeout> | null>(null);
+  const errorTimerRef = useRef<ReturnType<typeof setTimeout> | null>(null);
 
   // Restore draft from localStorage on first mount. Photos start empty —
   // they aren't persistable.
@@ -58,11 +60,41 @@ export default function ListingFlyerPage() {
 
   const handleAddPhotos = (files: File[]) => {
     const slots = MAX_PHOTOS - photos.length;
-    if (slots <= 0) return;
-    const accepted = files.slice(0, slots).filter((f) =>
-      f.type.startsWith("image/")
-    );
-    setPhotos((prev) => [...prev, ...accepted.map(makePhoto)]);
+    if (slots <= 0) {
+      flashError(`Photo limit reached (${MAX_PHOTOS} max)`);
+      return;
+    }
+    const MAX_BYTES = 12 * 1024 * 1024; // 12 MB per photo
+    const tooLarge: string[] = [];
+    const wrongType: string[] = [];
+    const accepted: File[] = [];
+
+    for (const f of files.slice(0, slots)) {
+      if (!f.type.startsWith("image/")) {
+        wrongType.push(f.name);
+      } else if (f.size > MAX_BYTES) {
+        tooLarge.push(f.name);
+      } else {
+        accepted.push(f);
+      }
+    }
+
+    if (accepted.length > 0) {
+      setPhotos((prev) => [...prev, ...accepted.map(makePhoto)]);
+    }
+
+    const messages: string[] = [];
+    if (wrongType.length > 0)
+      messages.push(`Skipped non-image: ${wrongType.join(", ")}`);
+    if (tooLarge.length > 0)
+      messages.push(`Skipped >12MB: ${tooLarge.join(", ")}`);
+    if (messages.length > 0) flashError(messages.join(" · "));
+  };
+
+  const flashError = (message: string) => {
+    setUploadError(message);
+    if (errorTimerRef.current) clearTimeout(errorTimerRef.current);
+    errorTimerRef.current = setTimeout(() => setUploadError(null), 5000);
   };
 
   const handleRemovePhoto = (id: string) => {
@@ -118,22 +150,29 @@ export default function ListingFlyerPage() {
               onAddPhotos={handleAddPhotos}
               onRemovePhoto={handleRemovePhoto}
               onMovePhoto={handleMovePhoto}
+              uploadError={uploadError}
             />
           </section>
 
-          <aside className="lg:sticky lg:top-6 lg:self-start">
+          <aside className="sticky top-0 z-20 -mx-6 lg:mx-0 px-6 lg:px-0 pt-3 lg:pt-6 pb-3 lg:pb-0 bg-neutral-950 lg:bg-transparent border-b border-neutral-800/60 lg:border-0 lg:self-start">
             <p className="text-[10px] uppercase tracking-[0.15em] text-neutral-500 mb-3">
               Live preview
             </p>
-            <FlyerPreview draft={draft} photos={photos} brand={brand} />
-            <p className="text-[10px] text-neutral-600 mt-3 leading-relaxed">
-              Approximation of the final PDF — colors, layout, and brand
-              header round-trip to the export.
-            </p>
-            <div className="mt-5 pt-5 border-t border-neutral-800/60">
+            <div className="mx-auto max-w-[150px] lg:max-w-none">
+              <FlyerPreview draft={draft} photos={photos} brand={brand} />
+            </div>
+            <div className="hidden lg:block mt-5 pt-5 border-t border-neutral-800/60">
               <ExportButtons draft={draft} photos={photos} brand={brand} />
             </div>
           </aside>
+
+          {/* On mobile, render export buttons inline at end of form so the
+              sticky preview stays compact. */}
+          <section className="lg:hidden">
+            <div className="pt-5 border-t border-neutral-800/60">
+              <ExportButtons draft={draft} photos={photos} brand={brand} />
+            </div>
+          </section>
         </div>
       </div>
     </main>
