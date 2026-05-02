@@ -16,6 +16,7 @@ import {
 import { makePhoto, revokePhoto } from "@/tools/listing-flyer/engine/photos";
 import { FlyerForm } from "./FlyerForm";
 import { FlyerPreview } from "./FlyerPreview";
+import { ExportButtons } from "./ExportButtons";
 
 const SAVE_DEBOUNCE_MS = 1500;
 
@@ -126,9 +127,12 @@ export default function ListingFlyerPage() {
             </p>
             <FlyerPreview draft={draft} photos={photos} brand={brand} />
             <p className="text-[10px] text-neutral-600 mt-3 leading-relaxed">
-              Approximation of the final PDF. Full-resolution export with
-              brand colors, photo grid, and footer ships in the next phase.
+              Approximation of the final PDF — colors, layout, and brand
+              header round-trip to the export.
             </p>
+            <div className="mt-5 pt-5 border-t border-neutral-800/60">
+              <ExportButtons draft={draft} photos={photos} brand={brand} />
+            </div>
           </aside>
         </div>
       </div>

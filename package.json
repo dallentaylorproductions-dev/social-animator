@@ -13,6 +13,7 @@
     "@auth/upstash-redis-adapter": "^2.11.2",
     "@ffmpeg/ffmpeg": "^0.12.15",
     "@ffmpeg/util": "^0.12.2",
+    "@react-pdf/renderer": "^4.5.1",
     "@upstash/redis": "^1.37.0",
     "@vercel/kv": "^3.0.0",
     "lucide-react": "^1.14.0",
