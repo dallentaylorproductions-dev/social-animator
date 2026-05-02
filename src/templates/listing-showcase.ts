@@ -167,11 +167,19 @@ export const listingShowcaseTemplate: TemplateConfig = {
     const bottomSectionEnd = height - bottomMargin;
     const bottomSectionH = Math.max(0, bottomSectionEnd - bottomSectionY);
 
-    // Two-column split with a gap in the middle
+    // Two-column split with a gap in the middle. On 9:16, features bullets
+    // ("Indoor Pool", "Open Bar") are short and don't need an even half of
+    // the canvas width — so we give the agent column more room. Otherwise
+    // the H-1.5g truncate-to-width helper fires on agent names that should
+    // fit in the slack horizontal space ("Aaron Thomas Home Team" → "Aaron
+    // Thomas Home…"). 1:1 stays at 50/50 since it's working there.
     const columnGap = isShort ? 40 : 60;
-    const columnW = (width - horizontalMargin * 2 - columnGap) / 2;
+    const featuresColRatio = isShort ? 0.5 : 0.35;
+    const usableW = width - horizontalMargin * 2 - columnGap;
+    const featuresColW = Math.floor(usableW * featuresColRatio);
+    const agentColW = usableW - featuresColW;
     const leftColX = horizontalMargin;
-    const rightColX = horizontalMargin + columnW + columnGap;
+    const rightColX = horizontalMargin + featuresColW + columnGap;
 
     // Features (left column)
     const featureFontSize = isShort ? 24 : 30;
@@ -401,7 +409,7 @@ export const listingShowcaseTemplate: TemplateConfig = {
           ctx.textAlign = "left";
           ctx.textBaseline = "middle";
           const textX = leftColX + featureBulletRadius * 2 + 16;
-          const maxW = columnW - (featureBulletRadius * 2 + 16);
+          const maxW = featuresColW - (featureBulletRadius * 2 + 16);
           // Single-line truncate-via-wrap (we render only the first wrapped
           // line so each feature stays on its own row even with long copy)
           const lines = wrapText(ctx, line, maxW);
@@ -466,7 +474,7 @@ export const listingShowcaseTemplate: TemplateConfig = {
             const aspect =
               agentLogoImg.naturalWidth /
               Math.max(1, agentLogoImg.naturalHeight);
-            usedLogoW = Math.min(columnW * 0.45, logoSize * Math.min(2.2, aspect));
+            usedLogoW = Math.min(agentColW * 0.45, logoSize * Math.min(2.2, aspect));
             drawImageContain(
               ctx,
               agentLogoImg,
@@ -485,7 +493,7 @@ export const listingShowcaseTemplate: TemplateConfig = {
             ctx.textAlign = "left";
             ctx.textBaseline = "middle";
             // Available width = column right edge minus where text starts.
-            const nameMaxW = rightColX + columnW - textStartX;
+            const nameMaxW = rightColX + agentColW - textStartX;
             ctx.fillText(
               truncateToWidth(state.agentName, nameMaxW),
               textStartX,
@@ -507,7 +515,7 @@ export const listingShowcaseTemplate: TemplateConfig = {
             ctx.textAlign = "left";
             ctx.textBaseline = "top";
             ctx.fillText(
-              truncateToWidth(state.agentBrokerage, columnW),
+              truncateToWidth(state.agentBrokerage, agentColW),
               rightColX,
               cursorY
             );
@@ -533,10 +541,10 @@ export const listingShowcaseTemplate: TemplateConfig = {
               ? `${phoneText}  ·  ${licenseText}`
               : phoneText;
 
-            if (licenseText && ctx.measureText(combined).width > columnW) {
+            if (licenseText && ctx.measureText(combined).width > agentColW) {
               // Won't fit on one line — render phone now, license below.
               ctx.fillText(
-                truncateToWidth(phoneText, columnW),
+                truncateToWidth(phoneText, agentColW),
                 rightColX,
                 cursorY
               );
@@ -544,13 +552,13 @@ export const listingShowcaseTemplate: TemplateConfig = {
               ctx.fillStyle = state.agentMutedColor;
               ctx.font = `400 ${agentLicenseSize}px Inter, system-ui, sans-serif`;
               ctx.fillText(
-                truncateToWidth(licenseText, columnW),
+                truncateToWidth(licenseText, agentColW),
                 rightColX,
                 cursorY
               );
             } else {
               ctx.fillText(
-                truncateToWidth(combined, columnW),
+                truncateToWidth(combined, agentColW),
                 rightColX,
                 cursorY
               );
@@ -562,7 +570,7 @@ export const listingShowcaseTemplate: TemplateConfig = {
             ctx.textAlign = "left";
             ctx.textBaseline = "top";
             ctx.fillText(
-              truncateToWidth(licenseText, columnW),
+              truncateToWidth(licenseText, agentColW),
               rightColX,
               cursorY
             );
