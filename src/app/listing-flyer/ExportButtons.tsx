@@ -58,9 +58,15 @@ export function ExportButtons({ draft, photos, brand }: ExportButtonsProps) {
     if (!canExport) return;
     setPdfState({ kind: "generating" });
     try {
-      const photoUrls = photos.map((p) => p.url);
+      // Convert each photo File to a base64 data URL BEFORE invoking pdf().
+      // @react-pdf/renderer races against blob: object URLs — sometimes only
+      // the first photo decodes in time and the rest render as empty boxes.
+      // Data URLs are inlined and decoded synchronously, sidestepping the race.
+      const photoDataUrls = await Promise.all(
+        photos.map((p) => fileToDataUrl(p.file))
+      );
       const blob = await pdf(
-        <FlyerDocument draft={draft} photoUrls={photoUrls} brand={brand} />
+        <FlyerDocument draft={draft} photoUrls={photoDataUrls} brand={brand} />
       ).toBlob();
       downloadBlob(blob, `${addressSlug(draft.addressLine1)}-flyer.pdf`);
       clearDraft();
@@ -236,6 +242,20 @@ export function ExportButtons({ draft, photos, brand }: ExportButtonsProps) {
       />
     </div>
   );
+}
+
+/**
+ * Read a File as a base64 data URL. Used by PDF export so @react-pdf/renderer
+ * gets fully-decoded image bytes instead of racing against blob: object URLs.
+ */
+function fileToDataUrl(file: File): Promise<string> {
+  return new Promise((resolve, reject) => {
+    const reader = new FileReader();
+    reader.onload = () => resolve(reader.result as string);
+    reader.onerror = () =>
+      reject(new Error(`Could not read ${file.name}`));
+    reader.readAsDataURL(file);
+  });
 }
 
 function mp4StatusText(state: { phase: Mp4Phase; progress: number }): string {
