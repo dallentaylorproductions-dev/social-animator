@@ -48,6 +48,7 @@ export const config = {
   matcher: [
     "/dashboard/:path*",
     "/social-animator/:path*",
+    "/listing-flyer/:path*",
     "/settings/:path*",
     "/paywall/:path*",
     "/api/checkout",
