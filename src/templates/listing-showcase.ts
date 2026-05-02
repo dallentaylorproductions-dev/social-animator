@@ -148,15 +148,20 @@ export const listingShowcaseTemplate: TemplateConfig = {
 
     const addressFontSize = isShort ? 42 : 56;
     const cityStateFontSize = isShort ? 24 : 32;
-    const priceFontSize = isShort ? 88 : 120;
+    // Price was a billboard at 88/120pt — still the dominant info-side
+    // element at 72/96pt, but no longer crowding everything else.
+    const priceFontSize = isShort ? 72 : 96;
     const statsFontSize = isShort ? 24 : 30;
 
-    const gapHeroToBadge = isShort ? 28 : 40;
-    const gapBadgeToAddress = isShort ? 18 : 28;
-    const gapAddressToCity = isShort ? 14 : 22;
-    const gapCityToPrice = isShort ? 22 : 36;
-    const gapPriceToStats = isShort ? 24 : 36;
-    const gapStatsToBottom = isShort ? 22 : 36;
+    // Inter-group gaps tightened ~25% to remove dead vertical space between
+    // sections without crossing into "cramped". Hero, badge, address, price,
+    // stats, and bottom block read as a deliberate rhythm now.
+    const gapHeroToBadge = isShort ? 21 : 30;
+    const gapBadgeToAddress = isShort ? 14 : 21;
+    const gapAddressToCity = isShort ? 11 : 17;
+    const gapCityToPrice = isShort ? 17 : 27;
+    const gapPriceToStats = isShort ? 18 : 27;
+    const gapStatsToBottom = isShort ? 17 : 27;
 
     const contentX = horizontalMargin;
     const heroBottom = heroY + heroH;
