@@ -1,24 +1,32 @@
 import { Timeline, type Track } from "@/engine/timeline";
 import { easeOutCubic, easeOutBack, linear } from "@/engine/easing";
-import { drawImageCover, wrapText } from "@/engine/draw";
+import { drawImageCover, drawImageContain, wrapText } from "@/engine/draw";
 import type { TemplateConfig } from "./types";
 
 /**
- * Listing Showcase — luxury-paced 14s reveal of a single listing. Modeled on
- * Listing Card but slower and more dramatic, designed to be watched (not
- * scrolled past). Powers the MP4 export from the Listing Flyer Generator
- * tool, but also fully usable standalone in Social Animator.
+ * Listing Showcase — luxury-paced 14s reveal.
+ *
+ * Layout (vertically stacked, three regions):
+ *   1. Hero photo with Ken Burns zoom (top — fixed fraction of canvas height)
+ *   2. Info block (badge → address → city → price → stats), compact stack
+ *   3. Bottom section: features (left column, up to 3) + agent info (right
+ *      column: logo, name, brokerage, phone, license #)
+ *
+ * Aspect awareness: hero gets a fixed PROPORTION of canvas height instead of
+ * "whatever's left after content stacks". That keeps the hero usable at both
+ * 9:16 (Reel/Story) and 1:1 (Square) — center-cropping a phone-shaped photo
+ * into a reasonable rectangle, instead of squeezing it to a thin band at 1:1.
  *
  * Pacing:
- *   t=0–14s  hero photo Ken Burns zoom (1.0 → 1.08)
- *   t=1.0s   status badge slides in from left
- *   t=2.0s   address rises in
- *   t=2.3s   city/state rises in
- *   t=4.0s   price reveal with overshoot
- *   t=6.0s   stats stagger in (beds → baths → sqft, 0.2s offset each)
- *   t=8.0s   features reveal one by one (0.4s offset each, up to 5)
- *   t=12.0s  agent contact card slides up from bottom (if name or phone set)
- *   t=13.0s  final hold
+ *   t=0–14s   hero Ken Burns zoom (1.0 → 1.08, linear)
+ *   t=1.0s    status badge slides in from left
+ *   t=2.0s    address rises in
+ *   t=2.3s    city/state rises in
+ *   t=4.0s    price reveal with overshoot + count-up
+ *   t=6.0s    stats stagger in (beds → baths → sqft, 0.2s offset)
+ *   t=8.0s    features stagger in (left column, 0.3s offset, MAX 3)
+ *   t=8.5s    agent info card fades in (right column, slight rise)
+ *   t=14s     end (no fade-out, no slide-up — both columns visible to end)
  */
 const DURATION = 14;
 
@@ -26,14 +34,11 @@ export const listingShowcaseTemplate: TemplateConfig = {
   id: "listing-showcase",
   name: "Listing Showcase",
   description:
-    "Luxury-paced 14-second reveal of a single listing — slow zoom, dramatic price moment, feature highlights. Pairs with the Listing Flyer tool.",
+    "Luxury-paced 14-second reveal of a single listing — slow zoom, dramatic price moment, feature highlights with agent contact card. Pairs with the Listing Flyer tool.",
   duration: DURATION,
   fields: [
     { key: "heroPhoto", label: "Hero photo", type: "image", default: "" },
-    { key: "photo2", label: "Photo 2 (optional)", type: "image", default: "" },
-    { key: "photo3", label: "Photo 3 (optional)", type: "image", default: "" },
-    { key: "photo4", label: "Photo 4 (optional)", type: "image", default: "" },
-    { key: "photo5", label: "Photo 5 (optional)", type: "image", default: "" },
+    { key: "agentLogo", label: "Agent logo (optional)", type: "image", default: "" },
     {
       key: "status",
       label: "Status",
@@ -48,20 +53,32 @@ export const listingShowcaseTemplate: TemplateConfig = {
     { key: "sqft", label: "Sq ft", type: "text", default: "2,840" },
     {
       key: "features",
-      label: "Feature bullets (one per line)",
+      label: "Feature bullets (one per line — first 3 used in animation)",
       type: "textarea",
       default:
-        "Chef's kitchen with quartz counters\nPrimary suite with spa bath\nFinished basement\nFenced backyard\n2-car garage",
+        "Chef's kitchen with quartz counters\nPrimary suite with spa bath\nFinished basement",
     },
     {
       key: "agentName",
-      label: "Agent name (end-card, optional)",
+      label: "Agent name",
+      type: "text",
+      default: "",
+    },
+    {
+      key: "agentBrokerage",
+      label: "Brokerage",
       type: "text",
       default: "",
     },
     {
       key: "agentPhone",
-      label: "Agent phone (end-card, optional)",
+      label: "Agent phone",
+      type: "text",
+      default: "",
+    },
+    {
+      key: "agentLicense",
+      label: "License # (optional)",
       type: "text",
       default: "",
     },
@@ -74,8 +91,8 @@ export const listingShowcaseTemplate: TemplateConfig = {
     { key: "statsColor", label: "Stats", type: "color", default: "#ffffff" },
     { key: "featureColor", label: "Feature bullets", type: "color", default: "#4ef2d9" },
     { key: "featureTextColor", label: "Feature text", type: "color", default: "#ffffff" },
-    { key: "agentCardColor", label: "Agent card", type: "color", default: "#171717" },
-    { key: "agentCardTextColor", label: "Agent card text", type: "color", default: "#ffffff" },
+    { key: "agentNameColor", label: "Agent name", type: "color", default: "#ffffff" },
+    { key: "agentMutedColor", label: "Agent body text", type: "color", default: "#9ca3af" },
   ],
   sampleAssets: { heroPhoto: "/sample-assets/exterior.webp" },
   sampleState: {
@@ -86,78 +103,88 @@ export const listingShowcaseTemplate: TemplateConfig = {
     beds: "4",
     baths: "3",
     sqft: "2,840",
+    agentName: "Jordan Reeves",
+    agentBrokerage: "Skyline Realty",
+    agentPhone: "(503) 555-0188",
   },
   build(state, size, assets) {
     const { width, height } = size;
     const heroImg = assets?.heroPhoto ?? null;
+    const agentLogoImg = assets?.agentLogo ?? null;
 
-    // Layout — same proportions as listing-card so the user-experience is
-    // familiar across both templates.
-    const topMargin = 80;
-    const bottomMargin = 80;
+    // ── Aspect-aware layout ─────────────────────────────────────────────
+    // Square (1:1) is height-constrained — compress vertical sizing.
+    const isShort = height < 1300;
 
-    const badgeFontSize = 32;
-    const badgePaddingH = 24;
-    const badgePaddingV = 12;
+    const horizontalMargin = 60;
+    const topMargin = isShort ? 60 : 80;
+    const bottomMargin = isShort ? 50 : 60;
+
+    // Hero: fixed proportion of canvas height (gives 1:1 a usable hero
+    // instead of the 300px sliver the previous min-height math produced).
+    const heroH = Math.floor(height * (isShort ? 0.42 : 0.46));
+    const heroX = horizontalMargin;
+    const heroY = topMargin;
+    const heroW = width - horizontalMargin * 2;
+    const heroCorner = isShort ? 24 : 32;
+
+    // Info block: badge / address / city / price / stats
+    const badgeFontSize = isShort ? 26 : 32;
+    const badgePaddingH = isShort ? 20 : 24;
+    const badgePaddingV = isShort ? 9 : 12;
     const badgeHeight = badgeFontSize + badgePaddingV * 2;
 
-    const addressFontSize = 56;
-    const cityStateFontSize = 32;
-    const priceFontSize = 120;
-    const statsFontSize = 30;
-    const featureFontSize = 28;
-    const featureLineHeight = 42;
+    const addressFontSize = isShort ? 42 : 56;
+    const cityStateFontSize = isShort ? 24 : 32;
+    const priceFontSize = isShort ? 88 : 120;
+    const statsFontSize = isShort ? 24 : 30;
 
-    const gapPhotoToBadge = 56;
-    const gapBadgeToAddress = 40;
-    const gapAddressToCity = 24;
-    const gapCityToPrice = 44;
-    const gapPriceToStats = 40;
-    const gapStatsToFeatures = 32;
+    const gapHeroToBadge = isShort ? 28 : 40;
+    const gapBadgeToAddress = isShort ? 18 : 28;
+    const gapAddressToCity = isShort ? 14 : 22;
+    const gapCityToPrice = isShort ? 22 : 36;
+    const gapPriceToStats = isShort ? 24 : 36;
+    const gapStatsToBottom = isShort ? 22 : 36;
 
-    // Estimate features block height (assumes one wrapped line per feature).
+    const contentX = horizontalMargin;
+    const heroBottom = heroY + heroH;
+    const badgeY = heroBottom + gapHeroToBadge;
+    const addressY = badgeY + badgeHeight + gapBadgeToAddress + addressFontSize / 2;
+    const cityStateY = addressY + addressFontSize / 2 + gapAddressToCity + cityStateFontSize / 2;
+    const priceY = cityStateY + cityStateFontSize / 2 + gapCityToPrice + priceFontSize / 2;
+    const statsY = priceY + priceFontSize / 2 + gapPriceToStats + statsFontSize / 2;
+
+    // Bottom section starts after stats, ends before bottom margin
+    const bottomSectionY = statsY + statsFontSize / 2 + gapStatsToBottom;
+    const bottomSectionEnd = height - bottomMargin;
+    const bottomSectionH = Math.max(0, bottomSectionEnd - bottomSectionY);
+
+    // Two-column split with a gap in the middle
+    const columnGap = isShort ? 40 : 60;
+    const columnW = (width - horizontalMargin * 2 - columnGap) / 2;
+    const leftColX = horizontalMargin;
+    const rightColX = horizontalMargin + columnW + columnGap;
+
+    // Features (left column)
+    const featureFontSize = isShort ? 24 : 30;
+    const featureLineHeight = isShort ? 38 : 50;
+    const featureBulletRadius = isShort ? 6 : 8;
+
+    // Agent info (right column) — vertical stack
+    const logoMaxSize = isShort ? 56 : 88;
+    const agentNameSize = isShort ? 28 : 38;
+    const agentBrokerageSize = isShort ? 18 : 24;
+    const agentPhoneSize = isShort ? 18 : 24;
+    const agentLicenseSize = isShort ? 14 : 18;
+
+    // ── Parse features ──────────────────────────────────────────────────
     const featureLines = (state.features ?? "")
       .split(/\n/)
       .map((s) => s.trim())
       .filter(Boolean)
-      .slice(0, 5);
-    const featuresBlockHeight = featureLines.length * featureLineHeight;
+      .slice(0, 3); // animation hard cap; PDF still gets all features
 
-    const contentBlockHeight =
-      badgeHeight +
-      gapBadgeToAddress +
-      addressFontSize +
-      gapAddressToCity +
-      cityStateFontSize +
-      gapCityToPrice +
-      priceFontSize +
-      gapPriceToStats +
-      statsFontSize +
-      (featuresBlockHeight > 0 ? gapStatsToFeatures + featuresBlockHeight : 0);
-
-    const photoH = Math.max(
-      300,
-      height - topMargin - bottomMargin - contentBlockHeight - gapPhotoToBadge
-    );
-    const photoX = 60;
-    const photoY = topMargin;
-    const photoW = width - 120;
-    const photoCorner = 32;
-
-    const contentX = photoX;
-    const badgeY = photoY + photoH + gapPhotoToBadge;
-    const addressY =
-      badgeY + badgeHeight + gapBadgeToAddress + addressFontSize / 2;
-    const cityStateY =
-      addressY + addressFontSize / 2 + gapAddressToCity + cityStateFontSize / 2;
-    const priceY =
-      cityStateY + cityStateFontSize / 2 + gapCityToPrice + priceFontSize / 2;
-    const statsY =
-      priceY + priceFontSize / 2 + gapPriceToStats + statsFontSize / 2;
-    const featuresStartY =
-      statsY + statsFontSize / 2 + gapStatsToFeatures + featureLineHeight / 2;
-
-    // Price count-up (same parser as Stat Highlight / Listing Card)
+    // ── Parse price for count-up ────────────────────────────────────────
     const cleanedPrice = (state.price ?? "").replace(/,/g, "");
     const priceMatch = cleanedPrice.match(/^([^\d.-]*)([-+]?\d*\.?\d+)(.*)$/);
     const pricePrefix = priceMatch?.[1] ?? "";
@@ -170,23 +197,20 @@ export const listingShowcaseTemplate: TemplateConfig = {
 
     const tracks: Track[] = [];
 
-    // 1. Hero photo with Ken Burns zoom — runs the full duration so the
-    //    image is always visible. Linear easing for a constant-rate zoom feel.
+    // ── 1. Hero photo with Ken Burns zoom ───────────────────────────────
     tracks.push({
       id: "hero",
       start: 0,
       duration: DURATION,
       easing: linear,
       onUpdate: (p, ctx) => {
-        const zoom = 1.0 + 0.08 * p; // 1.00 → 1.08
-        const cx = photoX + photoW / 2;
-        const cy = photoY + photoH / 2;
+        const zoom = 1.0 + 0.08 * p;
+        const cx = heroX + heroW / 2;
+        const cy = heroY + heroH / 2;
 
         ctx.save();
-        // Clip to the rounded photo box so the zoom doesn't bleed onto
-        // content below.
         ctx.beginPath();
-        ctx.roundRect(photoX, photoY, photoW, photoH, photoCorner);
+        ctx.roundRect(heroX, heroY, heroW, heroH, heroCorner);
         ctx.clip();
 
         ctx.translate(cx, cy);
@@ -194,13 +218,15 @@ export const listingShowcaseTemplate: TemplateConfig = {
         ctx.translate(-cx, -cy);
 
         if (heroImg) {
-          drawImageCover(ctx, heroImg, photoX, photoY, photoW, photoH, 0);
+          // drawImageCover always center-crops both axes; combined with the
+          // 0.46-of-canvas hero height, 1:1 now keeps the middle band of a
+          // typical landscape phone photo instead of a thin sliver.
+          drawImageCover(ctx, heroImg, heroX, heroY, heroW, heroH, 0);
         } else {
-          // Placeholder when no photo is uploaded
           ctx.fillStyle = "#1a1a1a";
-          ctx.fillRect(photoX, photoY, photoW, photoH);
+          ctx.fillRect(heroX, heroY, heroW, heroH);
           ctx.fillStyle = "#666";
-          ctx.font = "28px Inter, system-ui, sans-serif";
+          ctx.font = `${isShort ? 22 : 28}px Inter, system-ui, sans-serif`;
           ctx.textAlign = "center";
           ctx.textBaseline = "middle";
           ctx.fillText("Add a hero photo →", cx, cy);
@@ -209,7 +235,7 @@ export const listingShowcaseTemplate: TemplateConfig = {
       },
     });
 
-    // 2. Status badge (slides in from left at t=1s)
+    // ── 2. Status badge ─────────────────────────────────────────────────
     tracks.push({
       id: "badge",
       start: 1.0,
@@ -237,7 +263,7 @@ export const listingShowcaseTemplate: TemplateConfig = {
       },
     });
 
-    // 3. Address (rises in at t=2s)
+    // ── 3. Address ──────────────────────────────────────────────────────
     tracks.push({
       id: "address",
       start: 2.0,
@@ -254,7 +280,7 @@ export const listingShowcaseTemplate: TemplateConfig = {
       },
     });
 
-    // 4. City/state (rises in at t=2.3s)
+    // ── 4. City/state ───────────────────────────────────────────────────
     tracks.push({
       id: "cityState",
       start: 2.3,
@@ -271,20 +297,15 @@ export const listingShowcaseTemplate: TemplateConfig = {
       },
     });
 
-    // 5. Price (dramatic reveal at t=4s — overshoot scale + count-up)
+    // ── 5. Price (overshoot + count-up) ─────────────────────────────────
     tracks.push({
       id: "price",
       start: 4.0,
       duration: 0.7,
-      // No track-level easing; we apply easeOutBack to scale and easeOutCubic
-      // to the count-up separately.
       onUpdate: (p, ctx) => {
-        // Scale flourish: easeOutBack 0.7 → 1.0
         const scaleEased = easeOutBack(Math.min(1, p));
         const scale = 0.7 + scaleEased * 0.3;
 
-        // Count-up runs slightly into the reveal so the final number lands
-        // crisp at p=1.
         const countEased = easeOutCubic(Math.min(1, p));
         const currentValue = priceTarget * countEased;
         const formatted =
@@ -293,7 +314,6 @@ export const listingShowcaseTemplate: TemplateConfig = {
             : Math.round(currentValue).toLocaleString();
 
         ctx.globalAlpha = Math.min(1, p * 1.3);
-        // Anchor scale around price's left baseline so it grows rightward
         ctx.translate(contentX, priceY);
         ctx.scale(scale, scale);
         ctx.fillStyle = state.priceColor;
@@ -304,7 +324,7 @@ export const listingShowcaseTemplate: TemplateConfig = {
       },
     });
 
-    // 6. Stats — stagger beds → baths → sqft at t=6s, 0.2s offset each
+    // ── 6. Stats stagger ────────────────────────────────────────────────
     const statItems = [
       { label: "BED", value: state.beds, plural: "BEDS" },
       { label: "BATH", value: state.baths, plural: "BATHS" },
@@ -324,16 +344,12 @@ export const listingShowcaseTemplate: TemplateConfig = {
           ctx.font = `500 ${statsFontSize}px Inter, system-ui, sans-serif`;
           ctx.textAlign = "left";
           ctx.textBaseline = "middle";
-          // Render only the items up through this index — earlier items are
-          // already painted by their own tracks. We need to compute x-offset
-          // for this single item: bed first, then bath, then sqft.
           const before = statItems
             .slice(0, i)
             .map((s) =>
               `${s.value} ${s.value === "1" ? s.label : s.plural}  •  `
             )
             .join("");
-          ctx.font = `500 ${statsFontSize}px Inter, system-ui, sans-serif`;
           const beforeWidth = ctx.measureText(before).width;
           const text = `${stat.value} ${
             stat.value === "1" ? stat.label : stat.plural
@@ -343,130 +359,116 @@ export const listingShowcaseTemplate: TemplateConfig = {
       });
     });
 
-    // 7. Features — one by one starting at t=8s, 0.4s apart. Each track
-    //    extends to the end of the timeline so we can run a fade-out phase
-    //    just before the contact card slides in (otherwise the card visually
-    //    covers the feature bullets at its final resting position).
-    //
-    //    Phases per feature:
-    //      [start, start+0.4]                  fade in (rise + alpha)
-    //      [start+0.4, DURATION-2.5]           hold visible
-    //      [DURATION-2.5, DURATION-2.0]        fade out
-    //      [DURATION-2.0, DURATION]            invisible (card slides in)
-    const fadeInDur = 0.4;
-    const fadeOutStartT = DURATION - 2.5;
-    const fadeOutEndT = DURATION - 2.0;
-
+    // ── 7. Features (left column, max 3, no fade-out) ───────────────────
     featureLines.forEach((line, i) => {
-      const featureStartT = 8.0 + i * 0.4;
-      const trackDuration = Math.max(0.001, DURATION - featureStartT);
-
       tracks.push({
         id: `feature-${i}`,
-        start: featureStartT,
-        duration: trackDuration,
-        // No track-level easing; we apply easing per-phase inside onUpdate.
+        start: 8.0 + i * 0.3,
+        duration: 0.5,
+        easing: easeOutCubic,
         onUpdate: (p, ctx) => {
-          // Recover absolute time from track-relative progress.
-          const t = featureStartT + p * trackDuration;
+          ctx.globalAlpha = p;
+          ctx.translate(0, (1 - p) * 14);
 
-          let alpha: number;
-          let translateY = 0;
-          if (t < featureStartT + fadeInDur) {
-            const inP = (t - featureStartT) / fadeInDur;
-            alpha = easeOutCubic(inP);
-            translateY = (1 - inP) * 12;
-          } else if (t < fadeOutStartT) {
-            alpha = 1;
-          } else if (t < fadeOutEndT) {
-            const outP = (t - fadeOutStartT) / (fadeOutEndT - fadeOutStartT);
-            alpha = 1 - easeOutCubic(outP);
-          } else {
-            return; // fully invisible — skip painting
-          }
-
-          if (alpha <= 0) return;
-
-          ctx.globalAlpha = alpha;
-          if (translateY !== 0) ctx.translate(0, translateY);
-
-          const y = featuresStartY + i * featureLineHeight;
+          const y =
+            bottomSectionY + featureLineHeight / 2 + i * featureLineHeight;
           // Bullet
           ctx.fillStyle = state.featureColor;
           ctx.beginPath();
-          ctx.arc(contentX + 8, y, 7, 0, Math.PI * 2);
+          ctx.arc(leftColX + featureBulletRadius + 2, y, featureBulletRadius, 0, Math.PI * 2);
           ctx.fill();
           // Text
           ctx.fillStyle = state.featureTextColor;
           ctx.font = `500 ${featureFontSize}px Inter, system-ui, sans-serif`;
           ctx.textAlign = "left";
           ctx.textBaseline = "middle";
-          const maxW = width - contentX - 80;
+          const textX = leftColX + featureBulletRadius * 2 + 16;
+          const maxW = columnW - (featureBulletRadius * 2 + 16);
+          // Single-line truncate-via-wrap (we render only the first wrapped
+          // line so each feature stays on its own row even with long copy)
           const lines = wrapText(ctx, line, maxW);
-          lines.forEach((wrapped, lineIdx) => {
-            ctx.fillText(wrapped, contentX + 32, y + lineIdx * featureLineHeight);
-          });
+          if (lines.length > 0) {
+            ctx.fillText(lines[0], textX, y);
+          }
         },
       });
     });
 
-    // 8. Agent contact card — slides up from bottom at t=12s if either
-    //    agentName or agentPhone is set. Otherwise skip; the brand watermark
-    //    in the corner already handles agent identity.
-    const hasAgent = !!(
-      state.agentName?.trim() || state.agentPhone?.trim()
+    // ── 8. Agent info card (right column, fade in + stay visible) ──────
+    const hasAgentContent = !!(
+      state.agentName?.trim() ||
+      state.agentBrokerage?.trim() ||
+      state.agentPhone?.trim() ||
+      agentLogoImg
     );
-    if (hasAgent) {
-      const cardHeight = 140;
-      const cardMargin = 60;
-      const cardX = cardMargin;
-      const cardY = height - cardMargin - cardHeight;
-      const cardWidth = width - cardMargin * 2;
 
+    if (hasAgentContent) {
       tracks.push({
         id: "agentCard",
-        start: DURATION - 2.0,
-        duration: 2.0,
+        start: 8.5,
+        duration: 0.8,
         easing: easeOutCubic,
         onUpdate: (p, ctx) => {
-          // Slide up from below the bottom edge
-          const offsetY = (1 - p) * (cardHeight + cardMargin + 40);
-          ctx.translate(0, offsetY);
           ctx.globalAlpha = p;
+          ctx.translate(0, (1 - p) * 20);
 
-          // Card background
-          ctx.fillStyle = state.agentCardColor;
-          ctx.beginPath();
-          ctx.roundRect(cardX, cardY, cardWidth, cardHeight, 16);
-          ctx.fill();
+          let cursorY = bottomSectionY;
 
-          // Agent name (left)
-          ctx.fillStyle = state.agentCardTextColor;
-          ctx.font = `700 36px Inter, system-ui, sans-serif`;
-          ctx.textAlign = "left";
-          ctx.textBaseline = "middle";
-          if (state.agentName?.trim()) {
-            ctx.fillText(
-              state.agentName,
-              cardX + 32,
-              cardY + cardHeight / 2 - (state.agentPhone ? 18 : 0)
-            );
+          // Logo
+          if (agentLogoImg) {
+            const logoH = logoMaxSize;
+            // Use contain so wordmarks don't get crushed; cap aspect at 2.5.
+            const aspect =
+              agentLogoImg.naturalWidth / Math.max(1, agentLogoImg.naturalHeight);
+            const logoW = Math.min(columnW, logoH * Math.min(2.5, aspect));
+            drawImageContain(ctx, agentLogoImg, rightColX, cursorY, logoW, logoH, 0);
+            cursorY += logoH + (isShort ? 12 : 18);
           }
 
-          // Phone (right or below name)
+          // Agent name
+          if (state.agentName?.trim()) {
+            ctx.fillStyle = state.agentNameColor;
+            ctx.font = `700 ${agentNameSize}px Inter, system-ui, sans-serif`;
+            ctx.textAlign = "left";
+            ctx.textBaseline = "top";
+            ctx.fillText(state.agentName, rightColX, cursorY);
+            cursorY += agentNameSize + (isShort ? 8 : 12);
+          }
+
+          // Brokerage
+          if (state.agentBrokerage?.trim()) {
+            ctx.fillStyle = state.agentMutedColor;
+            ctx.font = `500 ${agentBrokerageSize}px Inter, system-ui, sans-serif`;
+            ctx.textAlign = "left";
+            ctx.textBaseline = "top";
+            ctx.fillText(state.agentBrokerage, rightColX, cursorY);
+            cursorY += agentBrokerageSize + (isShort ? 4 : 6);
+          }
+
+          // Phone
           if (state.agentPhone?.trim()) {
-            ctx.font = `400 28px Inter, system-ui, sans-serif`;
-            ctx.fillText(
-              state.agentPhone,
-              cardX + 32,
-              cardY +
-                cardHeight / 2 +
-                (state.agentName ? 22 : 0)
-            );
+            ctx.fillStyle = state.agentNameColor;
+            ctx.font = `500 ${agentPhoneSize}px Inter, system-ui, sans-serif`;
+            ctx.textAlign = "left";
+            ctx.textBaseline = "top";
+            ctx.fillText(state.agentPhone, rightColX, cursorY);
+            cursorY += agentPhoneSize + (isShort ? 4 : 6);
+          }
+
+          // License
+          if (state.agentLicense?.trim()) {
+            ctx.fillStyle = state.agentMutedColor;
+            ctx.font = `400 ${agentLicenseSize}px Inter, system-ui, sans-serif`;
+            ctx.textAlign = "left";
+            ctx.textBaseline = "top";
+            ctx.fillText(state.agentLicense, rightColX, cursorY);
           }
         },
       });
     }
+
+    // Reference layout vars to silence unused-warnings on edge code paths.
+    void bottomSectionH;
 
     return new Timeline(tracks);
   },

@@ -25,7 +25,7 @@ export default function ListingFlyerPage() {
   const [photos, setPhotos] = useState<FlyerPhoto[]>([]);
   const [uploadError, setUploadError] = useState<string | null>(null);
   const [hydrated, setHydrated] = useState(false);
-  const { settings: brand } = useBrandSettings();
+  const { settings: brand, logoImg: brandLogoImg } = useBrandSettings();
   const saveTimerRef = useRef<ReturnType<typeof setTimeout> | null>(null);
   const errorTimerRef = useRef<ReturnType<typeof setTimeout> | null>(null);
 
@@ -162,7 +162,12 @@ export default function ListingFlyerPage() {
               <FlyerPreview draft={draft} photos={photos} brand={brand} />
             </div>
             <div className="hidden lg:block mt-5 pt-5 border-t border-neutral-800/60">
-              <ExportButtons draft={draft} photos={photos} brand={brand} />
+              <ExportButtons
+                draft={draft}
+                photos={photos}
+                brand={brand}
+                brandLogoImg={brandLogoImg}
+              />
             </div>
           </aside>
 
@@ -170,7 +175,12 @@ export default function ListingFlyerPage() {
               sticky preview stays compact. */}
           <section className="lg:hidden">
             <div className="pt-5 border-t border-neutral-800/60">
-              <ExportButtons draft={draft} photos={photos} brand={brand} />
+              <ExportButtons
+                draft={draft}
+                photos={photos}
+                brand={brand}
+                brandLogoImg={brandLogoImg}
+              />
             </div>
           </section>
         </div>

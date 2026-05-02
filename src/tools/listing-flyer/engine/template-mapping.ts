@@ -11,20 +11,25 @@ import {
  * the MP4 export path so we don't have two competing data models for the
  * same listing.
  */
+/**
+ * Maps the flyer form shape to the listing-showcase template's input.
+ *
+ * `brand` here is expected to be the EFFECTIVE brand (per-flyer color
+ * overrides already merged in by the caller). The mapper just reads
+ * brand.primaryColor / brand.accentColor — no separate override args.
+ */
 export function mapFlyerToShowcase(
   draft: FlyerDraft,
   photos: FlyerPhoto[],
-  brand: BrandSettings
+  brand: BrandSettings,
+  brandLogoImg: HTMLImageElement | null
 ): { state: TemplateState; assets: TemplateAssets } {
   const primary = brand.primaryColor || "#4ef2d9";
 
   const state: TemplateState = {
     // Image keys are present-but-empty — assets passed separately via build()
     heroPhoto: "",
-    photo2: "",
-    photo3: "",
-    photo4: "",
-    photo5: "",
+    agentLogo: "",
 
     status: draft.status || "Just Listed",
     address: draft.addressLine1 || "",
@@ -40,7 +45,9 @@ export function mapFlyerToShowcase(
       .join("\n"),
 
     agentName: brand.agentName || "",
+    agentBrokerage: brand.brokerage || "",
     agentPhone: brand.contactPhone || "",
+    agentLicense: brand.licenseNumber || "",
 
     background: "#0a0a0a",
     statusColor: primary,
@@ -51,16 +58,13 @@ export function mapFlyerToShowcase(
     statsColor: "#ffffff",
     featureColor: primary,
     featureTextColor: "#ffffff",
-    agentCardColor: "#171717",
-    agentCardTextColor: "#ffffff",
+    agentNameColor: "#ffffff",
+    agentMutedColor: "#9ca3af",
   };
 
   const assets: TemplateAssets = {
     heroPhoto: photos[0]?.img ?? null,
-    photo2: photos[1]?.img ?? null,
-    photo3: photos[2]?.img ?? null,
-    photo4: photos[3]?.img ?? null,
-    photo5: photos[4]?.img ?? null,
+    agentLogo: brandLogoImg,
   };
 
   return { state, assets };
