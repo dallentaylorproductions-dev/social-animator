@@ -54,15 +54,15 @@ const styles = StyleSheet.create({
     paddingLeft: 12,
   },
   headerName: {
-    fontSize: 12,
+    fontSize: 15,
     fontFamily: "Helvetica-Bold",
   },
   headerBrokerage: {
-    fontSize: 11,
+    fontSize: 14,
     opacity: 0.7,
   },
   headerRight: {
-    fontSize: 10,
+    fontSize: 13,
     textAlign: "right",
     opacity: 0.85,
   },

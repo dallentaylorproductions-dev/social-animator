@@ -72,14 +72,14 @@ export function FlyerPreview({ draft, photos, brand }: FlyerPreviewProps) {
           </div>
         )}
         <div className="flex-1 min-w-0">
-          <p className="text-[10px] font-semibold truncate">
+          <p className="text-[12px] font-semibold truncate">
             {brand.agentName || "Your name"}
           </p>
-          <p className="text-[10px] opacity-70 truncate">
+          <p className="text-[13px] opacity-70 truncate">
             {brand.brokerage || "Brokerage"}
           </p>
         </div>
-        <div className="text-right text-[10px] opacity-80 leading-tight">
+        <div className="text-right text-[13px] opacity-80 leading-tight">
           {brand.contactPhone && <div>{brand.contactPhone}</div>}
           {brand.contactEmail && <div>{brand.contactEmail}</div>}
         </div>
