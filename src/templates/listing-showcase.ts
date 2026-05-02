@@ -428,6 +428,23 @@ export const listingShowcaseTemplate: TemplateConfig = {
           // start at the same horizontal level. No bottom-of-frame anchoring.
           let cursorY = bottomSectionY;
 
+          // Agent column's right boundary = canvas right edge minus the
+          // shared horizontalMargin. All agent content is truncated to this
+          // limit so long names/brokerages don't crowd the canvas right edge
+          // (which previously made the column visibly closer to the edge
+          // than the features-column gutter on the left).
+          const truncateToWidth = (text: string, maxW: number): string => {
+            if (ctx.measureText(text).width <= maxW) return text;
+            let truncated = text;
+            while (
+              truncated.length > 1 &&
+              ctx.measureText(truncated + "…").width > maxW
+            ) {
+              truncated = truncated.slice(0, -1);
+            }
+            return truncated + "…";
+          };
+
           // ── Header row: logo + name side-by-side ─────────────────────
           // Logo and name are vertically centered on each other so they
           // read as one unit ("[LOGO] Aaron Thomas Home Team"), not as
@@ -437,22 +454,23 @@ export const listingShowcaseTemplate: TemplateConfig = {
             : 0;
           const headerCenterY = cursorY + logoSize / 2;
           let textStartX = rightColX;
+          let usedLogoW = 0;
 
           if (agentLogoImg) {
             const aspect =
               agentLogoImg.naturalWidth /
               Math.max(1, agentLogoImg.naturalHeight);
-            const logoW = Math.min(columnW * 0.45, logoSize * Math.min(2.2, aspect));
+            usedLogoW = Math.min(columnW * 0.45, logoSize * Math.min(2.2, aspect));
             drawImageContain(
               ctx,
               agentLogoImg,
               rightColX,
               cursorY,
-              logoW,
+              usedLogoW,
               logoSize,
               0
             );
-            textStartX = rightColX + logoW + logoToNameGap;
+            textStartX = rightColX + usedLogoW + logoToNameGap;
           }
 
           if (state.agentName?.trim()) {
@@ -460,7 +478,13 @@ export const listingShowcaseTemplate: TemplateConfig = {
             ctx.font = `700 ${agentNameSize}px Inter, system-ui, sans-serif`;
             ctx.textAlign = "left";
             ctx.textBaseline = "middle";
-            ctx.fillText(state.agentName, textStartX, headerCenterY);
+            // Available width = column right edge minus where text starts.
+            const nameMaxW = rightColX + columnW - textStartX;
+            ctx.fillText(
+              truncateToWidth(state.agentName, nameMaxW),
+              textStartX,
+              headerCenterY
+            );
           }
 
           if (headerRowHeight > 0) {
@@ -473,7 +497,11 @@ export const listingShowcaseTemplate: TemplateConfig = {
             ctx.font = `500 ${agentBrokerageSize}px Inter, system-ui, sans-serif`;
             ctx.textAlign = "left";
             ctx.textBaseline = "top";
-            ctx.fillText(state.agentBrokerage, rightColX, cursorY);
+            ctx.fillText(
+              truncateToWidth(state.agentBrokerage, columnW),
+              rightColX,
+              cursorY
+            );
             cursorY += agentBrokerageSize + agentRowGap;
           }
 
@@ -495,17 +523,28 @@ export const listingShowcaseTemplate: TemplateConfig = {
             const combined = licenseText
               ? `${phoneText}  ·  ${licenseText}`
               : phoneText;
-            const combinedWidth = ctx.measureText(combined).width;
 
-            if (licenseText && combinedWidth > columnW) {
+            if (licenseText && ctx.measureText(combined).width > columnW) {
               // Won't fit on one line — render phone now, license below.
-              ctx.fillText(phoneText, rightColX, cursorY);
+              ctx.fillText(
+                truncateToWidth(phoneText, columnW),
+                rightColX,
+                cursorY
+              );
               cursorY += agentPhoneSize + agentRowGap;
               ctx.fillStyle = state.agentMutedColor;
               ctx.font = `400 ${agentLicenseSize}px Inter, system-ui, sans-serif`;
-              ctx.fillText(licenseText, rightColX, cursorY);
+              ctx.fillText(
+                truncateToWidth(licenseText, columnW),
+                rightColX,
+                cursorY
+              );
             } else {
-              ctx.fillText(combined, rightColX, cursorY);
+              ctx.fillText(
+                truncateToWidth(combined, columnW),
+                rightColX,
+                cursorY
+              );
             }
           } else if (licenseText) {
             // No phone, license alone
@@ -513,7 +552,11 @@ export const listingShowcaseTemplate: TemplateConfig = {
             ctx.font = `400 ${agentLicenseSize}px Inter, system-ui, sans-serif`;
             ctx.textAlign = "left";
             ctx.textBaseline = "top";
-            ctx.fillText(licenseText, rightColX, cursorY);
+            ctx.fillText(
+              truncateToWidth(licenseText, columnW),
+              rightColX,
+              cursorY
+            );
           }
         },
       });
