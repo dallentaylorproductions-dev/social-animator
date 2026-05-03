@@ -161,7 +161,6 @@ export const listingShowcaseTemplate: TemplateConfig = {
     const gapAddressToCity = isShort ? 11 : 17;
     const gapCityToPrice = isShort ? 17 : 27;
     const gapPriceToStats = isShort ? 18 : 27;
-    const gapStatsToBottom = isShort ? 17 : 27;
 
     const contentX = horizontalMargin;
     const heroBottom = heroY + heroH;
@@ -170,11 +169,6 @@ export const listingShowcaseTemplate: TemplateConfig = {
     const cityStateY = addressY + addressFontSize / 2 + gapAddressToCity + cityStateFontSize / 2;
     const priceY = cityStateY + cityStateFontSize / 2 + gapCityToPrice + priceFontSize / 2;
     const statsY = priceY + priceFontSize / 2 + gapPriceToStats + statsFontSize / 2;
-
-    // Bottom section starts after stats, ends before bottom margin
-    const bottomSectionY = statsY + statsFontSize / 2 + gapStatsToBottom;
-    const bottomSectionEnd = height - bottomMargin;
-    const bottomSectionH = Math.max(0, bottomSectionEnd - bottomSectionY);
 
     // Two-column split with a gap in the middle. On 9:16, features bullets
     // ("Indoor Pool", "Open Bar") are short and don't need an even half of
@@ -190,9 +184,11 @@ export const listingShowcaseTemplate: TemplateConfig = {
     const leftColX = horizontalMargin;
     const rightColX = horizontalMargin + featuresColW + columnGap;
 
-    // Features (left column)
-    const featureFontSize = isShort ? 24 : 30;
-    const featureLineHeight = isShort ? 38 : 50;
+    // Features (left column). Bumped ~17-20% over the H-1.5o sizes once the
+    // bottom section started anchoring to the frame bottom — the freed-up
+    // slack absorbs the bigger type without crowding hero/info above.
+    const featureFontSize = isShort ? 28 : 36;
+    const featureLineHeight = isShort ? 44 : 58;
     const featureBulletRadius = isShort ? 6 : 8;
 
     // Agent info (right column) — header row (logo + name side-by-side) on
@@ -200,13 +196,13 @@ export const listingShowcaseTemplate: TemplateConfig = {
     // row height = logo size; logo and name are vertical-center-aligned.
     const logoSize = isShort ? 48 : 64;
     const logoToNameGap = 12;
-    const agentNameSize = isShort ? 26 : 34;
-    // Secondary agent text was visibly small on mobile (where Reels/Stories
-    // are watched). +22% across the board raises the floor on legibility
-    // while keeping the agent name dominant.
-    const agentBrokerageSize = isShort ? 22 : 27;
-    const agentPhoneSize = isShort ? 22 : 27;
-    const agentLicenseSize = isShort ? 17 : 22;
+    const agentNameSize = isShort ? 28 : 38;
+    // Secondary agent text bumped a second time after the bottom section
+    // gained vertical slack from frame-bottom anchoring. Header is still
+    // dominant — name > brokerage > phone > license.
+    const agentBrokerageSize = isShort ? 25 : 31;
+    const agentPhoneSize = isShort ? 25 : 31;
+    const agentLicenseSize = isShort ? 19 : 25;
     const agentRowGap = isShort ? 4 : 6;
 
     // ── Parse features ──────────────────────────────────────────────────
@@ -215,6 +211,34 @@ export const listingShowcaseTemplate: TemplateConfig = {
       .map((s) => s.trim())
       .filter(Boolean)
       .slice(0, 5); // matches MAX_FEATURES — PDF and MP4 are now in parity
+
+    // ── Bottom section anchor ───────────────────────────────────────────
+    // Anchor the bottom row to the frame bottom (with bottomMargin inset)
+    // instead of stacking it at gapStatsToBottom below the info block.
+    // With 5 features instead of 3, the bottom row got taller; bottom-
+    // anchoring lets the row push UP into the slack space rather than
+    // crowding stats/price above. The empty space between the info block
+    // and the bottom row absorbs whatever's left.
+    const hasAgentContent = !!(
+      state.agentName?.trim() ||
+      state.agentBrokerage?.trim() ||
+      state.agentPhone?.trim() ||
+      agentLogoImg
+    );
+    const featureColH =
+      featureLines.length > 0
+        ? logoSize / 2 +
+          (featureLines.length - 1) * featureLineHeight +
+          featureFontSize / 2
+        : 0;
+    const agentColH = hasAgentContent
+      ? logoSize +
+        (state.agentBrokerage?.trim() ? agentRowGap + agentBrokerageSize : 0) +
+        (state.agentPhone?.trim() ? agentRowGap + agentPhoneSize : 0) +
+        (state.agentLicense?.trim() ? agentRowGap + agentLicenseSize : 0)
+      : 0;
+    const bottomRowH = Math.max(featureColH, agentColH);
+    const bottomSectionY = height - bottomMargin - bottomRowH;
 
     // ── Parse price for count-up ────────────────────────────────────────
     const cleanedPrice = (state.price ?? "").replace(/,/g, "");
@@ -433,13 +457,6 @@ export const listingShowcaseTemplate: TemplateConfig = {
     });
 
     // ── 8. Agent info card (right column, fade in + stay visible) ──────
-    const hasAgentContent = !!(
-      state.agentName?.trim() ||
-      state.agentBrokerage?.trim() ||
-      state.agentPhone?.trim() ||
-      agentLogoImg
-    );
-
     if (hasAgentContent) {
       tracks.push({
         id: "agentCard",
@@ -590,9 +607,6 @@ export const listingShowcaseTemplate: TemplateConfig = {
         },
       });
     }
-
-    // Reference layout vars to silence unused-warnings on edge code paths.
-    void bottomSectionH;
 
     return new Timeline(tracks);
   },
