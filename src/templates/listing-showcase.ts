@@ -170,14 +170,15 @@ export const listingShowcaseTemplate: TemplateConfig = {
     const priceY = cityStateY + cityStateFontSize / 2 + gapCityToPrice + priceFontSize / 2;
     const statsY = priceY + priceFontSize / 2 + gapPriceToStats + statsFontSize / 2;
 
-    // Two-column split with a gap in the middle. On 9:16, features bullets
+    // Two-column split with a gap in the middle. On 9:16, feature bullets
     // ("Indoor Pool", "Open Bar") are short and don't need an even half of
-    // the canvas width — so we give the agent column more room. Otherwise
-    // the H-1.5g truncate-to-width helper fires on agent names that should
-    // fit in the slack horizontal space ("Aaron Thomas Home Team" → "Aaron
-    // Thomas Home…"). 1:1 stays at 50/50 since it's working there.
+    // the canvas width — so we give the agent column more room. On 1:1 the
+    // 50/50 split was truncating "Chef's kitchen with quartz counters" once
+    // CHANGE 14 bumped the feature font; rebalance to 55/45 so longer
+    // feature copy renders in full while leaving enough agent-side budget
+    // for "Aaron Thomas Home Team".
     const columnGap = isShort ? 40 : 60;
-    const featuresColRatio = isShort ? 0.5 : 0.35;
+    const featuresColRatio = isShort ? 0.55 : 0.35;
     const usableW = width - horizontalMargin * 2 - columnGap;
     const featuresColW = Math.floor(usableW * featuresColRatio);
     const agentColW = usableW - featuresColW;
