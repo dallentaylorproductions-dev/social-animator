@@ -9,7 +9,7 @@ import type { TemplateConfig } from "./types";
  * Layout (vertically stacked, three regions):
  *   1. Hero photo with Ken Burns zoom (top — fixed fraction of canvas height)
  *   2. Info block (badge → address → city → price → stats), compact stack
- *   3. Bottom section: features (left column, up to 3) + agent info (right
+ *   3. Bottom section: features (left column, up to 5) + agent info (right
  *      column: logo, name, brokerage, phone, license #)
  *
  * Aspect awareness: hero gets a fixed PROPORTION of canvas height instead of
@@ -28,7 +28,7 @@ import type { TemplateConfig } from "./types";
  *   t=1.5s    city/state rises in
  *   t=2.4s    price reveal with overshoot + count-up
  *   t=3.5s    stats stagger in (beds → baths → sqft, 0.15s offset)
- *   t=4.5s    features stagger in (left column, 0.25s offset, MAX 3)
+ *   t=4.5s    features stagger in (left column, 0.25s offset, MAX 5)
  *   t=4.8s    agent info card fades in (right column, slight rise)
  *   t=5.4s    last entry lands; static dwell to t=8s
  */
@@ -57,7 +57,7 @@ export const listingShowcaseTemplate: TemplateConfig = {
     { key: "sqft", label: "Sq ft", type: "text", default: "2,840" },
     {
       key: "features",
-      label: "Feature bullets (one per line — first 3 used in animation)",
+      label: "Feature bullets (one per line — up to 5)",
       type: "textarea",
       default:
         "Chef's kitchen with quartz counters\nPrimary suite with spa bath\nFinished basement",
@@ -214,7 +214,7 @@ export const listingShowcaseTemplate: TemplateConfig = {
       .split(/\n/)
       .map((s) => s.trim())
       .filter(Boolean)
-      .slice(0, 3); // animation hard cap; PDF still gets all features
+      .slice(0, 5); // matches MAX_FEATURES — PDF and MP4 are now in parity
 
     // ── Parse price for count-up ────────────────────────────────────────
     const cleanedPrice = (state.price ?? "").replace(/,/g, "");

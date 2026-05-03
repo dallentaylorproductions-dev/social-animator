@@ -211,12 +211,6 @@ export function FlyerForm({
               + Add feature bullet
             </button>
           )}
-          {draft.features.length > 3 && (
-            <p className="text-[11px] text-neutral-500 leading-snug mt-2">
-              Only the first 3 features appear in the animated version. PDF
-              flyer includes all features you add.
-            </p>
-          )}
         </div>
       </Field>
 
