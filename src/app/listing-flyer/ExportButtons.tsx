@@ -8,7 +8,7 @@ import {
   addressSlug,
   validateForExport,
 } from "@/tools/listing-flyer/engine/types";
-import { clearDraft } from "@/tools/listing-flyer/engine/draft-storage";
+import { clearDraft, saveDraft } from "@/tools/listing-flyer/engine/draft-storage";
 import { waitForPhoto } from "@/tools/listing-flyer/engine/photos";
 import { mapFlyerToShowcase } from "@/tools/listing-flyer/engine/template-mapping";
 import { renderTimelineToWebm } from "@/tools/listing-flyer/engine/render-mp4";
@@ -66,6 +66,10 @@ export function ExportButtons({
 
   const handlePdfExport = async () => {
     if (!canExport) return;
+    // Force-flush draft to localStorage BEFORE export. Bypasses the
+    // page-level debounced save so even if iOS Safari mishandles the new
+    // tab and the user loses the editor tab, reload restores their work.
+    saveDraft(draft);
     setPdfState({ kind: "generating" });
     try {
       // Downsample + re-encode every photo to a small JPEG data URL before
@@ -95,6 +99,9 @@ export function ExportButtons({
 
   const handleMp4Export = async () => {
     if (!canExport) return;
+    // Same pre-export flush as PDF: a long render + new-tab nav is the
+    // exact window where iOS Safari can drop the editor session.
+    saveDraft(draft);
     const canvas = hiddenCanvasRef.current;
     if (!canvas) {
       setMp4State({

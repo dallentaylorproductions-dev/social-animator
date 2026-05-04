@@ -218,16 +218,27 @@ export async function webmToMp4(
 
 /**
  * Trigger a browser download of the given Blob with the given filename.
+ *
+ * iOS Safari notes (the WebKitBlobResource bug):
+ *  - target="_blank" forces the new tab so the editor tab is never
+ *    navigated. Without this Safari opens the blob inline in the
+ *    current tab and a back-nav fails ("WebKitBlobResource error 1"),
+ *    losing the editor session.
+ *  - Revocation is deferred 60s so the new tab has time to render the
+ *    blob. Synchronous revoke (the prior 1s timer was effectively that)
+ *    races the tab swap on iOS and produces a blank page.
  */
 export function downloadBlob(blob: Blob, filename: string): void {
   const url = URL.createObjectURL(blob);
   const a = document.createElement("a");
   a.href = url;
   a.download = filename;
+  a.target = "_blank";
+  a.rel = "noopener";
   document.body.appendChild(a);
   a.click();
   document.body.removeChild(a);
-  setTimeout(() => URL.revokeObjectURL(url), 1000);
+  setTimeout(() => URL.revokeObjectURL(url), 60_000);
 }
 
 /**
