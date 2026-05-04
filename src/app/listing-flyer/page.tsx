@@ -153,25 +153,18 @@ export default function ListingFlyerPage() {
 
         <BrandBanner configured={brandConfigured} />
 
-        <div className="flex flex-col-reverse gap-6 lg:grid lg:grid-cols-[1fr_420px] lg:gap-10 mt-6">
-          <section>
-            <FlyerForm
-              draft={draft}
-              onChange={setDraft}
-              photos={photos}
-              onAddPhotos={handleAddPhotos}
-              onRemovePhoto={handleRemovePhoto}
-              onMovePhoto={handleMovePhoto}
-              uploadError={uploadError}
-              brand={brand}
-            />
-          </section>
-
-          <aside className="sticky top-0 z-20 -mx-6 lg:mx-0 px-6 lg:px-0 pt-3 lg:pt-6 pb-3 lg:pb-0 bg-neutral-950 lg:bg-transparent border-b border-neutral-800/60 lg:border-0 lg:self-start">
+        {/* Mobile portrait flow (top to bottom):
+              [order-1] sticky preview, top-pinned, ~30vh
+              [order-2] scrollable form, bottom-padded so last field clears the export bar
+              [order-3] sticky export action bar, bottom-pinned
+            Desktop (lg:): 2-col grid; preview+exports in the right aside,
+            form fills the left column. Mobile-only export bar is lg:hidden. */}
+        <div className="flex flex-col gap-6 lg:grid lg:grid-cols-[1fr_420px] lg:gap-10 mt-6">
+          <aside className="order-1 lg:order-2 sticky top-0 z-20 -mx-6 lg:mx-0 px-6 lg:px-0 pt-3 lg:pt-6 pb-3 lg:pb-0 bg-neutral-950 lg:bg-transparent border-b border-neutral-800/60 lg:border-0 shadow-md shadow-black/40 lg:shadow-none lg:self-start">
             <p className="text-[10px] uppercase tracking-[0.15em] text-neutral-500 mb-3">
               Live preview
             </p>
-            <div className="mx-auto max-w-[150px] lg:max-w-none">
+            <div className="mx-auto max-w-[180px] lg:max-w-none">
               <FlyerPreview
                 draft={draft}
                 photos={photos}
@@ -188,18 +181,27 @@ export default function ListingFlyerPage() {
             </div>
           </aside>
 
-          {/* On mobile, render export buttons inline at end of form so the
-              sticky preview stays compact. */}
-          <section className="lg:hidden">
-            <div className="pt-5 border-t border-neutral-800/60">
-              <ExportButtons
-                draft={draft}
-                photos={photos}
-                brand={effectiveBrand}
-                brandLogoImg={brandLogoImg}
-              />
-            </div>
+          <section className="order-2 lg:order-1 pb-32 lg:pb-0">
+            <FlyerForm
+              draft={draft}
+              onChange={setDraft}
+              photos={photos}
+              onAddPhotos={handleAddPhotos}
+              onRemovePhoto={handleRemovePhoto}
+              onMovePhoto={handleMovePhoto}
+              uploadError={uploadError}
+              brand={brand}
+            />
           </section>
+
+          <div className="order-3 sticky bottom-0 z-20 -mx-6 px-6 py-3 bg-neutral-950 border-t border-neutral-800/60 shadow-[0_-4px_12px_rgba(0,0,0,0.4)] lg:hidden">
+            <ExportButtons
+              draft={draft}
+              photos={photos}
+              brand={effectiveBrand}
+              brandLogoImg={brandLogoImg}
+            />
+          </div>
         </div>
       </div>
     </main>
