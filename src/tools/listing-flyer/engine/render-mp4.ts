@@ -31,6 +31,10 @@ export async function renderTimelineToWebm(
 
   let rafId = 0;
   let startTs: number | null = null;
+  let frameCount = 0;
+  console.log(
+    `[MP4-DEBUG] renderTimelineToWebm: ${size.width}x${size.height} duration=${seconds}s bg=${background}`
+  );
 
   const frame = (ts: DOMHighResTimeStamp) => {
     if (startTs === null) startTs = ts;
@@ -44,9 +48,20 @@ export async function renderTimelineToWebm(
     timeline.render(t, ctx);
 
     // Heartbeat pixel — keeps captureStream emitting frames during static
-    // holds (matches what Canvas.tsx does for live editor exports).
-    ctx.fillStyle = `rgba(0,0,0,${((t * 1000) % 1) * 0.001 + 0.0005})`;
-    ctx.fillRect(0, 0, 1, 1);
+    // holds. Vary BOTH the channel value (mod 256, so the pixel actually
+    // changes color frame-to-frame, not just sub-byte alpha that an
+    // encoder might dedupe) AND the (x,y) position so iOS Safari's
+    // captureStream registers each tick as a real frame difference.
+    const tick = frameCount % 256;
+    ctx.fillStyle = `rgb(${tick},${tick},${tick})`;
+    ctx.fillRect(frameCount % 2, 0, 1, 1);
+
+    frameCount += 1;
+    if (frameCount % 30 === 0) {
+      console.log(
+        `[MP4-DEBUG] frame ${frameCount} @ t=${t.toFixed(2)}s`
+      );
+    }
 
     if (t < seconds + 0.2) {
       rafId = requestAnimationFrame(frame);

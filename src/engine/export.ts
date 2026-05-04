@@ -32,6 +32,17 @@ export function getFFmpeg(): Promise<FFmpeg> {
 /**
  * Record a canvas for the given duration and return a WebM Blob.
  * Progress callback fires with 0..1 during recording.
+ *
+ * Mobile/iOS notes:
+ *  - mime candidates are ordered with mp4/avc1 first when on mobile so
+ *    iOS Safari picks its native encoder up front (it can't do webm);
+ *    desktop Chrome/Edge still get vp9/vp8 first via fallthrough.
+ *  - Stream tracks get explicitly stopped after recording to release
+ *    iOS Safari's hold on the canvas — without this, calling
+ *    canvas.captureStream() a second time on the same canvas (e.g.
+ *    when the flyer tool exports both reel + square) may yield a
+ *    stream that doesn't capture frames on iOS, producing a static
+ *    video for the second size.
  */
 export async function recordCanvas(
   canvas: HTMLCanvasElement,
@@ -41,13 +52,22 @@ export async function recordCanvas(
 ): Promise<Blob> {
   const stream = canvas.captureStream(fps);
 
-  const mimeCandidates = [
-    "video/webm;codecs=vp9",
-    "video/webm;codecs=vp8",
-    "video/webm",
-    "video/mp4;codecs=avc1.42E01E", // Safari/iOS native
-    "video/mp4",
-  ];
+  const isMobile = isMobileDevice();
+  const mimeCandidates = isMobile
+    ? [
+        "video/mp4;codecs=avc1.42E01E", // iOS Safari native
+        "video/mp4",
+        "video/webm;codecs=vp9",
+        "video/webm;codecs=vp8",
+        "video/webm",
+      ]
+    : [
+        "video/webm;codecs=vp9",
+        "video/webm;codecs=vp8",
+        "video/webm",
+        "video/mp4;codecs=avc1.42E01E",
+        "video/mp4",
+      ];
   const mimeType = mimeCandidates.find((m) => MediaRecorder.isTypeSupported(m));
   if (!mimeType) {
     throw new Error(
@@ -55,24 +75,47 @@ export async function recordCanvas(
     );
   }
 
+  console.log(
+    `[MP4-DEBUG] recordCanvas: mobile=${isMobile} mime=${mimeType} canvas=${canvas.width}x${canvas.height} duration=${durationSec}s`
+  );
+
   const recorder = new MediaRecorder(stream, {
     mimeType,
     videoBitsPerSecond: 8_000_000,
   });
   const chunks: Blob[] = [];
+  let chunkCount = 0;
+  let totalBytes = 0;
   recorder.ondataavailable = (e) => {
-    if (e.data && e.data.size > 0) chunks.push(e.data);
+    if (e.data && e.data.size > 0) {
+      chunks.push(e.data);
+      chunkCount += 1;
+      totalBytes += e.data.size;
+    }
   };
 
   return new Promise<Blob>((resolve, reject) => {
     recorder.onstop = () => {
       const blob = new Blob(chunks, { type: mimeType });
+      console.log(
+        `[MP4-DEBUG] recordCanvas stop: chunks=${chunkCount} totalBytes=${totalBytes} blobSize=${blob.size}`
+      );
+      // Release the canvas's captureStream tracks so a subsequent
+      // captureStream() call on the same canvas gets a fresh stream.
+      // iOS Safari otherwise leaves the prior stream in a half-bound
+      // state on the second invocation.
+      try {
+        stream.getTracks().forEach((t) => t.stop());
+      } catch {
+        // ignore — best-effort cleanup
+      }
       resolve(blob);
     };
     recorder.onerror = (e) =>
       reject(new Error(`MediaRecorder error: ${String(e)}`));
 
     recorder.start(100);
+    console.log(`[MP4-DEBUG] recordCanvas: recorder.start() ok, state=${recorder.state}`);
 
     const startTime = performance.now();
     const tick = () => {
@@ -82,6 +125,10 @@ export async function recordCanvas(
       if (elapsed < durationSec) {
         requestAnimationFrame(tick);
       } else {
+        const actualDuration = (performance.now() - startTime) / 1000;
+        console.log(
+          `[MP4-DEBUG] recordCanvas: target ${durationSec}s, actual ${actualDuration.toFixed(2)}s — calling recorder.stop()`
+        );
         try {
           recorder.stop();
         } catch (err) {
@@ -115,7 +162,11 @@ export async function webmToMp4(
   const inputName = `input.${inputExt}`;
 
   try {
-    await ffmpeg.writeFile(inputName, await fetchFile(webmBlob));
+    const inputBytes = await fetchFile(webmBlob);
+    console.log(
+      `[MP4-DEBUG] webmToMp4: input ${inputName} (${inputBytes.byteLength} bytes, type=${webmBlob.type}) → ${targetSize.width}x${targetSize.height} for ${durationSec}s`
+    );
+    await ffmpeg.writeFile(inputName, inputBytes);
 
     // Force exact output duration:
     //  - tpad clones the last frame for durationSec extra seconds
@@ -151,7 +202,9 @@ export async function webmToMp4(
     }
     const buffer = new ArrayBuffer(data.byteLength);
     new Uint8Array(buffer).set(data);
-    return new Blob([buffer], { type: "video/mp4" });
+    const out = new Blob([buffer], { type: "video/mp4" });
+    console.log(`[MP4-DEBUG] webmToMp4: output ${out.size} bytes`);
+    return out;
   } finally {
     ffmpeg.off("progress", progressHandler);
     try {
