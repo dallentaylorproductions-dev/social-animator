@@ -134,7 +134,12 @@ export const listingShowcaseTemplate: TemplateConfig = {
     // of the house. Anchoring to a canvas-height proportion keeps the hero
     // usably tall at every aspect, and drawImageCover then center-crops both
     // axes to keep the subject framed.
-    const heroH = Math.floor(height * (isShort ? 0.42 : 0.46));
+    // 9:16 hero bumped from 0.46 → 0.52 to (a) make the hero more visually
+    // dominant (it's the focal point of a real-estate flyer) and (b) absorb
+    // the vertical slack that opened up when CHANGE 14 anchored the bottom
+    // row to the frame bottom — without the bump, 9:16 had ~220pt of empty
+    // canvas between the stats line and the features list.
+    const heroH = Math.floor(height * (isShort ? 0.42 : 0.52));
     const heroX = horizontalMargin;
     const heroY = topMargin;
     const heroW = width - horizontalMargin * 2;
@@ -239,7 +244,22 @@ export const listingShowcaseTemplate: TemplateConfig = {
         (state.agentLicense?.trim() ? agentRowGap + agentLicenseSize : 0)
       : 0;
     const bottomRowH = Math.max(featureColH, agentColH);
-    const bottomSectionY = height - bottomMargin - bottomRowH;
+
+    // Anchor strategy differs by aspect:
+    //   1:1 (isShort): height-constrained — anchor bottom row to frame
+    //     bottom (with bottomMargin inset) so it pushes UP into whatever
+    //     slack is left between info block and bottom margin.
+    //   9:16 (tall):  was creating a 220pt void mid-canvas with the same
+    //     bottom-anchor strategy. Switch to info-block-anchored: bottom row
+    //     flows directly under stats with the same gap rhythm as the rest
+    //     of the info block. With the heroH 0.46→0.52 bump, the slack now
+    //     sits as breathing room at the BOTTOM of the frame (~120-150pt),
+    //     reading as deliberate margin rather than mid-page emptiness.
+    const gapStatsToBottom = isShort ? 17 : 27;
+    const statsEndY = statsY + statsFontSize / 2;
+    const bottomSectionY = isShort
+      ? height - bottomMargin - bottomRowH
+      : statsEndY + gapStatsToBottom;
 
     // ── Parse price for count-up ────────────────────────────────────────
     const cleanedPrice = (state.price ?? "").replace(/,/g, "");
