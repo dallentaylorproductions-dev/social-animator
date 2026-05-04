@@ -14,9 +14,11 @@ export default async function DashboardPage() {
   const greetingName = email ? email.split("@")[0] : "";
 
   return (
-    <main className="min-h-screen bg-neutral-950 text-white">
+    <main className="min-h-screen bg-neutral-950 text-white overflow-x-hidden">
       <div className="max-w-5xl mx-auto px-6 py-12 lg:py-20">
-        <header className="mb-12 flex items-start justify-between gap-6">
+        {/* Mobile: stack the heading group above the nav (Settings + Sign
+            out) so neither clips the viewport. md+: side-by-side as before. */}
+        <header className="mb-12 flex flex-col gap-4 md:flex-row md:items-start md:justify-between md:gap-6">
           <div>
             <p className="text-xs uppercase tracking-[0.2em] text-[#4ef2d9]">
               Simply Edit Pro Studio
