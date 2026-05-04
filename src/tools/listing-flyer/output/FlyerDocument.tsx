@@ -9,7 +9,7 @@ import {
   StyleSheet,
 } from "@react-pdf/renderer";
 import { type FlyerDraft } from "../engine/types";
-import { type BrandSettings } from "@/lib/brand";
+import { type BrandSettings, formatPhone } from "@/lib/brand";
 import { pickContrastText, pickContrastMuted } from "../engine/contrast";
 
 interface FlyerDocumentProps {
@@ -250,7 +250,7 @@ export function FlyerDocument({ draft, photoUrls, brand }: FlyerDocumentProps) {
           <View>
             {brand.contactPhone ? (
               <Text style={[styles.headerRight, { color: "#fff" }]}>
-                {brand.contactPhone}
+                {formatPhone(brand.contactPhone)}
               </Text>
             ) : null}
             {brand.contactEmail ? (
@@ -355,7 +355,7 @@ export function FlyerDocument({ draft, photoUrls, brand }: FlyerDocumentProps) {
               : ""}
           </Text>
           <Text style={styles.footerRight}>
-            {[brand.contactPhone, brand.contactEmail]
+            {[formatPhone(brand.contactPhone), brand.contactEmail]
               .filter(Boolean)
               .join("  ·  ")}
           </Text>

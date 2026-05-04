@@ -5,6 +5,8 @@ import {
   type BrandSettings,
   loadBrandSettings,
   saveBrandSettings,
+  formatPhone,
+  extractPhoneDigits,
 } from "@/lib/brand";
 
 /**
@@ -133,10 +135,13 @@ export function BrandProfileForm() {
           />
         </Field>
         <Field label="Contact phone">
+          {/* Storage is raw 10 digits; display is "(xxx) xxx-xxxx". Strips
+           * non-digits on every change so iOS phone-keypad characters like
+           * # * + never reach storage. */}
           <TextInput
             type="tel"
-            value={s.contactPhone}
-            onChange={(v) => update("contactPhone", v)}
+            value={formatPhone(s.contactPhone)}
+            onChange={(v) => update("contactPhone", extractPhoneDigits(v))}
             placeholder="(555) 123-4567"
           />
         </Field>

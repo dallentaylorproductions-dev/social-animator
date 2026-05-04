@@ -1,7 +1,7 @@
 "use client";
 
 import { type FlyerDraft, type FlyerPhoto } from "@/tools/listing-flyer/engine/types";
-import { type BrandSettings } from "@/lib/brand";
+import { type BrandSettings, formatPhone } from "@/lib/brand";
 import {
   pickContrastText,
   pickContrastMuted,
@@ -80,7 +80,7 @@ export function FlyerPreview({ draft, photos, brand }: FlyerPreviewProps) {
           </p>
         </div>
         <div className="text-right text-[13px] opacity-80 leading-tight">
-          {brand.contactPhone && <div>{brand.contactPhone}</div>}
+          {brand.contactPhone && <div>{formatPhone(brand.contactPhone)}</div>}
           {brand.contactEmail && <div>{brand.contactEmail}</div>}
         </div>
       </div>
@@ -216,7 +216,7 @@ export function FlyerPreview({ draft, photos, brand }: FlyerPreviewProps) {
           {brand.licenseNumber && ` · ${brand.licenseNumber}`}
         </span>
         <span className="opacity-70 truncate">
-          {[brand.contactPhone, brand.contactEmail].filter(Boolean).join("  ·  ")}
+          {[formatPhone(brand.contactPhone), brand.contactEmail].filter(Boolean).join("  ·  ")}
         </span>
       </div>
     </div>
