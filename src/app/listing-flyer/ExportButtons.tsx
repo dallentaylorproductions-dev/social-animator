@@ -14,7 +14,12 @@ import { mapFlyerToShowcase } from "@/tools/listing-flyer/engine/template-mappin
 import { renderTimelineToWebm } from "@/tools/listing-flyer/engine/render-mp4";
 import { FlyerDocument } from "@/tools/listing-flyer/output/FlyerDocument";
 import { listingShowcaseTemplate } from "@/templates/listing-showcase";
-import { downloadBlob, getFFmpeg, webmToMp4 } from "@/engine/export";
+import {
+  downloadBlob,
+  getFFmpeg,
+  shareOrDownload,
+  webmToMp4,
+} from "@/engine/export";
 import { type BrandSettings } from "@/lib/brand";
 
 interface ExportButtonsProps {
@@ -84,8 +89,19 @@ export function ExportButtons({
       const blob = await pdf(
         <FlyerDocument draft={draft} photoUrls={photoDataUrls} brand={brand} />
       ).toBlob();
-      downloadBlob(blob, `${addressSlug(draft.addressLine1)}-flyer.pdf`);
-      clearDraft();
+      // Route through shareOrDownload, NOT a plain anchor click. On iOS
+      // Safari the share sheet is a non-navigational overlay — the editor
+      // tab is never disturbed. Anchor-click + target="_blank" turned out
+      // to be unreliable for blob URLs on iOS (H-1.7e attempted that and
+      // still hit "WebKitBlobResource error 1" on back-nav).
+      const filename = `${addressSlug(draft.addressLine1)}-flyer.pdf`;
+      const result = await shareOrDownload(blob, filename);
+      // Only clear the draft when the file actually shipped. If the user
+      // dismissed the share sheet (cancelled), keep the draft so they can
+      // retry without re-typing the form.
+      if (result === "shared" || result === "downloaded") {
+        clearDraft();
+      }
       setPdfState({ kind: "done" });
       setTimeout(() => setPdfState({ kind: "idle" }), 3000);
     } catch (err) {
