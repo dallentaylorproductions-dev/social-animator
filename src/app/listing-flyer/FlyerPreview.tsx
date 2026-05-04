@@ -78,11 +78,16 @@ export function FlyerPreview({ draft, photos, brand }: FlyerPreviewProps) {
             LOGO
           </div>
         )}
-        <div className="flex-1 min-w-0">
-          <p className="text-[12px] font-semibold truncate">
+        {/* No `truncate` on agent name + brokerage — the PDF (FlyerDocument)
+            renders both in full, and an ellipsis in the preview misled
+            users into thinking their export would also be cut off. Allow
+            wrap; leading-tight + the parent's flex-1 min-w-0 still keep
+            the layout from blowing out horizontally. */}
+        <div className="flex-1 min-w-0 leading-tight">
+          <p className="text-[12px] font-semibold">
             {brand.agentName || "Your name"}
           </p>
-          <p className="text-[13px] opacity-70 truncate">
+          <p className="text-[13px] opacity-70">
             {brand.brokerage || "Brokerage"}
           </p>
         </div>
