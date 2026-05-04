@@ -117,6 +117,16 @@ export const listingShowcaseTemplate: TemplateConfig = {
     const heroImg = assets?.heroPhoto ?? null;
     const agentLogoImg = assets?.agentLogo ?? null;
 
+    // Runtime duration override. The Listing Flyer tool's slider passes a
+    // value via state.duration (5-15s). Standalone callers leave it unset
+    // and fall through to the DURATION constant. Entry timing is fixed at
+    // ~3.3s regardless — only the trailing dwell scales.
+    const requested = parseFloat(state.duration ?? "");
+    const runtimeDuration =
+      Number.isFinite(requested) && requested >= 5 && requested <= 15
+        ? requested
+        : DURATION;
+
     // ── Aspect-aware layout ─────────────────────────────────────────────
     // Square (1:1) is height-constrained — compress vertical sizing.
     const isShort = height < 1300;
@@ -276,13 +286,18 @@ export const listingShowcaseTemplate: TemplateConfig = {
     const tracks: Track[] = [];
 
     // ── 1. Hero photo with Ken Burns zoom ───────────────────────────────
+    // Fixed-rate zoom (1% per second of runtime duration) keeps the motion
+    // feel consistent across slider values: at 5s the hero zooms 1.00→1.05
+    // (subtle), at 15s it goes 1.00→1.15 (cinematic). Spreading a fixed 8%
+    // total over 15s instead reads as sleepy.
+    const heroZoomTotal = 0.01 * runtimeDuration;
     tracks.push({
       id: "hero",
       start: 0,
-      duration: DURATION,
+      duration: runtimeDuration,
       easing: linear,
       onUpdate: (p, ctx) => {
-        const zoom = 1.0 + 0.08 * p;
+        const zoom = 1.0 + heroZoomTotal * p;
         const cx = heroX + heroW / 2;
         const cy = heroY + heroH / 2;
 
