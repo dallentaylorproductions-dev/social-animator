@@ -1,4 +1,4 @@
-import { type FlyerDraft, EMPTY_DRAFT } from "./types";
+import { type FlyerDraft, EMPTY_DRAFT, clampDuration } from "./types";
 
 const STORAGE_KEY = "listingFlyer:draft";
 
@@ -31,6 +31,9 @@ export function loadDraft(): FlyerDraft {
       primaryColor: str(parsed.primaryColor),
       accentColor: str(parsed.accentColor),
       backgroundColor: str(parsed.backgroundColor),
+      // Clamp to [MIN_DURATION, MAX_DURATION]; missing field (drafts saved
+      // before H-1.6) falls through to the DEFAULT_DURATION inside clampDuration.
+      duration: clampDuration(parsed.duration),
     };
   } catch {
     return EMPTY_DRAFT;
