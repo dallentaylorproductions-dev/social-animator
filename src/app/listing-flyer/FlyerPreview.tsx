@@ -41,9 +41,16 @@ export function FlyerPreview({ draft, photos, brand }: FlyerPreviewProps) {
 
   return (
     <div
-      className="shadow-2xl mx-auto overflow-hidden"
+      // The outer card no longer forces an 8.5/11 aspect ratio with
+      // overflow-hidden. The content (header + body + photos + footer) was
+      // naturally taller than 8.5/11 at typical preview widths, so the
+      // bottom (and especially the photo grid) was getting clipped — the
+      // "user sees only the top corner" symptom on mobile. Letting the
+      // card take natural height shows the whole flyer; ScaleToFit (in
+      // page.tsx, mobile only) scales the rendered card down to fit a
+      // fixed-height sticky pane on small viewports.
+      className="shadow-2xl mx-auto overflow-hidden rounded-md"
       style={{
-        aspectRatio: "8.5 / 11",
         maxWidth: "100%",
         backgroundColor: background,
         color: textPrimary,

@@ -1,6 +1,6 @@
 "use client";
 
-import { useEffect, useRef, useState } from "react";
+import { useEffect, useRef, useState, type ReactNode } from "react";
 import Link from "next/link";
 import { useBrandSettings } from "@/lib/brand";
 import {
@@ -164,7 +164,19 @@ export default function ListingFlyerPage() {
             <p className="text-[10px] uppercase tracking-[0.15em] text-neutral-500 mb-3">
               Live preview
             </p>
-            <div className="mx-auto max-w-[180px] lg:max-w-none">
+            {/* Mobile: ScaleToFit measures the FlyerPreview's natural rendered
+                size and scales it down to fit a fixed 28vh pane, centered.
+                Desktop: render natively inside the aside column. */}
+            <div className="lg:hidden">
+              <ScaleToFit className="h-[28vh] w-full">
+                <FlyerPreview
+                  draft={draft}
+                  photos={photos}
+                  brand={effectiveBrand}
+                />
+              </ScaleToFit>
+            </div>
+            <div className="hidden lg:block">
               <FlyerPreview
                 draft={draft}
                 photos={photos}
@@ -235,6 +247,77 @@ function BrandBanner({ configured }: { configured: boolean }) {
       >
         Open Settings →
       </Link>
+    </div>
+  );
+}
+
+/**
+ * Centers a fixed-natural-size child and scales it (uniform, preserves aspect
+ * ratio) to fit the wrapper's box. Caps scale at 1 so a small child doesn't
+ * get blown up. Used on the mobile sticky preview pane to show the entire
+ * FlyerPreview card inside ~28vh, no clipping, no upscale.
+ *
+ * Implementation: ResizeObserver on both the outer wrapper and the inner
+ * (untransformed) measurement; recompute scale = min(outerW/innerW,
+ * outerH/innerH, 1) any time either resizes. The child renders at its
+ * natural intrinsic size and is then visually scaled with CSS transform.
+ */
+function ScaleToFit({
+  className,
+  children,
+}: {
+  className?: string;
+  children: ReactNode;
+}) {
+  const outerRef = useRef<HTMLDivElement>(null);
+  const innerRef = useRef<HTMLDivElement>(null);
+  const [scale, setScale] = useState(0);
+
+  useEffect(() => {
+    const outer = outerRef.current;
+    const inner = innerRef.current;
+    if (!outer || !inner) return;
+
+    const compute = () => {
+      const ow = outer.clientWidth;
+      const oh = outer.clientHeight;
+      // scrollWidth/scrollHeight measure the inner's untransformed natural
+      // size — the transform on innerRef doesn't affect these.
+      const iw = inner.scrollWidth;
+      const ih = inner.scrollHeight;
+      if (iw === 0 || ih === 0 || ow === 0 || oh === 0) return;
+      setScale(Math.min(ow / iw, oh / ih, 1));
+    };
+
+    compute();
+    const ro = new ResizeObserver(compute);
+    ro.observe(outer);
+    ro.observe(inner);
+    return () => ro.disconnect();
+  }, []);
+
+  return (
+    <div
+      ref={outerRef}
+      className={`flex items-center justify-center overflow-hidden ${className ?? ""}`}
+    >
+      <div
+        ref={innerRef}
+        style={{
+          // Explicit width so the child's maxWidth:100% resolves to a
+          // meaningful number (otherwise inner sizes to content and content
+          // sizes to inner — circular). 380 ≈ the desktop aside-column
+          // width the preview was originally tuned for.
+          width: 380,
+          transform: scale > 0 ? `scale(${scale})` : undefined,
+          transformOrigin: "center",
+          flexShrink: 0,
+          // Hide until first measurement to avoid the natural-size flash.
+          visibility: scale > 0 ? "visible" : "hidden",
+        }}
+      >
+        {children}
+      </div>
     </div>
   );
 }
