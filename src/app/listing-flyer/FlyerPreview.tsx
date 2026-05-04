@@ -2,6 +2,10 @@
 
 import { type FlyerDraft, type FlyerPhoto } from "@/tools/listing-flyer/engine/types";
 import { type BrandSettings } from "@/lib/brand";
+import {
+  pickContrastText,
+  pickContrastMuted,
+} from "@/tools/listing-flyer/engine/contrast";
 
 interface FlyerPreviewProps {
   draft: FlyerDraft;
@@ -21,6 +25,13 @@ export function FlyerPreview({ draft, photos, brand }: FlyerPreviewProps) {
   const heroPhoto = photos[0];
   const additionalPhotos = photos.slice(1);
   const primary = brand.primaryColor || "#4ef2d9";
+  const background = brand.backgroundColor || "#ffffff";
+
+  // Auto-flip text colors so dark backgrounds remain readable. Same formula
+  // used in FlyerDocument so the preview matches the PDF.
+  const textPrimary = pickContrastText(background);
+  const textMuted = pickContrastMuted(background);
+  const badgeTextColor = pickContrastText(primary);
 
   // Stats row text — only render parts that are filled in
   const statsParts: string[] = [];
@@ -30,10 +41,12 @@ export function FlyerPreview({ draft, photos, brand }: FlyerPreviewProps) {
 
   return (
     <div
-      className="bg-white text-neutral-900 shadow-2xl mx-auto overflow-hidden"
+      className="shadow-2xl mx-auto overflow-hidden"
       style={{
         aspectRatio: "8.5 / 11",
         maxWidth: "100%",
+        backgroundColor: background,
+        color: textPrimary,
         fontFamily:
           "'Inter', -apple-system, BlinkMacSystemFont, system-ui, sans-serif",
       }}
@@ -59,14 +72,14 @@ export function FlyerPreview({ draft, photos, brand }: FlyerPreviewProps) {
           </div>
         )}
         <div className="flex-1 min-w-0">
-          <p className="text-[10px] font-semibold truncate">
+          <p className="text-[12px] font-semibold truncate">
             {brand.agentName || "Your name"}
           </p>
-          <p className="text-[8px] opacity-70 truncate">
+          <p className="text-[13px] opacity-70 truncate">
             {brand.brokerage || "Brokerage"}
           </p>
         </div>
-        <div className="text-right text-[8px] opacity-80 leading-tight">
+        <div className="text-right text-[13px] opacity-80 leading-tight">
           {brand.contactPhone && <div>{brand.contactPhone}</div>}
           {brand.contactEmail && <div>{brand.contactEmail}</div>}
         </div>
@@ -77,7 +90,7 @@ export function FlyerPreview({ draft, photos, brand }: FlyerPreviewProps) {
         {draft.status && (
           <span
             className="inline-block text-[8px] font-bold uppercase tracking-wider px-2 py-1 rounded-full"
-            style={{ backgroundColor: primary, color: "#000" }}
+            style={{ backgroundColor: primary, color: badgeTextColor }}
           >
             {draft.status}
           </span>
@@ -109,7 +122,10 @@ export function FlyerPreview({ draft, photos, brand }: FlyerPreviewProps) {
               {draft.addressLine1 || "Street address"}
             </h1>
             {draft.addressLine2 && (
-              <p className="text-[10px] text-neutral-600 truncate">
+              <p
+                className="text-[10px] truncate"
+                style={{ color: textMuted }}
+              >
                 {draft.addressLine2}
               </p>
             )}
@@ -124,30 +140,50 @@ export function FlyerPreview({ draft, photos, brand }: FlyerPreviewProps) {
 
         {/* Stats */}
         {statsParts.length > 0 && (
-          <p className="mt-2 text-[10px] font-semibold tracking-wide text-neutral-700">
+          <p
+            className="mt-2 text-[10px] font-semibold tracking-wide"
+            style={{ color: textPrimary }}
+          >
             {statsParts.join("  •  ")}
           </p>
         )}
 
-        {/* Features */}
-        {draft.features.filter((f) => f.trim()).length > 0 && (
-          <ul className="mt-3 space-y-1">
-            {draft.features
-              .filter((f) => f.trim())
-              .map((feature, i) => (
+        {/* Features — 2-column bulleted grid mirroring the PDF layout */}
+        {(() => {
+          const cleaned = draft.features.filter((f) => f.trim());
+          if (cleaned.length === 0) return null;
+          const useTwoCols = cleaned.length >= 4;
+          const splitAt = useTwoCols
+            ? Math.ceil(cleaned.length / 2)
+            : cleaned.length;
+          const leftFeatures = cleaned.slice(0, splitAt);
+          const rightFeatures = cleaned.slice(splitAt);
+
+          const renderColumn = (items: string[], keyPrefix: string) => (
+            <ul className="space-y-1 flex-1">
+              {items.map((feature, i) => (
                 <li
-                  key={i}
-                  className="text-[9px] text-neutral-700 flex items-start gap-2"
+                  key={`${keyPrefix}-${i}`}
+                  className="text-[9px] flex items-start gap-2"
+                  style={{ color: textPrimary }}
                 >
                   <span
                     className="mt-0.5 inline-block w-1.5 h-1.5 rounded-full flex-shrink-0"
                     style={{ backgroundColor: primary }}
                   />
-                  {feature}
+                  <span className="flex-1">{feature}</span>
                 </li>
               ))}
-          </ul>
-        )}
+            </ul>
+          );
+
+          return (
+            <div className="mt-3 flex gap-6">
+              {renderColumn(leftFeatures, "l")}
+              {useTwoCols && renderColumn(rightFeatures, "r")}
+            </div>
+          );
+        })()}
 
         {/* Photo grid */}
         {additionalPhotos.length > 0 && (
@@ -172,7 +208,7 @@ export function FlyerPreview({ draft, photos, brand }: FlyerPreviewProps) {
 
       {/* Footer band */}
       <div
-        className="absolute-not-really mt-auto px-5 py-2 text-white text-[7px] flex items-center justify-between"
+        className="absolute-not-really mt-auto px-5 py-2 text-white text-[9px] flex items-center justify-between"
         style={{ backgroundColor: brand.accentColor || "#0a0a0a" }}
       >
         <span className="truncate">

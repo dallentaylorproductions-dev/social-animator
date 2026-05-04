@@ -10,6 +10,7 @@ import {
 } from "@react-pdf/renderer";
 import { type FlyerDraft } from "../engine/types";
 import { type BrandSettings } from "@/lib/brand";
+import { pickContrastText, pickContrastMuted } from "../engine/contrast";
 
 interface FlyerDocumentProps {
   draft: FlyerDraft;
@@ -53,22 +54,24 @@ const styles = StyleSheet.create({
     paddingLeft: 12,
   },
   headerName: {
-    fontSize: 12,
+    fontSize: 15,
     fontFamily: "Helvetica-Bold",
   },
   headerBrokerage: {
-    fontSize: 9,
+    fontSize: 14,
     opacity: 0.7,
   },
   headerRight: {
-    fontSize: 8,
+    fontSize: 13,
     textAlign: "right",
     opacity: 0.85,
   },
   body: {
     paddingHorizontal: MARGIN,
     paddingTop: 12,
-    paddingBottom: 12,
+    // Bottom padding clears the absolute-positioned footer band (~32pt) plus
+    // breathing room so the photo grid never visually collides with it.
+    paddingBottom: 60,
   },
   statusBadge: {
     alignSelf: "flex-start",
@@ -121,7 +124,14 @@ const styles = StyleSheet.create({
     marginTop: 8,
   },
   features: {
+    flexDirection: "row",
     marginTop: 14,
+  },
+  featureCol: {
+    flex: 1,
+  },
+  featureColGap: {
+    width: 24,
   },
   featureRow: {
     flexDirection: "row",
@@ -137,7 +147,6 @@ const styles = StyleSheet.create({
   },
   featureText: {
     fontSize: 10,
-    color: "#262626",
     lineHeight: 1.4,
     flex: 1,
   },
@@ -149,7 +158,11 @@ const styles = StyleSheet.create({
   },
   gridPhoto: {
     width: "49%",
-    height: 110,
+    // Cells are sized against (pageHeight − header − footer − bodyPad −
+    // contentAboveGrid), not pageHeight alone. At 4-5 photos in a 2×2 grid
+    // with 5 chip features above, 110pt overflowed onto a phantom page 2;
+    // 95pt clears comfortably across the worst-case test matrix.
+    height: 95,
     objectFit: "cover",
     borderRadius: 3,
     backgroundColor: "#e5e5e5",
@@ -166,11 +179,11 @@ const styles = StyleSheet.create({
     color: "#fff",
   },
   footerLeft: {
-    fontSize: 8,
+    fontSize: 10,
     fontFamily: "Helvetica-Bold",
   },
   footerRight: {
-    fontSize: 8,
+    fontSize: 10,
     opacity: 0.8,
   },
 });
@@ -180,6 +193,15 @@ export function FlyerDocument({ draft, photoUrls, brand }: FlyerDocumentProps) {
   const additionalUrls = photoUrls.slice(1);
   const primary = brand.primaryColor || "#4ef2d9";
   const accent = brand.accentColor || "#0a0a0a";
+  const background = brand.backgroundColor || "#ffffff";
+
+  // Auto-flip text colors based on background luminance so the page remains
+  // readable across light/dark backgrounds. Same formula used by FlyerPreview
+  // so the on-screen preview matches the PDF.
+  const textPrimary = pickContrastText(background);
+  const textMuted = pickContrastMuted(background);
+  // Status badge sits on `primary`, not the page bg — separate contrast check.
+  const badgeTextColor = pickContrastText(primary);
 
   const statsParts: string[] = [];
   if (draft.beds)
@@ -190,12 +212,22 @@ export function FlyerDocument({ draft, photoUrls, brand }: FlyerDocumentProps) {
 
   const features = draft.features.filter((f) => f.trim().length > 0);
 
+  // Two-column grid kicks in at ≥4 features (5→3+2, 4→2+2). 1-3 features
+  // stay single-column — splitting "3" as 2/1 looks lopsided.
+  const useTwoCols = features.length >= 4;
+  const splitAt = useTwoCols ? Math.ceil(features.length / 2) : features.length;
+  const leftFeatures = features.slice(0, splitAt);
+  const rightFeatures = features.slice(splitAt);
+
   return (
     <Document
       title={`Listing Flyer — ${draft.addressLine1 || "Untitled"}`}
       author={brand.agentName || undefined}
     >
-      <Page size="LETTER" style={styles.page}>
+      <Page
+        size="LETTER"
+        style={[styles.page, { backgroundColor: background, color: textPrimary }]}
+      >
         {/* Header band */}
         <View style={[styles.header, { backgroundColor: accent, color: "#fff" }]}>
           {brand.logoDataUrl ? (
@@ -232,7 +264,12 @@ export function FlyerDocument({ draft, photoUrls, brand }: FlyerDocumentProps) {
         {/* Body */}
         <View style={styles.body}>
           {draft.status ? (
-            <Text style={[styles.statusBadge, { backgroundColor: primary }]}>
+            <Text
+              style={[
+                styles.statusBadge,
+                { backgroundColor: primary, color: badgeTextColor },
+              ]}
+            >
               {draft.status}
             </Text>
           ) : null}
@@ -245,7 +282,9 @@ export function FlyerDocument({ draft, photoUrls, brand }: FlyerDocumentProps) {
                 {draft.addressLine1 || "Street address"}
               </Text>
               {draft.addressLine2 ? (
-                <Text style={styles.addressLine2}>{draft.addressLine2}</Text>
+                <Text style={[styles.addressLine2, { color: textMuted }]}>
+                  {draft.addressLine2}
+                </Text>
               ) : null}
             </View>
             <Text style={[styles.price, { color: primary }]}>
@@ -254,22 +293,47 @@ export function FlyerDocument({ draft, photoUrls, brand }: FlyerDocumentProps) {
           </View>
 
           {statsParts.length > 0 ? (
-            <Text style={styles.stats}>{statsParts.join("    •    ")}</Text>
+            <Text style={[styles.stats, { color: textPrimary }]}>
+              {statsParts.join("    •    ")}
+            </Text>
           ) : null}
 
           {features.length > 0 ? (
             <View style={styles.features}>
-              {features.map((feature, i) => (
-                <View key={i} style={styles.featureRow}>
-                  <View
-                    style={[
-                      styles.featureBullet,
-                      { backgroundColor: primary },
-                    ]}
-                  />
-                  <Text style={styles.featureText}>{feature}</Text>
-                </View>
-              ))}
+              <View style={styles.featureCol}>
+                {leftFeatures.map((feature, i) => (
+                  <View key={i} style={styles.featureRow}>
+                    <View
+                      style={[styles.featureBullet, { backgroundColor: primary }]}
+                    />
+                    <Text style={[styles.featureText, { color: textPrimary }]}>
+                      {feature}
+                    </Text>
+                  </View>
+                ))}
+              </View>
+              {useTwoCols ? (
+                <>
+                  <View style={styles.featureColGap} />
+                  <View style={styles.featureCol}>
+                    {rightFeatures.map((feature, i) => (
+                      <View key={i} style={styles.featureRow}>
+                        <View
+                          style={[
+                            styles.featureBullet,
+                            { backgroundColor: primary },
+                          ]}
+                        />
+                        <Text
+                          style={[styles.featureText, { color: textPrimary }]}
+                        >
+                          {feature}
+                        </Text>
+                      </View>
+                    ))}
+                  </View>
+                </>
+              ) : null}
             </View>
           ) : null}
 
@@ -286,7 +350,9 @@ export function FlyerDocument({ draft, photoUrls, brand }: FlyerDocumentProps) {
         <View style={[styles.footer, { backgroundColor: accent }]}>
           <Text style={styles.footerLeft}>
             {brand.agentName || "Your name"}
-            {brand.licenseNumber ? `  ·  ${brand.licenseNumber}` : ""}
+            {brand.licenseNumber
+              ? `  ·  License #${brand.licenseNumber.replace(/^#/, "")}`
+              : ""}
           </Text>
           <Text style={styles.footerRight}>
             {[brand.contactPhone, brand.contactEmail]

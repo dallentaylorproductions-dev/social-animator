@@ -1,39 +1,49 @@
 import { Timeline, type Track } from "@/engine/timeline";
 import { easeOutCubic, easeOutBack, linear } from "@/engine/easing";
-import { drawImageCover, wrapText } from "@/engine/draw";
+import { drawImageCover, drawImageContain, wrapText } from "@/engine/draw";
 import type { TemplateConfig } from "./types";
 
 /**
- * Listing Showcase — luxury-paced 14s reveal of a single listing. Modeled on
- * Listing Card but slower and more dramatic, designed to be watched (not
- * scrolled past). Powers the MP4 export from the Listing Flyer Generator
- * tool, but also fully usable standalone in Social Animator.
+ * Listing Showcase — social-native 8s reveal.
  *
- * Pacing:
- *   t=0–14s  hero photo Ken Burns zoom (1.0 → 1.08)
- *   t=1.0s   status badge slides in from left
- *   t=2.0s   address rises in
- *   t=2.3s   city/state rises in
- *   t=4.0s   price reveal with overshoot
- *   t=6.0s   stats stagger in (beds → baths → sqft, 0.2s offset each)
- *   t=8.0s   features reveal one by one (0.4s offset each, up to 5)
- *   t=12.0s  agent contact card slides up from bottom (if name or phone set)
- *   t=13.0s  final hold
+ * Layout (vertically stacked, three regions):
+ *   1. Hero photo with Ken Burns zoom (top — fixed fraction of canvas height)
+ *   2. Info block (badge → address → city → price → stats), compact stack
+ *   3. Bottom section: features (left column, up to 5) + agent info (right
+ *      column: logo, name, brokerage, phone, license #)
+ *
+ * Aspect awareness: hero gets a fixed PROPORTION of canvas height instead of
+ * "whatever's left after content stacks". That keeps the hero usable at both
+ * 9:16 (Reel/Story) and 1:1 (Square) — center-cropping a phone-shaped photo
+ * into a reasonable rectangle, instead of squeezing it to a thin band at 1:1.
+ *
+ * Pacing — compressed from the original 14s "luxury" version to 8s for
+ * social-native viewing. Reels/Stories want info up FAST so the viewer
+ * has time to read; H-1.5v further tightened entries to land within the
+ * first 3.3s, leaving ~4.7s of static dwell — the inverse of the old
+ * "5.4s entry, 2.6s dwell" ratio that read as too leisurely on social.
+ *
+ *   t=0–8s    hero Ken Burns zoom (1.0 → 1.08, linear over full duration)
+ *   t=0.3s    status badge slides in from left
+ *   t=0.7s    address rises in
+ *   t=0.9s    city/state rises in
+ *   t=1.3s    price reveal with overshoot + count-up
+ *   t=1.9s    stats stagger in (beds → baths → sqft, 0.10s offset)
+ *   t=2.4s    features stagger in (left column, 0.15s offset, MAX 5)
+ *   t=2.7s    agent info card fades in (right column, slight rise)
+ *   t=3.3s    last entry lands; static dwell to t=8s
  */
-const DURATION = 14;
+const DURATION = 8;
 
 export const listingShowcaseTemplate: TemplateConfig = {
   id: "listing-showcase",
   name: "Listing Showcase",
   description:
-    "Luxury-paced 14-second reveal of a single listing — slow zoom, dramatic price moment, feature highlights. Pairs with the Listing Flyer tool.",
+    "Luxury-paced 14-second reveal of a single listing — slow zoom, dramatic price moment, feature highlights with agent contact card. Pairs with the Listing Flyer tool.",
   duration: DURATION,
   fields: [
     { key: "heroPhoto", label: "Hero photo", type: "image", default: "" },
-    { key: "photo2", label: "Photo 2 (optional)", type: "image", default: "" },
-    { key: "photo3", label: "Photo 3 (optional)", type: "image", default: "" },
-    { key: "photo4", label: "Photo 4 (optional)", type: "image", default: "" },
-    { key: "photo5", label: "Photo 5 (optional)", type: "image", default: "" },
+    { key: "agentLogo", label: "Agent logo (optional)", type: "image", default: "" },
     {
       key: "status",
       label: "Status",
@@ -48,20 +58,32 @@ export const listingShowcaseTemplate: TemplateConfig = {
     { key: "sqft", label: "Sq ft", type: "text", default: "2,840" },
     {
       key: "features",
-      label: "Feature bullets (one per line)",
+      label: "Feature bullets (one per line — up to 5)",
       type: "textarea",
       default:
-        "Chef's kitchen with quartz counters\nPrimary suite with spa bath\nFinished basement\nFenced backyard\n2-car garage",
+        "Chef's kitchen with quartz counters\nPrimary suite with spa bath\nFinished basement",
     },
     {
       key: "agentName",
-      label: "Agent name (end-card, optional)",
+      label: "Agent name",
+      type: "text",
+      default: "",
+    },
+    {
+      key: "agentBrokerage",
+      label: "Brokerage",
       type: "text",
       default: "",
     },
     {
       key: "agentPhone",
-      label: "Agent phone (end-card, optional)",
+      label: "Agent phone",
+      type: "text",
+      default: "",
+    },
+    {
+      key: "agentLicense",
+      label: "License # (optional)",
       type: "text",
       default: "",
     },
@@ -74,8 +96,8 @@ export const listingShowcaseTemplate: TemplateConfig = {
     { key: "statsColor", label: "Stats", type: "color", default: "#ffffff" },
     { key: "featureColor", label: "Feature bullets", type: "color", default: "#4ef2d9" },
     { key: "featureTextColor", label: "Feature text", type: "color", default: "#ffffff" },
-    { key: "agentCardColor", label: "Agent card", type: "color", default: "#171717" },
-    { key: "agentCardTextColor", label: "Agent card text", type: "color", default: "#ffffff" },
+    { key: "agentNameColor", label: "Agent name", type: "color", default: "#ffffff" },
+    { key: "agentMutedColor", label: "Agent body text", type: "color", default: "#9ca3af" },
   ],
   sampleAssets: { heroPhoto: "/sample-assets/exterior.webp" },
   sampleState: {
@@ -86,78 +108,161 @@ export const listingShowcaseTemplate: TemplateConfig = {
     beds: "4",
     baths: "3",
     sqft: "2,840",
+    agentName: "Jordan Reeves",
+    agentBrokerage: "Skyline Realty",
+    agentPhone: "(503) 555-0188",
   },
   build(state, size, assets) {
     const { width, height } = size;
     const heroImg = assets?.heroPhoto ?? null;
+    const agentLogoImg = assets?.agentLogo ?? null;
 
-    // Layout — same proportions as listing-card so the user-experience is
-    // familiar across both templates.
-    const topMargin = 80;
-    const bottomMargin = 80;
+    // ── Aspect-aware layout ─────────────────────────────────────────────
+    // Square (1:1) is height-constrained — compress vertical sizing.
+    const isShort = height < 1300;
 
-    const badgeFontSize = 32;
-    const badgePaddingH = 24;
-    const badgePaddingV = 12;
+    // Square (1:1) gets a slightly tighter horizontal margin so the hero box
+    // has more horizontal room to work with. With center-cropping a typical
+    // landscape phone photo (4:3) into a wider box, more of the photo's
+    // useful content (the front door, key features) stays visible.
+    const horizontalMargin = isShort ? 40 : 60;
+    const topMargin = isShort ? 60 : 80;
+    const bottomMargin = isShort ? 50 : 60;
+
+    // Hero: fixed proportion of canvas height. Pre-H-1.5 the height was
+    // computed as "whatever's left after the content stack" and squashed to
+    // a 300px sliver at 1:1 — center-cropping that thin band lost the front
+    // of the house. Anchoring to a canvas-height proportion keeps the hero
+    // usably tall at every aspect, and drawImageCover then center-crops both
+    // axes to keep the subject framed.
+    // 9:16 hero bumped from 0.46 → 0.52 to (a) make the hero more visually
+    // dominant (it's the focal point of a real-estate flyer) and (b) absorb
+    // the vertical slack that opened up when CHANGE 14 anchored the bottom
+    // row to the frame bottom — without the bump, 9:16 had ~220pt of empty
+    // canvas between the stats line and the features list.
+    const heroH = Math.floor(height * (isShort ? 0.42 : 0.52));
+    const heroX = horizontalMargin;
+    const heroY = topMargin;
+    const heroW = width - horizontalMargin * 2;
+    const heroCorner = isShort ? 24 : 32;
+
+    // Info block: badge / address / city / price / stats
+    const badgeFontSize = isShort ? 26 : 32;
+    const badgePaddingH = isShort ? 20 : 24;
+    const badgePaddingV = isShort ? 9 : 12;
     const badgeHeight = badgeFontSize + badgePaddingV * 2;
 
-    const addressFontSize = 56;
-    const cityStateFontSize = 32;
-    const priceFontSize = 120;
-    const statsFontSize = 30;
-    const featureFontSize = 28;
-    const featureLineHeight = 42;
+    const addressFontSize = isShort ? 42 : 56;
+    const cityStateFontSize = isShort ? 24 : 32;
+    // Price was a billboard at 88/120pt — still the dominant info-side
+    // element at 72/96pt, but no longer crowding everything else.
+    const priceFontSize = isShort ? 72 : 96;
+    const statsFontSize = isShort ? 24 : 30;
 
-    const gapPhotoToBadge = 56;
-    const gapBadgeToAddress = 40;
-    const gapAddressToCity = 24;
-    const gapCityToPrice = 44;
-    const gapPriceToStats = 40;
-    const gapStatsToFeatures = 32;
+    // Inter-group gaps tightened ~25% to remove dead vertical space between
+    // sections without crossing into "cramped". Hero, badge, address, price,
+    // stats, and bottom block read as a deliberate rhythm now.
+    const gapHeroToBadge = isShort ? 21 : 30;
+    const gapBadgeToAddress = isShort ? 14 : 21;
+    const gapAddressToCity = isShort ? 11 : 17;
+    const gapCityToPrice = isShort ? 17 : 27;
+    const gapPriceToStats = isShort ? 18 : 27;
 
-    // Estimate features block height (assumes one wrapped line per feature).
+    const contentX = horizontalMargin;
+    const heroBottom = heroY + heroH;
+    const badgeY = heroBottom + gapHeroToBadge;
+    const addressY = badgeY + badgeHeight + gapBadgeToAddress + addressFontSize / 2;
+    const cityStateY = addressY + addressFontSize / 2 + gapAddressToCity + cityStateFontSize / 2;
+    const priceY = cityStateY + cityStateFontSize / 2 + gapCityToPrice + priceFontSize / 2;
+    const statsY = priceY + priceFontSize / 2 + gapPriceToStats + statsFontSize / 2;
+
+    // Two-column split with a gap in the middle. On 9:16, feature bullets
+    // ("Indoor Pool", "Open Bar") are short and don't need an even half of
+    // the canvas width — so we give the agent column more room. On 1:1 the
+    // 50/50 split was truncating "Chef's kitchen with quartz counters" once
+    // CHANGE 14 bumped the feature font; rebalance to 55/45 so longer
+    // feature copy renders in full while leaving enough agent-side budget
+    // for "Aaron Thomas Home Team".
+    const columnGap = isShort ? 40 : 60;
+    const featuresColRatio = isShort ? 0.55 : 0.35;
+    const usableW = width - horizontalMargin * 2 - columnGap;
+    const featuresColW = Math.floor(usableW * featuresColRatio);
+    const agentColW = usableW - featuresColW;
+    const leftColX = horizontalMargin;
+    const rightColX = horizontalMargin + featuresColW + columnGap;
+
+    // Features (left column). Bumped ~17-20% over the H-1.5o sizes once the
+    // bottom section started anchoring to the frame bottom — the freed-up
+    // slack absorbs the bigger type without crowding hero/info above.
+    const featureFontSize = isShort ? 28 : 36;
+    const featureLineHeight = isShort ? 44 : 58;
+    const featureBulletRadius = isShort ? 6 : 8;
+
+    // Agent info (right column) — header row (logo + name side-by-side) on
+    // top, then a tight stack of brokerage / phone / license below. Header
+    // row height = logo size; logo and name are vertical-center-aligned.
+    const logoSize = isShort ? 48 : 64;
+    const logoToNameGap = 12;
+    const agentNameSize = isShort ? 28 : 38;
+    // Secondary agent text bumped a second time after the bottom section
+    // gained vertical slack from frame-bottom anchoring. Header is still
+    // dominant — name > brokerage > phone > license.
+    const agentBrokerageSize = isShort ? 25 : 31;
+    const agentPhoneSize = isShort ? 25 : 31;
+    const agentLicenseSize = isShort ? 19 : 25;
+    const agentRowGap = isShort ? 4 : 6;
+
+    // ── Parse features ──────────────────────────────────────────────────
     const featureLines = (state.features ?? "")
       .split(/\n/)
       .map((s) => s.trim())
       .filter(Boolean)
-      .slice(0, 5);
-    const featuresBlockHeight = featureLines.length * featureLineHeight;
+      .slice(0, 5); // matches MAX_FEATURES — PDF and MP4 are now in parity
 
-    const contentBlockHeight =
-      badgeHeight +
-      gapBadgeToAddress +
-      addressFontSize +
-      gapAddressToCity +
-      cityStateFontSize +
-      gapCityToPrice +
-      priceFontSize +
-      gapPriceToStats +
-      statsFontSize +
-      (featuresBlockHeight > 0 ? gapStatsToFeatures + featuresBlockHeight : 0);
-
-    const photoH = Math.max(
-      300,
-      height - topMargin - bottomMargin - contentBlockHeight - gapPhotoToBadge
+    // ── Bottom section anchor ───────────────────────────────────────────
+    // Anchor the bottom row to the frame bottom (with bottomMargin inset)
+    // instead of stacking it at gapStatsToBottom below the info block.
+    // With 5 features instead of 3, the bottom row got taller; bottom-
+    // anchoring lets the row push UP into the slack space rather than
+    // crowding stats/price above. The empty space between the info block
+    // and the bottom row absorbs whatever's left.
+    const hasAgentContent = !!(
+      state.agentName?.trim() ||
+      state.agentBrokerage?.trim() ||
+      state.agentPhone?.trim() ||
+      agentLogoImg
     );
-    const photoX = 60;
-    const photoY = topMargin;
-    const photoW = width - 120;
-    const photoCorner = 32;
+    const featureColH =
+      featureLines.length > 0
+        ? logoSize / 2 +
+          (featureLines.length - 1) * featureLineHeight +
+          featureFontSize / 2
+        : 0;
+    const agentColH = hasAgentContent
+      ? logoSize +
+        (state.agentBrokerage?.trim() ? agentRowGap + agentBrokerageSize : 0) +
+        (state.agentPhone?.trim() ? agentRowGap + agentPhoneSize : 0) +
+        (state.agentLicense?.trim() ? agentRowGap + agentLicenseSize : 0)
+      : 0;
+    const bottomRowH = Math.max(featureColH, agentColH);
 
-    const contentX = photoX;
-    const badgeY = photoY + photoH + gapPhotoToBadge;
-    const addressY =
-      badgeY + badgeHeight + gapBadgeToAddress + addressFontSize / 2;
-    const cityStateY =
-      addressY + addressFontSize / 2 + gapAddressToCity + cityStateFontSize / 2;
-    const priceY =
-      cityStateY + cityStateFontSize / 2 + gapCityToPrice + priceFontSize / 2;
-    const statsY =
-      priceY + priceFontSize / 2 + gapPriceToStats + statsFontSize / 2;
-    const featuresStartY =
-      statsY + statsFontSize / 2 + gapStatsToFeatures + featureLineHeight / 2;
+    // Anchor strategy differs by aspect:
+    //   1:1 (isShort): height-constrained — anchor bottom row to frame
+    //     bottom (with bottomMargin inset) so it pushes UP into whatever
+    //     slack is left between info block and bottom margin.
+    //   9:16 (tall):  was creating a 220pt void mid-canvas with the same
+    //     bottom-anchor strategy. Switch to info-block-anchored: bottom row
+    //     flows directly under stats with the same gap rhythm as the rest
+    //     of the info block. With the heroH 0.46→0.52 bump, the slack now
+    //     sits as breathing room at the BOTTOM of the frame (~120-150pt),
+    //     reading as deliberate margin rather than mid-page emptiness.
+    const gapStatsToBottom = isShort ? 17 : 27;
+    const statsEndY = statsY + statsFontSize / 2;
+    const bottomSectionY = isShort
+      ? height - bottomMargin - bottomRowH
+      : statsEndY + gapStatsToBottom;
 
-    // Price count-up (same parser as Stat Highlight / Listing Card)
+    // ── Parse price for count-up ────────────────────────────────────────
     const cleanedPrice = (state.price ?? "").replace(/,/g, "");
     const priceMatch = cleanedPrice.match(/^([^\d.-]*)([-+]?\d*\.?\d+)(.*)$/);
     const pricePrefix = priceMatch?.[1] ?? "";
@@ -170,23 +275,20 @@ export const listingShowcaseTemplate: TemplateConfig = {
 
     const tracks: Track[] = [];
 
-    // 1. Hero photo with Ken Burns zoom — runs the full duration so the
-    //    image is always visible. Linear easing for a constant-rate zoom feel.
+    // ── 1. Hero photo with Ken Burns zoom ───────────────────────────────
     tracks.push({
       id: "hero",
       start: 0,
       duration: DURATION,
       easing: linear,
       onUpdate: (p, ctx) => {
-        const zoom = 1.0 + 0.08 * p; // 1.00 → 1.08
-        const cx = photoX + photoW / 2;
-        const cy = photoY + photoH / 2;
+        const zoom = 1.0 + 0.08 * p;
+        const cx = heroX + heroW / 2;
+        const cy = heroY + heroH / 2;
 
         ctx.save();
-        // Clip to the rounded photo box so the zoom doesn't bleed onto
-        // content below.
         ctx.beginPath();
-        ctx.roundRect(photoX, photoY, photoW, photoH, photoCorner);
+        ctx.roundRect(heroX, heroY, heroW, heroH, heroCorner);
         ctx.clip();
 
         ctx.translate(cx, cy);
@@ -194,13 +296,15 @@ export const listingShowcaseTemplate: TemplateConfig = {
         ctx.translate(-cx, -cy);
 
         if (heroImg) {
-          drawImageCover(ctx, heroImg, photoX, photoY, photoW, photoH, 0);
+          // drawImageCover always center-crops both axes; combined with the
+          // 0.46-of-canvas hero height, 1:1 now keeps the middle band of a
+          // typical landscape phone photo instead of a thin sliver.
+          drawImageCover(ctx, heroImg, heroX, heroY, heroW, heroH, 0);
         } else {
-          // Placeholder when no photo is uploaded
           ctx.fillStyle = "#1a1a1a";
-          ctx.fillRect(photoX, photoY, photoW, photoH);
+          ctx.fillRect(heroX, heroY, heroW, heroH);
           ctx.fillStyle = "#666";
-          ctx.font = "28px Inter, system-ui, sans-serif";
+          ctx.font = `${isShort ? 22 : 28}px Inter, system-ui, sans-serif`;
           ctx.textAlign = "center";
           ctx.textBaseline = "middle";
           ctx.fillText("Add a hero photo →", cx, cy);
@@ -209,11 +313,11 @@ export const listingShowcaseTemplate: TemplateConfig = {
       },
     });
 
-    // 2. Status badge (slides in from left at t=1s)
+    // ── 2. Status badge ─────────────────────────────────────────────────
     tracks.push({
       id: "badge",
-      start: 1.0,
-      duration: 0.5,
+      start: 0.3,
+      duration: 0.25,
       easing: easeOutBack,
       onUpdate: (p, ctx) => {
         const offsetX = (1 - p) * -200;
@@ -237,11 +341,11 @@ export const listingShowcaseTemplate: TemplateConfig = {
       },
     });
 
-    // 3. Address (rises in at t=2s)
+    // ── 3. Address ──────────────────────────────────────────────────────
     tracks.push({
       id: "address",
-      start: 2.0,
-      duration: 0.5,
+      start: 0.7,
+      duration: 0.25,
       easing: easeOutCubic,
       onUpdate: (p, ctx) => {
         ctx.globalAlpha = p;
@@ -254,11 +358,11 @@ export const listingShowcaseTemplate: TemplateConfig = {
       },
     });
 
-    // 4. City/state (rises in at t=2.3s)
+    // ── 4. City/state ───────────────────────────────────────────────────
     tracks.push({
       id: "cityState",
-      start: 2.3,
-      duration: 0.5,
+      start: 0.9,
+      duration: 0.25,
       easing: easeOutCubic,
       onUpdate: (p, ctx) => {
         ctx.globalAlpha = p;
@@ -271,20 +375,15 @@ export const listingShowcaseTemplate: TemplateConfig = {
       },
     });
 
-    // 5. Price (dramatic reveal at t=4s — overshoot scale + count-up)
+    // ── 5. Price (overshoot + count-up) ─────────────────────────────────
     tracks.push({
       id: "price",
-      start: 4.0,
-      duration: 0.7,
-      // No track-level easing; we apply easeOutBack to scale and easeOutCubic
-      // to the count-up separately.
+      start: 1.3,
+      duration: 0.3,
       onUpdate: (p, ctx) => {
-        // Scale flourish: easeOutBack 0.7 → 1.0
         const scaleEased = easeOutBack(Math.min(1, p));
         const scale = 0.7 + scaleEased * 0.3;
 
-        // Count-up runs slightly into the reveal so the final number lands
-        // crisp at p=1.
         const countEased = easeOutCubic(Math.min(1, p));
         const currentValue = priceTarget * countEased;
         const formatted =
@@ -293,7 +392,6 @@ export const listingShowcaseTemplate: TemplateConfig = {
             : Math.round(currentValue).toLocaleString();
 
         ctx.globalAlpha = Math.min(1, p * 1.3);
-        // Anchor scale around price's left baseline so it grows rightward
         ctx.translate(contentX, priceY);
         ctx.scale(scale, scale);
         ctx.fillStyle = state.priceColor;
@@ -304,7 +402,7 @@ export const listingShowcaseTemplate: TemplateConfig = {
       },
     });
 
-    // 6. Stats — stagger beds → baths → sqft at t=6s, 0.2s offset each
+    // ── 6. Stats stagger ────────────────────────────────────────────────
     const statItems = [
       { label: "BED", value: state.beds, plural: "BEDS" },
       { label: "BATH", value: state.baths, plural: "BATHS" },
@@ -314,8 +412,8 @@ export const listingShowcaseTemplate: TemplateConfig = {
     statItems.forEach((stat, i) => {
       tracks.push({
         id: `stat-${i}`,
-        start: 6.0 + i * 0.2,
-        duration: 0.5,
+        start: 1.9 + i * 0.1,
+        duration: 0.25,
         easing: easeOutCubic,
         onUpdate: (p, ctx) => {
           ctx.globalAlpha = p;
@@ -324,16 +422,12 @@ export const listingShowcaseTemplate: TemplateConfig = {
           ctx.font = `500 ${statsFontSize}px Inter, system-ui, sans-serif`;
           ctx.textAlign = "left";
           ctx.textBaseline = "middle";
-          // Render only the items up through this index — earlier items are
-          // already painted by their own tracks. We need to compute x-offset
-          // for this single item: bed first, then bath, then sqft.
           const before = statItems
             .slice(0, i)
             .map((s) =>
               `${s.value} ${s.value === "1" ? s.label : s.plural}  •  `
             )
             .join("");
-          ctx.font = `500 ${statsFontSize}px Inter, system-ui, sans-serif`;
           const beforeWidth = ctx.measureText(before).width;
           const text = `${stat.value} ${
             stat.value === "1" ? stat.label : stat.plural
@@ -343,125 +437,193 @@ export const listingShowcaseTemplate: TemplateConfig = {
       });
     });
 
-    // 7. Features — one by one starting at t=8s, 0.4s apart. Each track
-    //    extends to the end of the timeline so we can run a fade-out phase
-    //    just before the contact card slides in (otherwise the card visually
-    //    covers the feature bullets at its final resting position).
-    //
-    //    Phases per feature:
-    //      [start, start+0.4]                  fade in (rise + alpha)
-    //      [start+0.4, DURATION-2.5]           hold visible
-    //      [DURATION-2.5, DURATION-2.0]        fade out
-    //      [DURATION-2.0, DURATION]            invisible (card slides in)
-    const fadeInDur = 0.4;
-    const fadeOutStartT = DURATION - 2.5;
-    const fadeOutEndT = DURATION - 2.0;
+    // ── 7. Features (left column, max 3, no fade-out) ───────────────────
+    // First-feature optical center anchors to the agent column's header row
+    // center (bottomSectionY + logoSize/2). Without this, features sat at
+    // bottomSectionY + featureLineHeight/2 (e.g. y=+25) while the agent
+    // header centered at bottomSectionY + logoSize/2 (e.g. y=+32) — visibly
+    // off by a few pixels even though both columns "started" at the same Y.
+    const firstFeatureCenterY = bottomSectionY + logoSize / 2;
 
     featureLines.forEach((line, i) => {
-      const featureStartT = 8.0 + i * 0.4;
-      const trackDuration = Math.max(0.001, DURATION - featureStartT);
-
       tracks.push({
         id: `feature-${i}`,
-        start: featureStartT,
-        duration: trackDuration,
-        // No track-level easing; we apply easing per-phase inside onUpdate.
+        start: 2.4 + i * 0.15,
+        duration: 0.3,
+        easing: easeOutCubic,
         onUpdate: (p, ctx) => {
-          // Recover absolute time from track-relative progress.
-          const t = featureStartT + p * trackDuration;
+          ctx.globalAlpha = p;
+          ctx.translate(0, (1 - p) * 14);
 
-          let alpha: number;
-          let translateY = 0;
-          if (t < featureStartT + fadeInDur) {
-            const inP = (t - featureStartT) / fadeInDur;
-            alpha = easeOutCubic(inP);
-            translateY = (1 - inP) * 12;
-          } else if (t < fadeOutStartT) {
-            alpha = 1;
-          } else if (t < fadeOutEndT) {
-            const outP = (t - fadeOutStartT) / (fadeOutEndT - fadeOutStartT);
-            alpha = 1 - easeOutCubic(outP);
-          } else {
-            return; // fully invisible — skip painting
-          }
-
-          if (alpha <= 0) return;
-
-          ctx.globalAlpha = alpha;
-          if (translateY !== 0) ctx.translate(0, translateY);
-
-          const y = featuresStartY + i * featureLineHeight;
+          const y = firstFeatureCenterY + i * featureLineHeight;
           // Bullet
           ctx.fillStyle = state.featureColor;
           ctx.beginPath();
-          ctx.arc(contentX + 8, y, 7, 0, Math.PI * 2);
+          ctx.arc(leftColX + featureBulletRadius + 2, y, featureBulletRadius, 0, Math.PI * 2);
           ctx.fill();
           // Text
           ctx.fillStyle = state.featureTextColor;
           ctx.font = `500 ${featureFontSize}px Inter, system-ui, sans-serif`;
           ctx.textAlign = "left";
           ctx.textBaseline = "middle";
-          const maxW = width - contentX - 80;
+          const textX = leftColX + featureBulletRadius * 2 + 16;
+          const maxW = featuresColW - (featureBulletRadius * 2 + 16);
+          // Single-line truncate-via-wrap (we render only the first wrapped
+          // line so each feature stays on its own row even with long copy)
           const lines = wrapText(ctx, line, maxW);
-          lines.forEach((wrapped, lineIdx) => {
-            ctx.fillText(wrapped, contentX + 32, y + lineIdx * featureLineHeight);
-          });
+          if (lines.length > 0) {
+            ctx.fillText(lines[0], textX, y);
+          }
         },
       });
     });
 
-    // 8. Agent contact card — slides up from bottom at t=12s if either
-    //    agentName or agentPhone is set. Otherwise skip; the brand watermark
-    //    in the corner already handles agent identity.
-    const hasAgent = !!(
-      state.agentName?.trim() || state.agentPhone?.trim()
-    );
-    if (hasAgent) {
-      const cardHeight = 140;
-      const cardMargin = 60;
-      const cardX = cardMargin;
-      const cardY = height - cardMargin - cardHeight;
-      const cardWidth = width - cardMargin * 2;
-
+    // ── 8. Agent info card (right column, fade in + stay visible) ──────
+    if (hasAgentContent) {
       tracks.push({
         id: "agentCard",
-        start: DURATION - 2.0,
-        duration: 2.0,
+        start: 2.7,
+        duration: 0.4,
         easing: easeOutCubic,
         onUpdate: (p, ctx) => {
-          // Slide up from below the bottom edge
-          const offsetY = (1 - p) * (cardHeight + cardMargin + 40);
-          ctx.translate(0, offsetY);
           ctx.globalAlpha = p;
+          ctx.translate(0, (1 - p) * 20);
 
-          // Card background
-          ctx.fillStyle = state.agentCardColor;
-          ctx.beginPath();
-          ctx.roundRect(cardX, cardY, cardWidth, cardHeight, 16);
-          ctx.fill();
+          // Top-anchored: same Y as the first feature line so both columns
+          // start at the same horizontal level. No bottom-of-frame anchoring.
+          let cursorY = bottomSectionY;
 
-          // Agent name (left)
-          ctx.fillStyle = state.agentCardTextColor;
-          ctx.font = `700 36px Inter, system-ui, sans-serif`;
-          ctx.textAlign = "left";
-          ctx.textBaseline = "middle";
+          // Agent column's right boundary = canvas right edge minus the
+          // shared horizontalMargin. All agent content is truncated to this
+          // limit so long names/brokerages don't crowd the canvas right edge
+          // (which previously made the column visibly closer to the edge
+          // than the features-column gutter on the left).
+          const truncateToWidth = (text: string, maxW: number): string => {
+            if (ctx.measureText(text).width <= maxW) return text;
+            let truncated = text;
+            while (
+              truncated.length > 1 &&
+              ctx.measureText(truncated + "…").width > maxW
+            ) {
+              truncated = truncated.slice(0, -1);
+            }
+            return truncated + "…";
+          };
+
+          // ── Header row: logo + name side-by-side ─────────────────────
+          // Logo and name are vertically centered on each other so they
+          // read as one unit ("[LOGO] Aaron Thomas Home Team"), not as
+          // logo-stacked-above-name.
+          const headerRowHeight = state.agentName?.trim() || agentLogoImg
+            ? logoSize
+            : 0;
+          const headerCenterY = cursorY + logoSize / 2;
+          let textStartX = rightColX;
+          let usedLogoW = 0;
+
+          if (agentLogoImg) {
+            const aspect =
+              agentLogoImg.naturalWidth /
+              Math.max(1, agentLogoImg.naturalHeight);
+            usedLogoW = Math.min(agentColW * 0.45, logoSize * Math.min(2.2, aspect));
+            drawImageContain(
+              ctx,
+              agentLogoImg,
+              rightColX,
+              cursorY,
+              usedLogoW,
+              logoSize,
+              0
+            );
+            textStartX = rightColX + usedLogoW + logoToNameGap;
+          }
+
           if (state.agentName?.trim()) {
+            ctx.fillStyle = state.agentNameColor;
+            ctx.font = `700 ${agentNameSize}px Inter, system-ui, sans-serif`;
+            ctx.textAlign = "left";
+            ctx.textBaseline = "middle";
+            // Available width = column right edge minus where text starts.
+            const nameMaxW = rightColX + agentColW - textStartX;
             ctx.fillText(
-              state.agentName,
-              cardX + 32,
-              cardY + cardHeight / 2 - (state.agentPhone ? 18 : 0)
+              truncateToWidth(state.agentName, nameMaxW),
+              textStartX,
+              headerCenterY
             );
           }
 
-          // Phone (right or below name)
-          if (state.agentPhone?.trim()) {
-            ctx.font = `400 28px Inter, system-ui, sans-serif`;
+          if (headerRowHeight > 0) {
+            // Same gap below the header as between body lines — uniform
+            // spacing reads as one tight group rather than "header, then
+            // a paragraph below".
+            cursorY += headerRowHeight + agentRowGap;
+          }
+
+          // ── Brokerage ────────────────────────────────────────────────
+          if (state.agentBrokerage?.trim()) {
+            ctx.fillStyle = state.agentMutedColor;
+            ctx.font = `500 ${agentBrokerageSize}px Inter, system-ui, sans-serif`;
+            ctx.textAlign = "left";
+            ctx.textBaseline = "top";
             ctx.fillText(
-              state.agentPhone,
-              cardX + 32,
-              cardY +
-                cardHeight / 2 +
-                (state.agentName ? 22 : 0)
+              truncateToWidth(state.agentBrokerage, agentColW),
+              rightColX,
+              cursorY
+            );
+            cursorY += agentBrokerageSize + agentRowGap;
+          }
+
+          // ── Phone (with optional inline license #) ───────────────────
+          // Format license as "License #1234" so it doesn't read as a
+          // stray number. Inline with phone if it fits in the column,
+          // else fall through to its own line.
+          const phoneText = state.agentPhone?.trim() ?? "";
+          const licenseText = state.agentLicense?.trim()
+            ? `License #${state.agentLicense.trim().replace(/^#/, "")}`
+            : "";
+
+          if (phoneText) {
+            ctx.fillStyle = state.agentNameColor;
+            ctx.font = `500 ${agentPhoneSize}px Inter, system-ui, sans-serif`;
+            ctx.textAlign = "left";
+            ctx.textBaseline = "top";
+
+            const combined = licenseText
+              ? `${phoneText}  ·  ${licenseText}`
+              : phoneText;
+
+            if (licenseText && ctx.measureText(combined).width > agentColW) {
+              // Won't fit on one line — render phone now, license below.
+              ctx.fillText(
+                truncateToWidth(phoneText, agentColW),
+                rightColX,
+                cursorY
+              );
+              cursorY += agentPhoneSize + agentRowGap;
+              ctx.fillStyle = state.agentMutedColor;
+              ctx.font = `400 ${agentLicenseSize}px Inter, system-ui, sans-serif`;
+              ctx.fillText(
+                truncateToWidth(licenseText, agentColW),
+                rightColX,
+                cursorY
+              );
+            } else {
+              ctx.fillText(
+                truncateToWidth(combined, agentColW),
+                rightColX,
+                cursorY
+              );
+            }
+          } else if (licenseText) {
+            // No phone, license alone
+            ctx.fillStyle = state.agentMutedColor;
+            ctx.font = `400 ${agentLicenseSize}px Inter, system-ui, sans-serif`;
+            ctx.textAlign = "left";
+            ctx.textBaseline = "top";
+            ctx.fillText(
+              truncateToWidth(licenseText, agentColW),
+              rightColX,
+              cursorY
             );
           }
         },

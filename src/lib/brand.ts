@@ -8,6 +8,12 @@ export interface BrandSettings {
   agentName: string;
   primaryColor: string;
   accentColor: string;
+  /**
+   * Page/output background color. Reserved for tools that render their own
+   * artifact (e.g. Listing Flyer PDF). Brand-profile UI does not currently
+   * expose this — empty string means "use the tool's safe default".
+   */
+  backgroundColor: string;
   contactEmail: string;
   contactPhone: string;
   licenseNumber: string;
@@ -23,6 +29,7 @@ const DEFAULT_BRAND: BrandSettings = {
   agentName: "",
   primaryColor: "#4ef2d9",
   accentColor: "#ffffff",
+  backgroundColor: "",
   contactEmail: "",
   contactPhone: "",
   licenseNumber: "",
@@ -44,6 +51,7 @@ export function loadBrandSettings(): BrandSettings {
       agentName: str(parsed.agentName),
       primaryColor: str(parsed.primaryColor, DEFAULT_BRAND.primaryColor),
       accentColor: str(parsed.accentColor, DEFAULT_BRAND.accentColor),
+      backgroundColor: str(parsed.backgroundColor),
       contactEmail: str(parsed.contactEmail),
       contactPhone: str(parsed.contactPhone),
       licenseNumber: str(parsed.licenseNumber),

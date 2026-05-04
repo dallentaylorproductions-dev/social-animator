@@ -13,6 +13,20 @@ export interface FlyerDraft {
   sqft: string;
   /** Up to 5 short feature bullets. */
   features: string[];
+  /**
+   * Per-flyer color override. Empty string means "use brand profile color"
+   * — the form displays brand colors via `draft.primaryColor || brand.primaryColor`,
+   * the user typing into the input sets the override, and Reset clears
+   * back to "" to fall through to brand again.
+   */
+  primaryColor: string;
+  accentColor: string;
+  /**
+   * Per-flyer PDF background color override. Empty string means "use white"
+   * (brand profile doesn't currently expose a background color, so the
+   * fallback is the tool default rather than a brand value).
+   */
+  backgroundColor: string;
 }
 
 /** Photo entry held in component state only (NOT persisted to localStorage). */
@@ -36,6 +50,9 @@ export const EMPTY_DRAFT: FlyerDraft = {
   baths: "",
   sqft: "",
   features: [],
+  primaryColor: "",
+  accentColor: "",
+  backgroundColor: "",
 };
 
 export const MAX_PHOTOS = 5;

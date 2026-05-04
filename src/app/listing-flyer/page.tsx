@@ -25,7 +25,7 @@ export default function ListingFlyerPage() {
   const [photos, setPhotos] = useState<FlyerPhoto[]>([]);
   const [uploadError, setUploadError] = useState<string | null>(null);
   const [hydrated, setHydrated] = useState(false);
-  const { settings: brand } = useBrandSettings();
+  const { settings: brand, logoImg: brandLogoImg } = useBrandSettings();
   const saveTimerRef = useRef<ReturnType<typeof setTimeout> | null>(null);
   const errorTimerRef = useRef<ReturnType<typeof setTimeout> | null>(null);
 
@@ -120,6 +120,18 @@ export default function ListingFlyerPage() {
   const brandConfigured =
     !!brand.agentName || !!brand.logoDataUrl || !!brand.brokerage;
 
+  // Effective brand: per-flyer color overrides merged into the brand profile.
+  // Empty draft colors fall through to brand colors. Downstream code (form,
+  // preview, exports) just reads brand.primaryColor / brand.accentColor /
+  // brand.backgroundColor. backgroundColor's tool-default is white (brand
+  // profile doesn't expose a background color yet).
+  const effectiveBrand = {
+    ...brand,
+    primaryColor: draft.primaryColor || brand.primaryColor,
+    accentColor: draft.accentColor || brand.accentColor,
+    backgroundColor: draft.backgroundColor || brand.backgroundColor || "#ffffff",
+  };
+
   return (
     <main className="min-h-screen bg-neutral-950 text-white">
       <div className="max-w-6xl mx-auto p-6 lg:p-10">
@@ -151,6 +163,7 @@ export default function ListingFlyerPage() {
               onRemovePhoto={handleRemovePhoto}
               onMovePhoto={handleMovePhoto}
               uploadError={uploadError}
+              brand={brand}
             />
           </section>
 
@@ -159,10 +172,19 @@ export default function ListingFlyerPage() {
               Live preview
             </p>
             <div className="mx-auto max-w-[150px] lg:max-w-none">
-              <FlyerPreview draft={draft} photos={photos} brand={brand} />
+              <FlyerPreview
+                draft={draft}
+                photos={photos}
+                brand={effectiveBrand}
+              />
             </div>
             <div className="hidden lg:block mt-5 pt-5 border-t border-neutral-800/60">
-              <ExportButtons draft={draft} photos={photos} brand={brand} />
+              <ExportButtons
+                draft={draft}
+                photos={photos}
+                brand={effectiveBrand}
+                brandLogoImg={brandLogoImg}
+              />
             </div>
           </aside>
 
@@ -170,7 +192,12 @@ export default function ListingFlyerPage() {
               sticky preview stays compact. */}
           <section className="lg:hidden">
             <div className="pt-5 border-t border-neutral-800/60">
-              <ExportButtons draft={draft} photos={photos} brand={brand} />
+              <ExportButtons
+                draft={draft}
+                photos={photos}
+                brand={effectiveBrand}
+                brandLogoImg={brandLogoImg}
+              />
             </div>
           </section>
         </div>

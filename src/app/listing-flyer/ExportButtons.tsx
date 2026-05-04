@@ -20,7 +20,14 @@ import { type BrandSettings } from "@/lib/brand";
 interface ExportButtonsProps {
   draft: FlyerDraft;
   photos: FlyerPhoto[];
+  /**
+   * Effective brand — per-flyer color overrides already merged in by caller.
+   * Used as-is for PDF generation and MP4 mapping.
+   */
   brand: BrandSettings;
+  /** Materialized brand logo from useBrandSettings — passed into MP4 export
+   * so the listing-showcase template can render it in the agent card. */
+  brandLogoImg: HTMLImageElement | null;
 }
 
 type PdfState =
@@ -44,7 +51,12 @@ type Mp4State =
 
 const SHOWCASE_DURATION = listingShowcaseTemplate.duration;
 
-export function ExportButtons({ draft, photos, brand }: ExportButtonsProps) {
+export function ExportButtons({
+  draft,
+  photos,
+  brand,
+  brandLogoImg,
+}: ExportButtonsProps) {
   const [pdfState, setPdfState] = useState<PdfState>({ kind: "idle" });
   const [mp4State, setMp4State] = useState<Mp4State>({ kind: "idle" });
   const hiddenCanvasRef = useRef<HTMLCanvasElement>(null);
@@ -103,7 +115,12 @@ export function ExportButtons({ draft, photos, brand }: ExportButtonsProps) {
       // Wait for all photos to have materialized HTMLImageElements
       await Promise.all(photos.map((p) => waitForPhoto(p)));
 
-      const { state, assets } = mapFlyerToShowcase(draft, photos, brand);
+      const { state, assets } = mapFlyerToShowcase(
+        draft,
+        photos,
+        brand,
+        brandLogoImg
+      );
       const slug = addressSlug(draft.addressLine1);
 
       // Sequential renders — never concurrent (memory)

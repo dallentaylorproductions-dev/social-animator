@@ -7,6 +7,7 @@ import {
   MAX_PHOTOS,
   MAX_FEATURES,
 } from "@/tools/listing-flyer/engine/types";
+import { type BrandSettings } from "@/lib/brand";
 
 interface FlyerFormProps {
   draft: FlyerDraft;
@@ -17,6 +18,9 @@ interface FlyerFormProps {
   onMovePhoto: (id: string, direction: "up" | "down") => void;
   /** Transient error from photo upload (file too large, wrong type, etc). */
   uploadError?: string | null;
+  /** Brand profile (from Settings) — used as the fallback color and as the
+   * "Reset to brand defaults" target. */
+  brand: BrandSettings;
 }
 
 export function FlyerForm({
@@ -27,6 +31,7 @@ export function FlyerForm({
   onRemovePhoto,
   onMovePhoto,
   uploadError,
+  brand,
 }: FlyerFormProps) {
   const photoInputRef = useRef<HTMLInputElement>(null);
 
@@ -59,8 +64,65 @@ export function FlyerForm({
     if (photoInputRef.current) photoInputRef.current.value = "";
   };
 
+  // Per-flyer color overrides — empty draft value falls through to brand.
+  // Background falls back to white (brand profile doesn't expose one yet).
+  const effectivePrimary = draft.primaryColor || brand.primaryColor;
+  const effectiveAccent = draft.accentColor || brand.accentColor;
+  const effectiveBackground =
+    draft.backgroundColor || brand.backgroundColor || "#ffffff";
+  const hasColorOverride =
+    !!draft.primaryColor ||
+    !!draft.accentColor ||
+    !!draft.backgroundColor;
+
+  const resetColors = () =>
+    onChange({
+      ...draft,
+      primaryColor: "",
+      accentColor: "",
+      backgroundColor: "",
+    });
+
   return (
     <div className="space-y-6">
+      <div>
+        <div className="flex items-baseline justify-between mb-2">
+          <label className="block text-[10px] uppercase tracking-[0.15em] text-neutral-500">
+            Brand colors (this flyer)
+          </label>
+          {hasColorOverride && (
+            <button
+              type="button"
+              onClick={resetColors}
+              className="text-[10px] text-neutral-500 hover:text-[#4ef2d9] transition"
+            >
+              ↺ Reset to brand defaults
+            </button>
+          )}
+        </div>
+        <div className="grid grid-cols-3 gap-3">
+          <ColorInput
+            label="Primary"
+            value={effectivePrimary}
+            onChange={(v) => update("primaryColor", v)}
+          />
+          <ColorInput
+            label="Accent"
+            value={effectiveAccent}
+            onChange={(v) => update("accentColor", v)}
+          />
+          <ColorInput
+            label="Background"
+            value={effectiveBackground}
+            onChange={(v) => update("backgroundColor", v)}
+          />
+        </div>
+        <p className="text-[10px] text-neutral-600 mt-2 leading-relaxed">
+          Override colors for this flyer only — your brand profile in Settings
+          is unchanged.
+        </p>
+      </div>
+
       <Field label="Status (optional)">
         <TextInput
           value={draft.status}
@@ -275,5 +337,37 @@ function TextInput({
       placeholder={placeholder}
       className="w-full bg-neutral-900 border border-neutral-800 rounded-md px-3 py-2 text-sm focus:outline-none focus:border-[#4ef2d9]"
     />
+  );
+}
+
+function ColorInput({
+  label,
+  value,
+  onChange,
+}: {
+  label: string;
+  value: string;
+  onChange: (v: string) => void;
+}) {
+  return (
+    <div>
+      <span className="block text-[9px] uppercase tracking-[0.12em] text-neutral-600 mb-1.5">
+        {label}
+      </span>
+      <div className="flex items-center gap-2">
+        <input
+          type="color"
+          value={value || "#000000"}
+          onChange={(e) => onChange(e.target.value)}
+          className="w-10 h-9 rounded cursor-pointer bg-transparent border border-neutral-800 p-0.5"
+        />
+        <input
+          type="text"
+          value={value}
+          onChange={(e) => onChange(e.target.value)}
+          className="flex-1 bg-neutral-900 border border-neutral-800 rounded-md px-2 py-1.5 text-xs font-mono focus:outline-none focus:border-[#4ef2d9]"
+        />
+      </div>
+    </div>
   );
 }
