@@ -206,12 +206,20 @@ function ColorInput({
 }) {
   return (
     <div className="flex items-center gap-2">
-      <input
-        type="color"
-        value={value}
-        onChange={(e) => onChange(e.target.value)}
-        className="w-12 h-10 rounded cursor-pointer bg-transparent border border-neutral-800 p-0.5"
-      />
+      {/* Wrapper claims explicit 44×44pt (Apple HIG min tap target) so the
+       * swatch is visible in mobile Safari portrait. Native input is layered
+       * on top at opacity-0 so taps still trigger the system color picker. */}
+      <label
+        className="relative block w-11 h-11 rounded border border-neutral-800 cursor-pointer overflow-hidden flex-shrink-0"
+        style={{ backgroundColor: value || "#000000" }}
+      >
+        <input
+          type="color"
+          value={value}
+          onChange={(e) => onChange(e.target.value)}
+          className="absolute inset-0 w-full h-full opacity-0 cursor-pointer"
+        />
+      </label>
       <input
         type="text"
         value={value}

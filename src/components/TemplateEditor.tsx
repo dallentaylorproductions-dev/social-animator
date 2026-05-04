@@ -286,12 +286,23 @@ export function TemplateEditor({ template }: TemplateEditorProps) {
                     )}
                     {field.type === "color" && (
                       <div className="flex items-center gap-2">
-                        <input
-                          type="color"
-                          value={state[field.key] ?? "#000000"}
-                          onChange={(e) => updateField(field.key, e.target.value)}
-                          className="w-12 h-10 rounded cursor-pointer bg-transparent border border-neutral-800 p-0.5"
-                        />
+                        {/* 44×44pt wrapper — visible swatch in mobile Safari
+                         * portrait where the bare native input collapses. */}
+                        <label
+                          className="relative block w-11 h-11 rounded border border-neutral-800 cursor-pointer overflow-hidden flex-shrink-0"
+                          style={{
+                            backgroundColor: state[field.key] ?? "#000000",
+                          }}
+                        >
+                          <input
+                            type="color"
+                            value={state[field.key] ?? "#000000"}
+                            onChange={(e) =>
+                              updateField(field.key, e.target.value)
+                            }
+                            className="absolute inset-0 w-full h-full opacity-0 cursor-pointer"
+                          />
+                        </label>
                         <input
                           type="text"
                           value={state[field.key] ?? ""}
