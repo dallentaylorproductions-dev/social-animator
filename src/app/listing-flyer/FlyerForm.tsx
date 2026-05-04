@@ -6,6 +6,9 @@ import {
   type FlyerPhoto,
   MAX_PHOTOS,
   MAX_FEATURES,
+  MIN_DURATION,
+  MAX_DURATION,
+  clampDuration,
 } from "@/tools/listing-flyer/engine/types";
 import { type BrandSettings } from "@/lib/brand";
 
@@ -213,6 +216,32 @@ export function FlyerForm({
           )}
         </div>
       </Field>
+
+      <div>
+        <div className="flex items-baseline justify-between mb-2">
+          <label className="block text-[10px] uppercase tracking-[0.15em] text-neutral-500">
+            MP4 duration
+          </label>
+          <span className="text-[11px] text-neutral-300 font-mono tabular-nums">
+            {draft.duration} seconds
+          </span>
+        </div>
+        <input
+          type="range"
+          min={MIN_DURATION}
+          max={MAX_DURATION}
+          step={1}
+          value={draft.duration}
+          onChange={(e) =>
+            update("duration", clampDuration(Number(e.target.value)))
+          }
+          className="w-full accent-[#4ef2d9] cursor-pointer"
+        />
+        <p className="text-[10px] text-neutral-600 mt-2 leading-relaxed">
+          Longer videos give viewers more time to read. 8 seconds is
+          recommended for Instagram Reels and Stories.
+        </p>
+      </div>
 
       <Field label={`Photos (${photos.length} / ${MAX_PHOTOS})`} required>
         <input

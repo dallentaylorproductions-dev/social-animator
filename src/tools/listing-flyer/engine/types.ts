@@ -27,6 +27,20 @@ export interface FlyerDraft {
    * fallback is the tool default rather than a brand value).
    */
   backgroundColor: string;
+  /**
+   * MP4 export length in seconds. Range [5, 15]. Entry timing is fixed —
+   * only the trailing static dwell scales with this value.
+   */
+  duration: number;
+}
+
+export const MIN_DURATION = 5;
+export const MAX_DURATION = 15;
+export const DEFAULT_DURATION = 8;
+
+export function clampDuration(n: unknown): number {
+  const v = typeof n === "number" && Number.isFinite(n) ? n : DEFAULT_DURATION;
+  return Math.max(MIN_DURATION, Math.min(MAX_DURATION, Math.round(v)));
 }
 
 /** Photo entry held in component state only (NOT persisted to localStorage). */
@@ -53,6 +67,7 @@ export const EMPTY_DRAFT: FlyerDraft = {
   primaryColor: "",
   accentColor: "",
   backgroundColor: "",
+  duration: DEFAULT_DURATION,
 };
 
 export const MAX_PHOTOS = 5;

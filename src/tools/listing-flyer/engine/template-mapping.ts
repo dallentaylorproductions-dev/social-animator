@@ -57,6 +57,11 @@ export function mapFlyerToShowcase(
       .filter((f) => f.length > 0)
       .join("\n"),
 
+    // Stringified — TemplateState is Record<string, string>. The template's
+    // build() parses this back to a number, falling back to its own default
+    // (8s) for standalone callers that don't set this field.
+    duration: String(draft.duration),
+
     agentName: brand.agentName || "",
     agentBrokerage: brand.brokerage || "",
     agentPhone: brand.contactPhone || "",

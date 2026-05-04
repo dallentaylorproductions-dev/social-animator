@@ -49,8 +49,6 @@ type Mp4State =
   | { kind: "done" }
   | { kind: "error"; message: string };
 
-const SHOWCASE_DURATION = listingShowcaseTemplate.duration;
-
 export function ExportButtons({
   draft,
   photos,
@@ -159,7 +157,7 @@ export function ExportButtons({
           canvas,
           timeline,
           { width: sz.width, height: sz.height },
-          SHOWCASE_DURATION,
+          draft.duration,
           state.background ?? "#0a0a0a",
           (p) =>
             setMp4State({ kind: "running", phase: sz.renderingPhase, progress: p })
@@ -175,7 +173,7 @@ export function ExportButtons({
         const mp4 = await webmToMp4(
           webm,
           { width: sz.width, height: sz.height },
-          SHOWCASE_DURATION,
+          draft.duration,
           (p) =>
             setMp4State({ kind: "running", phase: sz.convertingPhase, progress: p })
         );
