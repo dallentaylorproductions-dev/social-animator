@@ -18,19 +18,20 @@ import type { TemplateConfig } from "./types";
  * into a reasonable rectangle, instead of squeezing it to a thin band at 1:1.
  *
  * Pacing — compressed from the original 14s "luxury" version to 8s for
- * social-native viewing. Instagram Stories auto-advance at 7s; Reels
- * engagement curve drops after ~8s. All animation entries land by t≈5.4s,
- * leaving ~2.6s for the viewer to read the bottom section before loop.
+ * social-native viewing. Reels/Stories want info up FAST so the viewer
+ * has time to read; H-1.5v further tightened entries to land within the
+ * first 3.3s, leaving ~4.7s of static dwell — the inverse of the old
+ * "5.4s entry, 2.6s dwell" ratio that read as too leisurely on social.
  *
  *   t=0–8s    hero Ken Burns zoom (1.0 → 1.08, linear over full duration)
- *   t=0.6s    status badge slides in from left
- *   t=1.3s    address rises in
- *   t=1.5s    city/state rises in
- *   t=2.4s    price reveal with overshoot + count-up
- *   t=3.5s    stats stagger in (beds → baths → sqft, 0.15s offset)
- *   t=4.5s    features stagger in (left column, 0.25s offset, MAX 5)
- *   t=4.8s    agent info card fades in (right column, slight rise)
- *   t=5.4s    last entry lands; static dwell to t=8s
+ *   t=0.3s    status badge slides in from left
+ *   t=0.7s    address rises in
+ *   t=0.9s    city/state rises in
+ *   t=1.3s    price reveal with overshoot + count-up
+ *   t=1.9s    stats stagger in (beds → baths → sqft, 0.10s offset)
+ *   t=2.4s    features stagger in (left column, 0.15s offset, MAX 5)
+ *   t=2.7s    agent info card fades in (right column, slight rise)
+ *   t=3.3s    last entry lands; static dwell to t=8s
  */
 const DURATION = 8;
 
@@ -315,8 +316,8 @@ export const listingShowcaseTemplate: TemplateConfig = {
     // ── 2. Status badge ─────────────────────────────────────────────────
     tracks.push({
       id: "badge",
-      start: 0.6,
-      duration: 0.4,
+      start: 0.3,
+      duration: 0.25,
       easing: easeOutBack,
       onUpdate: (p, ctx) => {
         const offsetX = (1 - p) * -200;
@@ -343,8 +344,8 @@ export const listingShowcaseTemplate: TemplateConfig = {
     // ── 3. Address ──────────────────────────────────────────────────────
     tracks.push({
       id: "address",
-      start: 1.3,
-      duration: 0.4,
+      start: 0.7,
+      duration: 0.25,
       easing: easeOutCubic,
       onUpdate: (p, ctx) => {
         ctx.globalAlpha = p;
@@ -360,8 +361,8 @@ export const listingShowcaseTemplate: TemplateConfig = {
     // ── 4. City/state ───────────────────────────────────────────────────
     tracks.push({
       id: "cityState",
-      start: 1.5,
-      duration: 0.4,
+      start: 0.9,
+      duration: 0.25,
       easing: easeOutCubic,
       onUpdate: (p, ctx) => {
         ctx.globalAlpha = p;
@@ -377,8 +378,8 @@ export const listingShowcaseTemplate: TemplateConfig = {
     // ── 5. Price (overshoot + count-up) ─────────────────────────────────
     tracks.push({
       id: "price",
-      start: 2.4,
-      duration: 0.5,
+      start: 1.3,
+      duration: 0.3,
       onUpdate: (p, ctx) => {
         const scaleEased = easeOutBack(Math.min(1, p));
         const scale = 0.7 + scaleEased * 0.3;
@@ -411,8 +412,8 @@ export const listingShowcaseTemplate: TemplateConfig = {
     statItems.forEach((stat, i) => {
       tracks.push({
         id: `stat-${i}`,
-        start: 3.5 + i * 0.15,
-        duration: 0.35,
+        start: 1.9 + i * 0.1,
+        duration: 0.25,
         easing: easeOutCubic,
         onUpdate: (p, ctx) => {
           ctx.globalAlpha = p;
@@ -447,8 +448,8 @@ export const listingShowcaseTemplate: TemplateConfig = {
     featureLines.forEach((line, i) => {
       tracks.push({
         id: `feature-${i}`,
-        start: 4.5 + i * 0.25,
-        duration: 0.4,
+        start: 2.4 + i * 0.15,
+        duration: 0.3,
         easing: easeOutCubic,
         onUpdate: (p, ctx) => {
           ctx.globalAlpha = p;
@@ -481,8 +482,8 @@ export const listingShowcaseTemplate: TemplateConfig = {
     if (hasAgentContent) {
       tracks.push({
         id: "agentCard",
-        start: 4.8,
-        duration: 0.6,
+        start: 2.7,
+        duration: 0.4,
         easing: easeOutCubic,
         onUpdate: (p, ctx) => {
           ctx.globalAlpha = p;
