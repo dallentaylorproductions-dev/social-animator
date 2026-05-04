@@ -103,7 +103,10 @@ export function FlyerForm({
             </button>
           )}
         </div>
-        <div className="grid grid-cols-3 gap-3">
+        {/* Mobile portrait can't fit three pickers in one row at 44pt swatch
+         * + a usable hex input each (column would need ~120px, viewport
+         * gives ~100px). Wrap to two rows on <sm; keep a single row at sm+. */}
+        <div className="grid grid-cols-2 gap-3 sm:grid-cols-3">
           <ColorInput
             label="Primary"
             value={effectivePrimary}
@@ -404,7 +407,11 @@ function ColorInput({
           type="text"
           value={value}
           onChange={(e) => onChange(e.target.value)}
-          className="flex-1 bg-neutral-900 border border-neutral-800 rounded-md px-2 py-1.5 text-xs font-mono focus:outline-none focus:border-[#4ef2d9]"
+          // min-w-0 lets the input shrink below its content's intrinsic size.
+          // Without it, the inner flex row exceeds its grid cell and
+          // overflows into the neighboring picker (the symptom Dallen saw
+          // before the grid-cols-2 wrap landed).
+          className="flex-1 min-w-0 bg-neutral-900 border border-neutral-800 rounded-md px-2 py-1.5 text-xs font-mono focus:outline-none focus:border-[#4ef2d9]"
         />
       </div>
     </div>

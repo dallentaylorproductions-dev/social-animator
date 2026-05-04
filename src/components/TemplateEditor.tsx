@@ -307,7 +307,7 @@ export function TemplateEditor({ template }: TemplateEditorProps) {
                           type="text"
                           value={state[field.key] ?? ""}
                           onChange={(e) => updateField(field.key, e.target.value)}
-                          className="flex-1 bg-neutral-900 border border-neutral-800 rounded-md px-3 py-2 text-sm font-mono focus:outline-none focus:border-[#4ef2d9]"
+                          className="flex-1 min-w-0 bg-neutral-900 border border-neutral-800 rounded-md px-3 py-2 text-sm font-mono focus:outline-none focus:border-[#4ef2d9]"
                         />
                       </div>
                     )}

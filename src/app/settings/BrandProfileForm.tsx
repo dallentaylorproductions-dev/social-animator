@@ -229,7 +229,9 @@ function ColorInput({
         type="text"
         value={value}
         onChange={(e) => onChange(e.target.value)}
-        className="flex-1 bg-neutral-900 border border-neutral-800 rounded-md px-3 py-2 text-sm font-mono focus:outline-none focus:border-[#4ef2d9]"
+        // min-w-0 prevents the input's intrinsic content size from forcing
+        // the inner flex row wider than its grid cell on narrow viewports.
+        className="flex-1 min-w-0 bg-neutral-900 border border-neutral-800 rounded-md px-3 py-2 text-sm font-mono focus:outline-none focus:border-[#4ef2d9]"
       />
     </div>
   );
