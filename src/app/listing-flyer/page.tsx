@@ -14,6 +14,7 @@ import {
   saveDraft,
 } from "@/tools/listing-flyer/engine/draft-storage";
 import { makePhoto, revokePhoto } from "@/tools/listing-flyer/engine/photos";
+import { getFFmpeg } from "@/engine/export";
 import { FlyerForm } from "./FlyerForm";
 import { FlyerPreview } from "./FlyerPreview";
 import { ExportButtons } from "./ExportButtons";
@@ -34,6 +35,18 @@ export default function ListingFlyerPage() {
   useEffect(() => {
     setDraft(loadDraft());
     setHydrated(true);
+  }, []);
+
+  // Pre-warm ffmpeg.wasm on page mount so the first MP4 export doesn't
+  // have to wait for the ~10MB core to load + initialize. The first export
+  // before this preload landed was hitting an FS error: ffmpeg's virtual
+  // filesystem wasn't ready when writeFile() was called. Same pattern the
+  // Social Animator TemplateEditor uses (silent catch — the real export
+  // path retries via the same getFFmpeg() singleton).
+  useEffect(() => {
+    getFFmpeg().catch(() => {
+      // Silent — actual export will retry if this fails
+    });
   }, []);
 
   // Debounced auto-save. Skip until hydrated so we don't clobber existing
