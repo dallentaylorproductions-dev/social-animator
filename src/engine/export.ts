@@ -6,6 +6,21 @@ import { toBlobURL, fetchFile } from "@ffmpeg/util";
 // Single-threaded core: no SharedArrayBuffer / COOP+COEP required.
 const FFMPEG_CDN = "https://unpkg.com/@ffmpeg/core@0.12.10/dist/umd";
 
+/**
+ * Pre-roll buffer (ms) before the animation timeline starts. iOS Safari's
+ * second sequential canvas.captureStream() takes ~3-4 seconds to start
+ * producing real frames; if the animation begins immediately, those entry
+ * tracks (which all land within t=3.3s in listing-showcase) get partially
+ * or entirely missed by the recorder. During warmup the canvas is held at
+ * t=0 — the heartbeat pixel still varies frame-to-frame so the encoder
+ * doesn't dedupe — and ffmpeg trims the warmup section out via `-ss` so
+ * the final MP4 length matches the duration slider exactly.
+ *
+ * 5s comfortably covers the worst observed iOS warmup (~4s for the second
+ * capture). Tunable here if real-device telemetry shows different values.
+ */
+export const WARMUP_MS = 5000;
+
 let ffmpegInstance: FFmpeg | null = null;
 let ffmpegLoadPromise: Promise<FFmpeg> | null = null;
 
@@ -48,7 +63,11 @@ export async function recordCanvas(
   canvas: HTMLCanvasElement,
   durationSec: number,
   fps = 30,
-  onProgress?: (progress: number) => void
+  onProgress?: (progress: number) => void,
+  // Defaults to 0 so existing Social Animator callers (ExportButton,
+  // BatchExportButton) get unchanged behavior. The listing-flyer path
+  // explicitly opts in to WARMUP_MS via renderTimelineToWebm.
+  warmupMs: number = 0
 ): Promise<Blob> {
   const stream = canvas.captureStream(fps);
 
@@ -75,8 +94,9 @@ export async function recordCanvas(
     );
   }
 
+  const totalSec = warmupMs / 1000 + durationSec;
   console.log(
-    `[MP4-DEBUG] recordCanvas: mobile=${isMobile} mime=${mimeType} canvas=${canvas.width}x${canvas.height} duration=${durationSec}s`
+    `[MP4-DEBUG] recordCanvas: mobile=${isMobile} mime=${mimeType} canvas=${canvas.width}x${canvas.height} duration=${durationSec}s warmup=${(warmupMs / 1000).toFixed(1)}s total=${totalSec.toFixed(1)}s`
   );
 
   const recorder = new MediaRecorder(stream, {
@@ -120,14 +140,19 @@ export async function recordCanvas(
     const startTime = performance.now();
     const tick = () => {
       const elapsed = (performance.now() - startTime) / 1000;
-      const progress = Math.min(1, elapsed / durationSec);
+      // Progress is reported across the FULL recording window
+      // (warmup + animation) so the UI bar moves smoothly. The user-facing
+      // pacing is unchanged — they always saw a "rendering reel" / "rendering
+      // square" stage that took some seconds; this just makes it longer by
+      // the warmup amount.
+      const progress = Math.min(1, elapsed / totalSec);
       onProgress?.(progress);
-      if (elapsed < durationSec) {
+      if (elapsed < totalSec) {
         requestAnimationFrame(tick);
       } else {
         const actualDuration = (performance.now() - startTime) / 1000;
         console.log(
-          `[MP4-DEBUG] recordCanvas: target ${durationSec}s, actual ${actualDuration.toFixed(2)}s — calling recorder.stop()`
+          `[MP4-DEBUG] recordCanvas: target ${totalSec.toFixed(1)}s (warmup ${(warmupMs / 1000).toFixed(1)}s + animation ${durationSec}s), actual ${actualDuration.toFixed(2)}s — calling recorder.stop()`
         );
         try {
           recorder.stop();
@@ -148,7 +173,11 @@ export async function webmToMp4(
   webmBlob: Blob,
   targetSize: { width: number; height: number },
   durationSec: number,
-  onProgress?: (progress: number) => void
+  onProgress?: (progress: number) => void,
+  // 0 default = no input skip (existing Social Animator callers). The
+  // listing-flyer path passes WARMUP_MS explicitly to trim the warmup
+  // section recorded ahead of the animation timeline.
+  warmupMs: number = 0
 ): Promise<Blob> {
   const ffmpeg = await getFFmpeg();
 
@@ -169,14 +198,22 @@ export async function webmToMp4(
     await ffmpeg.writeFile(inputName, inputBytes);
 
     // Force exact output duration:
-    //  - tpad clones the last frame for durationSec extra seconds
+    //  - `-ss warmupSec` AFTER `-i` is an output (decode) seek — frame-
+    //    accurate at the cost of decoding the warmup region. For the 5s
+    //    warmup the perf hit is negligible; input-side -ss could land
+    //    between WebM keyframes and produce a smeared first frame.
+    //  - tpad clones the last frame for durationSec extra seconds (defense
+    //    against the rAF loop finishing slightly short of target)
     //  - -t trims output to exactly durationSec
     //  - -r 30 normalizes output framerate at the output stage
     //  - ultrafast preset trades file size for speed (Instagram re-encodes
     //    anyway, so file size doesn't matter; speed shaves ~30-50% off conversion)
+    const warmupSec = warmupMs / 1000;
     await ffmpeg.exec([
       "-i",
       inputName,
+      "-ss",
+      String(warmupSec),
       "-vf",
       `tpad=stop_mode=clone:stop_duration=${durationSec},scale=${targetSize.width}:${targetSize.height}:force_original_aspect_ratio=decrease,pad=${targetSize.width}:${targetSize.height}:(ow-iw)/2:(oh-ih)/2:color=black`,
       "-t",

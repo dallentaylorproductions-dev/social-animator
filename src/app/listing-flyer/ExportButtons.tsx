@@ -19,6 +19,7 @@ import {
   getFFmpeg,
   shareOrDownload,
   webmToMp4,
+  WARMUP_MS,
 } from "@/engine/export";
 import { type BrandSettings } from "@/lib/brand";
 
@@ -230,7 +231,12 @@ export function ExportButtons({
           { width: sz.width, height: sz.height },
           draft.duration,
           (p) =>
-            setMp4State({ kind: "running", phase: sz.convertingPhase, progress: p })
+            setMp4State({ kind: "running", phase: sz.convertingPhase, progress: p }),
+          // Trim the captureStream warmup from the start of the webm so
+          // the final MP4 length matches the duration slider exactly.
+          // renderTimelineToWebm above passed WARMUP_MS to recordCanvas;
+          // pass the same here to keep input-skip and recording in sync.
+          WARMUP_MS
         );
 
         downloadBlob(mp4, `${slug}-${sz.label}.mp4`);
