@@ -16,10 +16,12 @@ const FFMPEG_CDN = "https://unpkg.com/@ffmpeg/core@0.12.10/dist/umd";
  * doesn't dedupe — and ffmpeg trims the warmup section out via `-ss` so
  * the final MP4 length matches the duration slider exactly.
  *
- * 5s comfortably covers the worst observed iOS warmup (~4s for the second
- * capture). Tunable here if real-device telemetry shows different values.
+ * H-1.8g bumped 5000 → 5500 to absorb a residual ~1s captureStream
+ * "stabilization tail" surfacing as black frames at the start of the
+ * trimmed output. Same `-ss WARMUP/1000` placement, just more skip on
+ * both ends of the pipeline (recorder records longer, ffmpeg trims more).
  */
-export const WARMUP_MS = 5000;
+export const WARMUP_MS = 5500;
 
 let ffmpegInstance: FFmpeg | null = null;
 let ffmpegLoadPromise: Promise<FFmpeg> | null = null;
