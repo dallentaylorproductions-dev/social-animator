@@ -62,6 +62,12 @@ export function ExportButtons({
 }: ExportButtonsProps) {
   const [pdfState, setPdfState] = useState<PdfState>({ kind: "idle" });
   const [mp4State, setMp4State] = useState<Mp4State>({ kind: "idle" });
+  // In-page diagnostic capture for the MP4 export. Populated by a
+  // monkey-patch on console.log around the export call so [MP4-DEBUG]
+  // lines emitted by recordCanvas / render-mp4 / webmToMp4 land in the
+  // UI for users who can't connect a phone to a desktop Web Inspector.
+  const [mp4Debug, setMp4Debug] = useState("");
+  const [mp4DebugCopied, setMp4DebugCopied] = useState(false);
   const hiddenCanvasRef = useRef<HTMLCanvasElement>(null);
 
   const validationError = validateForExport(draft, photos.length);
@@ -129,6 +135,26 @@ export function ExportButtons({
 
     setMp4State({ kind: "running", phase: "preparing", progress: 0 });
 
+    // Capture every [MP4-DEBUG]-prefixed console.log emitted during the
+    // export pipeline (recordCanvas, render-mp4, webmToMp4). The original
+    // console.log is preserved + restored in finally; this just tees the
+    // matching lines into a state buffer for in-page display.
+    const debugLines: string[] = [];
+    const origConsoleLog = console.log;
+    console.log = (...args: unknown[]) => {
+      origConsoleLog(...args);
+      try {
+        const line = args
+          .map((a) => (typeof a === "string" ? a : JSON.stringify(a)))
+          .join(" ");
+        if (line.startsWith("[MP4-DEBUG]")) {
+          debugLines.push(line);
+        }
+      } catch {
+        // best-effort; never let logging break the export
+      }
+    };
+
     try {
       // Pre-load ffmpeg in parallel with photo readiness
       const ffmpegPromise = getFFmpeg();
@@ -163,6 +189,12 @@ export function ExportButtons({
       ];
 
       for (const sz of sizes) {
+        // Section header so the in-page debug panel makes the reel-vs-square
+        // boundary obvious — without it, two interleaved blocks of
+        // recordCanvas/rAF/webmToMp4 logs read as a single stream.
+        console.log(
+          `[MP4-DEBUG] === ${sz.label} (${sz.width}x${sz.height}) ===`
+        );
         // Build a fresh timeline for each size (layout adapts per dimensions)
         const timeline = listingShowcaseTemplate.build(
           state,
@@ -209,10 +241,31 @@ export function ExportButtons({
       setTimeout(() => setMp4State({ kind: "idle" }), 5000);
     } catch (err) {
       console.error("[flyer mp4]", err);
+      // Surface the throw inside the captured debug stream too, since
+      // console.error isn't part of the [MP4-DEBUG] tee.
+      debugLines.push(
+        `[MP4-DEBUG] EXPORT ERROR: ${err instanceof Error ? err.message : String(err)}`
+      );
       setMp4State({
         kind: "error",
         message: err instanceof Error ? err.message : String(err),
       });
+    } finally {
+      console.log = origConsoleLog;
+      setMp4Debug(debugLines.join("\n"));
+      setMp4DebugCopied(false);
+    }
+  };
+
+  const handleCopyMp4Debug = async () => {
+    if (!mp4Debug) return;
+    try {
+      await navigator.clipboard.writeText(mp4Debug);
+      setMp4DebugCopied(true);
+      setTimeout(() => setMp4DebugCopied(false), 2000);
+    } catch {
+      // Clipboard API blocked (Safari without user gesture, etc.) — long-press
+      // on the <pre> is the documented fallback in the panel header.
     }
   };
 
@@ -264,6 +317,39 @@ export function ExportButtons({
         <p className="text-[11px] text-red-400 break-words">
           {mp4State.message}
         </p>
+      )}
+
+      {mp4Debug && (
+        <div className="mt-2 bg-neutral-900 border border-neutral-800 rounded-md p-3">
+          <div className="flex items-center justify-between gap-2 mb-2">
+            <p className="text-[9px] uppercase tracking-[0.15em] text-neutral-500 font-semibold">
+              MP4 diagnostics — long-press to copy
+            </p>
+            <div className="flex items-center gap-3">
+              <button
+                type="button"
+                onClick={handleCopyMp4Debug}
+                className="text-[10px] text-[#4ef2d9] hover:underline"
+              >
+                {mp4DebugCopied ? "Copied ✓" : "Copy"}
+              </button>
+              <button
+                type="button"
+                onClick={() => setMp4Debug("")}
+                aria-label="Dismiss diagnostics"
+                className="text-neutral-500 hover:text-neutral-300 text-sm leading-none"
+              >
+                ✕
+              </button>
+            </div>
+          </div>
+          {/* select-text + whitespace-pre-wrap so iOS long-press selects the
+              whole block; break-all so long mime strings don't trigger
+              horizontal scroll inside the sticky preview pane. */}
+          <pre className="font-mono text-[10px] text-neutral-300 whitespace-pre-wrap break-all select-text leading-snug max-h-64 overflow-y-auto">
+            {mp4Debug}
+          </pre>
+        </div>
       )}
 
       {/* Hidden canvas — used by the MP4 export pipeline. Position off-screen

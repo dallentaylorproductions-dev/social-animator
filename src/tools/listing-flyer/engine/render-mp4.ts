@@ -65,6 +65,14 @@ export async function renderTimelineToWebm(
 
     if (t < seconds + 0.2) {
       rafId = requestAnimationFrame(frame);
+    } else {
+      // Final-frame log so the in-page debug panel can show whether the
+      // rAF loop actually ran for the full duration. Compare this against
+      // the recorder.stop() actualDuration in export.ts to spot a stalled
+      // capture.
+      console.log(
+        `[MP4-DEBUG] rAF stop: total frames=${frameCount} final t=${t.toFixed(2)}s`
+      );
     }
   };
   rafId = requestAnimationFrame(frame);
