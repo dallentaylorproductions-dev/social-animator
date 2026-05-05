@@ -196,6 +196,10 @@ export default function ListingFlyerPage() {
                 brand={effectiveBrand}
               />
             </div>
+            <p className="text-[10px] text-neutral-600 leading-relaxed mt-2">
+              Preview is an approximation — exported PDF may differ slightly
+              in layout.
+            </p>
             <div className="hidden lg:block mt-5 pt-5 border-t border-neutral-800/60">
               <ExportButtons
                 draft={draft}
