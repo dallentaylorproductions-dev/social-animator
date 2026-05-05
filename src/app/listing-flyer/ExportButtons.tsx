@@ -15,7 +15,6 @@ import { exportJpegFromDraft } from "@/tools/listing-flyer/engine/jpeg-export";
 import { generatePdfBlob } from "@/tools/listing-flyer/output/pdf-export";
 import { listingShowcaseTemplate } from "@/templates/listing-showcase";
 import {
-  downloadBlob,
   getFFmpeg,
   shareOrDownload,
   webmToMp4,
@@ -181,10 +180,15 @@ export function ExportButtons({
         },
       ];
 
+      // Interleaved render + share. After each size's MP4 is ready, hand
+      // it to the iOS share sheet so the user can save to Photos before
+      // the second render starts. Two back-to-back share sheets without
+      // intervening work read as confusing UX; placing the second render
+      // BETWEEN the two share dismissals gives "okay that's done, here's
+      // the next one" pacing instead.
+      let allShared = true;
       for (const sz of sizes) {
-        // Section header so the in-page debug panel makes the reel-vs-square
-        // boundary obvious — without it, two interleaved blocks of
-        // recordCanvas/rAF/webmToMp4 logs read as a single stream.
+        // Section header for any [MP4-DEBUG] devtools session.
         console.log(
           `[MP4-DEBUG] === ${sz.label} (${sz.width}x${sz.height}) ===`
         );
@@ -226,15 +230,25 @@ export function ExportButtons({
             setMp4State({ kind: "running", phase: sz.convertingPhase, progress: p }),
           // Trim the captureStream warmup from the start of the webm so
           // the final MP4 length matches the duration slider exactly.
-          // renderTimelineToWebm above passed WARMUP_MS to recordCanvas;
-          // pass the same here to keep input-skip and recording in sync.
           WARMUP_MS
         );
 
-        downloadBlob(mp4, `${slug}-${sz.label}.mp4`);
+        const result = await shareOrDownload(
+          mp4,
+          `${slug}-${sz.label}.mp4`
+        );
+        if (result === "cancelled") {
+          // User dismissed this size's share sheet. Skip the next render
+          // and keep the draft so they can retry. The size already in
+          // Photos (if reel was saved before square cancelled) stays.
+          allShared = false;
+          break;
+        }
       }
 
-      clearDraft();
+      if (allShared) {
+        clearDraft();
+      }
       setMp4State({ kind: "done" });
       setTimeout(() => setMp4State({ kind: "idle" }), 5000);
     } catch (err) {
