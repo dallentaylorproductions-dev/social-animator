@@ -297,7 +297,7 @@ export function ExportButtons({
       >
         {mp4State.kind === "idle" && "Export Animated Version (MP4)"}
         {mp4State.kind === "running" && mp4StatusText(mp4State)}
-        {mp4State.kind === "done" && "Both MP4s downloaded ✓"}
+        {mp4State.kind === "done" && "Both videos saved ✓"}
         {mp4State.kind === "error" && "Try again — Export Animated Version"}
       </button>
 
@@ -307,8 +307,9 @@ export function ExportButtons({
 
       {mp4State.kind === "running" && (
         <p className="text-[11px] text-neutral-500 leading-snug">
-          Renders Reel (9:16) and Square (1:1) — about 30–60 seconds total.
-          Keep this tab focused.
+          Renders Reel (9:16) and Square (1:1). Each video opens its own
+          share sheet — save to Photos, then the next render starts. Keep
+          this tab focused.
         </p>
       )}
 
@@ -352,11 +353,11 @@ function mp4StatusText(state: { phase: Mp4Phase; progress: number }): string {
     case "preparing":
       return "Preparing…";
     case "rendering-reel":
-      return `Recording Reel… ${pct}% (1 of 2)`;
+      return `Rendering Reel… ${pct}% (1 of 2)`;
     case "converting-reel":
       return `Converting Reel… ${pct}%`;
     case "rendering-square":
-      return `Recording Square… ${pct}% (2 of 2)`;
+      return `Rendering Square… ${pct}% (2 of 2)`;
     case "converting-square":
       return `Converting Square… ${pct}%`;
   }
