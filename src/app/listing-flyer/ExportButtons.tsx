@@ -1,7 +1,6 @@
 "use client";
 
 import { useRef, useState } from "react";
-import { pdf } from "@react-pdf/renderer";
 import {
   type FlyerDraft,
   type FlyerPhoto,
@@ -12,7 +11,8 @@ import { clearDraft, saveDraft } from "@/tools/listing-flyer/engine/draft-storag
 import { waitForPhoto } from "@/tools/listing-flyer/engine/photos";
 import { mapFlyerToShowcase } from "@/tools/listing-flyer/engine/template-mapping";
 import { renderTimelineToWebm } from "@/tools/listing-flyer/engine/render-mp4";
-import { FlyerDocument } from "@/tools/listing-flyer/output/FlyerDocument";
+import { exportJpegFromDraft } from "@/tools/listing-flyer/engine/jpeg-export";
+import { generatePdfBlob } from "@/tools/listing-flyer/output/pdf-export";
 import { listingShowcaseTemplate } from "@/templates/listing-showcase";
 import {
   downloadBlob,
@@ -42,6 +42,12 @@ type PdfState =
   | { kind: "done" }
   | { kind: "error"; message: string };
 
+type JpegState =
+  | { kind: "idle" }
+  | { kind: "generating" }
+  | { kind: "done" }
+  | { kind: "error"; message: string };
+
 type Mp4Phase =
   | "preparing"
   | "rendering-reel"
@@ -62,39 +68,26 @@ export function ExportButtons({
   brandLogoImg,
 }: ExportButtonsProps) {
   const [pdfState, setPdfState] = useState<PdfState>({ kind: "idle" });
+  const [jpegState, setJpegState] = useState<JpegState>({ kind: "idle" });
   const [mp4State, setMp4State] = useState<Mp4State>({ kind: "idle" });
   const hiddenCanvasRef = useRef<HTMLCanvasElement>(null);
 
   const validationError = validateForExport(draft, photos.length);
   const isBusy =
-    pdfState.kind === "generating" || mp4State.kind === "running";
+    pdfState.kind === "generating" ||
+    jpegState.kind === "generating" ||
+    mp4State.kind === "running";
   const canExport = !validationError && !isBusy;
 
   const handlePdfExport = async () => {
     if (!canExport) return;
     // Force-flush draft to localStorage BEFORE export. Bypasses the
-    // page-level debounced save so even if iOS Safari mishandles the new
-    // tab and the user loses the editor tab, reload restores their work.
+    // page-level debounced save so a navigation/share-sheet glitch leaves
+    // the editor session recoverable on reload.
     saveDraft(draft);
     setPdfState({ kind: "generating" });
     try {
-      // Downsample + re-encode every photo to a small JPEG data URL before
-      // invoking pdf(). Original phone photos (4-10MB each, base64 = 5-13MB
-      // strings) overload @react-pdf/renderer's image processor — symptom is
-      // that only one Image renders and the rest fall through to their
-      // backgroundColor placeholder. At 1600px max edge / JPEG q=0.85 each
-      // photo is ~150-300KB, and a 5×3.5" hero at print size is still ~150dpi.
-      const photoDataUrls = await Promise.all(
-        photos.map((p) => fileToCompressedDataUrl(p.file))
-      );
-      const blob = await pdf(
-        <FlyerDocument draft={draft} photoUrls={photoDataUrls} brand={brand} />
-      ).toBlob();
-      // Route through shareOrDownload, NOT a plain anchor click. On iOS
-      // Safari the share sheet is a non-navigational overlay — the editor
-      // tab is never disturbed. Anchor-click + target="_blank" turned out
-      // to be unreliable for blob URLs on iOS (H-1.7e attempted that and
-      // still hit "WebKitBlobResource error 1" on back-nav).
+      const blob = await generatePdfBlob(draft, photos, brand);
       const filename = `${addressSlug(draft.addressLine1)}-flyer.pdf`;
       const result = await shareOrDownload(blob, filename);
       // Only clear the draft when the file actually shipped. If the user
@@ -108,6 +101,31 @@ export function ExportButtons({
     } catch (err) {
       console.error("[flyer pdf]", err);
       setPdfState({
+        kind: "error",
+        message: err instanceof Error ? err.message : String(err),
+      });
+    }
+  };
+
+  const handleJpegExport = async () => {
+    if (!canExport) return;
+    // Same pre-export flush as PDF — JPEG generation goes through the same
+    // PDF render path before rasterizing, so the same mid-export failure
+    // window applies.
+    saveDraft(draft);
+    setJpegState({ kind: "generating" });
+    try {
+      const blob = await exportJpegFromDraft(draft, photos, brand);
+      const filename = `${addressSlug(draft.addressLine1)}-flyer.jpg`;
+      const result = await shareOrDownload(blob, filename);
+      if (result === "shared" || result === "downloaded") {
+        clearDraft();
+      }
+      setJpegState({ kind: "done" });
+      setTimeout(() => setJpegState({ kind: "idle" }), 3000);
+    } catch (err) {
+      console.error("[flyer jpeg]", err);
+      setJpegState({
         kind: "error",
         message: err instanceof Error ? err.message : String(err),
       });
@@ -239,8 +257,21 @@ export function ExportButtons({
       >
         {pdfState.kind === "idle" && "Export PDF"}
         {pdfState.kind === "generating" && "Generating PDF…"}
-        {pdfState.kind === "done" && "PDF downloaded ✓"}
+        {pdfState.kind === "done" && "PDF saved ✓"}
         {pdfState.kind === "error" && "Try again — Export PDF"}
+      </button>
+
+      <button
+        type="button"
+        onClick={handleJpegExport}
+        disabled={!canExport}
+        title={validationError ?? undefined}
+        className="w-full bg-[#4ef2d9] hover:bg-[#3ad9c0] text-black rounded-md px-4 py-3 text-sm font-semibold transition disabled:opacity-60 disabled:cursor-not-allowed"
+      >
+        {jpegState.kind === "idle" && "Export JPEG (Camera Roll)"}
+        {jpegState.kind === "generating" && "Generating JPEG…"}
+        {jpegState.kind === "done" && "JPEG saved ✓"}
+        {jpegState.kind === "error" && "Try again — Export JPEG"}
       </button>
 
       <button
@@ -272,6 +303,11 @@ export function ExportButtons({
           {pdfState.message}
         </p>
       )}
+      {jpegState.kind === "error" && (
+        <p className="text-[11px] text-red-400 break-words">
+          {jpegState.message}
+        </p>
+      )}
       {mp4State.kind === "error" && (
         <p className="text-[11px] text-red-400 break-words">
           {mp4State.message}
@@ -294,62 +330,6 @@ export function ExportButtons({
       />
     </div>
   );
-}
-
-/**
- * Decode an image File, downsample to maxEdge on the longest side, and
- * re-encode as a compressed JPEG data URL.
- *
- * Used by PDF export. Phone photos at 4000×3000 = 4-10MB; base64 inflates by
- * ~33%; 4 photos = 20-50MB of string going into pdf().toBlob(). Empirically
- * this overwhelms @react-pdf/renderer — only the last image renders, the
- * rest fall through to their View backgroundColor.
- *
- * 1600px max edge at JPEG q=0.85 produces ~150-300KB per photo. A 5×3.5"
- * hero at print size is still ~150dpi (well above print-quality threshold).
- */
-function fileToCompressedDataUrl(
-  file: File,
-  maxEdge: number = 1600,
-  quality: number = 0.85
-): Promise<string> {
-  return new Promise((resolve, reject) => {
-    const blobUrl = URL.createObjectURL(file);
-    const img = new Image();
-    img.onload = () => {
-      try {
-        const w = img.naturalWidth;
-        const h = img.naturalHeight;
-        const scale = Math.min(1, maxEdge / Math.max(w, h));
-        const targetW = Math.max(1, Math.round(w * scale));
-        const targetH = Math.max(1, Math.round(h * scale));
-
-        const canvas = document.createElement("canvas");
-        canvas.width = targetW;
-        canvas.height = targetH;
-        const ctx = canvas.getContext("2d");
-        if (!ctx) {
-          URL.revokeObjectURL(blobUrl);
-          reject(new Error("Canvas 2D context unavailable"));
-          return;
-        }
-        ctx.imageSmoothingEnabled = true;
-        ctx.imageSmoothingQuality = "high";
-        ctx.drawImage(img, 0, 0, targetW, targetH);
-        const dataUrl = canvas.toDataURL("image/jpeg", quality);
-        URL.revokeObjectURL(blobUrl);
-        resolve(dataUrl);
-      } catch (err) {
-        URL.revokeObjectURL(blobUrl);
-        reject(err);
-      }
-    };
-    img.onerror = () => {
-      URL.revokeObjectURL(blobUrl);
-      reject(new Error(`Could not load ${file.name}`));
-    };
-    img.src = blobUrl;
-  });
 }
 
 function mp4StatusText(state: { phase: Mp4Phase; progress: number }): string {
