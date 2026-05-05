@@ -28,11 +28,14 @@ export async function exportJpegFromDraft(
   return pdfBlobToJpeg(pdfBlob);
 }
 
-/** 2x scale = ~153 dpi on US Letter (612pt × 2 / 8.5in). q=0.92 keeps
- *  the file under ~1MB while preserving photo detail. */
+/** 3x scale = ~1836px wide on US Letter, ~230 dpi at 8.5in. Higher than
+ *  the H-1.8 initial 2x (1224px) — Instagram's display range tops out
+ *  around 2048px and 1836 reads noticeably crisper on phone screens.
+ *  q=0.92 keeps file size manageable (~1.2MB typical for a 5-photo flyer).
+ *  Trade-off: ~1s additional CPU on rasterization, 2.25× canvas memory. */
 async function pdfBlobToJpeg(
   pdfBlob: Blob,
-  scale = 2.0,
+  scale = 3.0,
   quality = 0.92
 ): Promise<Blob> {
   const pdfjsLib = await loadPdfjs();
