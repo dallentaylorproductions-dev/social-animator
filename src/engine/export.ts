@@ -6,6 +6,21 @@ import { toBlobURL, fetchFile } from "@ffmpeg/util";
 // Single-threaded core: no SharedArrayBuffer / COOP+COEP required.
 const FFMPEG_CDN = "https://unpkg.com/@ffmpeg/core@0.12.10/dist/umd";
 
+/**
+ * Pre-roll buffer (ms) before the animation timeline starts. iOS Safari's
+ * second sequential canvas.captureStream() takes ~3-4 seconds to start
+ * producing real frames; if the animation begins immediately, those entry
+ * tracks (which all land within t=3.3s in listing-showcase) get partially
+ * or entirely missed by the recorder. During warmup the canvas is held at
+ * t=0 — the heartbeat pixel still varies frame-to-frame so the encoder
+ * doesn't dedupe — and ffmpeg trims the warmup section out via `-ss` so
+ * the final MP4 length matches the duration slider exactly.
+ *
+ * 5s comfortably covers the worst observed iOS warmup (~4s for the second
+ * capture). Tunable here if real-device telemetry shows different values.
+ */
+export const WARMUP_MS = 5000;
+
 let ffmpegInstance: FFmpeg | null = null;
 let ffmpegLoadPromise: Promise<FFmpeg> | null = null;
 
@@ -32,22 +47,46 @@ export function getFFmpeg(): Promise<FFmpeg> {
 /**
  * Record a canvas for the given duration and return a WebM Blob.
  * Progress callback fires with 0..1 during recording.
+ *
+ * Mobile/iOS notes:
+ *  - mime candidates are ordered with mp4/avc1 first when on mobile so
+ *    iOS Safari picks its native encoder up front (it can't do webm);
+ *    desktop Chrome/Edge still get vp9/vp8 first via fallthrough.
+ *  - Stream tracks get explicitly stopped after recording to release
+ *    iOS Safari's hold on the canvas — without this, calling
+ *    canvas.captureStream() a second time on the same canvas (e.g.
+ *    when the flyer tool exports both reel + square) may yield a
+ *    stream that doesn't capture frames on iOS, producing a static
+ *    video for the second size.
  */
 export async function recordCanvas(
   canvas: HTMLCanvasElement,
   durationSec: number,
   fps = 30,
-  onProgress?: (progress: number) => void
+  onProgress?: (progress: number) => void,
+  // Defaults to 0 so existing Social Animator callers (ExportButton,
+  // BatchExportButton) get unchanged behavior. The listing-flyer path
+  // explicitly opts in to WARMUP_MS via renderTimelineToWebm.
+  warmupMs: number = 0
 ): Promise<Blob> {
   const stream = canvas.captureStream(fps);
 
-  const mimeCandidates = [
-    "video/webm;codecs=vp9",
-    "video/webm;codecs=vp8",
-    "video/webm",
-    "video/mp4;codecs=avc1.42E01E", // Safari/iOS native
-    "video/mp4",
-  ];
+  const isMobile = isMobileDevice();
+  const mimeCandidates = isMobile
+    ? [
+        "video/mp4;codecs=avc1.42E01E", // iOS Safari native
+        "video/mp4",
+        "video/webm;codecs=vp9",
+        "video/webm;codecs=vp8",
+        "video/webm",
+      ]
+    : [
+        "video/webm;codecs=vp9",
+        "video/webm;codecs=vp8",
+        "video/webm",
+        "video/mp4;codecs=avc1.42E01E",
+        "video/mp4",
+      ];
   const mimeType = mimeCandidates.find((m) => MediaRecorder.isTypeSupported(m));
   if (!mimeType) {
     throw new Error(
@@ -55,33 +94,66 @@ export async function recordCanvas(
     );
   }
 
+  const totalSec = warmupMs / 1000 + durationSec;
+  console.log(
+    `[MP4-DEBUG] recordCanvas: mobile=${isMobile} mime=${mimeType} canvas=${canvas.width}x${canvas.height} duration=${durationSec}s warmup=${(warmupMs / 1000).toFixed(1)}s total=${totalSec.toFixed(1)}s`
+  );
+
   const recorder = new MediaRecorder(stream, {
     mimeType,
     videoBitsPerSecond: 8_000_000,
   });
   const chunks: Blob[] = [];
+  let chunkCount = 0;
+  let totalBytes = 0;
   recorder.ondataavailable = (e) => {
-    if (e.data && e.data.size > 0) chunks.push(e.data);
+    if (e.data && e.data.size > 0) {
+      chunks.push(e.data);
+      chunkCount += 1;
+      totalBytes += e.data.size;
+    }
   };
 
   return new Promise<Blob>((resolve, reject) => {
     recorder.onstop = () => {
       const blob = new Blob(chunks, { type: mimeType });
+      console.log(
+        `[MP4-DEBUG] recordCanvas stop: chunks=${chunkCount} totalBytes=${totalBytes} blobSize=${blob.size}`
+      );
+      // Release the canvas's captureStream tracks so a subsequent
+      // captureStream() call on the same canvas gets a fresh stream.
+      // iOS Safari otherwise leaves the prior stream in a half-bound
+      // state on the second invocation.
+      try {
+        stream.getTracks().forEach((t) => t.stop());
+      } catch {
+        // ignore — best-effort cleanup
+      }
       resolve(blob);
     };
     recorder.onerror = (e) =>
       reject(new Error(`MediaRecorder error: ${String(e)}`));
 
     recorder.start(100);
+    console.log(`[MP4-DEBUG] recordCanvas: recorder.start() ok, state=${recorder.state}`);
 
     const startTime = performance.now();
     const tick = () => {
       const elapsed = (performance.now() - startTime) / 1000;
-      const progress = Math.min(1, elapsed / durationSec);
+      // Progress is reported across the FULL recording window
+      // (warmup + animation) so the UI bar moves smoothly. The user-facing
+      // pacing is unchanged — they always saw a "rendering reel" / "rendering
+      // square" stage that took some seconds; this just makes it longer by
+      // the warmup amount.
+      const progress = Math.min(1, elapsed / totalSec);
       onProgress?.(progress);
-      if (elapsed < durationSec) {
+      if (elapsed < totalSec) {
         requestAnimationFrame(tick);
       } else {
+        const actualDuration = (performance.now() - startTime) / 1000;
+        console.log(
+          `[MP4-DEBUG] recordCanvas: target ${totalSec.toFixed(1)}s (warmup ${(warmupMs / 1000).toFixed(1)}s + animation ${durationSec}s), actual ${actualDuration.toFixed(2)}s — calling recorder.stop()`
+        );
         try {
           recorder.stop();
         } catch (err) {
@@ -101,7 +173,11 @@ export async function webmToMp4(
   webmBlob: Blob,
   targetSize: { width: number; height: number },
   durationSec: number,
-  onProgress?: (progress: number) => void
+  onProgress?: (progress: number) => void,
+  // 0 default = no input skip (existing Social Animator callers). The
+  // listing-flyer path passes WARMUP_MS explicitly to trim the warmup
+  // section recorded ahead of the animation timeline.
+  warmupMs: number = 0
 ): Promise<Blob> {
   const ffmpeg = await getFFmpeg();
 
@@ -115,17 +191,29 @@ export async function webmToMp4(
   const inputName = `input.${inputExt}`;
 
   try {
-    await ffmpeg.writeFile(inputName, await fetchFile(webmBlob));
+    const inputBytes = await fetchFile(webmBlob);
+    console.log(
+      `[MP4-DEBUG] webmToMp4: input ${inputName} (${inputBytes.byteLength} bytes, type=${webmBlob.type}) → ${targetSize.width}x${targetSize.height} for ${durationSec}s`
+    );
+    await ffmpeg.writeFile(inputName, inputBytes);
 
     // Force exact output duration:
-    //  - tpad clones the last frame for durationSec extra seconds
+    //  - `-ss warmupSec` AFTER `-i` is an output (decode) seek — frame-
+    //    accurate at the cost of decoding the warmup region. For the 5s
+    //    warmup the perf hit is negligible; input-side -ss could land
+    //    between WebM keyframes and produce a smeared first frame.
+    //  - tpad clones the last frame for durationSec extra seconds (defense
+    //    against the rAF loop finishing slightly short of target)
     //  - -t trims output to exactly durationSec
     //  - -r 30 normalizes output framerate at the output stage
     //  - ultrafast preset trades file size for speed (Instagram re-encodes
     //    anyway, so file size doesn't matter; speed shaves ~30-50% off conversion)
+    const warmupSec = warmupMs / 1000;
     await ffmpeg.exec([
       "-i",
       inputName,
+      "-ss",
+      String(warmupSec),
       "-vf",
       `tpad=stop_mode=clone:stop_duration=${durationSec},scale=${targetSize.width}:${targetSize.height}:force_original_aspect_ratio=decrease,pad=${targetSize.width}:${targetSize.height}:(ow-iw)/2:(oh-ih)/2:color=black`,
       "-t",
@@ -151,7 +239,9 @@ export async function webmToMp4(
     }
     const buffer = new ArrayBuffer(data.byteLength);
     new Uint8Array(buffer).set(data);
-    return new Blob([buffer], { type: "video/mp4" });
+    const out = new Blob([buffer], { type: "video/mp4" });
+    console.log(`[MP4-DEBUG] webmToMp4: output ${out.size} bytes`);
+    return out;
   } finally {
     ffmpeg.off("progress", progressHandler);
     try {
@@ -165,16 +255,27 @@ export async function webmToMp4(
 
 /**
  * Trigger a browser download of the given Blob with the given filename.
+ *
+ * iOS Safari notes (the WebKitBlobResource bug):
+ *  - target="_blank" forces the new tab so the editor tab is never
+ *    navigated. Without this Safari opens the blob inline in the
+ *    current tab and a back-nav fails ("WebKitBlobResource error 1"),
+ *    losing the editor session.
+ *  - Revocation is deferred 60s so the new tab has time to render the
+ *    blob. Synchronous revoke (the prior 1s timer was effectively that)
+ *    races the tab swap on iOS and produces a blank page.
  */
 export function downloadBlob(blob: Blob, filename: string): void {
   const url = URL.createObjectURL(blob);
   const a = document.createElement("a");
   a.href = url;
   a.download = filename;
+  a.target = "_blank";
+  a.rel = "noopener";
   document.body.appendChild(a);
   a.click();
   document.body.removeChild(a);
-  setTimeout(() => URL.revokeObjectURL(url), 1000);
+  setTimeout(() => URL.revokeObjectURL(url), 60_000);
 }
 
 /**

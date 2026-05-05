@@ -1,7 +1,7 @@
 "use client";
 
 import { type FlyerDraft, type FlyerPhoto } from "@/tools/listing-flyer/engine/types";
-import { type BrandSettings } from "@/lib/brand";
+import { type BrandSettings, formatPhone } from "@/lib/brand";
 import {
   pickContrastText,
   pickContrastMuted,
@@ -41,9 +41,16 @@ export function FlyerPreview({ draft, photos, brand }: FlyerPreviewProps) {
 
   return (
     <div
-      className="shadow-2xl mx-auto overflow-hidden"
+      // The outer card no longer forces an 8.5/11 aspect ratio with
+      // overflow-hidden. The content (header + body + photos + footer) was
+      // naturally taller than 8.5/11 at typical preview widths, so the
+      // bottom (and especially the photo grid) was getting clipped — the
+      // "user sees only the top corner" symptom on mobile. Letting the
+      // card take natural height shows the whole flyer; ScaleToFit (in
+      // page.tsx, mobile only) scales the rendered card down to fit a
+      // fixed-height sticky pane on small viewports.
+      className="shadow-2xl mx-auto overflow-hidden rounded-md"
       style={{
-        aspectRatio: "8.5 / 11",
         maxWidth: "100%",
         backgroundColor: background,
         color: textPrimary,
@@ -71,16 +78,21 @@ export function FlyerPreview({ draft, photos, brand }: FlyerPreviewProps) {
             LOGO
           </div>
         )}
-        <div className="flex-1 min-w-0">
-          <p className="text-[12px] font-semibold truncate">
+        {/* No `truncate` on agent name + brokerage — the PDF (FlyerDocument)
+            renders both in full, and an ellipsis in the preview misled
+            users into thinking their export would also be cut off. Allow
+            wrap; leading-tight + the parent's flex-1 min-w-0 still keep
+            the layout from blowing out horizontally. */}
+        <div className="flex-1 min-w-0 leading-tight">
+          <p className="text-[12px] font-semibold">
             {brand.agentName || "Your name"}
           </p>
-          <p className="text-[13px] opacity-70 truncate">
+          <p className="text-[13px] opacity-70">
             {brand.brokerage || "Brokerage"}
           </p>
         </div>
         <div className="text-right text-[13px] opacity-80 leading-tight">
-          {brand.contactPhone && <div>{brand.contactPhone}</div>}
+          {brand.contactPhone && <div>{formatPhone(brand.contactPhone)}</div>}
           {brand.contactEmail && <div>{brand.contactEmail}</div>}
         </div>
       </div>
@@ -216,7 +228,7 @@ export function FlyerPreview({ draft, photos, brand }: FlyerPreviewProps) {
           {brand.licenseNumber && ` · ${brand.licenseNumber}`}
         </span>
         <span className="opacity-70 truncate">
-          {[brand.contactPhone, brand.contactEmail].filter(Boolean).join("  ·  ")}
+          {[formatPhone(brand.contactPhone), brand.contactEmail].filter(Boolean).join("  ·  ")}
         </span>
       </div>
     </div>

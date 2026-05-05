@@ -1,5 +1,5 @@
 import { type FlyerDraft, type FlyerPhoto } from "./types";
-import { type BrandSettings } from "@/lib/brand";
+import { type BrandSettings, formatPhone } from "@/lib/brand";
 import {
   type TemplateState,
   type TemplateAssets,
@@ -64,7 +64,7 @@ export function mapFlyerToShowcase(
 
     agentName: brand.agentName || "",
     agentBrokerage: brand.brokerage || "",
-    agentPhone: brand.contactPhone || "",
+    agentPhone: formatPhone(brand.contactPhone),
     agentLicense: brand.licenseNumber || "",
 
     background,

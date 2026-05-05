@@ -8,13 +8,19 @@ import {
   addressSlug,
   validateForExport,
 } from "@/tools/listing-flyer/engine/types";
-import { clearDraft } from "@/tools/listing-flyer/engine/draft-storage";
+import { clearDraft, saveDraft } from "@/tools/listing-flyer/engine/draft-storage";
 import { waitForPhoto } from "@/tools/listing-flyer/engine/photos";
 import { mapFlyerToShowcase } from "@/tools/listing-flyer/engine/template-mapping";
 import { renderTimelineToWebm } from "@/tools/listing-flyer/engine/render-mp4";
 import { FlyerDocument } from "@/tools/listing-flyer/output/FlyerDocument";
 import { listingShowcaseTemplate } from "@/templates/listing-showcase";
-import { downloadBlob, getFFmpeg, webmToMp4 } from "@/engine/export";
+import {
+  downloadBlob,
+  getFFmpeg,
+  shareOrDownload,
+  webmToMp4,
+  WARMUP_MS,
+} from "@/engine/export";
 import { type BrandSettings } from "@/lib/brand";
 
 interface ExportButtonsProps {
@@ -66,6 +72,10 @@ export function ExportButtons({
 
   const handlePdfExport = async () => {
     if (!canExport) return;
+    // Force-flush draft to localStorage BEFORE export. Bypasses the
+    // page-level debounced save so even if iOS Safari mishandles the new
+    // tab and the user loses the editor tab, reload restores their work.
+    saveDraft(draft);
     setPdfState({ kind: "generating" });
     try {
       // Downsample + re-encode every photo to a small JPEG data URL before
@@ -80,8 +90,19 @@ export function ExportButtons({
       const blob = await pdf(
         <FlyerDocument draft={draft} photoUrls={photoDataUrls} brand={brand} />
       ).toBlob();
-      downloadBlob(blob, `${addressSlug(draft.addressLine1)}-flyer.pdf`);
-      clearDraft();
+      // Route through shareOrDownload, NOT a plain anchor click. On iOS
+      // Safari the share sheet is a non-navigational overlay — the editor
+      // tab is never disturbed. Anchor-click + target="_blank" turned out
+      // to be unreliable for blob URLs on iOS (H-1.7e attempted that and
+      // still hit "WebKitBlobResource error 1" on back-nav).
+      const filename = `${addressSlug(draft.addressLine1)}-flyer.pdf`;
+      const result = await shareOrDownload(blob, filename);
+      // Only clear the draft when the file actually shipped. If the user
+      // dismissed the share sheet (cancelled), keep the draft so they can
+      // retry without re-typing the form.
+      if (result === "shared" || result === "downloaded") {
+        clearDraft();
+      }
       setPdfState({ kind: "done" });
       setTimeout(() => setPdfState({ kind: "idle" }), 3000);
     } catch (err) {
@@ -95,6 +116,9 @@ export function ExportButtons({
 
   const handleMp4Export = async () => {
     if (!canExport) return;
+    // Same pre-export flush as PDF: a long render + new-tab nav is the
+    // exact window where iOS Safari can drop the editor session.
+    saveDraft(draft);
     const canvas = hiddenCanvasRef.current;
     if (!canvas) {
       setMp4State({
@@ -140,6 +164,12 @@ export function ExportButtons({
       ];
 
       for (const sz of sizes) {
+        // Section header so the in-page debug panel makes the reel-vs-square
+        // boundary obvious — without it, two interleaved blocks of
+        // recordCanvas/rAF/webmToMp4 logs read as a single stream.
+        console.log(
+          `[MP4-DEBUG] === ${sz.label} (${sz.width}x${sz.height}) ===`
+        );
         // Build a fresh timeline for each size (layout adapts per dimensions)
         const timeline = listingShowcaseTemplate.build(
           state,
@@ -175,7 +205,12 @@ export function ExportButtons({
           { width: sz.width, height: sz.height },
           draft.duration,
           (p) =>
-            setMp4State({ kind: "running", phase: sz.convertingPhase, progress: p })
+            setMp4State({ kind: "running", phase: sz.convertingPhase, progress: p }),
+          // Trim the captureStream warmup from the start of the webm so
+          // the final MP4 length matches the duration slider exactly.
+          // renderTimelineToWebm above passed WARMUP_MS to recordCanvas;
+          // pass the same here to keep input-skip and recording in sync.
+          WARMUP_MS
         );
 
         downloadBlob(mp4, `${slug}-${sz.label}.mp4`);

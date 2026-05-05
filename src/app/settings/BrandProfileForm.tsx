@@ -5,6 +5,8 @@ import {
   type BrandSettings,
   loadBrandSettings,
   saveBrandSettings,
+  formatPhone,
+  extractPhoneDigits,
 } from "@/lib/brand";
 
 /**
@@ -133,10 +135,13 @@ export function BrandProfileForm() {
           />
         </Field>
         <Field label="Contact phone">
+          {/* Storage is raw 10 digits; display is "(xxx) xxx-xxxx". Strips
+           * non-digits on every change so iOS phone-keypad characters like
+           * # * + never reach storage. */}
           <TextInput
             type="tel"
-            value={s.contactPhone}
-            onChange={(v) => update("contactPhone", v)}
+            value={formatPhone(s.contactPhone)}
+            onChange={(v) => update("contactPhone", extractPhoneDigits(v))}
             placeholder="(555) 123-4567"
           />
         </Field>
@@ -206,17 +211,27 @@ function ColorInput({
 }) {
   return (
     <div className="flex items-center gap-2">
-      <input
-        type="color"
-        value={value}
-        onChange={(e) => onChange(e.target.value)}
-        className="w-12 h-10 rounded cursor-pointer bg-transparent border border-neutral-800 p-0.5"
-      />
+      {/* Wrapper claims explicit 44×44pt (Apple HIG min tap target) so the
+       * swatch is visible in mobile Safari portrait. Native input is layered
+       * on top at opacity-0 so taps still trigger the system color picker. */}
+      <label
+        className="relative block w-11 h-11 rounded border border-neutral-800 cursor-pointer overflow-hidden flex-shrink-0"
+        style={{ backgroundColor: value || "#000000" }}
+      >
+        <input
+          type="color"
+          value={value}
+          onChange={(e) => onChange(e.target.value)}
+          className="absolute inset-0 w-full h-full opacity-0 cursor-pointer"
+        />
+      </label>
       <input
         type="text"
         value={value}
         onChange={(e) => onChange(e.target.value)}
-        className="flex-1 bg-neutral-900 border border-neutral-800 rounded-md px-3 py-2 text-sm font-mono focus:outline-none focus:border-[#4ef2d9]"
+        // min-w-0 prevents the input's intrinsic content size from forcing
+        // the inner flex row wider than its grid cell on narrow viewports.
+        className="flex-1 min-w-0 bg-neutral-900 border border-neutral-800 rounded-md px-3 py-2 text-sm font-mono focus:outline-none focus:border-[#4ef2d9]"
       />
     </div>
   );

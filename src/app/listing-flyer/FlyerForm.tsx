@@ -103,7 +103,10 @@ export function FlyerForm({
             </button>
           )}
         </div>
-        <div className="grid grid-cols-3 gap-3">
+        {/* Mobile portrait can't fit three pickers in one row at 44pt swatch
+         * + a usable hex input each (column would need ~120px, viewport
+         * gives ~100px). Wrap to two rows on <sm; keep a single row at sm+. */}
+        <div className="grid grid-cols-2 gap-3 sm:grid-cols-3">
           <ColorInput
             label="Primary"
             value={effectivePrimary}
@@ -384,17 +387,31 @@ function ColorInput({
         {label}
       </span>
       <div className="flex items-center gap-2">
-        <input
-          type="color"
-          value={value || "#000000"}
-          onChange={(e) => onChange(e.target.value)}
-          className="w-10 h-9 rounded cursor-pointer bg-transparent border border-neutral-800 p-0.5"
-        />
+        {/* Wrapper claims explicit 44×44pt (Apple HIG min tap target) so the
+         * swatch is visible in mobile Safari portrait, where the bare native
+         * input collapses to a sliver inside narrow flex containers. The
+         * native input is absolutely positioned inside at opacity-0 so taps
+         * still trigger the system color picker. */}
+        <label
+          className="relative block w-11 h-11 rounded border border-neutral-800 cursor-pointer overflow-hidden flex-shrink-0"
+          style={{ backgroundColor: value || "#000000" }}
+        >
+          <input
+            type="color"
+            value={value || "#000000"}
+            onChange={(e) => onChange(e.target.value)}
+            className="absolute inset-0 w-full h-full opacity-0 cursor-pointer"
+          />
+        </label>
         <input
           type="text"
           value={value}
           onChange={(e) => onChange(e.target.value)}
-          className="flex-1 bg-neutral-900 border border-neutral-800 rounded-md px-2 py-1.5 text-xs font-mono focus:outline-none focus:border-[#4ef2d9]"
+          // min-w-0 lets the input shrink below its content's intrinsic size.
+          // Without it, the inner flex row exceeds its grid cell and
+          // overflows into the neighboring picker (the symptom Dallen saw
+          // before the grid-cols-2 wrap landed).
+          className="flex-1 min-w-0 bg-neutral-900 border border-neutral-800 rounded-md px-2 py-1.5 text-xs font-mono focus:outline-none focus:border-[#4ef2d9]"
         />
       </div>
     </div>

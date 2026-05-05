@@ -39,6 +39,30 @@ const DEFAULT_BRAND: BrandSettings = {
 const str = (v: unknown, fallback = ""): string =>
   typeof v === "string" ? v : fallback;
 
+/**
+ * Strip everything except digits, cap at 10 (US phone numbers). iOS phone
+ * keypad lets `# * +` through type="tel" inputs — strip those out so they
+ * never reach storage. Pasted formatted numbers ("253-202-8825") become
+ * raw digits ready to re-format.
+ */
+export function extractPhoneDigits(input: string): string {
+  return input.replace(/\D/g, "").slice(0, 10);
+}
+
+/**
+ * Format raw digits as "(xxx) xxx-xxxx", accepting any input form (already
+ * formatted, partial, or raw digits) by extracting digits first. Idempotent
+ * — pass formatted output back in and you get the same formatted output.
+ * Empty input returns empty string (don't render "(   )    -    " for blanks).
+ */
+export function formatPhone(input: string): string {
+  const digits = extractPhoneDigits(input);
+  if (digits.length === 0) return "";
+  if (digits.length <= 3) return `(${digits}`;
+  if (digits.length <= 6) return `(${digits.slice(0, 3)}) ${digits.slice(3)}`;
+  return `(${digits.slice(0, 3)}) ${digits.slice(3, 6)}-${digits.slice(6)}`;
+}
+
 export function loadBrandSettings(): BrandSettings {
   if (typeof window === "undefined") return DEFAULT_BRAND;
   try {
@@ -53,7 +77,10 @@ export function loadBrandSettings(): BrandSettings {
       accentColor: str(parsed.accentColor, DEFAULT_BRAND.accentColor),
       backgroundColor: str(parsed.backgroundColor),
       contactEmail: str(parsed.contactEmail),
-      contactPhone: str(parsed.contactPhone),
+      // Normalize on load: drafts saved before H-1.7 stored "(253) 202-8825";
+      // strip to raw digits so the input mask + downstream renders are
+      // consistent. Idempotent for fresh-format storage.
+      contactPhone: extractPhoneDigits(str(parsed.contactPhone)),
       licenseNumber: str(parsed.licenseNumber),
       brokerage: str(parsed.brokerage),
     };
