@@ -180,13 +180,15 @@ export function ExportButtons({
         },
       ];
 
-      // Interleaved render + share. After each size's MP4 is ready, hand
-      // it to the iOS share sheet so the user can save to Photos before
-      // the second render starts. Two back-to-back share sheets without
-      // intervening work read as confusing UX; placing the second render
-      // BETWEEN the two share dismissals gives "okay that's done, here's
-      // the next one" pacing instead.
-      let allShared = true;
+      // Render BOTH MP4s first, then surface share sheets sequentially.
+      // H-1.8b's interleaved variant (render-share-render-share) caused
+      // square iOS regressions and desktop black-frame intros — the
+      // share-sheet interruption between renders changed canvas /
+      // captureStream state in ways the warmup buffer couldn't absorb.
+      // v1.19 back-to-back rendering doesn't have that problem; the UX
+      // cost is one ~30s wait instead of two ~15s waits separated by a
+      // share sheet.
+      const renderedMp4s: Array<{ label: string; blob: Blob }> = [];
       for (const sz of sizes) {
         // Section header for any [MP4-DEBUG] devtools session.
         console.log(
@@ -233,16 +235,17 @@ export function ExportButtons({
           WARMUP_MS
         );
 
-        const result = await shareOrDownload(
-          mp4,
-          `${slug}-${sz.label}.mp4`
-        );
+        renderedMp4s.push({ label: sz.label, blob: mp4 });
+      }
+
+      // Both renders done. Now show share sheets sequentially. Cancelling
+      // one doesn't skip the other — the user might want square but not
+      // reel, or vice versa. Draft is preserved if ANY sheet got cancelled.
+      let allShared = true;
+      for (const { label, blob } of renderedMp4s) {
+        const result = await shareOrDownload(blob, `${slug}-${label}.mp4`);
         if (result === "cancelled") {
-          // User dismissed this size's share sheet. Skip the next render
-          // and keep the draft so they can retry. The size already in
-          // Photos (if reel was saved before square cancelled) stays.
           allShared = false;
-          break;
         }
       }
 
