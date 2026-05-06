@@ -1,5 +1,12 @@
 import Link from "next/link";
-import { Home, Lock, Shield } from "lucide-react";
+import {
+  Briefcase,
+  Home,
+  Lock,
+  Palette,
+  Shield,
+  Smartphone,
+} from "lucide-react";
 import { PRICING } from "@/lib/pricing";
 import IphoneScrollShowcase from "@/components/ui/iphone-scroll-showcase";
 import ListingFlyerMockup from "@/components/ui/listing-flyer-mockup";
@@ -105,6 +112,57 @@ export default function StudioLandingPage() {
         </div>
       </section>
 
+      {/* Bridge — establishes positioning before showing tool outputs.
+          Subtle radial accent at the top hints "this section is its own
+          beat" without dropping into a different visual world. */}
+      <section className="relative px-6 py-20 border-t border-neutral-900 overflow-hidden">
+        <div
+          aria-hidden
+          className="absolute inset-x-0 top-0 h-px"
+          style={{
+            background:
+              "linear-gradient(90deg, transparent 0%, #4ef2d9 50%, transparent 100%)",
+            opacity: 0.35,
+          }}
+        />
+        <div
+          aria-hidden
+          className="absolute inset-0 pointer-events-none"
+          style={{
+            background:
+              "radial-gradient(circle at 50% -10%, rgba(78, 242, 217, 0.06) 0%, transparent 60%)",
+          }}
+        />
+        <div className="relative max-w-5xl mx-auto">
+          <div className="text-center max-w-3xl mx-auto">
+            <p className="text-xs uppercase tracking-[0.2em] text-[#4ef2d9]">
+              Why Simply Edit Pro
+            </p>
+            <h2 className="text-3xl md:text-5xl font-bold mt-3 tracking-tight">
+              Made for realtors. Not creators.
+            </h2>
+          </div>
+
+          <div className="grid md:grid-cols-3 gap-6 mt-12">
+            <PillarCard
+              icon={<Smartphone size={32} className="text-[#4ef2d9]" />}
+              headline="Mobile-first."
+              body="Built for realtors who work between showings, not at a desk. Every tool runs on the phone in your pocket."
+            />
+            <PillarCard
+              icon={<Briefcase size={32} className="text-[#4ef2d9]" />}
+              headline="Real estate templates."
+              body="Property flyers, listing carousels, market updates, just-sold posts. Every template is purpose-built for property marketing — not Instagram dance videos."
+            />
+            <PillarCard
+              icon={<Palette size={32} className="text-[#4ef2d9]" />}
+              headline="Branded automatically."
+              body="Your logo, your colors, your contact info, your license number — applied to every flyer, post, and presentation. Set it once."
+            />
+          </div>
+        </div>
+      </section>
+
       {/* What's inside — rotating gallery */}
       <section className="px-6 py-20 border-t border-neutral-900">
         <div className="max-w-6xl mx-auto">
@@ -178,5 +236,23 @@ function CredibilityChip({
       <span className="text-[#4ef2d9]">{icon}</span>
       {label}
     </span>
+  );
+}
+
+function PillarCard({
+  icon,
+  headline,
+  body,
+}: {
+  icon: React.ReactNode;
+  headline: string;
+  body: string;
+}) {
+  return (
+    <div className="group p-8 rounded-xl bg-neutral-900/50 border border-neutral-800 hover:border-[#4ef2d9]/40 hover:bg-neutral-900/80 hover:scale-[1.02] transition-all duration-300">
+      <div className="mb-5">{icon}</div>
+      <h3 className="text-xl font-bold text-white">{headline}</h3>
+      <p className="text-sm text-neutral-400 mt-3 leading-relaxed">{body}</p>
+    </div>
   );
 }
