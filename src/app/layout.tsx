@@ -1,4 +1,4 @@
-import type { Metadata } from "next";
+import type { Metadata, Viewport } from "next";
 import { Geist, Geist_Mono, Inter } from "next/font/google";
 import "./globals.css";
 
@@ -24,6 +24,14 @@ export const metadata: Metadata = {
     "Animated Instagram posts for real estate. Pick a template, fill it in, export.",
 };
 
+// Mobile viewport: device-width + 1.0 initial scale prevents iOS Safari
+// from auto-zooming the marketing page on first load. NO maximum-scale or
+// user-scalable=no — pinch-zoom must remain available for accessibility.
+export const viewport: Viewport = {
+  width: "device-width",
+  initialScale: 1,
+};
+
 export default function RootLayout({
   children,
 }: Readonly<{
@@ -32,7 +40,11 @@ export default function RootLayout({
   return (
     <html lang="en">
       <body
-        className={`${geistSans.variable} ${geistMono.variable} ${inter.variable} antialiased`}
+        // overflow-x-hidden as a band-aid against any element that ever
+        // grows past 100vw — keeps mobile pages from showing a horizontal
+        // scrollbar even if a transform/animation extends a bounding box
+        // past the viewport (e.g., gallery card 3D rotateY).
+        className={`${geistSans.variable} ${geistMono.variable} ${inter.variable} antialiased overflow-x-hidden`}
       >
         {children}
       </body>
