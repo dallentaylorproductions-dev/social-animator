@@ -1,4 +1,5 @@
 import Link from "next/link";
+import { Home, Lock, Shield } from "lucide-react";
 import { PRICING } from "@/lib/pricing";
 import IphoneScrollShowcase from "@/components/ui/iphone-scroll-showcase";
 import ListingFlyerMockup from "@/components/ui/listing-flyer-mockup";
@@ -66,28 +67,34 @@ export default function StudioLandingPage() {
         </div>
       </header>
 
-      {/* Hero */}
-      <section className="px-6 pt-32 pb-12 lg:pt-40 lg:pb-16">
+      {/* Hero — credibility chips above headline, compressed vertical
+          rhythm so the iPhone showcase comes into view sooner. */}
+      <section className="px-6 pt-28 pb-6 lg:pt-32 lg:pb-8">
         <div className="max-w-3xl mx-auto text-center">
+          <div className="mx-auto max-w-[520px] flex flex-wrap items-center justify-center gap-2 mb-7">
+            <CredibilityChip icon={<Home size={14} />} label="Built for realtors" />
+            <CredibilityChip icon={<Lock size={14} />} label="Privacy-first" />
+            <CredibilityChip icon={<Shield size={14} />} label="Stripe-secured billing" />
+          </div>
           <h1 className="text-4xl md:text-6xl font-bold tracking-tight">
             Tools that help realtors produce client-ready content in minutes,
             not hours.
           </h1>
-          <p className="text-base md:text-lg text-neutral-400 mt-6 max-w-xl mx-auto leading-relaxed">
+          <p className="text-base md:text-lg text-neutral-400 mt-5 max-w-xl mx-auto leading-relaxed">
             One subscription. Every tool we ship. No design skills required, no
             uploads, no clutter.
           </p>
         </div>
       </section>
 
-      {/* iPhone scroll showcase: scroll-driven 3D tilt around the animated
-          listing-flyer mockup. The "Get started" CTA lives below so visitors
-          see the product working before being asked to act. */}
+      {/* iPhone scroll showcase. Compressed window from h-50/60rem → 40/50rem
+          since the animation still reads at typical scroll speeds and the
+          extra 10rem of padding was eating budget the bridge section needs. */}
       <IphoneScrollShowcase>
         <ListingFlyerMockup />
       </IphoneScrollShowcase>
 
-      <section className="px-6 pb-20">
+      <section className="px-6 pb-16 -mt-8">
         <div className="max-w-3xl mx-auto text-center">
           <Link
             href="/login"
@@ -156,5 +163,20 @@ export default function StudioLandingPage() {
         </div>
       </footer>
     </main>
+  );
+}
+
+function CredibilityChip({
+  icon,
+  label,
+}: {
+  icon: React.ReactNode;
+  label: string;
+}) {
+  return (
+    <span className="inline-flex items-center gap-1.5 px-3 py-1.5 text-xs rounded-full border border-neutral-800 bg-neutral-900/50 backdrop-blur-sm text-neutral-300">
+      <span className="text-[#4ef2d9]">{icon}</span>
+      {label}
+    </span>
   );
 }
