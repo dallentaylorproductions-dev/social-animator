@@ -14,44 +14,104 @@ import { useEffect, useState } from "react";
 
 /**
  * Self-contained 12-second loop demoing the Listing Flyer Generator on a
- * mobile-shaped surface. No video, no real photos — every visual is React,
- * Tailwind, or inline SVG. Designed to render inside the inner area of
+ * mobile-shaped surface. Designed to render inside the inner area of
  * IphoneScrollShowcase (~300×690px after bezel).
  *
  * Animation engine: a single requestAnimationFrame timer publishes the
  * current loop time `t` (0–12s, modulo). All UI is derived from `t` via
- * pure helpers — no setTimeout chains, no state machine, no animation
- * library timeline. Restarting the loop just means t wraps back to 0.
+ * pure helpers — `opacityCycle` for hold→fade-out→hidden→fade-in,
+ * `typedCycle` for typed text on top of the same lifecycle.
+ *
+ * H-3.5a inverted the loop: populated state is now the DEFAULT visible
+ * state at t=0 (so first-paint impressions are "real product," not
+ * "blank form"). The reset+typing sequence comes after a 3-second hold.
  *
  * Timeline:
- *   0.0–0.5  empty form
- *   0.5–2.5  type address into form (mirrored to preview at ~4.5s)
- *   2.5–3.5  type price
- *   3.5–4.5  beds / baths / sqft (staggered)
- *   4.5–6.5  preview populates progressively
- *   6.5–8.5  three feature bullets type sequentially (mirrored to preview)
- *   8.5–9.5  Export PDF button pulses (highlight/scale)
- *   9.5–10.5 Button "tap" (scale-down/up) + brief loading state
- *  10.5–11.5 iOS share sheet slides up from bottom
- *  11.5–12.0 hold the share sheet
- *  12.0      reset, loop
+ *   0.0–3.0   HOLD POPULATED STATE — every field filled, preview rendered,
+ *             slow Ken Burns zoom on the property hero photo (1.0 → 1.02)
+ *   3.0–3.3   reset wipe — fields and preview content fade out
+ *   3.3–5.5   address re-types
+ *   5.5–6.0   price re-types
+ *   6.0–6.4   beds / baths / sqft populate (staggered)
+ *   6.4–7.0   preview content reveals progressively (badge, hero, address,
+ *             price, stats, footer)
+ *   7.0–8.5   three feature bullets type in sequence (form + preview mirror)
+ *   8.5–9.5   Export PDF button pulses
+ *   9.5–10.5  button tap + loading state
+ *  10.5–11.7  share sheet slides up
+ *  11.7–12.0  hold share sheet
+ *  12.0 = 0.0 wrap to populated state (share sheet snaps offscreen via the
+ *             `visible` flag returning false)
  */
 
 const LOOP_S = 12;
 const MINT = "#4ef2d9";
 
-/** Linear progress through [start, end]; clamped to [0, 1]. */
-function progress(t: number, start: number, end: number): number {
-  if (t <= start) return 0;
-  if (t >= end) return 1;
-  return (t - start) / (end - start);
+// Unsplash photo URL used as the property hero for the iPhone mockup.
+// Unsplash license doesn't require attribution but encourages it; keeping
+// these comments so credit can be added later if policy changes.
+//
+//   Modern home exterior — https://unsplash.com/photos/Pc4iz8h5JJo
+const HERO_PHOTO_URL =
+  "https://images.unsplash.com/photo-1568605114967-8130f3a36994?w=800&q=85";
+
+const HOLD_END = 3.0;
+const RESET_END = 3.3;
+
+/** Opacity for an element that holds visible at start of loop, fades out
+ *  during the reset, hides through the typing phase, fades back in during
+ *  the preview reveal, and stays visible until loop end. */
+function opacityCycle(
+  t: number,
+  holdEnd: number,
+  resetEnd: number,
+  revealStart: number,
+  revealEnd: number
+): number {
+  if (t <= holdEnd) return 1;
+  if (t <= resetEnd) return 1 - (t - holdEnd) / (resetEnd - holdEnd);
+  if (t <= revealStart) return 0;
+  if (t <= revealEnd) return (t - revealStart) / (revealEnd - revealStart);
+  return 1;
 }
 
-/** Character-by-character typing — fraction of `text` visible based on t. */
-function typed(text: string, t: number, start: number, end: number): string {
-  const p = progress(t, start, end);
-  const chars = Math.round(p * text.length);
-  return text.slice(0, chars);
+/** Typed-text cycle. Returns the substring visible at time t and the
+ *  opacity multiplier for the parent. */
+function typedCycle(
+  text: string,
+  t: number,
+  holdEnd: number,
+  resetEnd: number,
+  typeStart: number,
+  typeEnd: number
+): { text: string; opacity: number } {
+  if (t <= holdEnd) return { text, opacity: 1 };
+  if (t <= resetEnd) {
+    return {
+      text,
+      opacity: 1 - (t - holdEnd) / (resetEnd - holdEnd),
+    };
+  }
+  if (t <= typeStart) return { text: "", opacity: 1 };
+  if (t <= typeEnd) {
+    const p = (t - typeStart) / (typeEnd - typeStart);
+    return { text: text.slice(0, Math.round(p * text.length)), opacity: 1 };
+  }
+  return { text, opacity: 1 };
+}
+
+/** Snap-in cycle for one-shot values (digits in beds/baths/sqft). */
+function staggerCycle(t: number, revealAt: number) {
+  const opacity =
+    t <= HOLD_END
+      ? 1
+      : t <= RESET_END
+        ? 1 - (t - HOLD_END) / (RESET_END - HOLD_END)
+        : t < revealAt
+          ? 0
+          : 1;
+  const visible = t <= HOLD_END || t >= revealAt;
+  return (text: string) => ({ text: visible ? text : "", opacity });
 }
 
 export default function ListingFlyerMockup() {
@@ -69,34 +129,34 @@ export default function ListingFlyerMockup() {
     return () => cancelAnimationFrame(raf);
   }, []);
 
-  // Form-side typed values
-  const addressForm = typed("1247 Maple Heights Dr", t, 0.5, 2.5);
-  const priceForm = typed("$685,000", t, 2.5, 3.5);
-  const bedsForm = t >= 3.5 ? "4" : "";
-  const bathsForm = t >= 3.7 ? "3" : "";
-  const sqftForm = t >= 3.9 ? "2,548" : "";
-  const feature1Form = typed("Chef's kitchen with marble", t, 6.5, 7.3);
-  const feature2Form = typed("Open Bar", t, 7.5, 7.9);
-  const feature3Form = typed("Indoor Pool", t, 8.0, 8.4);
+  const address = typedCycle("1247 Maple Heights Dr", t, HOLD_END, RESET_END, 3.3, 5.5);
+  const price = typedCycle("$685,000", t, HOLD_END, RESET_END, 5.5, 6.0);
+  const beds = staggerCycle(t, 6.0)("4");
+  const baths = staggerCycle(t, 6.2)("3");
+  const sqft = staggerCycle(t, 6.4)("2,548");
+  const feature1 = typedCycle("Chef's kitchen with marble", t, HOLD_END, RESET_END, 7.0, 7.6);
+  const feature2 = typedCycle("Open Bar", t, HOLD_END, RESET_END, 7.6, 8.0);
+  const feature3 = typedCycle("Indoor Pool", t, HOLD_END, RESET_END, 8.0, 8.5);
 
-  // Preview-side reveal
-  const previewBadgeOpacity = progress(t, 4.4, 4.7);
-  const previewHeroOpacity = progress(t, 4.5, 5.0);
-  const previewAddressOpacity = progress(t, 5.0, 5.4);
-  const previewPriceOpacity = progress(t, 5.4, 5.9);
-  const previewStatsOpacity = progress(t, 5.9, 6.3);
-  const previewF1Opacity = progress(t, 6.7, 7.2);
-  const previewF2Opacity = progress(t, 7.6, 8.0);
-  const previewF3Opacity = progress(t, 8.1, 8.5);
-  const previewGridOpacity = progress(t, 8.4, 8.8);
-  const previewFooterOpacity = progress(t, 5.0, 5.5);
+  const previewBadgeOp = opacityCycle(t, HOLD_END, RESET_END, 6.4, 6.55);
+  const previewHeroOp = opacityCycle(t, HOLD_END, RESET_END, 6.45, 6.85);
+  const previewAddressOp = opacityCycle(t, HOLD_END, RESET_END, 6.6, 6.9);
+  const previewPriceOp = opacityCycle(t, HOLD_END, RESET_END, 6.7, 7.0);
+  const previewStatsOp = opacityCycle(t, HOLD_END, RESET_END, 6.8, 7.1);
+  const previewFooterOp = opacityCycle(t, HOLD_END, RESET_END, 6.85, 7.15);
+  const previewF1Op = opacityCycle(t, HOLD_END, RESET_END, 7.2, 7.5);
+  const previewF2Op = opacityCycle(t, HOLD_END, RESET_END, 7.7, 8.0);
+  const previewF3Op = opacityCycle(t, HOLD_END, RESET_END, 8.1, 8.4);
+  const previewGridOp = opacityCycle(t, HOLD_END, RESET_END, 8.4, 8.8);
 
-  // Button states
+  // Subtle Ken Burns on the hero — only during the populated hold phase so
+  // the frame doesn't feel completely static. 1.0 → 1.02 over the first 3s.
+  const heroZoom = t < HOLD_END ? 1.0 + (t / HOLD_END) * 0.02 : 1.0;
+
   const buttonPulse = t >= 8.5 && t < 9.5;
   const buttonTap = t >= 9.5 && t < 9.7;
   const buttonLoading = t >= 9.7 && t < 10.5;
 
-  // Share sheet — persistent in DOM, transformed in/out via motion
   const shareSheetIn = t >= 10.5 && t < 12.0;
 
   return (
@@ -114,45 +174,43 @@ export default function ListingFlyerMockup() {
         </p>
       </div>
 
-      {/* Live preview */}
       <div className="flex-shrink-0 px-3 pt-2 pb-2 border-b border-neutral-900 bg-neutral-950">
         <p className="text-[7px] uppercase tracking-[0.15em] text-neutral-600 mb-1.5">
           Live preview
         </p>
         <FlyerPreviewCard
-          badgeOpacity={previewBadgeOpacity}
-          heroOpacity={previewHeroOpacity}
-          addressOpacity={previewAddressOpacity}
-          priceOpacity={previewPriceOpacity}
-          statsOpacity={previewStatsOpacity}
-          f1Opacity={previewF1Opacity}
-          f2Opacity={previewF2Opacity}
-          f3Opacity={previewF3Opacity}
-          gridOpacity={previewGridOpacity}
-          footerOpacity={previewFooterOpacity}
+          badgeOpacity={previewBadgeOp}
+          heroOpacity={previewHeroOp}
+          heroZoom={heroZoom}
+          addressOpacity={previewAddressOp}
+          priceOpacity={previewPriceOp}
+          statsOpacity={previewStatsOp}
+          f1Opacity={previewF1Op}
+          f2Opacity={previewF2Op}
+          f3Opacity={previewF3Op}
+          gridOpacity={previewGridOp}
+          footerOpacity={previewFooterOp}
         />
       </div>
 
-      {/* Form fields */}
       <div className="flex-1 px-3 py-2 space-y-2 overflow-hidden">
-        <FormField label="Address" value={addressForm} />
-        <FormField label="List price" value={priceForm} accent />
+        <FormField label="Address" cycle={address} />
+        <FormField label="List price" cycle={price} accent />
         <div className="grid grid-cols-3 gap-1.5">
-          <FormField label="Beds" value={bedsForm} />
-          <FormField label="Baths" value={bathsForm} />
-          <FormField label="Sq ft" value={sqftForm} />
+          <FormField label="Beds" cycle={beds} />
+          <FormField label="Baths" cycle={baths} />
+          <FormField label="Sq ft" cycle={sqft} />
         </div>
         <div className="space-y-1">
           <p className="text-[7px] uppercase tracking-[0.15em] text-neutral-500">
             Feature bullets
           </p>
-          <FormChip value={feature1Form} />
-          <FormChip value={feature2Form} />
-          <FormChip value={feature3Form} />
+          <FormChip cycle={feature1} />
+          <FormChip cycle={feature2} />
+          <FormChip cycle={feature3} />
         </div>
       </div>
 
-      {/* Sticky export button */}
       <div className="px-3 pb-3 pt-2 bg-neutral-950 border-t border-neutral-900 flex-shrink-0">
         <motion.button
           type="button"
@@ -179,7 +237,6 @@ export default function ListingFlyerMockup() {
         </motion.button>
       </div>
 
-      {/* Share sheet — persistent in DOM, transformed in/out for smoothness */}
       <ShareSheet visible={shareSheetIn} />
     </div>
   );
@@ -204,13 +261,14 @@ function Spinner() {
 
 function FormField({
   label,
-  value,
+  cycle,
   accent = false,
 }: {
   label: string;
-  value: string;
+  cycle: { text: string; opacity: number };
   accent?: boolean;
 }) {
+  const { text, opacity } = cycle;
   return (
     <div>
       <p className="uppercase tracking-[0.15em] text-neutral-500 mb-0.5 text-[7px]">
@@ -218,23 +276,33 @@ function FormField({
       </p>
       <div
         className={`bg-neutral-900 border rounded px-2 py-1 text-[10px] min-h-[22px] flex items-center transition-colors ${
-          value
+          text
             ? accent
               ? "border-[#4ef2d9]/40"
               : "border-neutral-800"
             : "border-neutral-800"
         }`}
       >
-        <span style={accent && value ? { color: MINT } : undefined}>
-          {value || <span className="opacity-30">|</span>}
+        <span
+          style={{
+            opacity,
+            color: accent && text ? MINT : undefined,
+          }}
+        >
+          {text || <span className="opacity-30">|</span>}
         </span>
       </div>
     </div>
   );
 }
 
-function FormChip({ value }: { value: string }) {
-  if (!value) {
+function FormChip({
+  cycle,
+}: {
+  cycle: { text: string; opacity: number };
+}) {
+  const { text, opacity } = cycle;
+  if (!text) {
     return (
       <div className="bg-neutral-900 border border-dashed border-neutral-800 rounded px-2 py-1 text-[9px] text-neutral-600 min-h-[20px] flex items-center">
         +
@@ -242,24 +310,25 @@ function FormChip({ value }: { value: string }) {
     );
   }
   return (
-    <div className="bg-neutral-900 border border-neutral-800 rounded px-2 py-1 text-[9px] text-white min-h-[20px] flex items-center gap-1.5">
+    <div
+      className="bg-neutral-900 border border-neutral-800 rounded px-2 py-1 text-[9px] text-white min-h-[20px] flex items-center gap-1.5"
+      style={{ opacity }}
+    >
       <span
         className="inline-block w-1.5 h-1.5 rounded-full flex-shrink-0"
         style={{ backgroundColor: MINT }}
       />
-      <span className="truncate">{value}</span>
+      <span className="truncate">{text}</span>
     </div>
   );
 }
 
 /* ────────────────────────────────────────────────────────────────────── */
 
-/** The "live preview" card — refreshed for H-3a fidelity:
- *  JUST LISTED pill, evocative hero, polished typography hierarchy,
- *  4-tile photo grid, agent footer bar. */
 function FlyerPreviewCard({
   badgeOpacity,
   heroOpacity,
+  heroZoom,
   addressOpacity,
   priceOpacity,
   statsOpacity,
@@ -271,6 +340,7 @@ function FlyerPreviewCard({
 }: {
   badgeOpacity: number;
   heroOpacity: number;
+  heroZoom: number;
   addressOpacity: number;
   priceOpacity: number;
   statsOpacity: number;
@@ -282,20 +352,22 @@ function FlyerPreviewCard({
 }) {
   return (
     <div className="bg-white text-neutral-900 rounded-md overflow-hidden shadow-lg ring-1 ring-black/5 mx-auto flex flex-col">
-      {/* Hero w/ JUST LISTED pill overlay */}
-      <div className="relative w-full" style={{ aspectRatio: "8.5 / 4" }}>
+      <div
+        className="relative w-full overflow-hidden"
+        style={{ aspectRatio: "8.5 / 4" }}
+      >
         <motion.div
-          style={{ opacity: heroOpacity }}
+          style={{ opacity: heroOpacity, scale: heroZoom }}
           className="absolute inset-0"
         >
-          <PropertyHeroSvg />
+          <PropertyHeroPhoto />
         </motion.div>
         <motion.span
           style={{ opacity: badgeOpacity }}
-          className="absolute top-1.5 left-1.5 text-[6px] font-bold uppercase tracking-[0.15em] text-black px-1.5 py-0.5 rounded-full shadow-sm"
+          className="absolute top-1.5 left-1.5"
         >
           <span
-            className="inline-block px-1.5 py-0.5 rounded-full"
+            className="inline-block px-1.5 py-0.5 rounded-full text-[6px] font-bold uppercase tracking-[0.15em] text-black shadow-sm"
             style={{ backgroundColor: MINT }}
           >
             JUST LISTED
@@ -303,7 +375,6 @@ function FlyerPreviewCard({
         </motion.span>
       </div>
 
-      {/* Info block */}
       <div className="px-2 pt-1.5 pb-1.5 flex flex-col gap-0.5">
         <motion.div style={{ opacity: addressOpacity }}>
           <p className="text-[7px] font-bold leading-tight text-neutral-900">
@@ -326,14 +397,12 @@ function FlyerPreviewCard({
           4 BEDS · 3 BATHS · 2,548 SQ FT
         </motion.p>
 
-        {/* Bullets */}
         <div className="space-y-0.5 mt-0.5">
           <PreviewBullet text="Chef's kitchen with marble" opacity={f1Opacity} />
           <PreviewBullet text="Open Bar" opacity={f2Opacity} />
           <PreviewBullet text="Indoor Pool" opacity={f3Opacity} />
         </div>
 
-        {/* 2x2 photo grid */}
         <motion.div
           style={{ opacity: gridOpacity }}
           className="grid grid-cols-2 gap-0.5 mt-1"
@@ -345,7 +414,6 @@ function FlyerPreviewCard({
         </motion.div>
       </div>
 
-      {/* Agent footer bar */}
       <motion.div
         style={{ opacity: footerOpacity }}
         className="px-2 py-1 border-t border-neutral-200 flex items-center gap-1.5 bg-neutral-50"
@@ -387,76 +455,22 @@ function PhotoTile({ gradient }: { gradient: string }) {
   );
 }
 
-/* ────────────────────────────────────────────────────────────────────── */
-
-/** More evocative property hero: dusk gradient sky, stylized house with
- *  detailed roofline + windows + door + walkway, subtle ground shadow. */
-function PropertyHeroSvg() {
+/** Real property exterior — Unsplash modern home. Loaded eagerly because
+ *  it's the first-paint focal point of the marketing hero. */
+function PropertyHeroPhoto() {
   return (
-    <svg
-      viewBox="0 0 100 50"
-      preserveAspectRatio="xMidYMid slice"
-      className="w-full h-full"
-    >
-      <defs>
-        <linearGradient id="propSky" x1="0" y1="0" x2="0" y2="1">
-          <stop offset="0%" stopColor="#bfdbfe" />
-          <stop offset="60%" stopColor="#fde68a" />
-          <stop offset="100%" stopColor="#fbbf77" />
-        </linearGradient>
-        <linearGradient id="propGround" x1="0" y1="0" x2="0" y2="1">
-          <stop offset="0%" stopColor="#a3b18a" />
-          <stop offset="100%" stopColor="#588157" />
-        </linearGradient>
-        <linearGradient id="propRoof" x1="0" y1="0" x2="0" y2="1">
-          <stop offset="0%" stopColor="#312e2e" />
-          <stop offset="100%" stopColor="#1f1d1d" />
-        </linearGradient>
-        <linearGradient id="propBody" x1="0" y1="0" x2="0" y2="1">
-          <stop offset="0%" stopColor="#f5f5f4" />
-          <stop offset="100%" stopColor="#d6d3d1" />
-        </linearGradient>
-      </defs>
-      {/* Sky */}
-      <rect width="100" height="50" fill="url(#propSky)" />
-      {/* Distant tree line */}
-      <path d="M 0 36 Q 15 30 30 33 T 60 32 T 100 34 L 100 38 L 0 38 Z" fill="#3a5a4a" opacity="0.7" />
-      {/* Lawn */}
-      <rect x="0" y="38" width="100" height="12" fill="url(#propGround)" />
-      {/* House body shadow */}
-      <ellipse cx="50" cy="42" rx="32" ry="2" fill="#000" opacity="0.18" />
-      {/* Roof — main pitch */}
-      <polygon points="20,28 50,12 80,28" fill="url(#propRoof)" />
-      {/* Roofline trim */}
-      <polygon points="20,28 50,12 50,14 22,29" fill="#1f1d1d" />
-      {/* Body */}
-      <rect x="24" y="28" width="52" height="14" fill="url(#propBody)" />
-      {/* Door */}
-      <rect x="46" y="33" width="8" height="9" fill="#7c2d12" />
-      <circle cx="52" cy="38" r="0.4" fill="#fbbf24" />
-      {/* Windows w/ warm interior glow */}
-      <rect x="29" y="32" width="9" height="6" fill="#fef3c7" />
-      <rect x="29" y="32" width="9" height="6" fill="none" stroke="#1f1d1d" strokeWidth="0.3" />
-      <line x1="33.5" y1="32" x2="33.5" y2="38" stroke="#1f1d1d" strokeWidth="0.3" />
-      <rect x="62" y="32" width="9" height="6" fill="#fef3c7" />
-      <rect x="62" y="32" width="9" height="6" fill="none" stroke="#1f1d1d" strokeWidth="0.3" />
-      <line x1="66.5" y1="32" x2="66.5" y2="38" stroke="#1f1d1d" strokeWidth="0.3" />
-      {/* Chimney */}
-      <rect x="64" y="14" width="4" height="11" fill="#1f1d1d" />
-      {/* Walkway */}
-      <polygon points="46,42 54,42 60,50 40,50" fill="#9ca3af" opacity="0.85" />
-      {/* Tiny shrub */}
-      <circle cx="20" cy="40" r="2" fill="#3a5a4a" />
-      <circle cx="80" cy="40" r="2.2" fill="#3a5a4a" />
-    </svg>
+    // eslint-disable-next-line @next/next/no-img-element
+    <img
+      src={HERO_PHOTO_URL}
+      alt="Modern home exterior"
+      loading="eager"
+      className="w-full h-full object-cover"
+    />
   );
 }
 
 /* ────────────────────────────────────────────────────────────────────── */
 
-/** iOS-style share sheet — drag handle, file preview tile (with mini flyer
- *  thumbnail), recent contacts, app icons row, action list, Cancel button.
- *  Persistent in DOM; slides in/out via motion transforms. */
 function ShareSheet({ visible }: { visible: boolean }) {
   return (
     <motion.div
@@ -468,10 +482,8 @@ function ShareSheet({ visible }: { visible: boolean }) {
       className="absolute bottom-0 left-0 right-0 bg-neutral-900/97 backdrop-blur-md rounded-t-2xl border-t border-neutral-800 px-3 pt-2 pb-3 max-h-[85%] overflow-hidden"
       style={{ pointerEvents: visible ? "auto" : "none" }}
     >
-      {/* Drag handle */}
       <div className="w-10 h-1 bg-neutral-600 rounded-full mx-auto mb-2.5" />
 
-      {/* File preview tile with mini flyer thumbnail */}
       <div className="bg-neutral-800/80 rounded-lg p-2 flex items-center gap-2 mb-2.5">
         <div className="w-10 h-12 bg-white rounded shadow-md overflow-hidden flex-shrink-0 ring-1 ring-black/10">
           <MiniFlyerThumbnail />
@@ -484,7 +496,6 @@ function ShareSheet({ visible }: { visible: boolean }) {
         </div>
       </div>
 
-      {/* Top contacts row */}
       <div className="flex justify-between mb-3 px-1">
         <ContactCircle initials="JM" bg="#ec4899" />
         <ContactCircle initials="AT" bg={MINT} dark />
@@ -492,7 +503,6 @@ function ShareSheet({ visible }: { visible: boolean }) {
         <ContactCircle initials="" bg="#ef4444" icon="heart" label="Mom" />
       </div>
 
-      {/* Apps row */}
       <div className="flex justify-around mb-2.5 pb-2.5 border-b border-neutral-800">
         <AppIcon label="AirDrop" bg="#1d4ed8">
           <AirDropIcon />
@@ -508,14 +518,12 @@ function ShareSheet({ visible }: { visible: boolean }) {
         </AppIcon>
       </div>
 
-      {/* Action list */}
       <div className="bg-neutral-800/70 rounded-lg overflow-hidden">
         <ActionRow label="Save to Files" icon={<FolderPlus size={12} />} />
         <ActionRow label="Markup" icon={<Pencil size={12} />} />
         <ActionRow label="Print" icon={<Printer size={12} />} last />
       </div>
 
-      {/* Cancel */}
       <button
         type="button"
         className="w-full mt-2 bg-neutral-800/70 rounded-lg py-1.5 text-[10px] font-semibold text-white"
@@ -604,7 +612,14 @@ function ActionRow({
 
 function AirDropIcon() {
   return (
-    <svg viewBox="0 0 24 24" className="w-3.5 h-3.5 text-white" fill="none" stroke="currentColor" strokeWidth="2.2" strokeLinecap="round">
+    <svg
+      viewBox="0 0 24 24"
+      className="w-3.5 h-3.5 text-white"
+      fill="none"
+      stroke="currentColor"
+      strokeWidth="2.2"
+      strokeLinecap="round"
+    >
       <path d="M5 15c2-3 5-5 7-5s5 2 7 5" />
       <path d="M8 17c1.5-2 3-3 4-3s2.5 1 4 3" />
       <circle cx="12" cy="19.5" r="1.4" fill="currentColor" />
@@ -612,14 +627,20 @@ function AirDropIcon() {
   );
 }
 
-/** Tiny representation of the flyer used inside the share sheet's file
- *  preview tile. Standalone (not the live PreviewCard) so it always shows
- *  the "rendered" final state regardless of the loop position. */
+/** Tiny flyer-card representation inside the share sheet's file preview
+ *  tile. Uses the same Unsplash hero photo for end-to-end visual
+ *  consistency. */
 function MiniFlyerThumbnail() {
   return (
     <div className="w-full h-full bg-white flex flex-col">
-      <div className="h-1/2">
-        <PropertyHeroSvg />
+      <div className="h-1/2 overflow-hidden">
+        {/* eslint-disable-next-line @next/next/no-img-element */}
+        <img
+          src={HERO_PHOTO_URL}
+          alt=""
+          loading="eager"
+          className="w-full h-full object-cover"
+        />
       </div>
       <div className="flex-1 px-0.5 pt-0.5 flex flex-col">
         <div className="h-0.5 w-3/4 bg-neutral-800 rounded mb-0.5" />
