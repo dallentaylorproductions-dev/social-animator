@@ -16,10 +16,12 @@ const FFMPEG_CDN = "https://unpkg.com/@ffmpeg/core@0.12.10/dist/umd";
  * doesn't dedupe — and ffmpeg trims the warmup section out via `-ss` so
  * the final MP4 length matches the duration slider exactly.
  *
- * 5s comfortably covers the worst observed iOS warmup (~4s for the second
- * capture). Tunable here if real-device telemetry shows different values.
+ * H-1.8g bumped 5000 → 5500 to absorb a residual ~1s captureStream
+ * "stabilization tail" surfacing as black frames at the start of the
+ * trimmed output. Same `-ss WARMUP/1000` placement, just more skip on
+ * both ends of the pipeline (recorder records longer, ffmpeg trims more).
  */
-export const WARMUP_MS = 5000;
+export const WARMUP_MS = 5500;
 
 let ffmpegInstance: FFmpeg | null = null;
 let ffmpegLoadPromise: Promise<FFmpeg> | null = null;
@@ -292,29 +294,45 @@ export async function shareOrDownload(
   blob: Blob,
   filename: string
 ): Promise<SaveResult> {
+  console.log(
+    `[SHARE-DEBUG] entry: filename=${filename} mime=${blob.type} size=${blob.size}`
+  );
   if (typeof navigator === "undefined") {
+    console.log(`[SHARE-DEBUG] no navigator (SSR?) → cancelled`);
     return "cancelled";
   }
 
   const isMobile = /iPhone|iPad|iPod|Android/.test(navigator.userAgent);
+  const hasShare = typeof navigator.share === "function";
+  const hasCanShare = typeof navigator.canShare === "function";
+  console.log(
+    `[SHARE-DEBUG] caps: mobile=${isMobile} share=${hasShare} canShare=${hasCanShare}`
+  );
 
-  if (
-    isMobile &&
-    typeof navigator.share === "function" &&
-    typeof navigator.canShare === "function"
-  ) {
+  if (isMobile && hasShare && hasCanShare) {
     try {
       const file = new File([blob], filename, { type: blob.type });
-      if (navigator.canShare({ files: [file] })) {
+      const canShareFiles = navigator.canShare({ files: [file] });
+      console.log(`[SHARE-DEBUG] canShare({files}) = ${canShareFiles}`);
+      if (canShareFiles) {
+        console.log(`[SHARE-DEBUG] → Web Share API path`);
         await navigator.share({ files: [file] });
+        console.log(`[SHARE-DEBUG] navigator.share resolved → shared`);
         return "shared";
       }
     } catch (err) {
-      if (err instanceof Error && err.name === "AbortError") return "cancelled";
+      if (err instanceof Error && err.name === "AbortError") {
+        console.log(`[SHARE-DEBUG] navigator.share AbortError → cancelled`);
+        return "cancelled";
+      }
+      console.log(
+        `[SHARE-DEBUG] navigator.share threw: ${err instanceof Error ? err.message : String(err)} — falling through to downloadBlob`
+      );
       // Other errors fall through to download
     }
   }
 
+  console.log(`[SHARE-DEBUG] → downloadBlob fallback path`);
   downloadBlob(blob, filename);
   return "downloaded";
 }

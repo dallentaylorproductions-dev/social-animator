@@ -1,7 +1,6 @@
 "use client";
 
-import { useRef, useState } from "react";
-import { pdf } from "@react-pdf/renderer";
+import { useEffect, useRef, useState } from "react";
 import {
   type FlyerDraft,
   type FlyerPhoto,
@@ -12,11 +11,13 @@ import { clearDraft, saveDraft } from "@/tools/listing-flyer/engine/draft-storag
 import { waitForPhoto } from "@/tools/listing-flyer/engine/photos";
 import { mapFlyerToShowcase } from "@/tools/listing-flyer/engine/template-mapping";
 import { renderTimelineToWebm } from "@/tools/listing-flyer/engine/render-mp4";
-import { FlyerDocument } from "@/tools/listing-flyer/output/FlyerDocument";
+import { exportJpegFromDraft } from "@/tools/listing-flyer/engine/jpeg-export";
+import { generatePdfBlob } from "@/tools/listing-flyer/output/pdf-export";
 import { listingShowcaseTemplate } from "@/templates/listing-showcase";
 import {
   downloadBlob,
   getFFmpeg,
+  isMobileDevice,
   shareOrDownload,
   webmToMp4,
   WARMUP_MS,
@@ -42,6 +43,12 @@ type PdfState =
   | { kind: "done" }
   | { kind: "error"; message: string };
 
+type JpegState =
+  | { kind: "idle" }
+  | { kind: "generating" }
+  | { kind: "done" }
+  | { kind: "error"; message: string };
+
 type Mp4Phase =
   | "preparing"
   | "rendering-reel"
@@ -52,6 +59,19 @@ type Mp4Phase =
 type Mp4State =
   | { kind: "idle" }
   | { kind: "running"; phase: Mp4Phase; progress: number }
+  // Mobile two-step: render finished, blobs are held in state, waiting on
+  // a fresh user gesture (tap on Save Reel / Save Square) to call
+  // navigator.share. iOS Safari's user-gesture token expires across the
+  // long render, so calling share() automatically after render fails.
+  | {
+      kind: "ready";
+      reelBlob: Blob;
+      reelFilename: string;
+      reelSaved: boolean;
+      squareBlob: Blob;
+      squareFilename: string;
+      squareSaved: boolean;
+    }
   | { kind: "done" }
   | { kind: "error"; message: string };
 
@@ -62,56 +82,138 @@ export function ExportButtons({
   brandLogoImg,
 }: ExportButtonsProps) {
   const [pdfState, setPdfState] = useState<PdfState>({ kind: "idle" });
+  const [jpegState, setJpegState] = useState<JpegState>({ kind: "idle" });
   const [mp4State, setMp4State] = useState<Mp4State>({ kind: "idle" });
+  // Shared in-page diagnostic capture across all three export handlers.
+  // Populated by a console.log monkey-patch that tees [MP4-DEBUG] and
+  // [SHARE-DEBUG] lines into a state buffer so users on devices without
+  // a desktop Web Inspector can long-press → copy → paste back.
+  const [debugLogs, setDebugLogs] = useState("");
+  const [debugCopied, setDebugCopied] = useState(false);
   const hiddenCanvasRef = useRef<HTMLCanvasElement>(null);
 
   const validationError = validateForExport(draft, photos.length);
   const isBusy =
-    pdfState.kind === "generating" || mp4State.kind === "running";
+    pdfState.kind === "generating" ||
+    jpegState.kind === "generating" ||
+    mp4State.kind === "running" ||
+    mp4State.kind === "ready";
   const canExport = !validationError && !isBusy;
+
+  // When the user has saved both reel + square in the ready state,
+  // transition to "done" + clear the draft. Done in useEffect so the two
+  // save handlers don't race each other on the both-saved check.
+  useEffect(() => {
+    if (
+      mp4State.kind === "ready" &&
+      mp4State.reelSaved &&
+      mp4State.squareSaved
+    ) {
+      clearDraft();
+      setMp4State({ kind: "done" });
+      const t = setTimeout(() => setMp4State({ kind: "idle" }), 3000);
+      return () => clearTimeout(t);
+    }
+  }, [mp4State]);
+
+  // Wrap an export run in a console.log tee so [MP4-DEBUG] and
+  // [SHARE-DEBUG] lines flow into the in-page panel. Original console.log
+  // is preserved + restored in finally; desktop devtools still see
+  // everything, and a thrown export doesn't leave the patch installed.
+  const captureDebug = async <T,>(fn: () => Promise<T>): Promise<T> => {
+    const lines: string[] = [];
+    const origLog = console.log;
+    console.log = (...args: unknown[]) => {
+      origLog(...args);
+      try {
+        const line = args
+          .map((a) => (typeof a === "string" ? a : JSON.stringify(a)))
+          .join(" ");
+        if (
+          line.startsWith("[MP4-DEBUG]") ||
+          line.startsWith("[SHARE-DEBUG]")
+        ) {
+          lines.push(line);
+        }
+      } catch {
+        // best-effort
+      }
+    };
+    try {
+      return await fn();
+    } finally {
+      console.log = origLog;
+      setDebugLogs(lines.join("\n"));
+      setDebugCopied(false);
+    }
+  };
+
+  const handleCopyDebug = async () => {
+    if (!debugLogs) return;
+    try {
+      await navigator.clipboard.writeText(debugLogs);
+      setDebugCopied(true);
+      setTimeout(() => setDebugCopied(false), 2000);
+    } catch {
+      // Clipboard API blocked — long-press on the <pre> is the fallback.
+    }
+  };
 
   const handlePdfExport = async () => {
     if (!canExport) return;
     // Force-flush draft to localStorage BEFORE export. Bypasses the
-    // page-level debounced save so even if iOS Safari mishandles the new
-    // tab and the user loses the editor tab, reload restores their work.
+    // page-level debounced save so a navigation/share-sheet glitch leaves
+    // the editor session recoverable on reload.
     saveDraft(draft);
     setPdfState({ kind: "generating" });
-    try {
-      // Downsample + re-encode every photo to a small JPEG data URL before
-      // invoking pdf(). Original phone photos (4-10MB each, base64 = 5-13MB
-      // strings) overload @react-pdf/renderer's image processor — symptom is
-      // that only one Image renders and the rest fall through to their
-      // backgroundColor placeholder. At 1600px max edge / JPEG q=0.85 each
-      // photo is ~150-300KB, and a 5×3.5" hero at print size is still ~150dpi.
-      const photoDataUrls = await Promise.all(
-        photos.map((p) => fileToCompressedDataUrl(p.file))
-      );
-      const blob = await pdf(
-        <FlyerDocument draft={draft} photoUrls={photoDataUrls} brand={brand} />
-      ).toBlob();
-      // Route through shareOrDownload, NOT a plain anchor click. On iOS
-      // Safari the share sheet is a non-navigational overlay — the editor
-      // tab is never disturbed. Anchor-click + target="_blank" turned out
-      // to be unreliable for blob URLs on iOS (H-1.7e attempted that and
-      // still hit "WebKitBlobResource error 1" on back-nav).
-      const filename = `${addressSlug(draft.addressLine1)}-flyer.pdf`;
-      const result = await shareOrDownload(blob, filename);
-      // Only clear the draft when the file actually shipped. If the user
-      // dismissed the share sheet (cancelled), keep the draft so they can
-      // retry without re-typing the form.
-      if (result === "shared" || result === "downloaded") {
-        clearDraft();
+    await captureDebug(async () => {
+      try {
+        const blob = await generatePdfBlob(draft, photos, brand);
+        const filename = `${addressSlug(draft.addressLine1)}-flyer.pdf`;
+        const result = await shareOrDownload(blob, filename);
+        // Only clear the draft when the file actually shipped. If the user
+        // dismissed the share sheet (cancelled), keep the draft so they can
+        // retry without re-typing the form.
+        if (result === "shared" || result === "downloaded") {
+          clearDraft();
+        }
+        setPdfState({ kind: "done" });
+        setTimeout(() => setPdfState({ kind: "idle" }), 3000);
+      } catch (err) {
+        console.error("[flyer pdf]", err);
+        setPdfState({
+          kind: "error",
+          message: err instanceof Error ? err.message : String(err),
+        });
       }
-      setPdfState({ kind: "done" });
-      setTimeout(() => setPdfState({ kind: "idle" }), 3000);
-    } catch (err) {
-      console.error("[flyer pdf]", err);
-      setPdfState({
-        kind: "error",
-        message: err instanceof Error ? err.message : String(err),
-      });
-    }
+    });
+  };
+
+  const handleJpegExport = async () => {
+    if (!canExport) return;
+    // Same pre-export flush as PDF — JPEG generation goes through the same
+    // PDF render path before rasterizing, so the same mid-export failure
+    // window applies.
+    saveDraft(draft);
+    setJpegState({ kind: "generating" });
+    await captureDebug(async () => {
+      try {
+        const blob = await exportJpegFromDraft(draft, photos, brand);
+        const filename = `${addressSlug(draft.addressLine1)}-flyer.jpg`;
+        const result = await shareOrDownload(blob, filename);
+        if (result === "shared" || result === "downloaded") {
+          clearDraft();
+        }
+        setJpegState({ kind: "done" });
+        setTimeout(() => setJpegState({ kind: "idle" }), 3000);
+      } catch (err) {
+        console.error("[flyer jpeg]", err);
+        setJpegState({
+          kind: "error",
+          message: err instanceof Error ? err.message : String(err),
+        });
+      }
+    });
   };
 
   const handleMp4Export = async () => {
@@ -130,6 +232,7 @@ export function ExportButtons({
 
     setMp4State({ kind: "running", phase: "preparing", progress: 0 });
 
+    await captureDebug(async () => {
     try {
       // Pre-load ffmpeg in parallel with photo readiness
       const ffmpegPromise = getFFmpeg();
@@ -163,10 +266,17 @@ export function ExportButtons({
         },
       ];
 
+      // Render BOTH MP4s first, then surface share sheets sequentially.
+      // H-1.8b's interleaved variant (render-share-render-share) caused
+      // square iOS regressions and desktop black-frame intros — the
+      // share-sheet interruption between renders changed canvas /
+      // captureStream state in ways the warmup buffer couldn't absorb.
+      // v1.19 back-to-back rendering doesn't have that problem; the UX
+      // cost is one ~30s wait instead of two ~15s waits separated by a
+      // share sheet.
+      const renderedMp4s: Array<{ label: string; blob: Blob }> = [];
       for (const sz of sizes) {
-        // Section header so the in-page debug panel makes the reel-vs-square
-        // boundary obvious — without it, two interleaved blocks of
-        // recordCanvas/rAF/webmToMp4 logs read as a single stream.
+        // Section header for any [MP4-DEBUG] devtools session.
         console.log(
           `[MP4-DEBUG] === ${sz.label} (${sz.width}x${sz.height}) ===`
         );
@@ -208,17 +318,43 @@ export function ExportButtons({
             setMp4State({ kind: "running", phase: sz.convertingPhase, progress: p }),
           // Trim the captureStream warmup from the start of the webm so
           // the final MP4 length matches the duration slider exactly.
-          // renderTimelineToWebm above passed WARMUP_MS to recordCanvas;
-          // pass the same here to keep input-skip and recording in sync.
           WARMUP_MS
         );
 
-        downloadBlob(mp4, `${slug}-${sz.label}.mp4`);
+        renderedMp4s.push({ label: sz.label, blob: mp4 });
       }
 
-      clearDraft();
-      setMp4State({ kind: "done" });
-      setTimeout(() => setMp4State({ kind: "idle" }), 5000);
+      // Platform fork. iOS Safari's user-gesture token expires across the
+      // ~30s render window — calling navigator.share() automatically after
+      // rendering fails silently and falls through to downloadBlob (which
+      // lands the file in Files, not Photos). On mobile we stash the
+      // blobs in state and wait for the user to tap explicit "Save Reel"
+      // / "Save Square" buttons; each tap is a fresh gesture that
+      // navigator.share will honor. Desktop has no gesture issue, so we
+      // skip the extra clicks and trigger downloads inline.
+      const reelBlob = renderedMp4s[0].blob;
+      const squareBlob = renderedMp4s[1].blob;
+      const reelFilename = `${slug}-reel.mp4`;
+      const squareFilename = `${slug}-square.mp4`;
+
+      if (isMobileDevice()) {
+        setMp4State({
+          kind: "ready",
+          reelBlob,
+          reelFilename,
+          reelSaved: false,
+          squareBlob,
+          squareFilename,
+          squareSaved: false,
+        });
+        // Draft clears via the useEffect once both files have been saved.
+      } else {
+        downloadBlob(reelBlob, reelFilename);
+        downloadBlob(squareBlob, squareFilename);
+        clearDraft();
+        setMp4State({ kind: "done" });
+        setTimeout(() => setMp4State({ kind: "idle" }), 5000);
+      }
     } catch (err) {
       console.error("[flyer mp4]", err);
       setMp4State({
@@ -226,6 +362,45 @@ export function ExportButtons({
         message: err instanceof Error ? err.message : String(err),
       });
     }
+    });
+  };
+
+  const handleSaveReel = async () => {
+    if (mp4State.kind !== "ready") return;
+    const ready = mp4State;
+    let saved = false;
+    await captureDebug(async () => {
+      const result = await shareOrDownload(ready.reelBlob, ready.reelFilename);
+      saved = result === "shared" || result === "downloaded";
+    });
+    if (!saved) return;
+    setMp4State((prev) =>
+      prev.kind === "ready" ? { ...prev, reelSaved: true } : prev
+    );
+  };
+
+  const handleSaveSquare = async () => {
+    if (mp4State.kind !== "ready") return;
+    const ready = mp4State;
+    let saved = false;
+    await captureDebug(async () => {
+      const result = await shareOrDownload(
+        ready.squareBlob,
+        ready.squareFilename
+      );
+      saved = result === "shared" || result === "downloaded";
+    });
+    if (!saved) return;
+    setMp4State((prev) =>
+      prev.kind === "ready" ? { ...prev, squareSaved: true } : prev
+    );
+  };
+
+  const handleDismissMp4Ready = () => {
+    if (mp4State.kind !== "ready") return;
+    // Leave the draft alone — user dismissed without saving everything,
+    // so they may want to retry.
+    setMp4State({ kind: "idle" });
   };
 
   return (
@@ -239,22 +414,69 @@ export function ExportButtons({
       >
         {pdfState.kind === "idle" && "Export PDF"}
         {pdfState.kind === "generating" && "Generating PDF…"}
-        {pdfState.kind === "done" && "PDF downloaded ✓"}
+        {pdfState.kind === "done" && "PDF saved ✓"}
         {pdfState.kind === "error" && "Try again — Export PDF"}
       </button>
 
       <button
         type="button"
-        onClick={handleMp4Export}
+        onClick={handleJpegExport}
         disabled={!canExport}
         title={validationError ?? undefined}
-        className="w-full bg-neutral-800 hover:bg-neutral-700 text-neutral-200 rounded-md px-4 py-3 text-sm font-semibold transition disabled:opacity-60 disabled:cursor-not-allowed"
+        className="w-full bg-[#4ef2d9] hover:bg-[#3ad9c0] text-black rounded-md px-4 py-3 text-sm font-semibold transition disabled:opacity-60 disabled:cursor-not-allowed"
       >
-        {mp4State.kind === "idle" && "Export Animated Version (MP4)"}
-        {mp4State.kind === "running" && mp4StatusText(mp4State)}
-        {mp4State.kind === "done" && "Both MP4s downloaded ✓"}
-        {mp4State.kind === "error" && "Try again — Export Animated Version"}
+        {jpegState.kind === "idle" && "Export JPEG (Camera Roll)"}
+        {jpegState.kind === "generating" && "Generating JPEG…"}
+        {jpegState.kind === "done" && "JPEG saved ✓"}
+        {jpegState.kind === "error" && "Try again — Export JPEG"}
       </button>
+
+      {mp4State.kind === "ready" ? (
+        <div className="bg-neutral-900 border border-neutral-800 rounded-md p-3 space-y-3">
+          <div className="flex items-start justify-between gap-2">
+            <p className="text-[11px] text-neutral-300 leading-snug">
+              Videos rendered. Tap each one to save to Photos.
+            </p>
+            <button
+              type="button"
+              onClick={handleDismissMp4Ready}
+              aria-label="Dismiss without saving"
+              className="text-neutral-500 hover:text-neutral-300 text-sm leading-none flex-shrink-0"
+            >
+              ✕
+            </button>
+          </div>
+          <button
+            type="button"
+            onClick={handleSaveReel}
+            disabled={mp4State.reelSaved}
+            className="w-full bg-[#4ef2d9] hover:bg-[#3ad9c0] text-black rounded-md px-4 py-3 text-sm font-semibold transition disabled:bg-neutral-800 disabled:text-neutral-400 disabled:cursor-default"
+          >
+            {mp4State.reelSaved ? "Reel saved ✓" : "Save Reel to Photos"}
+          </button>
+          <button
+            type="button"
+            onClick={handleSaveSquare}
+            disabled={mp4State.squareSaved}
+            className="w-full bg-[#4ef2d9] hover:bg-[#3ad9c0] text-black rounded-md px-4 py-3 text-sm font-semibold transition disabled:bg-neutral-800 disabled:text-neutral-400 disabled:cursor-default"
+          >
+            {mp4State.squareSaved ? "Square saved ✓" : "Save Square to Photos"}
+          </button>
+        </div>
+      ) : (
+        <button
+          type="button"
+          onClick={handleMp4Export}
+          disabled={!canExport}
+          title={validationError ?? undefined}
+          className="w-full bg-neutral-800 hover:bg-neutral-700 text-neutral-200 rounded-md px-4 py-3 text-sm font-semibold transition disabled:opacity-60 disabled:cursor-not-allowed"
+        >
+          {mp4State.kind === "idle" && "Export Animated Version (MP4)"}
+          {mp4State.kind === "running" && mp4StatusText(mp4State)}
+          {mp4State.kind === "done" && "Both videos saved ✓"}
+          {mp4State.kind === "error" && "Try again — Export Animated Version"}
+        </button>
+      )}
 
       {validationError && (
         <p className="text-[11px] text-neutral-500">{validationError}</p>
@@ -262,8 +484,8 @@ export function ExportButtons({
 
       {mp4State.kind === "running" && (
         <p className="text-[11px] text-neutral-500 leading-snug">
-          Renders Reel (9:16) and Square (1:1) — about 30–60 seconds total.
-          Keep this tab focused.
+          Renders Reel (9:16) and Square (1:1) back-to-back. When both are
+          ready, you&apos;ll get save buttons for each. Keep this tab focused.
         </p>
       )}
 
@@ -272,10 +494,45 @@ export function ExportButtons({
           {pdfState.message}
         </p>
       )}
+      {jpegState.kind === "error" && (
+        <p className="text-[11px] text-red-400 break-words">
+          {jpegState.message}
+        </p>
+      )}
       {mp4State.kind === "error" && (
         <p className="text-[11px] text-red-400 break-words">
           {mp4State.message}
         </p>
+      )}
+
+      {debugLogs && (
+        <div className="mt-2 bg-neutral-900 border border-neutral-800 rounded-md p-3">
+          <div className="flex items-center justify-between gap-2 mb-2">
+            <p className="text-[9px] uppercase tracking-[0.15em] text-neutral-500 font-semibold">
+              Diagnostics — long-press to copy
+            </p>
+            <div className="flex items-center gap-3">
+              <button
+                type="button"
+                onClick={handleCopyDebug}
+                className="text-[10px] text-[#4ef2d9] hover:underline"
+              >
+                {debugCopied ? "Copied ✓" : "Copy"}
+              </button>
+              <button
+                type="button"
+                onClick={() => setDebugLogs("")}
+                aria-label="Dismiss diagnostics"
+                className="text-neutral-500 hover:text-neutral-300 text-sm leading-none"
+              >
+                ✕
+              </button>
+            </div>
+          </div>
+          <pre className="font-mono text-[10px] text-neutral-300 whitespace-pre-wrap break-all select-text leading-snug max-h-64 overflow-y-auto">
+            {debugLogs}
+          </pre>
+        </div>
       )}
 
       {/* Hidden canvas — used by the MP4 export pipeline. Position off-screen
@@ -296,73 +553,17 @@ export function ExportButtons({
   );
 }
 
-/**
- * Decode an image File, downsample to maxEdge on the longest side, and
- * re-encode as a compressed JPEG data URL.
- *
- * Used by PDF export. Phone photos at 4000×3000 = 4-10MB; base64 inflates by
- * ~33%; 4 photos = 20-50MB of string going into pdf().toBlob(). Empirically
- * this overwhelms @react-pdf/renderer — only the last image renders, the
- * rest fall through to their View backgroundColor.
- *
- * 1600px max edge at JPEG q=0.85 produces ~150-300KB per photo. A 5×3.5"
- * hero at print size is still ~150dpi (well above print-quality threshold).
- */
-function fileToCompressedDataUrl(
-  file: File,
-  maxEdge: number = 1600,
-  quality: number = 0.85
-): Promise<string> {
-  return new Promise((resolve, reject) => {
-    const blobUrl = URL.createObjectURL(file);
-    const img = new Image();
-    img.onload = () => {
-      try {
-        const w = img.naturalWidth;
-        const h = img.naturalHeight;
-        const scale = Math.min(1, maxEdge / Math.max(w, h));
-        const targetW = Math.max(1, Math.round(w * scale));
-        const targetH = Math.max(1, Math.round(h * scale));
-
-        const canvas = document.createElement("canvas");
-        canvas.width = targetW;
-        canvas.height = targetH;
-        const ctx = canvas.getContext("2d");
-        if (!ctx) {
-          URL.revokeObjectURL(blobUrl);
-          reject(new Error("Canvas 2D context unavailable"));
-          return;
-        }
-        ctx.imageSmoothingEnabled = true;
-        ctx.imageSmoothingQuality = "high";
-        ctx.drawImage(img, 0, 0, targetW, targetH);
-        const dataUrl = canvas.toDataURL("image/jpeg", quality);
-        URL.revokeObjectURL(blobUrl);
-        resolve(dataUrl);
-      } catch (err) {
-        URL.revokeObjectURL(blobUrl);
-        reject(err);
-      }
-    };
-    img.onerror = () => {
-      URL.revokeObjectURL(blobUrl);
-      reject(new Error(`Could not load ${file.name}`));
-    };
-    img.src = blobUrl;
-  });
-}
-
 function mp4StatusText(state: { phase: Mp4Phase; progress: number }): string {
   const pct = Math.round(state.progress * 100);
   switch (state.phase) {
     case "preparing":
       return "Preparing…";
     case "rendering-reel":
-      return `Recording Reel… ${pct}% (1 of 2)`;
+      return `Rendering Reel… ${pct}% (1 of 2)`;
     case "converting-reel":
       return `Converting Reel… ${pct}%`;
     case "rendering-square":
-      return `Recording Square… ${pct}% (2 of 2)`;
+      return `Rendering Square… ${pct}% (2 of 2)`;
     case "converting-square":
       return `Converting Square… ${pct}%`;
   }
