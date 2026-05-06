@@ -84,12 +84,6 @@ export function ExportButtons({
   const [pdfState, setPdfState] = useState<PdfState>({ kind: "idle" });
   const [jpegState, setJpegState] = useState<JpegState>({ kind: "idle" });
   const [mp4State, setMp4State] = useState<Mp4State>({ kind: "idle" });
-  // Shared in-page diagnostic capture across all three export handlers.
-  // Populated by a console.log monkey-patch that tees [MP4-DEBUG] and
-  // [SHARE-DEBUG] lines into a state buffer so users on devices without
-  // a desktop Web Inspector can long-press → copy → paste back.
-  const [debugLogs, setDebugLogs] = useState("");
-  const [debugCopied, setDebugCopied] = useState(false);
   const hiddenCanvasRef = useRef<HTMLCanvasElement>(null);
 
   const validationError = validateForExport(draft, photos.length);
@@ -116,49 +110,6 @@ export function ExportButtons({
     }
   }, [mp4State]);
 
-  // Wrap an export run in a console.log tee so [MP4-DEBUG] and
-  // [SHARE-DEBUG] lines flow into the in-page panel. Original console.log
-  // is preserved + restored in finally; desktop devtools still see
-  // everything, and a thrown export doesn't leave the patch installed.
-  const captureDebug = async <T,>(fn: () => Promise<T>): Promise<T> => {
-    const lines: string[] = [];
-    const origLog = console.log;
-    console.log = (...args: unknown[]) => {
-      origLog(...args);
-      try {
-        const line = args
-          .map((a) => (typeof a === "string" ? a : JSON.stringify(a)))
-          .join(" ");
-        if (
-          line.startsWith("[MP4-DEBUG]") ||
-          line.startsWith("[SHARE-DEBUG]")
-        ) {
-          lines.push(line);
-        }
-      } catch {
-        // best-effort
-      }
-    };
-    try {
-      return await fn();
-    } finally {
-      console.log = origLog;
-      setDebugLogs(lines.join("\n"));
-      setDebugCopied(false);
-    }
-  };
-
-  const handleCopyDebug = async () => {
-    if (!debugLogs) return;
-    try {
-      await navigator.clipboard.writeText(debugLogs);
-      setDebugCopied(true);
-      setTimeout(() => setDebugCopied(false), 2000);
-    } catch {
-      // Clipboard API blocked — long-press on the <pre> is the fallback.
-    }
-  };
-
   const handlePdfExport = async () => {
     if (!canExport) return;
     // Force-flush draft to localStorage BEFORE export. Bypasses the
@@ -166,27 +117,25 @@ export function ExportButtons({
     // the editor session recoverable on reload.
     saveDraft(draft);
     setPdfState({ kind: "generating" });
-    await captureDebug(async () => {
-      try {
-        const blob = await generatePdfBlob(draft, photos, brand);
-        const filename = `${addressSlug(draft.addressLine1)}-flyer.pdf`;
-        const result = await shareOrDownload(blob, filename);
-        // Only clear the draft when the file actually shipped. If the user
-        // dismissed the share sheet (cancelled), keep the draft so they can
-        // retry without re-typing the form.
-        if (result === "shared" || result === "downloaded") {
-          clearDraft();
-        }
-        setPdfState({ kind: "done" });
-        setTimeout(() => setPdfState({ kind: "idle" }), 3000);
-      } catch (err) {
-        console.error("[flyer pdf]", err);
-        setPdfState({
-          kind: "error",
-          message: err instanceof Error ? err.message : String(err),
-        });
+    try {
+      const blob = await generatePdfBlob(draft, photos, brand);
+      const filename = `${addressSlug(draft.addressLine1)}-flyer.pdf`;
+      const result = await shareOrDownload(blob, filename);
+      // Only clear the draft when the file actually shipped. If the user
+      // dismissed the share sheet (cancelled), keep the draft so they can
+      // retry without re-typing the form.
+      if (result === "shared" || result === "downloaded") {
+        clearDraft();
       }
-    });
+      setPdfState({ kind: "done" });
+      setTimeout(() => setPdfState({ kind: "idle" }), 3000);
+    } catch (err) {
+      console.error("[flyer pdf]", err);
+      setPdfState({
+        kind: "error",
+        message: err instanceof Error ? err.message : String(err),
+      });
+    }
   };
 
   const handleJpegExport = async () => {
@@ -196,24 +145,22 @@ export function ExportButtons({
     // window applies.
     saveDraft(draft);
     setJpegState({ kind: "generating" });
-    await captureDebug(async () => {
-      try {
-        const blob = await exportJpegFromDraft(draft, photos, brand);
-        const filename = `${addressSlug(draft.addressLine1)}-flyer.jpg`;
-        const result = await shareOrDownload(blob, filename);
-        if (result === "shared" || result === "downloaded") {
-          clearDraft();
-        }
-        setJpegState({ kind: "done" });
-        setTimeout(() => setJpegState({ kind: "idle" }), 3000);
-      } catch (err) {
-        console.error("[flyer jpeg]", err);
-        setJpegState({
-          kind: "error",
-          message: err instanceof Error ? err.message : String(err),
-        });
+    try {
+      const blob = await exportJpegFromDraft(draft, photos, brand);
+      const filename = `${addressSlug(draft.addressLine1)}-flyer.jpg`;
+      const result = await shareOrDownload(blob, filename);
+      if (result === "shared" || result === "downloaded") {
+        clearDraft();
       }
-    });
+      setJpegState({ kind: "done" });
+      setTimeout(() => setJpegState({ kind: "idle" }), 3000);
+    } catch (err) {
+      console.error("[flyer jpeg]", err);
+      setJpegState({
+        kind: "error",
+        message: err instanceof Error ? err.message : String(err),
+      });
+    }
   };
 
   const handleMp4Export = async () => {
@@ -232,7 +179,6 @@ export function ExportButtons({
 
     setMp4State({ kind: "running", phase: "preparing", progress: 0 });
 
-    await captureDebug(async () => {
     try {
       // Pre-load ffmpeg in parallel with photo readiness
       const ffmpegPromise = getFFmpeg();
@@ -362,18 +308,13 @@ export function ExportButtons({
         message: err instanceof Error ? err.message : String(err),
       });
     }
-    });
   };
 
   const handleSaveReel = async () => {
     if (mp4State.kind !== "ready") return;
     const ready = mp4State;
-    let saved = false;
-    await captureDebug(async () => {
-      const result = await shareOrDownload(ready.reelBlob, ready.reelFilename);
-      saved = result === "shared" || result === "downloaded";
-    });
-    if (!saved) return;
+    const result = await shareOrDownload(ready.reelBlob, ready.reelFilename);
+    if (result !== "shared" && result !== "downloaded") return;
     setMp4State((prev) =>
       prev.kind === "ready" ? { ...prev, reelSaved: true } : prev
     );
@@ -382,15 +323,11 @@ export function ExportButtons({
   const handleSaveSquare = async () => {
     if (mp4State.kind !== "ready") return;
     const ready = mp4State;
-    let saved = false;
-    await captureDebug(async () => {
-      const result = await shareOrDownload(
-        ready.squareBlob,
-        ready.squareFilename
-      );
-      saved = result === "shared" || result === "downloaded";
-    });
-    if (!saved) return;
+    const result = await shareOrDownload(
+      ready.squareBlob,
+      ready.squareFilename
+    );
+    if (result !== "shared" && result !== "downloaded") return;
     setMp4State((prev) =>
       prev.kind === "ready" ? { ...prev, squareSaved: true } : prev
     );
@@ -503,36 +440,6 @@ export function ExportButtons({
         <p className="text-[11px] text-red-400 break-words">
           {mp4State.message}
         </p>
-      )}
-
-      {debugLogs && (
-        <div className="mt-2 bg-neutral-900 border border-neutral-800 rounded-md p-3">
-          <div className="flex items-center justify-between gap-2 mb-2">
-            <p className="text-[9px] uppercase tracking-[0.15em] text-neutral-500 font-semibold">
-              Diagnostics — long-press to copy
-            </p>
-            <div className="flex items-center gap-3">
-              <button
-                type="button"
-                onClick={handleCopyDebug}
-                className="text-[10px] text-[#4ef2d9] hover:underline"
-              >
-                {debugCopied ? "Copied ✓" : "Copy"}
-              </button>
-              <button
-                type="button"
-                onClick={() => setDebugLogs("")}
-                aria-label="Dismiss diagnostics"
-                className="text-neutral-500 hover:text-neutral-300 text-sm leading-none"
-              >
-                ✕
-              </button>
-            </div>
-          </div>
-          <pre className="font-mono text-[10px] text-neutral-300 whitespace-pre-wrap break-all select-text leading-snug max-h-64 overflow-y-auto">
-            {debugLogs}
-          </pre>
-        </div>
       )}
 
       {/* Hidden canvas — used by the MP4 export pipeline. Position off-screen
