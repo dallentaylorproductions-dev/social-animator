@@ -88,8 +88,8 @@ export default function StudioLandingPage() {
             not hours.
           </h1>
           <p className="text-base md:text-lg text-neutral-400 mt-5 max-w-xl mx-auto leading-relaxed">
-            One subscription. Every tool we ship. No design skills required, no
-            uploads, no clutter.
+            One subscription. Every tool we ship. No design skills required.
+            Your photos stay on your device. No clutter.
           </p>
         </div>
       </section>

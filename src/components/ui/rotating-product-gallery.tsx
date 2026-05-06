@@ -79,10 +79,24 @@ export default function RotatingProductGallery({
       onMouseEnter={() => setPaused(true)}
       onMouseLeave={() => setPaused(false)}
     >
-      {/* Mockup carousel */}
-      <div
-        className="relative h-[420px] flex items-center justify-center"
+      {/* Mockup carousel — wrapped in motion.div drag="x" so touch swipes
+          on mobile (and click+drag on desktop) advance/rewind the gallery
+          alongside the chevron buttons. dragConstraints+elastic keep the
+          carousel pinned to its grid cell visually (no permanent offset
+          on release); onDragEnd reads offset OR velocity to decide
+          direction. Vertical page scroll passes through cleanly because
+          drag is x-only. */}
+      <motion.div
+        className="relative h-[420px] flex items-center justify-center touch-pan-y select-none"
         style={{ perspective: "1200px" }}
+        drag="x"
+        dragConstraints={{ left: 0, right: 0 }}
+        dragElastic={0.08}
+        dragMomentum={false}
+        onDragEnd={(_, info) => {
+          if (info.offset.x < -50 || info.velocity.x < -500) goNext();
+          else if (info.offset.x > 50 || info.velocity.x > 500) goPrev();
+        }}
       >
         {galleryItems.map((g, i) => {
           // Wrap-aware relative offset from the active index, clamped to
@@ -130,13 +144,13 @@ export default function RotatingProductGallery({
               }}
               className="absolute w-[260px] h-[400px] flex items-center justify-center"
             >
-              <div className="w-full h-full max-w-full max-h-full flex items-center justify-center">
+              <div className="w-full h-full max-w-full max-h-full flex items-center justify-center pointer-events-none">
                 {g.mockup}
               </div>
             </motion.div>
           );
         })}
-      </div>
+      </motion.div>
 
       {/* Text + nav */}
       <div className="text-left">
