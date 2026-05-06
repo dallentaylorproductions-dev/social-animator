@@ -19,29 +19,35 @@ import { useEffect, useState } from "react";
  *
  * Animation engine: a single requestAnimationFrame timer publishes the
  * current loop time `t` (0–12s, modulo). All UI is derived from `t` via
- * pure helpers — `opacityCycle` for hold→fade-out→hidden→fade-in,
- * `typedCycle` for typed text on top of the same lifecycle.
+ * pure helpers.
  *
- * H-3.5a inverted the loop: populated state is now the DEFAULT visible
- * state at t=0 (so first-paint impressions are "real product," not
- * "blank form"). The reset+typing sequence comes after a 3-second hold.
+ * H-3.5e re-tuned timing for cinematic feel:
+ *   - typing speed normalized so address (long) doesn't feel slower than
+ *     short bullets — ~70ms/char for the long values, ~35-40ms for the
+ *     short bullets which the eye doesn't dwell on anyway
+ *   - panel transitions extended from 0.3s → 0.6s on each side so the
+ *     mode resize reads as "settling" rather than "snapping"
+ *   - active-field highlights and preview content reveals re-timed to
+ *     match
  *
  * Timeline:
- *   0.0–3.0   HOLD POPULATED STATE — every field filled, preview rendered,
- *             slow Ken Burns zoom on the property hero photo (1.0 → 1.02)
- *   3.0–3.3   reset wipe — fields and preview content fade out
- *   3.3–5.5   address re-types
- *   5.5–6.0   price re-types
- *   6.0–6.4   beds / baths / sqft populate (staggered)
- *   6.4–7.0   preview content reveals progressively (badge, hero, address,
- *             price, stats, footer)
- *   7.0–8.5   three feature bullets type in sequence (form + preview mirror)
- *   8.5–9.5   Export PDF button pulses
- *   9.5–10.5  button tap + loading state
+ *   0.0–3.0   HOLD POPULATED STATE — populated, slow Ken Burns 1.0→1.02
+ *   3.0–3.6   transition out — fields + preview content fade, panels
+ *             resize (PREVIEW MODE → FORM MODE)
+ *   3.6–5.1   address types (1.5s, 21 chars ≈ 71ms/char)
+ *   5.3–5.86  price types (0.56s, 8 chars × 70ms)
+ *   5.95–6.35 beds / baths / sqft snap in (staggered)
+ *   6.5–7.4   feature 1 types (0.9s, 26 chars ≈ 35ms/char)
+ *   7.5–7.85  feature 2 types (0.35s, 8 chars ≈ 44ms/char)
+ *   7.9–8.25  feature 3 types (0.35s, 11 chars ≈ 32ms/char)
+ *   8.3–8.9   transition in — preview content reveals, panels resize
+ *             (FORM MODE → PREVIEW MODE)
+ *   9.0–9.7   Export PDF button pulses
+ *   9.7–9.9   button tap (scale-down/up)
+ *   9.9–10.5  loading state (spinner + "Generating PDF…")
  *  10.5–11.7  share sheet slides up
  *  11.7–12.0  hold share sheet
- *  12.0 = 0.0 wrap to populated state (share sheet snaps offscreen via the
- *             `visible` flag returning false)
+ *  12.0 = 0.0 wrap to populated state
  */
 
 const LOOP_S = 12;
@@ -55,8 +61,11 @@ const MINT = "#4ef2d9";
 const HERO_PHOTO_URL =
   "https://images.unsplash.com/photo-1568605114967-8130f3a36994?w=800&q=85";
 
+// Hold-end + reset-end define the populated→empty fade window, kept in
+// sync with the panel-resize window in computePreviewWeight so content
+// fade and panel motion happen together.
 const HOLD_END = 3.0;
-const RESET_END = 3.3;
+const RESET_END = 3.6;
 
 /** Opacity for an element that holds visible at start of loop, fades out
  *  during the reset, hides through the typing phase, fades back in during
@@ -124,16 +133,16 @@ const PREVIEW_LIGHT = 0.38;
 function computePreviewWeight(t: number): number {
   // Cold paint + initial hold
   if (t < 3.0) return PREVIEW_HEAVY;
-  // Transition into FORM MODE
-  if (t < 3.3) {
-    const p = easeInOutCubic((t - 3.0) / 0.3);
+  // Transition into FORM MODE — extended 0.3s → 0.6s for smoother motion
+  if (t < 3.6) {
+    const p = easeInOutCubic((t - 3.0) / 0.6);
     return PREVIEW_HEAVY - p * (PREVIEW_HEAVY - PREVIEW_LIGHT);
   }
   // FORM MODE
-  if (t < 8.5) return PREVIEW_LIGHT;
-  // Transition back to PREVIEW MODE (form complete, button about to pulse)
-  if (t < 8.7) {
-    const p = easeInOutCubic((t - 8.5) / 0.2);
+  if (t < 8.3) return PREVIEW_LIGHT;
+  // Transition back to PREVIEW MODE — also extended to 0.6s
+  if (t < 8.9) {
+    const p = easeInOutCubic((t - 8.3) / 0.6);
     return PREVIEW_LIGHT + p * (PREVIEW_HEAVY - PREVIEW_LIGHT);
   }
   // PREVIEW MODE through button + share-sheet sequence
@@ -169,33 +178,43 @@ export default function ListingFlyerMockup() {
     return () => cancelAnimationFrame(raf);
   }, []);
 
-  const address = typedCycle("1247 Maple Heights Dr", t, HOLD_END, RESET_END, 3.3, 5.5);
-  const price = typedCycle("$685,000", t, HOLD_END, RESET_END, 5.5, 6.0);
-  const beds = staggerCycle(t, 6.0)("4");
-  const baths = staggerCycle(t, 6.2)("3");
-  const sqft = staggerCycle(t, 6.4)("2,548");
-  const feature1 = typedCycle("Chef's kitchen with marble", t, HOLD_END, RESET_END, 7.0, 7.6);
-  const feature2 = typedCycle("Open Bar", t, HOLD_END, RESET_END, 7.6, 8.0);
-  const feature3 = typedCycle("Indoor Pool", t, HOLD_END, RESET_END, 8.0, 8.5);
+  // Typing windows — normalized to ~70ms/char for the long values so the
+  // rhythm doesn't feel "slow start, fast finish." Short bullets type at
+  // ~35-45ms/char since the eye doesn't dwell on three-word phrases.
+  const address = typedCycle("1247 Maple Heights Dr", t, HOLD_END, RESET_END, 3.6, 5.1);
+  const price = typedCycle("$685,000", t, HOLD_END, RESET_END, 5.3, 5.86);
+  const beds = staggerCycle(t, 5.95)("4");
+  const baths = staggerCycle(t, 6.1)("3");
+  const sqft = staggerCycle(t, 6.25)("2,548");
+  const feature1 = typedCycle("Chef's kitchen with marble", t, HOLD_END, RESET_END, 6.5, 7.4);
+  const feature2 = typedCycle("Open Bar", t, HOLD_END, RESET_END, 7.5, 7.85);
+  const feature3 = typedCycle("Indoor Pool", t, HOLD_END, RESET_END, 7.9, 8.25);
 
-  const previewBadgeOp = opacityCycle(t, HOLD_END, RESET_END, 6.4, 6.55);
-  const previewHeroOp = opacityCycle(t, HOLD_END, RESET_END, 6.45, 6.85);
-  const previewAddressOp = opacityCycle(t, HOLD_END, RESET_END, 6.6, 6.9);
-  const previewPriceOp = opacityCycle(t, HOLD_END, RESET_END, 6.7, 7.0);
-  const previewStatsOp = opacityCycle(t, HOLD_END, RESET_END, 6.8, 7.1);
-  const previewFooterOp = opacityCycle(t, HOLD_END, RESET_END, 6.85, 7.15);
-  const previewF1Op = opacityCycle(t, HOLD_END, RESET_END, 7.2, 7.5);
-  const previewF2Op = opacityCycle(t, HOLD_END, RESET_END, 7.7, 8.0);
-  const previewF3Op = opacityCycle(t, HOLD_END, RESET_END, 8.1, 8.4);
-  const previewGridOp = opacityCycle(t, HOLD_END, RESET_END, 8.4, 8.8);
+  // Preview reveal opacities — re-timed so badge + hero + address + price
+  // + stats fade in DURING form-mode typing (visible in the compact card),
+  // while bullets/footer/photo-grid (which are gated by `compact`) reveal
+  // during the form→preview transition window.
+  const previewBadgeOp = opacityCycle(t, HOLD_END, RESET_END, 3.6, 3.95);
+  const previewHeroOp = opacityCycle(t, HOLD_END, RESET_END, 3.6, 4.0);
+  const previewAddressOp = opacityCycle(t, HOLD_END, RESET_END, 4.5, 4.9);
+  const previewPriceOp = opacityCycle(t, HOLD_END, RESET_END, 5.4, 5.8);
+  const previewStatsOp = opacityCycle(t, HOLD_END, RESET_END, 5.95, 6.3);
+  const previewFooterOp = opacityCycle(t, HOLD_END, RESET_END, 5.95, 6.3);
+  const previewF1Op = opacityCycle(t, HOLD_END, RESET_END, 8.55, 8.75);
+  const previewF2Op = opacityCycle(t, HOLD_END, RESET_END, 8.6, 8.8);
+  const previewF3Op = opacityCycle(t, HOLD_END, RESET_END, 8.65, 8.85);
+  const previewGridOp = opacityCycle(t, HOLD_END, RESET_END, 8.7, 8.9);
 
   // Subtle Ken Burns on the hero — only during the populated hold phase so
   // the frame doesn't feel completely static. 1.0 → 1.02 over the first 3s.
   const heroZoom = t < HOLD_END ? 1.0 + (t / HOLD_END) * 0.02 : 1.0;
 
-  const buttonPulse = t >= 8.5 && t < 9.5;
-  const buttonTap = t >= 9.5 && t < 9.7;
-  const buttonLoading = t >= 9.7 && t < 10.5;
+  // Button states — shifted ~0.5s later to land after the form→preview
+  // transition completes at 8.9, so the pulse reads as the conclusion
+  // beat of the loop rather than overlapping with the panel resize.
+  const buttonPulse = t >= 9.0 && t < 9.7;
+  const buttonTap = t >= 9.7 && t < 9.9;
+  const buttonLoading = t >= 9.9 && t < 10.5;
 
   const shareSheetIn = t >= 10.5 && t < 12.0;
 
@@ -214,12 +233,15 @@ export default function ListingFlyerMockup() {
   // PREVIEW MODE.
   const previewCompact = previewWeight < 0.7;
 
-  // Active-field highlight — the currently-typing field gets a mint border
-  // so the eye follows the cursor. One field active at a time.
-  const activeAddress = t >= 3.3 && t < 5.5;
-  const activePrice = t >= 5.5 && t < 6.0;
-  const activeStats = t >= 6.0 && t < 6.4;
-  const activeFeatures = t >= 7.0 && t < 8.5;
+  // Active-field highlight — the currently-typing field gets a mint
+  // border so the eye follows the cursor. One field active at a time;
+  // windows match the typing windows above.
+  const activeAddress = t >= 3.6 && t < 5.1;
+  const activePrice = t >= 5.3 && t < 5.86;
+  const activeStats = t >= 5.95 && t < 6.35;
+  const activeF1 = t >= 6.5 && t < 7.4;
+  const activeF2 = t >= 7.5 && t < 7.85;
+  const activeF3 = t >= 7.9 && t < 8.25;
 
   return (
     <div className="w-full h-full bg-neutral-950 text-white flex flex-col text-[10px] font-sans relative overflow-hidden">
@@ -295,9 +317,9 @@ export default function ListingFlyerMockup() {
             <p className="text-[7px] uppercase tracking-[0.15em] text-neutral-500">
               Feature bullets
             </p>
-            <FormChip cycle={feature1} active={activeFeatures && t < 7.6} />
-            <FormChip cycle={feature2} active={activeFeatures && t >= 7.6 && t < 8.0} />
-            <FormChip cycle={feature3} active={activeFeatures && t >= 8.0} />
+            <FormChip cycle={feature1} active={activeF1} />
+            <FormChip cycle={feature2} active={activeF2} />
+            <FormChip cycle={feature3} active={activeF3} />
           </div>
           {/* Disabled "Export PDF" preview at the bottom of the form.
               Keeps the visual rhythm "fields → action button" while the
