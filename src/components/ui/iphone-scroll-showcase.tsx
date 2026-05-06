@@ -89,7 +89,13 @@ export default function IphoneScrollShowcase({
             scale,
             transformStyle: "preserve-3d",
           }}
-          className="mx-auto w-[20rem] aspect-[9/19.5] rounded-[3rem] bg-black shadow-[0_40px_80px_-20px_rgba(0,0,0,0.7)] border-[10px] border-black relative"
+          // Responsive width so the 9:19.5 aspect doesn't push the bezel
+          // taller than the showcase wrapper on narrow viewports. At
+          // 16rem (256px) the iPhone is ~554px tall — fits inside the
+          // 40rem (640px) mobile wrapper with ~43px breathing room top
+          // and bottom. At sm+ (≥640px viewport) we go to 18rem, and
+          // at md+ (≥768px) we restore the original 20rem desktop size.
+          className="mx-auto w-[16rem] sm:w-[18rem] md:w-[20rem] aspect-[9/19.5] rounded-[3rem] bg-black shadow-[0_40px_80px_-20px_rgba(0,0,0,0.7)] border-[10px] border-black relative"
         >
           {/* Dynamic-island-style notch */}
           <div className="w-24 h-6 bg-black rounded-b-2xl absolute top-0 left-1/2 -translate-x-1/2 z-20" />
