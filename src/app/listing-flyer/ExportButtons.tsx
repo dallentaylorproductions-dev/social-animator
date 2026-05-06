@@ -1,6 +1,6 @@
 "use client";
 
-import { useRef, useState } from "react";
+import { useEffect, useRef, useState } from "react";
 import {
   type FlyerDraft,
   type FlyerPhoto,
@@ -15,7 +15,9 @@ import { exportJpegFromDraft } from "@/tools/listing-flyer/engine/jpeg-export";
 import { generatePdfBlob } from "@/tools/listing-flyer/output/pdf-export";
 import { listingShowcaseTemplate } from "@/templates/listing-showcase";
 import {
+  downloadBlob,
   getFFmpeg,
+  isMobileDevice,
   shareOrDownload,
   webmToMp4,
   WARMUP_MS,
@@ -57,6 +59,19 @@ type Mp4Phase =
 type Mp4State =
   | { kind: "idle" }
   | { kind: "running"; phase: Mp4Phase; progress: number }
+  // Mobile two-step: render finished, blobs are held in state, waiting on
+  // a fresh user gesture (tap on Save Reel / Save Square) to call
+  // navigator.share. iOS Safari's user-gesture token expires across the
+  // long render, so calling share() automatically after render fails.
+  | {
+      kind: "ready";
+      reelBlob: Blob;
+      reelFilename: string;
+      reelSaved: boolean;
+      squareBlob: Blob;
+      squareFilename: string;
+      squareSaved: boolean;
+    }
   | { kind: "done" }
   | { kind: "error"; message: string };
 
@@ -81,8 +96,25 @@ export function ExportButtons({
   const isBusy =
     pdfState.kind === "generating" ||
     jpegState.kind === "generating" ||
-    mp4State.kind === "running";
+    mp4State.kind === "running" ||
+    mp4State.kind === "ready";
   const canExport = !validationError && !isBusy;
+
+  // When the user has saved both reel + square in the ready state,
+  // transition to "done" + clear the draft. Done in useEffect so the two
+  // save handlers don't race each other on the both-saved check.
+  useEffect(() => {
+    if (
+      mp4State.kind === "ready" &&
+      mp4State.reelSaved &&
+      mp4State.squareSaved
+    ) {
+      clearDraft();
+      setMp4State({ kind: "done" });
+      const t = setTimeout(() => setMp4State({ kind: "idle" }), 3000);
+      return () => clearTimeout(t);
+    }
+  }, [mp4State]);
 
   // Wrap an export run in a console.log tee so [MP4-DEBUG] and
   // [SHARE-DEBUG] lines flow into the in-page panel. Original console.log
@@ -292,22 +324,37 @@ export function ExportButtons({
         renderedMp4s.push({ label: sz.label, blob: mp4 });
       }
 
-      // Both renders done. Now show share sheets sequentially. Cancelling
-      // one doesn't skip the other — the user might want square but not
-      // reel, or vice versa. Draft is preserved if ANY sheet got cancelled.
-      let allShared = true;
-      for (const { label, blob } of renderedMp4s) {
-        const result = await shareOrDownload(blob, `${slug}-${label}.mp4`);
-        if (result === "cancelled") {
-          allShared = false;
-        }
-      }
+      // Platform fork. iOS Safari's user-gesture token expires across the
+      // ~30s render window — calling navigator.share() automatically after
+      // rendering fails silently and falls through to downloadBlob (which
+      // lands the file in Files, not Photos). On mobile we stash the
+      // blobs in state and wait for the user to tap explicit "Save Reel"
+      // / "Save Square" buttons; each tap is a fresh gesture that
+      // navigator.share will honor. Desktop has no gesture issue, so we
+      // skip the extra clicks and trigger downloads inline.
+      const reelBlob = renderedMp4s[0].blob;
+      const squareBlob = renderedMp4s[1].blob;
+      const reelFilename = `${slug}-reel.mp4`;
+      const squareFilename = `${slug}-square.mp4`;
 
-      if (allShared) {
+      if (isMobileDevice()) {
+        setMp4State({
+          kind: "ready",
+          reelBlob,
+          reelFilename,
+          reelSaved: false,
+          squareBlob,
+          squareFilename,
+          squareSaved: false,
+        });
+        // Draft clears via the useEffect once both files have been saved.
+      } else {
+        downloadBlob(reelBlob, reelFilename);
+        downloadBlob(squareBlob, squareFilename);
         clearDraft();
+        setMp4State({ kind: "done" });
+        setTimeout(() => setMp4State({ kind: "idle" }), 5000);
       }
-      setMp4State({ kind: "done" });
-      setTimeout(() => setMp4State({ kind: "idle" }), 5000);
     } catch (err) {
       console.error("[flyer mp4]", err);
       setMp4State({
@@ -316,6 +363,44 @@ export function ExportButtons({
       });
     }
     });
+  };
+
+  const handleSaveReel = async () => {
+    if (mp4State.kind !== "ready") return;
+    const ready = mp4State;
+    let saved = false;
+    await captureDebug(async () => {
+      const result = await shareOrDownload(ready.reelBlob, ready.reelFilename);
+      saved = result === "shared" || result === "downloaded";
+    });
+    if (!saved) return;
+    setMp4State((prev) =>
+      prev.kind === "ready" ? { ...prev, reelSaved: true } : prev
+    );
+  };
+
+  const handleSaveSquare = async () => {
+    if (mp4State.kind !== "ready") return;
+    const ready = mp4State;
+    let saved = false;
+    await captureDebug(async () => {
+      const result = await shareOrDownload(
+        ready.squareBlob,
+        ready.squareFilename
+      );
+      saved = result === "shared" || result === "downloaded";
+    });
+    if (!saved) return;
+    setMp4State((prev) =>
+      prev.kind === "ready" ? { ...prev, squareSaved: true } : prev
+    );
+  };
+
+  const handleDismissMp4Ready = () => {
+    if (mp4State.kind !== "ready") return;
+    // Leave the draft alone — user dismissed without saving everything,
+    // so they may want to retry.
+    setMp4State({ kind: "idle" });
   };
 
   return (
@@ -346,18 +431,52 @@ export function ExportButtons({
         {jpegState.kind === "error" && "Try again — Export JPEG"}
       </button>
 
-      <button
-        type="button"
-        onClick={handleMp4Export}
-        disabled={!canExport}
-        title={validationError ?? undefined}
-        className="w-full bg-neutral-800 hover:bg-neutral-700 text-neutral-200 rounded-md px-4 py-3 text-sm font-semibold transition disabled:opacity-60 disabled:cursor-not-allowed"
-      >
-        {mp4State.kind === "idle" && "Export Animated Version (MP4)"}
-        {mp4State.kind === "running" && mp4StatusText(mp4State)}
-        {mp4State.kind === "done" && "Both videos saved ✓"}
-        {mp4State.kind === "error" && "Try again — Export Animated Version"}
-      </button>
+      {mp4State.kind === "ready" ? (
+        <div className="bg-neutral-900 border border-neutral-800 rounded-md p-3 space-y-3">
+          <div className="flex items-start justify-between gap-2">
+            <p className="text-[11px] text-neutral-300 leading-snug">
+              Videos rendered. Tap each one to save to Photos.
+            </p>
+            <button
+              type="button"
+              onClick={handleDismissMp4Ready}
+              aria-label="Dismiss without saving"
+              className="text-neutral-500 hover:text-neutral-300 text-sm leading-none flex-shrink-0"
+            >
+              ✕
+            </button>
+          </div>
+          <button
+            type="button"
+            onClick={handleSaveReel}
+            disabled={mp4State.reelSaved}
+            className="w-full bg-[#4ef2d9] hover:bg-[#3ad9c0] text-black rounded-md px-4 py-3 text-sm font-semibold transition disabled:bg-neutral-800 disabled:text-neutral-400 disabled:cursor-default"
+          >
+            {mp4State.reelSaved ? "Reel saved ✓" : "Save Reel to Photos"}
+          </button>
+          <button
+            type="button"
+            onClick={handleSaveSquare}
+            disabled={mp4State.squareSaved}
+            className="w-full bg-[#4ef2d9] hover:bg-[#3ad9c0] text-black rounded-md px-4 py-3 text-sm font-semibold transition disabled:bg-neutral-800 disabled:text-neutral-400 disabled:cursor-default"
+          >
+            {mp4State.squareSaved ? "Square saved ✓" : "Save Square to Photos"}
+          </button>
+        </div>
+      ) : (
+        <button
+          type="button"
+          onClick={handleMp4Export}
+          disabled={!canExport}
+          title={validationError ?? undefined}
+          className="w-full bg-neutral-800 hover:bg-neutral-700 text-neutral-200 rounded-md px-4 py-3 text-sm font-semibold transition disabled:opacity-60 disabled:cursor-not-allowed"
+        >
+          {mp4State.kind === "idle" && "Export Animated Version (MP4)"}
+          {mp4State.kind === "running" && mp4StatusText(mp4State)}
+          {mp4State.kind === "done" && "Both videos saved ✓"}
+          {mp4State.kind === "error" && "Try again — Export Animated Version"}
+        </button>
+      )}
 
       {validationError && (
         <p className="text-[11px] text-neutral-500">{validationError}</p>
@@ -365,9 +484,8 @@ export function ExportButtons({
 
       {mp4State.kind === "running" && (
         <p className="text-[11px] text-neutral-500 leading-snug">
-          Renders Reel (9:16) and Square (1:1). Each video opens its own
-          share sheet — save to Photos, then the next render starts. Keep
-          this tab focused.
+          Renders Reel (9:16) and Square (1:1) back-to-back. When both are
+          ready, you&apos;ll get save buttons for each. Keep this tab focused.
         </p>
       )}
 
