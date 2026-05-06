@@ -106,13 +106,21 @@ function easeInOutCubic(p: number): number {
   return p < 0.5 ? 4 * p * p * p : 1 - Math.pow(-2 * p + 2, 3) / 2;
 }
 
-/** Returns the preview panel's flex-grow weight (0.05..0.95) at time t.
- *  Inverse of the form panel weight. PREVIEW MODE during the populated
- *  hold (0..3) and after form completes (8.7..12); FORM MODE during the
- *  typing window (3.3..8.7); two short transition windows interpolate
- *  smoothly between the modes. */
-const PREVIEW_HEAVY = 0.95;
-const PREVIEW_LIGHT = 0.05;
+/** Returns the preview panel's flex-grow weight at time t. Inverse of the
+ *  form panel weight. PREVIEW MODE during the populated hold (0..3) and
+ *  after form completes (8.7..12); FORM MODE during the typing window
+ *  (3.3..8.7); two short transition windows interpolate smoothly between
+ *  the modes.
+ *
+ *  H-3.5d softened the endpoints from 0.95/0.05 to 0.88/0.38. The 95/5
+ *  split left dead space in both modes: in PREVIEW the form strip was
+ *  too thin to fit the export button comfortably, in FORM the preview
+ *  collapsed to a useless label-only sliver. 88/12 keeps the export
+ *  button area readable below the full preview, 38/62 keeps a compact
+ *  property card visible while the user types — both panels read as
+ *  "doing something" at all times. */
+const PREVIEW_HEAVY = 0.88;
+const PREVIEW_LIGHT = 0.38;
 function computePreviewWeight(t: number): number {
   // Cold paint + initial hold
   if (t < 3.0) return PREVIEW_HEAVY;
@@ -191,13 +199,20 @@ export default function ListingFlyerMockup() {
 
   const shareSheetIn = t >= 10.5 && t < 12.0;
 
-  // Three-mode layout: PREVIEW (preview fills) at t=0..3 and 8.7..12.0,
-  // FORM (form fills) at t=3.3..8.7. Compute a smooth `previewWeight`
-  // (0.05..0.95) that drives both panels' flex-grow values inversely so
-  // each phase gets its own screen real estate.
+  // Three-mode layout: PREVIEW (preview-heavy) at t=0..3 and 8.7..12.0,
+  // FORM (form-heavy with a still-readable preview card) at t=3.3..8.7.
+  // Smooth `previewWeight` drives both panels' flex-grow values inversely.
   const previewWeight = computePreviewWeight(t);
   const formWeight = 1 - previewWeight;
-  const formExpanded = previewWeight < 0.5;
+  // formExpanded triggers the form-fields-vs-summary crossfade. With the
+  // new 0.88/0.38 endpoints, the midpoint is 0.63 — anything under 0.7
+  // means "form is meaningfully visible; show the full fields, hide the
+  // summary strip."
+  const formExpanded = previewWeight < 0.7;
+  // Whether the photo grid in the preview card has room to render. At
+  // 0.38 (FORM MODE) the preview is too compact for it; only show in
+  // PREVIEW MODE.
+  const previewCompact = previewWeight < 0.7;
 
   // Active-field highlight — the currently-typing field gets a mint border
   // so the eye follows the cursor. One field active at a time.
@@ -230,7 +245,7 @@ export default function ListingFlyerMockup() {
         <p className="px-3 pt-2 pb-1 text-[7px] uppercase tracking-[0.15em] text-neutral-600 flex-shrink-0">
           Live preview
         </p>
-        <div className="flex-1 px-3 pb-2 overflow-hidden flex items-start justify-center">
+        <div className="flex-1 px-3 pb-2 overflow-hidden flex flex-col">
           <FlyerPreviewCard
             badgeOpacity={previewBadgeOp}
             heroOpacity={previewHeroOp}
@@ -243,6 +258,7 @@ export default function ListingFlyerMockup() {
             f3Opacity={previewF3Op}
             gridOpacity={previewGridOp}
             footerOpacity={previewFooterOp}
+            compact={previewCompact}
           />
         </div>
       </div>
@@ -254,9 +270,11 @@ export default function ListingFlyerMockup() {
         style={{ flex: `${formWeight} 0 0` }}
         className="overflow-hidden flex flex-col relative bg-neutral-950"
       >
-        {/* Full form (visible when formExpanded) */}
+        {/* Full form (visible when formExpanded). Vertical flex with
+            equal spacing so fields fill the panel rather than clustering
+            at the top with dead space below. */}
         <div
-          className="absolute inset-0 px-3 py-2 space-y-2 overflow-hidden flex flex-col"
+          className="absolute inset-0 px-3 py-3 overflow-hidden flex flex-col gap-3"
           style={{
             opacity: formExpanded ? 1 : 0,
             transition: "opacity 200ms ease",
@@ -273,13 +291,22 @@ export default function ListingFlyerMockup() {
             <FormField label="Baths" cycle={baths} active={activeStats} />
             <FormField label="Sq ft" cycle={sqft} active={activeStats} />
           </div>
-          <div className="space-y-1">
+          <div className="space-y-1.5">
             <p className="text-[7px] uppercase tracking-[0.15em] text-neutral-500">
               Feature bullets
             </p>
             <FormChip cycle={feature1} active={activeFeatures && t < 7.6} />
             <FormChip cycle={feature2} active={activeFeatures && t >= 7.6 && t < 8.0} />
             <FormChip cycle={feature3} active={activeFeatures && t >= 8.0} />
+          </div>
+          {/* Disabled "Export PDF" preview at the bottom of the form.
+              Keeps the visual rhythm "fields → action button" while the
+              user types; the real interactive button lives below the
+              panel and pulses during PREVIEW MODE. */}
+          <div className="flex-1 flex items-end pt-1">
+            <div className="w-full rounded-md py-2 text-[10px] font-semibold text-center bg-neutral-900 border border-neutral-800 text-neutral-500">
+              Export PDF (fill all fields)
+            </div>
           </div>
         </div>
 
@@ -449,6 +476,7 @@ function FlyerPreviewCard({
   f3Opacity,
   gridOpacity,
   footerOpacity,
+  compact = false,
 }: {
   badgeOpacity: number;
   heroOpacity: number;
@@ -461,12 +489,19 @@ function FlyerPreviewCard({
   f3Opacity: number;
   gridOpacity: number;
   footerOpacity: number;
+  /** When true (FORM MODE), the card runs lean: hero stretches via
+   *  flex-1 instead of fixed aspect-ratio, photo grid + bullets hidden,
+   *  agent footer hidden. Just badge / hero / address / price / stats. */
+  compact?: boolean;
 }) {
   return (
-    <div className="bg-white text-neutral-900 rounded-md overflow-hidden shadow-lg ring-1 ring-black/5 mx-auto flex flex-col">
+    <div className="bg-white text-neutral-900 rounded-md overflow-hidden shadow-lg ring-1 ring-black/5 mx-auto flex flex-col h-full w-full">
+      {/* Hero — when compact, flex-1 grows it to absorb the freed space.
+          When not compact, fixed 8.5/4 aspect (a tight band so the
+          info block + photo grid + footer have room below it). */}
       <div
-        className="relative w-full overflow-hidden bg-gradient-to-b from-sky-300 via-amber-200 to-amber-400"
-        style={{ aspectRatio: "8.5 / 4" }}
+        className={`relative w-full overflow-hidden bg-gradient-to-b from-sky-300 via-amber-200 to-amber-400 ${compact ? "flex-1 min-h-0" : ""}`}
+        style={compact ? undefined : { aspectRatio: "8.5 / 4" }}
       >
         <motion.div
           style={{ opacity: heroOpacity, scale: heroZoom }}
@@ -487,7 +522,9 @@ function FlyerPreviewCard({
         </motion.span>
       </div>
 
-      <div className="px-2 pt-1.5 pb-1.5 flex flex-col gap-0.5">
+      <div
+        className={`px-2 pt-1.5 pb-1.5 flex flex-col gap-0.5 ${compact ? "" : "flex-1 min-h-0"}`}
+      >
         <motion.div style={{ opacity: addressOpacity }}>
           <p className="text-[7px] font-bold leading-tight text-neutral-900">
             1247 Maple Heights Dr
@@ -509,37 +546,45 @@ function FlyerPreviewCard({
           4 BEDS · 3 BATHS · 2,548 SQ FT
         </motion.p>
 
-        <div className="space-y-0.5 mt-0.5">
-          <PreviewBullet text="Chef's kitchen with marble" opacity={f1Opacity} />
-          <PreviewBullet text="Open Bar" opacity={f2Opacity} />
-          <PreviewBullet text="Indoor Pool" opacity={f3Opacity} />
-        </div>
-
-        <motion.div
-          style={{ opacity: gridOpacity }}
-          className="grid grid-cols-2 gap-0.5 mt-1"
-        >
-          <PhotoTile gradient="from-amber-100 via-amber-200 to-amber-300" />
-          <PhotoTile gradient="from-slate-200 via-slate-300 to-slate-400" />
-          <PhotoTile gradient="from-emerald-100 via-emerald-200 to-emerald-300" />
-          <PhotoTile gradient="from-sky-100 via-sky-200 to-sky-300" />
-        </motion.div>
+        {/* Bullets + photo grid only render when there's room (PREVIEW
+            MODE). Hiding outright instead of opacity-fading because at
+            the compact card height these would crash into each other. */}
+        {!compact && (
+          <>
+            <div className="space-y-0.5 mt-0.5">
+              <PreviewBullet text="Chef's kitchen with marble" opacity={f1Opacity} />
+              <PreviewBullet text="Open Bar" opacity={f2Opacity} />
+              <PreviewBullet text="Indoor Pool" opacity={f3Opacity} />
+            </div>
+            <motion.div
+              style={{ opacity: gridOpacity }}
+              className="grid grid-cols-2 gap-0.5 mt-auto pt-1"
+            >
+              <PhotoTile gradient="from-amber-100 via-amber-200 to-amber-300" />
+              <PhotoTile gradient="from-slate-200 via-slate-300 to-slate-400" />
+              <PhotoTile gradient="from-emerald-100 via-emerald-200 to-emerald-300" />
+              <PhotoTile gradient="from-sky-100 via-sky-200 to-sky-300" />
+            </motion.div>
+          </>
+        )}
       </div>
 
-      <motion.div
-        style={{ opacity: footerOpacity }}
-        className="px-2 py-1 border-t border-neutral-200 flex items-center gap-1.5 bg-neutral-50"
-      >
-        <div
-          className="w-3.5 h-3.5 rounded flex items-center justify-center text-[5px] font-bold text-black flex-shrink-0"
-          style={{ backgroundColor: MINT }}
+      {!compact && (
+        <motion.div
+          style={{ opacity: footerOpacity }}
+          className="px-2 py-1 border-t border-neutral-200 flex items-center gap-1.5 bg-neutral-50 flex-shrink-0"
         >
-          AT
-        </div>
-        <p className="text-[5.5px] text-neutral-500 truncate">
-          Aaron Thomas Home Team · License #1234
-        </p>
-      </motion.div>
+          <div
+            className="w-3.5 h-3.5 rounded flex items-center justify-center text-[5px] font-bold text-black flex-shrink-0"
+            style={{ backgroundColor: MINT }}
+          >
+            AT
+          </div>
+          <p className="text-[5.5px] text-neutral-500 truncate">
+            Aaron Thomas Home Team · License #1234
+          </p>
+        </motion.div>
+      )}
     </div>
   );
 }
