@@ -3,15 +3,38 @@
 /**
  * Programmatic illustrations for the marketing-page rotating gallery. Each
  * mockup is a self-contained React component that fills its parent slot
- * (max-w / max-h 100%) at its own intrinsic aspect ratio. No external
- * images, no Unsplash, no asset files — every visual is Tailwind, inline
- * SVG, or text.
+ * (max-w / max-h 100%) at its own intrinsic aspect ratio.
  *
- * Five components, exported individually. The marketing page composes them
- * into the gallery's galleryItems array.
+ * H-3.5b: The two property-themed mockups (PDF flyer, MP4 flyer) now use
+ * Unsplash photography for the hero photo + photo grid — abstract SVG
+ * houses read as low-budget at the gallery scale. The other three mockups
+ * (Q&A, Market Update, Coming Soon) don't depend on house imagery and
+ * stay pure Tailwind/SVG.
+ *
+ * Plain <img> tags rather than Next/Image so the gallery's framer-motion
+ * transforms (3D rotateY, scale) play nicely without wrapping container
+ * quirks. No Unsplash domain registration in next.config needed.
  */
 
 const MINT = "#4ef2d9";
+
+// Unsplash photo IDs. License doesn't require attribution but encourages
+// it; keeping these comments so credits can be added later if policy changes.
+//   exterior  https://unsplash.com/photos/Pc4iz8h5JJo (modern home)
+//   kitchen   https://unsplash.com/photos/ll0iuvVtTGg (modern kitchen)
+//   living    https://unsplash.com/photos/I_LgQ8JZFGE (modern living room)
+//   bedroom   https://unsplash.com/photos/SYTO3xs06fU (modern bedroom)
+//   bathroom  https://unsplash.com/photos/qeF8FzaA5YE (modern bathroom)
+const UNSPLASH = (id: string, w: number, q = 80) =>
+  `https://images.unsplash.com/photo-${id}?w=${w}&q=${q}&auto=format&fit=crop`;
+
+const PHOTOS = {
+  exterior: UNSPLASH("1568605114967-8130f3a36994", 800),
+  kitchen: UNSPLASH("1556909114-f6e7ad7d3136", 400),
+  living: UNSPLASH("1493663284031-b7e3aefcae8e", 400),
+  bedroom: UNSPLASH("1540518614846-7eded433c457", 400),
+  bathroom: UNSPLASH("1552321554-5fefe8c9ef14", 400),
+};
 
 /* ────────────────────────────────────────────────────────────────────── */
 
@@ -55,7 +78,7 @@ export function ListingFlyerPdfMockup() {
         >
           Just Listed
         </span>
-        <HouseHeroBlock />
+        <PropertyHero src={PHOTOS.exterior} alt="Modern home exterior" />
         <div className="flex justify-between items-end gap-2">
           <div className="flex-1 min-w-0">
             <p className="text-[10px] font-bold leading-tight">
@@ -73,12 +96,13 @@ export function ListingFlyerPdfMockup() {
         <p className="text-[7px] font-bold uppercase tracking-wider text-neutral-700">
           4 BEDS · 3 BATHS · 2,548 SQ FT
         </p>
-        {/* Photo grid */}
+        {/* Photo grid — kitchen, living, bedroom, bathroom from one
+            visually-coherent property set. */}
         <div className="grid grid-cols-2 gap-1 mt-auto">
-          <PhotoTile gradient="from-amber-200 to-amber-400" />
-          <PhotoTile gradient="from-emerald-200 to-emerald-400" />
-          <PhotoTile gradient="from-sky-200 to-sky-400" />
-          <PhotoTile gradient="from-rose-200 to-rose-400" />
+          <PhotoTile src={PHOTOS.kitchen} alt="" gradient="from-amber-200 to-amber-400" />
+          <PhotoTile src={PHOTOS.living} alt="" gradient="from-emerald-200 to-emerald-400" />
+          <PhotoTile src={PHOTOS.bedroom} alt="" gradient="from-sky-200 to-sky-400" />
+          <PhotoTile src={PHOTOS.bathroom} alt="" gradient="from-rose-200 to-rose-400" />
         </div>
       </div>
 
@@ -111,7 +135,7 @@ export function ListingFlyerMp4Mockup() {
     >
       {/* Hero photo top half */}
       <div className="h-[48%] relative overflow-hidden">
-        <HouseHeroBlock />
+        <PropertyHero src={PHOTOS.exterior} alt="Modern home exterior" />
         <span
           className="absolute top-3 left-3 text-[7px] font-bold uppercase tracking-[0.15em] text-black px-2 py-1 rounded-full"
           style={{ backgroundColor: MINT }}
@@ -383,51 +407,46 @@ export function ListingPresentationComingSoonMockup() {
 
 /* ────────────────────────────────────────────────────────────────────── */
 
-/** Stylized "house photo" placeholder — pure SVG, mint-tinted dusk palette. */
-function HouseHeroBlock() {
+/** Property hero photo. Plain <img> with object-cover; gradient
+ *  fallback shows behind during load (and as a graceful fallback if
+ *  Unsplash CDN ever fails to serve the image). */
+function PropertyHero({ src, alt }: { src: string; alt: string }) {
   return (
-    <div className="relative w-full h-full overflow-hidden">
-      <svg
-        viewBox="0 0 100 60"
-        preserveAspectRatio="xMidYMid slice"
-        className="w-full h-full"
-      >
-        <defs>
-          <linearGradient id="heroSky" x1="0" y1="0" x2="0" y2="1">
-            <stop offset="0%" stopColor="#1f3a44" />
-            <stop offset="100%" stopColor="#3e6b78" />
-          </linearGradient>
-          <linearGradient id="heroBody" x1="0" y1="0" x2="0" y2="1">
-            <stop offset="0%" stopColor="#525252" />
-            <stop offset="100%" stopColor="#262626" />
-          </linearGradient>
-        </defs>
-        <rect width="100" height="60" fill="url(#heroSky)" />
-        {/* Distant hills */}
-        <path d="M 0 42 Q 20 35 40 40 T 80 38 L 100 42 L 100 60 L 0 60 Z" fill="#16242b" />
-        {/* Lawn */}
-        <rect x="0" y="48" width="100" height="12" fill="#1a2922" />
-        {/* House */}
-        <polygon points="20,30 50,16 80,30" fill="#171717" />
-        <rect x="25" y="30" width="50" height="20" fill="url(#heroBody)" />
-        {/* Door */}
-        <rect x="46" y="38" width="8" height="12" fill="#0a0a0a" />
-        {/* Windows w/ warm glow */}
-        <rect x="32" y="35" width="7" height="6" fill="#fde68a" opacity="0.9" />
-        <rect x="61" y="35" width="7" height="6" fill="#fde68a" opacity="0.9" />
-        {/* Chimney */}
-        <rect x="62" y="20" width="4" height="11" fill="#0a0a0a" />
-        {/* Walkway */}
-        <polygon points="46,50 54,50 60,60 40,60" fill="#3f4a4a" opacity="0.7" />
-      </svg>
+    <div className="relative w-full h-full overflow-hidden bg-gradient-to-br from-slate-700 to-slate-900">
+      {/* eslint-disable-next-line @next/next/no-img-element */}
+      <img
+        src={src}
+        alt={alt}
+        loading="lazy"
+        className="w-full h-full object-cover"
+      />
     </div>
   );
 }
 
-function PhotoTile({ gradient }: { gradient: string }) {
+/** Photo tile inside the PDF mockup's 2x2 grid. Image overlay on a
+ *  gradient fallback so loading state and any Unsplash CDN failure
+ *  still render a tasteful tile. */
+function PhotoTile({
+  src,
+  alt,
+  gradient,
+}: {
+  src: string;
+  alt: string;
+  gradient: string;
+}) {
   return (
     <div
-      className={`w-full aspect-[4/3] rounded-sm bg-gradient-to-br ${gradient}`}
-    />
+      className={`relative w-full aspect-[4/3] rounded-sm overflow-hidden bg-gradient-to-br ${gradient} ring-1 ring-black/10`}
+    >
+      {/* eslint-disable-next-line @next/next/no-img-element */}
+      <img
+        src={src}
+        alt={alt}
+        loading="lazy"
+        className="absolute inset-0 w-full h-full object-cover"
+      />
+    </div>
   );
 }
