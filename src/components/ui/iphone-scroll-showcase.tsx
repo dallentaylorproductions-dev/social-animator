@@ -10,9 +10,10 @@ import { useRef, type ReactNode } from "react";
  * (bezel, rounded corners, dynamic-island notch) so an arbitrary `children`
  * payload reads as "what the user sees on their phone."
  *
- * Marketing-budget scroll length: 50–60rem container, NOT the 1500px the
+ * Marketing-budget scroll length: 40–50rem container, NOT the 1500px the
  * Aceternity demo uses. Anything more steals scroll budget from the rest
- * of the marketing flow.
+ * of the marketing flow. H-3b compressed from 50/60 → 40/50 once the
+ * "Why Simply Edit Pro" bridge section needed real estate below.
  */
 export default function IphoneScrollShowcase({
   title,
@@ -34,7 +35,7 @@ export default function IphoneScrollShowcase({
   return (
     <div
       ref={containerRef}
-      className="h-[50rem] md:h-[60rem] flex items-center justify-center relative px-4"
+      className="h-[40rem] md:h-[50rem] flex items-center justify-center relative px-4"
       style={{ perspective: "1000px" }}
     >
       <div className="w-full max-w-3xl mx-auto">
