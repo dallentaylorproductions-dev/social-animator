@@ -100,6 +100,38 @@ function typedCycle(
   return { text, opacity: 1 };
 }
 
+/** Cubic ease-in-out — smooths the layout-mode transitions so the panels
+ *  don't snap. */
+function easeInOutCubic(p: number): number {
+  return p < 0.5 ? 4 * p * p * p : 1 - Math.pow(-2 * p + 2, 3) / 2;
+}
+
+/** Returns the preview panel's flex-grow weight (0.05..0.95) at time t.
+ *  Inverse of the form panel weight. PREVIEW MODE during the populated
+ *  hold (0..3) and after form completes (8.7..12); FORM MODE during the
+ *  typing window (3.3..8.7); two short transition windows interpolate
+ *  smoothly between the modes. */
+const PREVIEW_HEAVY = 0.95;
+const PREVIEW_LIGHT = 0.05;
+function computePreviewWeight(t: number): number {
+  // Cold paint + initial hold
+  if (t < 3.0) return PREVIEW_HEAVY;
+  // Transition into FORM MODE
+  if (t < 3.3) {
+    const p = easeInOutCubic((t - 3.0) / 0.3);
+    return PREVIEW_HEAVY - p * (PREVIEW_HEAVY - PREVIEW_LIGHT);
+  }
+  // FORM MODE
+  if (t < 8.5) return PREVIEW_LIGHT;
+  // Transition back to PREVIEW MODE (form complete, button about to pulse)
+  if (t < 8.7) {
+    const p = easeInOutCubic((t - 8.5) / 0.2);
+    return PREVIEW_LIGHT + p * (PREVIEW_HEAVY - PREVIEW_LIGHT);
+  }
+  // PREVIEW MODE through button + share-sheet sequence
+  return PREVIEW_HEAVY;
+}
+
 /** Snap-in cycle for one-shot values (digits in beds/baths/sqft). */
 function staggerCycle(t: number, revealAt: number) {
   const opacity =
@@ -159,9 +191,24 @@ export default function ListingFlyerMockup() {
 
   const shareSheetIn = t >= 10.5 && t < 12.0;
 
+  // Three-mode layout: PREVIEW (preview fills) at t=0..3 and 8.7..12.0,
+  // FORM (form fills) at t=3.3..8.7. Compute a smooth `previewWeight`
+  // (0.05..0.95) that drives both panels' flex-grow values inversely so
+  // each phase gets its own screen real estate.
+  const previewWeight = computePreviewWeight(t);
+  const formWeight = 1 - previewWeight;
+  const formExpanded = previewWeight < 0.5;
+
+  // Active-field highlight — the currently-typing field gets a mint border
+  // so the eye follows the cursor. One field active at a time.
+  const activeAddress = t >= 3.3 && t < 5.5;
+  const activePrice = t >= 5.5 && t < 6.0;
+  const activeStats = t >= 6.0 && t < 6.4;
+  const activeFeatures = t >= 7.0 && t < 8.5;
+
   return (
     <div className="w-full h-full bg-neutral-950 text-white flex flex-col text-[10px] font-sans relative overflow-hidden">
-      {/* Top label */}
+      {/* Top label — fixed strip */}
       <div className="px-4 pt-7 pb-1.5 border-b border-neutral-900 flex-shrink-0">
         <p
           className="text-[8px] uppercase tracking-[0.2em]"
@@ -174,40 +221,86 @@ export default function ListingFlyerMockup() {
         </p>
       </div>
 
-      <div className="flex-shrink-0 px-3 pt-2 pb-2 border-b border-neutral-900 bg-neutral-950">
-        <p className="text-[7px] uppercase tracking-[0.15em] text-neutral-600 mb-1.5">
+      {/* Preview panel — flex-grow follows previewWeight so it expands in
+          PREVIEW MODE and shrinks to a label strip in FORM MODE. */}
+      <div
+        style={{ flex: `${previewWeight} 0 0` }}
+        className="overflow-hidden flex flex-col bg-neutral-950 border-b border-neutral-900"
+      >
+        <p className="px-3 pt-2 pb-1 text-[7px] uppercase tracking-[0.15em] text-neutral-600 flex-shrink-0">
           Live preview
         </p>
-        <FlyerPreviewCard
-          badgeOpacity={previewBadgeOp}
-          heroOpacity={previewHeroOp}
-          heroZoom={heroZoom}
-          addressOpacity={previewAddressOp}
-          priceOpacity={previewPriceOp}
-          statsOpacity={previewStatsOp}
-          f1Opacity={previewF1Op}
-          f2Opacity={previewF2Op}
-          f3Opacity={previewF3Op}
-          gridOpacity={previewGridOp}
-          footerOpacity={previewFooterOp}
-        />
+        <div className="flex-1 px-3 pb-2 overflow-hidden flex items-start justify-center">
+          <FlyerPreviewCard
+            badgeOpacity={previewBadgeOp}
+            heroOpacity={previewHeroOp}
+            heroZoom={heroZoom}
+            addressOpacity={previewAddressOp}
+            priceOpacity={previewPriceOp}
+            statsOpacity={previewStatsOp}
+            f1Opacity={previewF1Op}
+            f2Opacity={previewF2Op}
+            f3Opacity={previewF3Op}
+            gridOpacity={previewGridOp}
+            footerOpacity={previewFooterOp}
+          />
+        </div>
       </div>
 
-      <div className="flex-1 px-3 py-2 space-y-2 overflow-hidden">
-        <FormField label="Address" cycle={address} />
-        <FormField label="List price" cycle={price} accent />
-        <div className="grid grid-cols-3 gap-1.5">
-          <FormField label="Beds" cycle={beds} />
-          <FormField label="Baths" cycle={baths} />
-          <FormField label="Sq ft" cycle={sqft} />
-        </div>
-        <div className="space-y-1">
-          <p className="text-[7px] uppercase tracking-[0.15em] text-neutral-500">
-            Feature bullets
+      {/* Form panel — inverse of preview. Crossfades between full form
+          (during FORM MODE) and a "ready to export" summary (during
+          PREVIEW MODE) so the collapsed strip says something meaningful. */}
+      <div
+        style={{ flex: `${formWeight} 0 0` }}
+        className="overflow-hidden flex flex-col relative bg-neutral-950"
+      >
+        {/* Full form (visible when formExpanded) */}
+        <div
+          className="absolute inset-0 px-3 py-2 space-y-2 overflow-hidden flex flex-col"
+          style={{
+            opacity: formExpanded ? 1 : 0,
+            transition: "opacity 200ms ease",
+            pointerEvents: formExpanded ? "auto" : "none",
+          }}
+        >
+          <p className="text-[7px] uppercase tracking-[0.15em] text-neutral-500 flex-shrink-0">
+            Fill in your flyer
           </p>
-          <FormChip cycle={feature1} />
-          <FormChip cycle={feature2} />
-          <FormChip cycle={feature3} />
+          <FormField label="Address" cycle={address} active={activeAddress} />
+          <FormField label="List price" cycle={price} accent active={activePrice} />
+          <div className="grid grid-cols-3 gap-1.5">
+            <FormField label="Beds" cycle={beds} active={activeStats} />
+            <FormField label="Baths" cycle={baths} active={activeStats} />
+            <FormField label="Sq ft" cycle={sqft} active={activeStats} />
+          </div>
+          <div className="space-y-1">
+            <p className="text-[7px] uppercase tracking-[0.15em] text-neutral-500">
+              Feature bullets
+            </p>
+            <FormChip cycle={feature1} active={activeFeatures && t < 7.6} />
+            <FormChip cycle={feature2} active={activeFeatures && t >= 7.6 && t < 8.0} />
+            <FormChip cycle={feature3} active={activeFeatures && t >= 8.0} />
+          </div>
+        </div>
+
+        {/* Collapsed summary (visible when !formExpanded) */}
+        <div
+          className="absolute inset-0 px-3 py-2 flex items-center gap-2"
+          style={{
+            opacity: formExpanded ? 0 : 1,
+            transition: "opacity 200ms ease",
+            pointerEvents: formExpanded ? "none" : "auto",
+          }}
+        >
+          <span
+            className="inline-flex items-center justify-center w-3.5 h-3.5 rounded-full text-[8px] font-bold text-black flex-shrink-0"
+            style={{ backgroundColor: MINT }}
+          >
+            ✓
+          </span>
+          <span className="text-[9px] text-neutral-300 truncate">
+            Listing flyer ready to export
+          </span>
         </div>
       </div>
 
@@ -263,25 +356,33 @@ function FormField({
   label,
   cycle,
   accent = false,
+  active = false,
 }: {
   label: string;
   cycle: { text: string; opacity: number };
   accent?: boolean;
+  active?: boolean;
 }) {
   const { text, opacity } = cycle;
+  // Active border (mint) trumps the accent treatment so the eye follows
+  // the typing cursor; once the field is no longer being typed, accent
+  // (price field) reverts to its mint-tinted "filled" border.
+  const borderClass = active
+    ? "border-[#4ef2d9]"
+    : accent && text
+      ? "border-[#4ef2d9]/40"
+      : "border-neutral-800";
+  const bgStyle = active
+    ? { backgroundColor: "rgba(78, 242, 217, 0.05)" }
+    : undefined;
   return (
     <div>
       <p className="uppercase tracking-[0.15em] text-neutral-500 mb-0.5 text-[7px]">
         {label}
       </p>
       <div
-        className={`bg-neutral-900 border rounded px-2 py-1 text-[10px] min-h-[22px] flex items-center transition-colors ${
-          text
-            ? accent
-              ? "border-[#4ef2d9]/40"
-              : "border-neutral-800"
-            : "border-neutral-800"
-        }`}
+        className={`bg-neutral-900 border rounded px-2 py-1 text-[10px] min-h-[22px] flex items-center transition-colors ${borderClass}`}
+        style={bgStyle}
       >
         <span
           style={{
@@ -298,21 +399,32 @@ function FormField({
 
 function FormChip({
   cycle,
+  active = false,
 }: {
   cycle: { text: string; opacity: number };
+  active?: boolean;
 }) {
   const { text, opacity } = cycle;
   if (!text) {
     return (
-      <div className="bg-neutral-900 border border-dashed border-neutral-800 rounded px-2 py-1 text-[9px] text-neutral-600 min-h-[20px] flex items-center">
+      <div
+        className={`bg-neutral-900 border border-dashed rounded px-2 py-1 text-[9px] text-neutral-600 min-h-[20px] flex items-center transition-colors ${
+          active ? "border-[#4ef2d9]" : "border-neutral-800"
+        }`}
+      >
         +
       </div>
     );
   }
   return (
     <div
-      className="bg-neutral-900 border border-neutral-800 rounded px-2 py-1 text-[9px] text-white min-h-[20px] flex items-center gap-1.5"
-      style={{ opacity }}
+      className={`bg-neutral-900 border rounded px-2 py-1 text-[9px] text-white min-h-[20px] flex items-center gap-1.5 transition-colors ${
+        active ? "border-[#4ef2d9]" : "border-neutral-800"
+      }`}
+      style={{
+        opacity,
+        ...(active ? { backgroundColor: "rgba(78, 242, 217, 0.05)" } : {}),
+      }}
     >
       <span
         className="inline-block w-1.5 h-1.5 rounded-full flex-shrink-0"
@@ -353,7 +465,7 @@ function FlyerPreviewCard({
   return (
     <div className="bg-white text-neutral-900 rounded-md overflow-hidden shadow-lg ring-1 ring-black/5 mx-auto flex flex-col">
       <div
-        className="relative w-full overflow-hidden"
+        className="relative w-full overflow-hidden bg-gradient-to-b from-sky-300 via-amber-200 to-amber-400"
         style={{ aspectRatio: "8.5 / 4" }}
       >
         <motion.div
@@ -455,8 +567,11 @@ function PhotoTile({ gradient }: { gradient: string }) {
   );
 }
 
-/** Real property exterior — Unsplash modern home. Loaded eagerly because
- *  it's the first-paint focal point of the marketing hero. */
+/** Real property exterior — Unsplash modern home. Loaded eagerly with
+ *  fetchPriority="high" because it's the first-paint focal point of the
+ *  marketing hero. The parent has a sky-to-amber gradient bg so during
+ *  the brief load window the user sees a tasteful "exterior loading"
+ *  warm gradient, never pure white. */
 function PropertyHeroPhoto() {
   return (
     // eslint-disable-next-line @next/next/no-img-element
@@ -464,6 +579,7 @@ function PropertyHeroPhoto() {
       src={HERO_PHOTO_URL}
       alt="Modern home exterior"
       loading="eager"
+      fetchPriority="high"
       className="w-full h-full object-cover"
     />
   );
