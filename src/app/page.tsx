@@ -1,7 +1,53 @@
 import Link from "next/link";
-import { TOOLS } from "@/tools";
 import { PRICING } from "@/lib/pricing";
-import * as LucideIcons from "lucide-react";
+import IphoneScrollShowcase from "@/components/ui/iphone-scroll-showcase";
+import ListingFlyerMockup from "@/components/ui/listing-flyer-mockup";
+import RotatingProductGallery from "@/components/ui/rotating-product-gallery";
+import {
+  ListingFlyerPdfMockup,
+  ListingFlyerMp4Mockup,
+  SocialAnimatorQACardMockup,
+  SocialAnimatorMarketUpdateMockup,
+  ListingPresentationComingSoonMockup,
+} from "@/components/ui/gallery-mockups";
+
+const GALLERY_ITEMS = [
+  {
+    mockup: <ListingFlyerPdfMockup />,
+    toolName: "Listing Flyer Generator",
+    feature: "Print-ready PDF",
+    tagline:
+      "Branded property flyers from a single form. Photo grid, agent block, all five photos, ready to print or text.",
+  },
+  {
+    mockup: <ListingFlyerMp4Mockup />,
+    toolName: "Listing Flyer Generator",
+    feature: "Animated MP4 for social",
+    tagline:
+      "Instagram-ready vertical and square videos with smooth animations, agent branding, and your color palette.",
+  },
+  {
+    mockup: <SocialAnimatorQACardMockup />,
+    toolName: "Social Animator",
+    feature: "10 ready templates",
+    tagline:
+      "Animated Instagram posts for real estate. Q&A cards, market updates, listing carousels — pick a template, fill in your content, export.",
+  },
+  {
+    mockup: <SocialAnimatorMarketUpdateMockup />,
+    toolName: "Social Animator",
+    feature: "Market data templates",
+    tagline:
+      "Show clients you know your market. Animated charts and stats branded to your team.",
+  },
+  {
+    mockup: <ListingPresentationComingSoonMockup />,
+    toolName: "Listing Presentation One-Pager",
+    feature: "Coming soon",
+    tagline:
+      "Polished pre-listing presentation page that makes you look like the obvious choice when a homeowner is interviewing agents.",
+  },
+];
 
 export default function StudioLandingPage() {
   return (
@@ -21,7 +67,7 @@ export default function StudioLandingPage() {
       </header>
 
       {/* Hero */}
-      <section className="px-6 pt-32 pb-20 lg:pt-40 lg:pb-28">
+      <section className="px-6 pt-32 pb-12 lg:pt-40 lg:pb-16">
         <div className="max-w-3xl mx-auto text-center">
           <h1 className="text-4xl md:text-6xl font-bold tracking-tight">
             Tools that help realtors produce client-ready content in minutes,
@@ -31,57 +77,38 @@ export default function StudioLandingPage() {
             One subscription. Every tool we ship. No design skills required, no
             uploads, no clutter.
           </p>
+        </div>
+      </section>
+
+      {/* iPhone scroll showcase: scroll-driven 3D tilt around the animated
+          listing-flyer mockup. The "Get started" CTA lives below so visitors
+          see the product working before being asked to act. */}
+      <IphoneScrollShowcase>
+        <ListingFlyerMockup />
+      </IphoneScrollShowcase>
+
+      <section className="px-6 pb-20">
+        <div className="max-w-3xl mx-auto text-center">
           <Link
             href="/login"
-            className="inline-flex items-center mt-10 bg-[#4ef2d9] hover:bg-[#3ad9c0] text-black rounded-md px-7 py-3.5 text-sm font-semibold transition"
+            className="inline-flex items-center bg-[#4ef2d9] hover:bg-[#3ad9c0] text-black rounded-md px-7 py-3.5 text-sm font-semibold transition"
           >
             Get started
           </Link>
         </div>
       </section>
 
-      {/* Tool preview */}
+      {/* What's inside — rotating gallery */}
       <section className="px-6 py-20 border-t border-neutral-900">
-        <div className="max-w-5xl mx-auto">
+        <div className="max-w-6xl mx-auto">
           <p className="text-xs uppercase tracking-[0.2em] text-[#4ef2d9] text-center">
             What&apos;s inside
           </p>
           <h2 className="text-2xl md:text-3xl font-bold mt-2 text-center">
             Every tool included.
           </h2>
-
-          <div className="grid md:grid-cols-3 gap-4 mt-12">
-            {TOOLS.map((tool) => {
-              const Icon =
-                (LucideIcons as unknown as Record<
-                  string,
-                  React.ComponentType<{ size?: number; className?: string }>
-                >)[tool.icon] ?? LucideIcons.Sparkles;
-              const isLive = tool.status === "live";
-              return (
-                <div
-                  key={tool.id}
-                  className={`p-5 rounded-xl bg-neutral-900 border border-neutral-800 ${
-                    !isLive ? "opacity-60" : ""
-                  }`}
-                >
-                  <div className="w-10 h-10 rounded-lg bg-neutral-800 flex items-center justify-center mb-4">
-                    <Icon size={20} className="text-[#4ef2d9]" />
-                  </div>
-                  <div className="flex items-center gap-2">
-                    <h3 className="text-base font-semibold">{tool.name}</h3>
-                    {!isLive && (
-                      <span className="text-[9px] uppercase tracking-wider text-neutral-500 bg-neutral-800 px-2 py-0.5 rounded-full">
-                        Coming soon
-                      </span>
-                    )}
-                  </div>
-                  <p className="text-xs text-neutral-400 mt-2 leading-relaxed">
-                    {tool.description}
-                  </p>
-                </div>
-              );
-            })}
+          <div className="mt-14">
+            <RotatingProductGallery galleryItems={GALLERY_ITEMS} />
           </div>
         </div>
       </section>
