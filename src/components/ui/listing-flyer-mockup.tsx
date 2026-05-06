@@ -321,15 +321,6 @@ export default function ListingFlyerMockup() {
             <FormChip cycle={feature2} active={activeF2} />
             <FormChip cycle={feature3} active={activeF3} />
           </div>
-          {/* Disabled "Export PDF" preview at the bottom of the form.
-              Keeps the visual rhythm "fields → action button" while the
-              user types; the real interactive button lives below the
-              panel and pulses during PREVIEW MODE. */}
-          <div className="flex-1 flex items-end pt-1">
-            <div className="w-full rounded-md py-2 text-[10px] font-semibold text-center bg-neutral-900 border border-neutral-800 text-neutral-500">
-              Export PDF (fill all fields)
-            </div>
-          </div>
         </div>
 
         {/* Collapsed summary (visible when !formExpanded) */}

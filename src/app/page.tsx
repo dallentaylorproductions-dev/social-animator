@@ -101,7 +101,7 @@ export default function StudioLandingPage() {
         <ListingFlyerMockup />
       </IphoneScrollShowcase>
 
-      <section className="px-6 pb-16 -mt-8">
+      <section className="px-6 pb-16 mt-12">
         <div className="max-w-3xl mx-auto text-center">
           <Link
             href="/login"
