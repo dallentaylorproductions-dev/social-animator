@@ -167,16 +167,20 @@ export default function StudioLandingPage() {
         </div>
       </section>
 
-      {/* How it works — 3-step workflow. Sits between the bridge
-          ("Made for realtors") and the gallery so the reader learns
-          the mechanics before seeing outputs. Step numbers in mono
-          font for the slight technical/precise read. */}
+      {/* How it works — typography-driven vertical layout. Replaces
+          the previous 3-card grid that visually echoed the bridge
+          section's pillar cards. Each step is a row split into a
+          large numeric accent (left, 3 cols on desktop) and content
+          (right, 9 cols). Horizontal dividers between rows do the
+          structural work — no card containers, no fills, no borders
+          per row. Step numbers are large + mint + slightly transparent
+          so they read as visual rhythm rather than literal labels. */}
       <section
         id="how-it-works"
         className="px-6 py-20 border-t border-neutral-900 scroll-mt-16"
       >
         <div className="max-w-5xl mx-auto">
-          <div className="text-center max-w-3xl mx-auto">
+          <div className="text-center max-w-3xl mx-auto mb-12">
             <p className="text-xs uppercase tracking-[0.2em] text-[#4ef2d9]">
               How it works
             </p>
@@ -185,24 +189,25 @@ export default function StudioLandingPage() {
             </h2>
           </div>
 
-          <div className="grid md:grid-cols-3 gap-6 mt-12">
-            <StepCard
+          <div className="max-w-4xl mx-auto">
+            <StepRow
               number="01"
-              icon={<PencilLine size={28} className="text-[#4ef2d9]" />}
+              icon={<PencilLine size={24} className="text-[#4ef2d9]" />}
               headline="Fill in your listing."
               body="Address, price, beds/baths, photos, features. The form fields are short and the live preview updates as you type."
             />
-            <StepCard
+            <StepRow
               number="02"
-              icon={<Palette size={28} className="text-[#4ef2d9]" />}
+              icon={<Palette size={24} className="text-[#4ef2d9]" />}
               headline="Brand it your way."
               body="Your logo, colors, contact info, license number — applied automatically. Override the colors per-flyer if a listing calls for something different."
             />
-            <StepCard
+            <StepRow
               number="03"
-              icon={<Share2 size={28} className="text-[#4ef2d9]" />}
+              icon={<Share2 size={24} className="text-[#4ef2d9]" />}
               headline="Export everywhere."
               body="Print-ready PDF for handouts. JPEG for Instagram. Animated MP4 for Reels and Stories. All from the same fields, in seconds."
+              isLast
             />
           </div>
         </div>
@@ -546,25 +551,39 @@ function IncludedItem({
   );
 }
 
-function StepCard({
+function StepRow({
   number,
   icon,
   headline,
   body,
+  isLast,
 }: {
   number: string;
   icon: React.ReactNode;
   headline: string;
   body: string;
+  isLast?: boolean;
 }) {
   return (
-    <div className="group p-8 rounded-xl bg-neutral-900/50 border border-neutral-800 hover:border-[#4ef2d9]/40 hover:bg-neutral-900/80 hover:scale-[1.02] transition-all duration-300">
-      <p className="font-mono text-3xl tracking-tight text-[#4ef2d9]">
-        {number}
-      </p>
-      <div className="mt-5 mb-4">{icon}</div>
-      <h3 className="text-xl font-bold text-white">{headline}</h3>
-      <p className="text-sm text-neutral-400 mt-3 leading-relaxed">{body}</p>
+    <div
+      className={`grid grid-cols-1 md:grid-cols-12 gap-y-4 md:gap-x-8 py-10 md:py-12 ${
+        isLast ? "" : "border-b border-neutral-900"
+      }`}
+    >
+      <div className="md:col-span-3">
+        <p className="font-mono text-6xl md:text-7xl leading-none tracking-tight text-[#4ef2d9] opacity-80">
+          {number}
+        </p>
+      </div>
+      <div className="md:col-span-9">
+        <div className="mb-4">{icon}</div>
+        <h3 className="text-xl md:text-2xl font-bold text-white">
+          {headline}
+        </h3>
+        <p className="text-base text-neutral-400 mt-3 leading-relaxed max-w-2xl">
+          {body}
+        </p>
+      </div>
     </div>
   );
 }
