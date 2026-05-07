@@ -1,6 +1,7 @@
 import Link from "next/link";
 import {
   Briefcase,
+  Check,
   Home,
   Lock,
   Palette,
@@ -218,6 +219,37 @@ export default function StudioLandingPage() {
         </div>
       </section>
 
+      {/* What's included — value breakdown sandwiched between the
+          gallery (outputs) and pricing. Reading flow: see outputs →
+          see what you get → see the price. Item order is intentional:
+          1-3 are the tools (headline value), 4-7 are capabilities,
+          8-10 are commercial reassurance. */}
+      <section className="px-6 py-20 border-t border-neutral-900">
+        <div className="max-w-3xl mx-auto">
+          <div className="text-center">
+            <p className="text-xs uppercase tracking-[0.2em] text-[#4ef2d9]">
+              What&apos;s included
+            </p>
+            <h2 className="text-3xl md:text-5xl font-bold mt-3 tracking-tight">
+              Everything in your subscription.
+            </h2>
+          </div>
+
+          <div className="grid md:grid-cols-2 gap-x-12 gap-y-5 mt-12">
+            <IncludedItem text="Listing Flyer Generator" sub="PDF, JPEG, and animated MP4" />
+            <IncludedItem text="Social Animator" sub="10 ready-made post templates" />
+            <IncludedItem text="Listing Presentation One-Pager" sub="Coming soon — free when it ships" />
+            <IncludedItem text="Unlimited exports" />
+            <IncludedItem text="Mobile, tablet, desktop" />
+            <IncludedItem text="Your branding on every output" />
+            <IncludedItem text="Per-flyer color override" />
+            <IncludedItem text="All future tools included" />
+            <IncludedItem text="Cancel anytime" />
+            <IncludedItem text="Stripe-secured billing" />
+          </div>
+        </div>
+      </section>
+
       {/* Pricing */}
       <section className="px-6 py-20 border-t border-neutral-900">
         <div className="max-w-md mx-auto text-center">
@@ -293,6 +325,30 @@ function PillarCard({
       <div className="mb-5">{icon}</div>
       <h3 className="text-xl font-bold text-white">{headline}</h3>
       <p className="text-sm text-neutral-400 mt-3 leading-relaxed">{body}</p>
+    </div>
+  );
+}
+
+function IncludedItem({
+  text,
+  sub,
+}: {
+  text: string;
+  sub?: string;
+}) {
+  return (
+    <div className="flex items-start gap-3">
+      <Check
+        size={18}
+        className="text-[#4ef2d9] mt-0.5 shrink-0"
+        strokeWidth={2.5}
+      />
+      <div>
+        <p className="text-base text-white leading-snug">{text}</p>
+        {sub ? (
+          <p className="text-xs text-neutral-500 mt-0.5">{sub}</p>
+        ) : null}
+      </div>
     </div>
   );
 }
