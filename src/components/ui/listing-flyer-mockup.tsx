@@ -66,14 +66,16 @@ import { useEffect, useState } from "react";
  *  10.9–11.6  Export PDF button pulses (custom palette visible)
  *  11.6–11.8  button tap
  *  11.8–12.4  loading state
- *  12.4–13.0  share sheet visible (slides up, holds)
- *  13.0       share sheet exit triggered (spring slides down ~0.3s)
- *  13.0–13.5  palette resets to default (mostly hidden behind sheet)
- *  13.5–14.0  hold preview at default palette
- *  14.0 = 0.0 wrap — palette already default, no snap
+ *  12.4–14.5  share sheet visible (slides up, holds ~1.8s pure hold
+ *             after spring settles — H-5.1b extended from 0.3s)
+ *  14.5       share sheet exit triggered (spring slides down ~0.3s)
+ *  14.5–15.3  palette resets to default (0.8s window, mostly hidden
+ *             behind the receding sheet)
+ *  15.3–15.6  hold preview at default palette
+ *  15.6 = 0.0 wrap — palette already default, no snap
  */
 
-const LOOP_S = 14;
+const LOOP_S = 15.6;
 const MINT = "#4ef2d9";
 
 // Default flyer palette (what the loop starts with) and the custom palette
@@ -311,14 +313,15 @@ export default function ListingFlyerMockup() {
 
   // Live flyer palette. Stays at default through typing, eases to
   // custom during the relevant swatch-tap window in COLOR MODE, holds
-  // through PREVIEW + SHARE-ENTRY, then eases back to default during
-  // the share-sheet exit (13.0-13.5) so the loop wrap is colorless —
-  // no visible palette snap. Each color uses a 0.6s forward transition
-  // (chained end-to-end across the COLOR MODE budget) and a shared
-  // 0.5s reset window aligned with the share-sheet slide-down.
-  const currentPrimary = colorCycle(t, FLYER_PRIMARY_DEFAULT, FLYER_PRIMARY_CUSTOM, 8.4, 9.0, 13.0, 13.5);
-  const currentAccent = colorCycle(t, FLYER_ACCENT_DEFAULT, FLYER_ACCENT_CUSTOM, 9.0, 9.6, 13.0, 13.5);
-  const currentBg = colorCycle(t, FLYER_BG_DEFAULT, FLYER_BG_CUSTOM, 9.6, 10.2, 13.0, 13.5);
+  // through PREVIEW + the extended SHARE hold, then eases back to
+  // default during the share-sheet exit (14.5-15.3) so the loop wrap
+  // is colorless — no visible palette snap. Each color uses a 0.6s
+  // forward transition (chained end-to-end across the COLOR MODE
+  // budget) and a shared 0.8s reset window aligned with the share-
+  // sheet slide-down.
+  const currentPrimary = colorCycle(t, FLYER_PRIMARY_DEFAULT, FLYER_PRIMARY_CUSTOM, 8.4, 9.0, 14.5, 15.3);
+  const currentAccent = colorCycle(t, FLYER_ACCENT_DEFAULT, FLYER_ACCENT_CUSTOM, 9.0, 9.6, 14.5, 15.3);
+  const currentBg = colorCycle(t, FLYER_BG_DEFAULT, FLYER_BG_CUSTOM, 9.6, 10.2, 14.5, 15.3);
 
   // Active swatch index for the picker. -1 means no swatch focused.
   // Each window covers its swatch's color-transition window plus a
@@ -327,16 +330,18 @@ export default function ListingFlyerMockup() {
   const activeSwatch =
     t >= 8.3 && t < 9.0 ? 0 : t >= 9.0 && t < 9.6 ? 1 : t >= 9.6 && t < 10.3 ? 2 : -1;
 
-  // Button + share-sheet timing. Sheet now exits at 13.0 (was 14.0)
-  // so the spring slide-down happens parallel to the color reset,
-  // keeping the reset hidden behind the receding sheet. Spring
-  // (damping:26, stiffness:280) settles in ~0.3s; reset finishes at
-  // 13.5. Net: by 13.5 the sheet is gone and the palette is default.
+  // Button + share-sheet timing. Sheet now holds visibly for ~1.8s
+  // (H-5.1b extended from 0.3s, brief found the original too quick
+  // to read) before exiting at 14.5. Spring (damping:26, stiffness:
+  // 280) settles in ~0.3s; the 0.8s color-reset window finishes at
+  // 15.3 with 0.3s of preview hold remaining before the loop wraps
+  // at 15.6. Loop end-state matches loop start-state (default
+  // palette, full preview, no share sheet) so the wrap is invisible.
   const buttonPulse = t >= 10.9 && t < 11.6;
   const buttonTap = t >= 11.6 && t < 11.8;
   const buttonLoading = t >= 11.8 && t < 12.4;
 
-  const shareSheetIn = t >= 12.4 && t < 13.0;
+  const shareSheetIn = t >= 12.4 && t < 14.5;
 
   // Three-mode layout. previewWeight drives both panels' flex-grow
   // inversely; PREVIEW at t=0..3 and 10.9..14, FORM/COLOR at t=3.6..10.3.
