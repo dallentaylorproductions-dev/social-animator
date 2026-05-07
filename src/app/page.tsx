@@ -4,6 +4,8 @@ import {
   Home,
   Lock,
   Palette,
+  PencilLine,
+  Share2,
   Shield,
   Smartphone,
 } from "lucide-react";
@@ -163,6 +165,44 @@ export default function StudioLandingPage() {
         </div>
       </section>
 
+      {/* How it works — 3-step workflow. Sits between the bridge
+          ("Made for realtors") and the gallery so the reader learns
+          the mechanics before seeing outputs. Step numbers in mono
+          font for the slight technical/precise read. */}
+      <section className="px-6 py-20 border-t border-neutral-900">
+        <div className="max-w-5xl mx-auto">
+          <div className="text-center max-w-3xl mx-auto">
+            <p className="text-xs uppercase tracking-[0.2em] text-[#4ef2d9]">
+              How it works
+            </p>
+            <h2 className="text-3xl md:text-5xl font-bold mt-3 tracking-tight">
+              Three steps. Five minutes.
+            </h2>
+          </div>
+
+          <div className="grid md:grid-cols-3 gap-6 mt-12">
+            <StepCard
+              number="01"
+              icon={<PencilLine size={28} className="text-[#4ef2d9]" />}
+              headline="Fill in your listing."
+              body="Address, price, beds/baths, photos, features. The form fields are short and the live preview updates as you type."
+            />
+            <StepCard
+              number="02"
+              icon={<Palette size={28} className="text-[#4ef2d9]" />}
+              headline="Brand it your way."
+              body="Your logo, colors, contact info, license number — applied automatically. Override the colors per-flyer if a listing calls for something different."
+            />
+            <StepCard
+              number="03"
+              icon={<Share2 size={28} className="text-[#4ef2d9]" />}
+              headline="Export everywhere."
+              body="Print-ready PDF for handouts. JPEG for Instagram. Animated MP4 for Reels and Stories. All from the same fields, in seconds."
+            />
+          </div>
+        </div>
+      </section>
+
       {/* What's inside — rotating gallery */}
       <section className="px-6 py-20 border-t border-neutral-900">
         <div className="max-w-6xl mx-auto">
@@ -251,6 +291,29 @@ function PillarCard({
   return (
     <div className="group p-8 rounded-xl bg-neutral-900/50 border border-neutral-800 hover:border-[#4ef2d9]/40 hover:bg-neutral-900/80 hover:scale-[1.02] transition-all duration-300">
       <div className="mb-5">{icon}</div>
+      <h3 className="text-xl font-bold text-white">{headline}</h3>
+      <p className="text-sm text-neutral-400 mt-3 leading-relaxed">{body}</p>
+    </div>
+  );
+}
+
+function StepCard({
+  number,
+  icon,
+  headline,
+  body,
+}: {
+  number: string;
+  icon: React.ReactNode;
+  headline: string;
+  body: string;
+}) {
+  return (
+    <div className="group p-8 rounded-xl bg-neutral-900/50 border border-neutral-800 hover:border-[#4ef2d9]/40 hover:bg-neutral-900/80 hover:scale-[1.02] transition-all duration-300">
+      <p className="font-mono text-3xl tracking-tight text-[#4ef2d9]">
+        {number}
+      </p>
+      <div className="mt-5 mb-4">{icon}</div>
       <h3 className="text-xl font-bold text-white">{headline}</h3>
       <p className="text-sm text-neutral-400 mt-3 leading-relaxed">{body}</p>
     </div>
