@@ -13,45 +13,59 @@ import {
 import { useEffect, useState } from "react";
 
 /**
- * Self-contained 12-second loop demoing the Listing Flyer Generator on a
+ * Self-contained 14-second loop demoing the Listing Flyer Generator on a
  * mobile-shaped surface. Designed to render inside the inner area of
  * IphoneScrollShowcase (~300×690px after bezel).
  *
  * Animation engine: a single requestAnimationFrame timer publishes the
- * current loop time `t` (0–12s, modulo). All UI is derived from `t` via
+ * current loop time `t` (0–14s, modulo). All UI is derived from `t` via
  * pure helpers.
  *
- * H-3.5e re-tuned timing for cinematic feel:
- *   - typing speed normalized so address (long) doesn't feel slower than
- *     short bullets — ~70ms/char for the long values, ~35-40ms for the
- *     short bullets which the eye doesn't dwell on anyway
- *   - panel transitions extended from 0.3s → 0.6s on each side so the
- *     mode resize reads as "settling" rather than "snapping"
- *   - active-field highlights and preview content reveals re-timed to
- *     match
+ * H-5 added a COLOR MODE step demonstrating the per-flyer color override
+ * feature. Loop extended 12s→14s; typing budget held at 4.7s (the rhythm
+ * was carefully tuned in H-3.5e, so downstream events are shifted instead
+ * of compressing the typing). App UI elements (top label, export button,
+ * active field borders, status chip) stay mint — only flyer-content
+ * elements (JUST LISTED badge, price, bullet dots, agent-footer mark,
+ * mini-thumbnail accent, preview-frame bg) switch palettes during COLOR
+ * MODE. Two distinct color systems: the app's brand mint vs the
+ * flyer's customizable colors.
  *
  * Timeline:
- *   0.0–3.0   HOLD POPULATED STATE — populated, slow Ken Burns 1.0→1.02
- *   3.0–3.6   transition out — fields + preview content fade, panels
- *             resize (PREVIEW MODE → FORM MODE)
- *   3.6–5.1   address types (1.5s, 21 chars ≈ 71ms/char)
- *   5.3–5.86  price types (0.56s, 8 chars × 70ms)
- *   5.95–6.35 beds / baths / sqft snap in (staggered)
- *   6.5–7.4   feature 1 types (0.9s, 26 chars ≈ 35ms/char)
- *   7.5–7.85  feature 2 types (0.35s, 8 chars ≈ 44ms/char)
- *   7.9–8.25  feature 3 types (0.35s, 11 chars ≈ 32ms/char)
- *   8.3–8.9   transition in — preview content reveals, panels resize
- *             (FORM MODE → PREVIEW MODE)
- *   9.0–9.7   Export PDF button pulses
- *   9.7–9.9   button tap (scale-down/up)
- *   9.9–10.5  loading state (spinner + "Generating PDF…")
- *  10.5–11.7  share sheet slides up
- *  11.7–12.0  hold share sheet
- *  12.0 = 0.0 wrap to populated state
+ *   0.0–3.0   HOLD POPULATED STATE — populated, slow Ken Burns, default palette
+ *   3.0–3.6   PREVIEW → FORM transition (panels resize, content fades)
+ *   3.6–5.1   address types
+ *   5.3–5.86  price types
+ *   5.95–6.35 beds / baths / sqft snap in
+ *   6.5–7.4   feature 1 types
+ *   7.5–7.85  feature 2 types
+ *   7.9–8.25  feature 3 types
+ *   8.1–8.3   form fields fade out, BRAND COLORS swatches fade in
+ *   8.5–9.1   PRIMARY swatch active → mint→coral (preview price + badge animate)
+ *   9.1–9.6   ACCENT swatch active → mint→coral (bullet dots animate on reveal)
+ *   9.6–10.3  BACKGROUND swatch active → dark→navy (preview frame bg animates)
+ *  10.1–10.3  hold new palette
+ *  10.3–10.9  COLOR → PREVIEW transition (color picker fades out, summary in)
+ *  10.9–11.6  Export PDF button pulses (now displaying custom palette)
+ *  11.6–11.8  button tap
+ *  11.8–12.4  loading state
+ *  12.4–13.6  share sheet slides up
+ *  13.6–14.0  hold
+ *  14.0 = 0.0 wrap — palette snaps back to default
  */
 
-const LOOP_S = 12;
+const LOOP_S = 14;
 const MINT = "#4ef2d9";
+
+// Default flyer palette (what the loop starts with) and the custom palette
+// transitioned to during COLOR MODE. Coral primary + deep navy bg picked
+// for boutique-realtor warmth and clear distance from the brand mint.
+const FLYER_PRIMARY_DEFAULT = "#4ef2d9";
+const FLYER_ACCENT_DEFAULT = "#4ef2d9";
+const FLYER_BG_DEFAULT = "#0a0a0a";
+const FLYER_PRIMARY_CUSTOM = "#f97056";
+const FLYER_ACCENT_CUSTOM = "#f97056";
+const FLYER_BG_CUSTOM = "#1a2740";
 
 // Unsplash photo URL used as the property hero for the iPhone mockup.
 // Unsplash license doesn't require attribution but encourages it; keeping
@@ -115,6 +129,56 @@ function easeInOutCubic(p: number): number {
   return p < 0.5 ? 4 * p * p * p : 1 - Math.pow(-2 * p + 2, 3) / 2;
 }
 
+/** Linear RGB interpolation between two #rrggbb hex colors. p in [0,1]. */
+function lerpColor(a: string, b: string, p: number): string {
+  const ar = parseInt(a.slice(1, 3), 16);
+  const ag = parseInt(a.slice(3, 5), 16);
+  const ab = parseInt(a.slice(5, 7), 16);
+  const br = parseInt(b.slice(1, 3), 16);
+  const bg = parseInt(b.slice(3, 5), 16);
+  const bb = parseInt(b.slice(5, 7), 16);
+  const r = Math.round(ar + (br - ar) * p);
+  const g = Math.round(ag + (bg - ag) * p);
+  const bv = Math.round(ab + (bb - ab) * p);
+  return `#${r.toString(16).padStart(2, "0")}${g.toString(16).padStart(2, "0")}${bv.toString(16).padStart(2, "0")}`;
+}
+
+/** Returns the live color value at time t. Holds at `base` until
+ *  transitionStart, eases to `custom` between transitionStart and
+ *  transitionEnd, then holds at `custom` until the next loop wrap.
+ *  At t=0 the function returns base again because t < transitionStart,
+ *  so the loop reset is automatic — no separate reset window needed. */
+function colorCycle(
+  t: number,
+  base: string,
+  custom: string,
+  transitionStart: number,
+  transitionEnd: number
+): string {
+  if (t <= transitionStart) return base;
+  if (t >= transitionEnd) return custom;
+  const p = easeInOutCubic((t - transitionStart) / (transitionEnd - transitionStart));
+  return lerpColor(base, custom, p);
+}
+
+/** Generic fade-in/hold/fade-out opacity. 0 outside the windows, 1
+ *  between fadeInEnd and fadeOutStart, linearly tweened on either edge.
+ *  Used for the form-fields ↔ color-picker ↔ summary crossfade in the
+ *  form panel. */
+function fadeOnly(
+  t: number,
+  fadeInStart: number,
+  fadeInEnd: number,
+  fadeOutStart: number,
+  fadeOutEnd: number
+): number {
+  if (t < fadeInStart) return 0;
+  if (t < fadeInEnd) return (t - fadeInStart) / (fadeInEnd - fadeInStart);
+  if (t < fadeOutStart) return 1;
+  if (t < fadeOutEnd) return 1 - (t - fadeOutStart) / (fadeOutEnd - fadeOutStart);
+  return 0;
+}
+
 /** Returns the preview panel's flex-grow weight at time t. Inverse of the
  *  form panel weight. PREVIEW MODE during the populated hold (0..3) and
  *  after form completes (8.7..12); FORM MODE during the typing window
@@ -133,16 +197,19 @@ const PREVIEW_LIGHT = 0.38;
 function computePreviewWeight(t: number): number {
   // Cold paint + initial hold
   if (t < 3.0) return PREVIEW_HEAVY;
-  // Transition into FORM MODE — extended 0.3s → 0.6s for smoother motion
+  // Transition into FORM MODE
   if (t < 3.6) {
     const p = easeInOutCubic((t - 3.0) / 0.6);
     return PREVIEW_HEAVY - p * (PREVIEW_HEAVY - PREVIEW_LIGHT);
   }
-  // FORM MODE
-  if (t < 8.3) return PREVIEW_LIGHT;
-  // Transition back to PREVIEW MODE — also extended to 0.6s
-  if (t < 8.9) {
-    const p = easeInOutCubic((t - 8.3) / 0.6);
+  // FORM MODE (typing) + COLOR MODE (color picker) — both share the
+  // same panel split. The form-panel content crossfades between form
+  // fields, color picker, and "ready to export" summary; layout split
+  // doesn't need to move during the swap.
+  if (t < 10.3) return PREVIEW_LIGHT;
+  // Transition back to PREVIEW MODE
+  if (t < 10.9) {
+    const p = easeInOutCubic((t - 10.3) / 0.6);
     return PREVIEW_LIGHT + p * (PREVIEW_HEAVY - PREVIEW_LIGHT);
   }
   // PREVIEW MODE through button + share-sheet sequence
@@ -190,52 +257,79 @@ export default function ListingFlyerMockup() {
   const feature2 = typedCycle("Open Bar", t, HOLD_END, RESET_END, 7.5, 7.85);
   const feature3 = typedCycle("Indoor Pool", t, HOLD_END, RESET_END, 7.9, 8.25);
 
-  // Preview reveal opacities — re-timed so badge + hero + address + price
-  // + stats fade in DURING form-mode typing (visible in the compact card),
-  // while bullets/footer/photo-grid (which are gated by `compact`) reveal
-  // during the form→preview transition window.
+  // Preview reveal opacities — badge + hero + address + price + stats
+  // + footer fade in DURING form-mode typing (visible in the compact
+  // card). Bullets + photo-grid reveal during the COLOR→PREVIEW
+  // transition (10.3-10.9), so their windows are 2s later than the
+  // pre-H-5 layout where this transition was at 8.3-8.9.
   const previewBadgeOp = opacityCycle(t, HOLD_END, RESET_END, 3.6, 3.95);
   const previewHeroOp = opacityCycle(t, HOLD_END, RESET_END, 3.6, 4.0);
   const previewAddressOp = opacityCycle(t, HOLD_END, RESET_END, 4.5, 4.9);
   const previewPriceOp = opacityCycle(t, HOLD_END, RESET_END, 5.4, 5.8);
   const previewStatsOp = opacityCycle(t, HOLD_END, RESET_END, 5.95, 6.3);
   const previewFooterOp = opacityCycle(t, HOLD_END, RESET_END, 5.95, 6.3);
-  const previewF1Op = opacityCycle(t, HOLD_END, RESET_END, 8.55, 8.75);
-  const previewF2Op = opacityCycle(t, HOLD_END, RESET_END, 8.6, 8.8);
-  const previewF3Op = opacityCycle(t, HOLD_END, RESET_END, 8.65, 8.85);
-  const previewGridOp = opacityCycle(t, HOLD_END, RESET_END, 8.7, 8.9);
+  const previewF1Op = opacityCycle(t, HOLD_END, RESET_END, 10.55, 10.75);
+  const previewF2Op = opacityCycle(t, HOLD_END, RESET_END, 10.6, 10.8);
+  const previewF3Op = opacityCycle(t, HOLD_END, RESET_END, 10.65, 10.85);
+  const previewGridOp = opacityCycle(t, HOLD_END, RESET_END, 10.7, 10.9);
 
-  // Subtle Ken Burns on the hero — only during the populated hold phase so
-  // the frame doesn't feel completely static. 1.0 → 1.02 over the first 3s.
+  // Subtle Ken Burns on the hero — only during the populated hold phase
+  // so the frame doesn't feel completely static. 1.0 → 1.02 over 0-3s.
   const heroZoom = t < HOLD_END ? 1.0 + (t / HOLD_END) * 0.02 : 1.0;
 
-  // Button states — shifted ~0.5s later to land after the form→preview
-  // transition completes at 8.9, so the pulse reads as the conclusion
-  // beat of the loop rather than overlapping with the panel resize.
-  const buttonPulse = t >= 9.0 && t < 9.7;
-  const buttonTap = t >= 9.7 && t < 9.9;
-  const buttonLoading = t >= 9.9 && t < 10.5;
+  // Live flyer palette. Stays at default through typing, eases to
+  // custom during the relevant swatch-tap window in COLOR MODE, holds
+  // through PREVIEW + SHARE, snaps back to default at loop wrap (the
+  // colorCycle helper returns base when t < transitionStart, which is
+  // automatically true at t=0). Three independent transitions so the
+  // user sees each swatch animate in sequence.
+  const currentPrimary = colorCycle(t, FLYER_PRIMARY_DEFAULT, FLYER_PRIMARY_CUSTOM, 8.7, 9.1);
+  const currentAccent = colorCycle(t, FLYER_ACCENT_DEFAULT, FLYER_ACCENT_CUSTOM, 9.3, 9.6);
+  const currentBg = colorCycle(t, FLYER_BG_DEFAULT, FLYER_BG_CUSTOM, 9.8, 10.1);
 
-  const shareSheetIn = t >= 10.5 && t < 12.0;
+  // Active swatch index for the picker. -1 means no swatch focused.
+  // Each window slightly outlasts its color transition so the focus
+  // ring lingers briefly after the color settles, before the eye
+  // jumps to the next.
+  const activeSwatch =
+    t >= 8.5 && t < 9.1 ? 0 : t >= 9.1 && t < 9.6 ? 1 : t >= 9.6 && t < 10.3 ? 2 : -1;
 
-  // Three-mode layout: PREVIEW (preview-heavy) at t=0..3 and 8.7..12.0,
-  // FORM (form-heavy with a still-readable preview card) at t=3.3..8.7.
-  // Smooth `previewWeight` drives both panels' flex-grow values inversely.
+  // Button + share-sheet timing — shifted +1.9s vs the pre-H-5 loop so
+  // each beat lands after the COLOR→PREVIEW transition completes at 10.9.
+  const buttonPulse = t >= 10.9 && t < 11.6;
+  const buttonTap = t >= 11.6 && t < 11.8;
+  const buttonLoading = t >= 11.8 && t < 12.4;
+
+  const shareSheetIn = t >= 12.4 && t < 14.0;
+
+  // Three-mode layout. previewWeight drives both panels' flex-grow
+  // inversely; PREVIEW at t=0..3 and 10.9..14, FORM/COLOR at t=3.6..10.3.
   const previewWeight = computePreviewWeight(t);
   const formWeight = 1 - previewWeight;
-  // formExpanded triggers the form-fields-vs-summary crossfade. With the
-  // new 0.88/0.38 endpoints, the midpoint is 0.63 — anything under 0.7
-  // means "form is meaningfully visible; show the full fields, hide the
-  // summary strip."
-  const formExpanded = previewWeight < 0.7;
-  // Whether the photo grid in the preview card has room to render. At
-  // 0.38 (FORM MODE) the preview is too compact for it; only show in
-  // PREVIEW MODE.
+
+  // Form-panel content crossfade. Three stacked layers with independent
+  // opacity windows so each handoff is a clean fade rather than a flag-
+  // flip. Form fields fade out at 8.1-8.3 as the color picker fades in;
+  // picker fades out at 10.3-10.5 as the "ready to export" summary
+  // returns for the export beat.
+  const formFieldsOpacity = fadeOnly(t, 3.5, 3.7, 8.1, 8.3);
+  const colorPickerOpacity = fadeOnly(t, 8.1, 8.3, 10.3, 10.5);
+  // Summary visible at the loop boundaries (start + end), hidden in
+  // the middle. Computed piecewise since fadeOnly assumes hidden-then-
+  // visible-then-hidden, the inverse of what we need.
+  let summaryOpacity: number;
+  if (t < 3.3) summaryOpacity = 1;
+  else if (t < 3.5) summaryOpacity = 1 - (t - 3.3) / 0.2;
+  else if (t < 10.5) summaryOpacity = 0;
+  else if (t < 10.7) summaryOpacity = (t - 10.5) / 0.2;
+  else summaryOpacity = 1;
+
+  // Photo grid + bullets + agent footer only render when the preview
+  // card has room. Gated on previewWeight crossing 0.7 — true during
+  // PREVIEW MODE, false during FORM/COLOR MODE.
   const previewCompact = previewWeight < 0.7;
 
-  // Active-field highlight — the currently-typing field gets a mint
-  // border so the eye follows the cursor. One field active at a time;
-  // windows match the typing windows above.
+  // Active-field highlight — currently-typing field gets a mint border.
   const activeAddress = t >= 3.6 && t < 5.1;
   const activePrice = t >= 5.3 && t < 5.86;
   const activeStats = t >= 5.95 && t < 6.35;
@@ -259,10 +353,13 @@ export default function ListingFlyerMockup() {
       </div>
 
       {/* Preview panel — flex-grow follows previewWeight so it expands in
-          PREVIEW MODE and shrinks to a label strip in FORM MODE. */}
+          PREVIEW MODE and shrinks to a label strip in FORM/COLOR MODE.
+          Background animates with currentBg during the BACKGROUND swatch
+          tap (9.8-10.1) so the area framing the white flyer card visibly
+          shifts to navy — keeps the card's text contrast intact. */}
       <div
-        style={{ flex: `${previewWeight} 0 0` }}
-        className="overflow-hidden flex flex-col bg-neutral-950 border-b border-neutral-900"
+        style={{ flex: `${previewWeight} 0 0`, backgroundColor: currentBg }}
+        className="overflow-hidden flex flex-col border-b border-neutral-900 transition-none"
       >
         <p className="px-3 pt-2 pb-1 text-[7px] uppercase tracking-[0.15em] text-neutral-600 flex-shrink-0">
           Live preview
@@ -281,26 +378,27 @@ export default function ListingFlyerMockup() {
             gridOpacity={previewGridOp}
             footerOpacity={previewFooterOp}
             compact={previewCompact}
+            primaryColor={currentPrimary}
+            accentColor={currentAccent}
           />
         </div>
       </div>
 
-      {/* Form panel — inverse of preview. Crossfades between full form
-          (during FORM MODE) and a "ready to export" summary (during
-          PREVIEW MODE) so the collapsed strip says something meaningful. */}
+      {/* Form panel — inverse of preview. Three stacked layers crossfade
+          via independent computed opacities: form fields during FORM
+          MODE, color picker during COLOR MODE, "ready to export" summary
+          at the loop boundaries. Each layer is absolute-positioned so
+          the panel height stays driven by formWeight. */}
       <div
         style={{ flex: `${formWeight} 0 0` }}
         className="overflow-hidden flex flex-col relative bg-neutral-950"
       >
-        {/* Full form (visible when formExpanded). Vertical flex with
-            equal spacing so fields fill the panel rather than clustering
-            at the top with dead space below. */}
+        {/* Full form */}
         <div
           className="absolute inset-0 px-3 py-3 overflow-hidden flex flex-col gap-3"
           style={{
-            opacity: formExpanded ? 1 : 0,
-            transition: "opacity 200ms ease",
-            pointerEvents: formExpanded ? "auto" : "none",
+            opacity: formFieldsOpacity,
+            pointerEvents: formFieldsOpacity > 0.5 ? "auto" : "none",
           }}
         >
           <p className="text-[7px] uppercase tracking-[0.15em] text-neutral-500 flex-shrink-0">
@@ -323,13 +421,40 @@ export default function ListingFlyerMockup() {
           </div>
         </div>
 
-        {/* Collapsed summary (visible when !formExpanded) */}
+        {/* Color picker */}
+        <div
+          className="absolute inset-0 px-3 py-3 overflow-hidden flex flex-col gap-2"
+          style={{
+            opacity: colorPickerOpacity,
+            pointerEvents: colorPickerOpacity > 0.5 ? "auto" : "none",
+          }}
+        >
+          <p className="text-[7px] uppercase tracking-[0.15em] text-neutral-500 flex-shrink-0">
+            Brand colors
+          </p>
+          <SwatchRow
+            label="Primary"
+            hex={currentPrimary}
+            active={activeSwatch === 0}
+          />
+          <SwatchRow
+            label="Accent"
+            hex={currentAccent}
+            active={activeSwatch === 1}
+          />
+          <SwatchRow
+            label="Background"
+            hex={currentBg}
+            active={activeSwatch === 2}
+          />
+        </div>
+
+        {/* Collapsed summary */}
         <div
           className="absolute inset-0 px-3 py-2 flex items-center gap-2"
           style={{
-            opacity: formExpanded ? 0 : 1,
-            transition: "opacity 200ms ease",
-            pointerEvents: formExpanded ? "none" : "auto",
+            opacity: summaryOpacity,
+            pointerEvents: summaryOpacity > 0.5 ? "auto" : "none",
           }}
         >
           <span
@@ -370,7 +495,7 @@ export default function ListingFlyerMockup() {
         </motion.button>
       </div>
 
-      <ShareSheet visible={shareSheetIn} />
+      <ShareSheet visible={shareSheetIn} flyerPrimaryColor={currentPrimary} />
     </div>
   );
 }
@@ -437,6 +562,46 @@ function FormField({
   );
 }
 
+function SwatchRow({
+  label,
+  hex,
+  active,
+}: {
+  label: string;
+  hex: string;
+  active: boolean;
+}) {
+  return (
+    <div
+      className="flex items-center gap-2 rounded px-2 py-1.5"
+      style={{
+        backgroundColor: active ? "rgba(78, 242, 217, 0.06)" : "transparent",
+        transition: "background-color 200ms ease",
+      }}
+    >
+      <div
+        className="w-7 h-7 rounded flex-shrink-0"
+        style={{
+          backgroundColor: hex,
+          boxShadow: active
+            ? `0 0 0 2px ${MINT}, 0 0 0 4px rgba(78, 242, 217, 0.18)`
+            : "0 0 0 1px rgba(255, 255, 255, 0.08)",
+          transform: active ? "scale(1.05)" : "scale(1)",
+          transition: "box-shadow 220ms ease, transform 220ms ease",
+        }}
+      />
+      <div className="flex-1 min-w-0">
+        <p className="uppercase tracking-[0.15em] text-neutral-500 text-[7px]">
+          {label}
+        </p>
+        <p className="font-mono text-[9px] text-neutral-300 leading-tight">
+          {hex.toUpperCase()}
+        </p>
+      </div>
+    </div>
+  );
+}
+
 function FormChip({
   cycle,
   active = false,
@@ -490,6 +655,8 @@ function FlyerPreviewCard({
   gridOpacity,
   footerOpacity,
   compact = false,
+  primaryColor,
+  accentColor,
 }: {
   badgeOpacity: number;
   heroOpacity: number;
@@ -502,10 +669,16 @@ function FlyerPreviewCard({
   f3Opacity: number;
   gridOpacity: number;
   footerOpacity: number;
-  /** When true (FORM MODE), the card runs lean: hero stretches via
-   *  flex-1 instead of fixed aspect-ratio, photo grid + bullets hidden,
-   *  agent footer hidden. Just badge / hero / address / price / stats. */
+  /** When true (FORM/COLOR MODE), the card runs lean: hero stretches
+   *  via flex-1 instead of fixed aspect-ratio, photo grid + bullets
+   *  hidden, agent footer hidden. */
   compact?: boolean;
+  /** Live flyer palette. primaryColor drives the JUST LISTED badge,
+   *  the price text, and the agent-footer chip; accentColor drives the
+   *  bullet dots. Default to MINT so the mockup renders sensibly if
+   *  rendered without the palette pipe. */
+  primaryColor: string;
+  accentColor: string;
 }) {
   return (
     <div className="bg-white text-neutral-900 rounded-md overflow-hidden shadow-lg ring-1 ring-black/5 mx-auto flex flex-col h-full w-full">
@@ -528,7 +701,7 @@ function FlyerPreviewCard({
         >
           <span
             className="inline-block px-1.5 py-0.5 rounded-full text-[6px] font-bold uppercase tracking-[0.15em] text-black shadow-sm"
-            style={{ backgroundColor: MINT }}
+            style={{ backgroundColor: primaryColor }}
           >
             JUST LISTED
           </span>
@@ -547,7 +720,7 @@ function FlyerPreviewCard({
           </p>
         </motion.div>
         <motion.p
-          style={{ opacity: priceOpacity, color: MINT }}
+          style={{ opacity: priceOpacity, color: primaryColor }}
           className="text-[12px] font-extrabold leading-none mt-0.5"
         >
           $685,000
@@ -565,9 +738,9 @@ function FlyerPreviewCard({
         {!compact && (
           <>
             <div className="space-y-0.5 mt-0.5">
-              <PreviewBullet text="Chef's kitchen with marble" opacity={f1Opacity} />
-              <PreviewBullet text="Open Bar" opacity={f2Opacity} />
-              <PreviewBullet text="Indoor Pool" opacity={f3Opacity} />
+              <PreviewBullet text="Chef's kitchen with marble" opacity={f1Opacity} dotColor={accentColor} />
+              <PreviewBullet text="Open Bar" opacity={f2Opacity} dotColor={accentColor} />
+              <PreviewBullet text="Indoor Pool" opacity={f3Opacity} dotColor={accentColor} />
             </div>
             <motion.div
               style={{ opacity: gridOpacity }}
@@ -589,7 +762,7 @@ function FlyerPreviewCard({
         >
           <div
             className="w-3.5 h-3.5 rounded flex items-center justify-center text-[5px] font-bold text-black flex-shrink-0"
-            style={{ backgroundColor: MINT }}
+            style={{ backgroundColor: primaryColor }}
           >
             AT
           </div>
@@ -602,7 +775,15 @@ function FlyerPreviewCard({
   );
 }
 
-function PreviewBullet({ text, opacity }: { text: string; opacity: number }) {
+function PreviewBullet({
+  text,
+  opacity,
+  dotColor,
+}: {
+  text: string;
+  opacity: number;
+  dotColor: string;
+}) {
   return (
     <motion.div
       style={{ opacity }}
@@ -610,7 +791,7 @@ function PreviewBullet({ text, opacity }: { text: string; opacity: number }) {
     >
       <span
         className="inline-block w-1 h-1 rounded-full flex-shrink-0"
-        style={{ backgroundColor: MINT }}
+        style={{ backgroundColor: dotColor }}
       />
       <span className="truncate">{text}</span>
     </motion.div>
@@ -645,7 +826,16 @@ function PropertyHeroPhoto() {
 
 /* ────────────────────────────────────────────────────────────────────── */
 
-function ShareSheet({ visible }: { visible: boolean }) {
+function ShareSheet({
+  visible,
+  flyerPrimaryColor,
+}: {
+  visible: boolean;
+  /** The flyer's primary color at share-time. Threaded into the
+   *  MiniFlyerThumbnail's price-line accent so the thumbnail reflects
+   *  the customized palette the user just picked. */
+  flyerPrimaryColor: string;
+}) {
   return (
     <motion.div
       animate={{
@@ -660,7 +850,7 @@ function ShareSheet({ visible }: { visible: boolean }) {
 
       <div className="bg-neutral-800/80 rounded-lg p-2 flex items-center gap-2 mb-2.5">
         <div className="w-10 h-12 bg-white rounded shadow-md overflow-hidden flex-shrink-0 ring-1 ring-black/10">
-          <MiniFlyerThumbnail />
+          <MiniFlyerThumbnail primaryColor={flyerPrimaryColor} />
         </div>
         <div className="flex-1 min-w-0">
           <p className="text-[9px] text-white font-semibold truncate">
@@ -803,8 +993,9 @@ function AirDropIcon() {
 
 /** Tiny flyer-card representation inside the share sheet's file preview
  *  tile. Uses the same Unsplash hero photo for end-to-end visual
- *  consistency. */
-function MiniFlyerThumbnail() {
+ *  consistency. The price-line accent reflects the live flyer primary
+ *  color so the thumbnail matches the customized flyer being shared. */
+function MiniFlyerThumbnail({ primaryColor }: { primaryColor: string }) {
   return (
     <div className="w-full h-full bg-white flex flex-col">
       <div className="h-1/2 overflow-hidden">
@@ -818,7 +1009,7 @@ function MiniFlyerThumbnail() {
       </div>
       <div className="flex-1 px-0.5 pt-0.5 flex flex-col">
         <div className="h-0.5 w-3/4 bg-neutral-800 rounded mb-0.5" />
-        <div className="h-1 w-1/2 rounded" style={{ backgroundColor: MINT }} />
+        <div className="h-1 w-1/2 rounded" style={{ backgroundColor: primaryColor }} />
         <div className="h-0.5 w-2/3 bg-neutral-300 rounded mt-0.5" />
       </div>
     </div>
