@@ -171,7 +171,10 @@ export default function StudioLandingPage() {
           ("Made for realtors") and the gallery so the reader learns
           the mechanics before seeing outputs. Step numbers in mono
           font for the slight technical/precise read. */}
-      <section className="px-6 py-20 border-t border-neutral-900">
+      <section
+        id="how-it-works"
+        className="px-6 py-20 border-t border-neutral-900 scroll-mt-16"
+      >
         <div className="max-w-5xl mx-auto">
           <div className="text-center max-w-3xl mx-auto">
             <p className="text-xs uppercase tracking-[0.2em] text-[#4ef2d9]">
@@ -206,7 +209,10 @@ export default function StudioLandingPage() {
       </section>
 
       {/* What's inside — rotating gallery */}
-      <section className="px-6 py-20 border-t border-neutral-900">
+      <section
+        id="tools"
+        className="px-6 py-20 border-t border-neutral-900 scroll-mt-16"
+      >
         <div className="max-w-6xl mx-auto">
           <p className="text-xs uppercase tracking-[0.2em] text-[#4ef2d9] text-center">
             What&apos;s inside
@@ -252,7 +258,10 @@ export default function StudioLandingPage() {
       </section>
 
       {/* Pricing */}
-      <section className="px-6 py-20 border-t border-neutral-900">
+      <section
+        id="pricing"
+        className="px-6 py-20 border-t border-neutral-900 scroll-mt-16"
+      >
         <div className="max-w-md mx-auto text-center">
           <p className="text-xs uppercase tracking-[0.2em] text-[#4ef2d9]">
             Pricing
@@ -285,7 +294,10 @@ export default function StudioLandingPage() {
           <details>/<summary> for zero-JS accordion; chevron rotation
           via group-open variant. Each card is a self-contained dark
           panel matching the rest of the page. */}
-      <section className="px-6 py-20 border-t border-neutral-900">
+      <section
+        id="faq"
+        className="px-6 py-20 border-t border-neutral-900 scroll-mt-16"
+      >
         <div className="max-w-3xl mx-auto">
           <div className="text-center">
             <p className="text-xs uppercase tracking-[0.2em] text-[#4ef2d9]">
@@ -344,16 +356,116 @@ export default function StudioLandingPage() {
         </div>
       </section>
 
-      {/* Footer */}
-      <footer className="px-6 py-12 border-t border-neutral-900">
-        <div className="max-w-5xl mx-auto flex flex-col sm:flex-row justify-between items-center gap-4 text-[11px] text-neutral-600">
-          <p>© Simply Edit Pro Studio</p>
-          <a
-            href="https://simplyeditpro.com"
-            className="hover:text-[#4ef2d9] transition"
-          >
-            simplyeditpro.com →
-          </a>
+      {/* Footer — 3-column on desktop, stacked on mobile. Brand column
+          carries identity + trust marker; product column jump-links
+          back into the page; support column has contact + legal stubs.
+          Bottom row spans full width with copyright + outbound link. */}
+      <footer className="px-6 pt-16 pb-10 border-t border-neutral-900">
+        <div className="max-w-5xl mx-auto">
+          <div className="grid md:grid-cols-3 gap-10 md:gap-12">
+            <div>
+              <p className="text-xs uppercase tracking-[0.2em] text-[#4ef2d9]">
+                Simply Edit Pro Studio
+              </p>
+              <p className="text-sm text-neutral-400 mt-4 leading-relaxed max-w-xs">
+                Tools that help realtors make client-ready content
+                faster.
+              </p>
+              <p className="text-[11px] text-neutral-600 mt-6">
+                Stripe-secured billing
+              </p>
+            </div>
+
+            <div>
+              <p className="text-xs uppercase tracking-[0.2em] text-neutral-500">
+                Product
+              </p>
+              <ul className="mt-4 space-y-2.5 text-sm">
+                <li>
+                  <a
+                    href="#pricing"
+                    className="text-neutral-400 hover:text-[#4ef2d9] transition"
+                  >
+                    Pricing
+                  </a>
+                </li>
+                <li>
+                  <a
+                    href="#how-it-works"
+                    className="text-neutral-400 hover:text-[#4ef2d9] transition"
+                  >
+                    How it works
+                  </a>
+                </li>
+                <li>
+                  <a
+                    href="#tools"
+                    className="text-neutral-400 hover:text-[#4ef2d9] transition"
+                  >
+                    Tools
+                  </a>
+                </li>
+                <li>
+                  <a
+                    href="#faq"
+                    className="text-neutral-400 hover:text-[#4ef2d9] transition"
+                  >
+                    FAQ
+                  </a>
+                </li>
+                <li>
+                  <Link
+                    href="/login"
+                    className="text-neutral-400 hover:text-[#4ef2d9] transition"
+                  >
+                    Sign in
+                  </Link>
+                </li>
+              </ul>
+            </div>
+
+            <div>
+              <p className="text-xs uppercase tracking-[0.2em] text-neutral-500">
+                Support
+              </p>
+              <ul className="mt-4 space-y-2.5 text-sm">
+                <li>
+                  <a
+                    href="mailto:hello@simplyeditpro.com"
+                    className="text-neutral-400 hover:text-[#4ef2d9] transition"
+                  >
+                    Contact
+                  </a>
+                </li>
+                <li>
+                  <Link
+                    href="/privacy"
+                    className="text-neutral-400 hover:text-[#4ef2d9] transition"
+                  >
+                    Privacy Policy
+                  </Link>
+                </li>
+                <li>
+                  <Link
+                    href="/terms"
+                    className="text-neutral-400 hover:text-[#4ef2d9] transition"
+                  >
+                    Terms of Service
+                  </Link>
+                </li>
+              </ul>
+            </div>
+          </div>
+
+          <div className="mt-12 pt-8 border-t border-neutral-900 flex flex-col sm:flex-row justify-between items-center gap-4 text-[11px] text-neutral-600">
+            <p>© 2026 Simply Edit Pro Studio. All rights reserved.</p>
+            <a
+              href="https://simplyeditpro.com"
+              className="hover:text-[#4ef2d9] transition"
+            >
+              simplyeditpro.com →
+            </a>
+          </div>
         </div>
       </footer>
     </main>
