@@ -2,6 +2,7 @@ import Link from "next/link";
 import {
   Briefcase,
   Check,
+  ChevronDown,
   Home,
   Lock,
   Palette,
@@ -280,6 +281,69 @@ export default function StudioLandingPage() {
         </div>
       </section>
 
+      {/* FAQ — last objection-handling beat before the close. Native
+          <details>/<summary> for zero-JS accordion; chevron rotation
+          via group-open variant. Each card is a self-contained dark
+          panel matching the rest of the page. */}
+      <section className="px-6 py-20 border-t border-neutral-900">
+        <div className="max-w-3xl mx-auto">
+          <div className="text-center">
+            <p className="text-xs uppercase tracking-[0.2em] text-[#4ef2d9]">
+              Questions
+            </p>
+            <h2 className="text-3xl md:text-5xl font-bold mt-3 tracking-tight">
+              Frequently asked.
+            </h2>
+          </div>
+
+          <div className="mt-12 space-y-3">
+            <FaqItem
+              q="How is this different from Canva?"
+              a="Canva is a creator tool with thousands of generic templates. Simply Edit Pro is built for realtors only — every template is property marketing, not Instagram dance graphics. The workflows are designed for the way agents actually work: on a phone, between showings, in five minutes."
+            />
+            <FaqItem
+              q="Do I need design skills?"
+              a="No. The tool makes design choices for you. You fill in a form, you get professional outputs. If you want to adjust colors per-flyer, you can — but the defaults are good."
+            />
+            <FaqItem
+              q="What devices work?"
+              a="Any modern browser. iPhone, Android, iPad, Mac, PC. The listing flyer generator was built mobile-first because most realtors do their marketing between appointments."
+            />
+            <FaqItem
+              q="What about my photos and data?"
+              a="Your photos stay on your device. Drafts are saved in your browser's local storage — never uploaded to our servers. Stripe handles billing securely. You own your work."
+            />
+            <FaqItem
+              q="Can I cancel anytime?"
+              a="Yes. Month-to-month, no contracts, no setup fees. Cancel from your dashboard. Billing stops at the end of the current cycle."
+            />
+            <FaqItem
+              q="What's coming next?"
+              a="Listing Presentation One-Pager (the third tool, in development). More Social Animator templates. Advanced flyer customization. Everything we ship is included in your subscription — no per-tool charges, ever."
+            />
+          </div>
+        </div>
+      </section>
+
+      {/* Founder note — humanizing close between the FAQ and footer.
+          Single column, three sentences, signed first-name. */}
+      <section className="px-6 py-16 border-t border-neutral-900">
+        <div className="max-w-2xl mx-auto text-center">
+          <p className="text-xs uppercase tracking-[0.2em] text-[#4ef2d9]">
+            Why this exists
+          </p>
+          <p className="mt-6 text-neutral-300 leading-relaxed">
+            I make video content for realtors. After watching too many
+            agents lose hours each week to generic design tools that
+            weren&apos;t built for property marketing, I started Simply
+            Edit Pro. The goal is simple: fast, branded, professional
+            outputs that don&apos;t require design skills — built for
+            the way you actually work.
+          </p>
+          <p className="mt-6 text-neutral-500 text-sm">— Dallen, Founder</p>
+        </div>
+      </section>
+
       {/* Footer */}
       <footer className="px-6 py-12 border-t border-neutral-900">
         <div className="max-w-5xl mx-auto flex flex-col sm:flex-row justify-between items-center gap-4 text-[11px] text-neutral-600">
@@ -326,6 +390,23 @@ function PillarCard({
       <h3 className="text-xl font-bold text-white">{headline}</h3>
       <p className="text-sm text-neutral-400 mt-3 leading-relaxed">{body}</p>
     </div>
+  );
+}
+
+function FaqItem({ q, a }: { q: string; a: string }) {
+  return (
+    <details className="group rounded-xl bg-neutral-900/50 border border-neutral-800 hover:border-[#4ef2d9]/40 transition-colors open:bg-neutral-900/80 [&_summary::-webkit-details-marker]:hidden">
+      <summary className="cursor-pointer list-none flex items-center justify-between gap-4 px-5 py-4 text-white text-base font-medium">
+        <span>{q}</span>
+        <ChevronDown
+          size={18}
+          className="text-neutral-500 shrink-0 transition-transform duration-200 group-open:rotate-180 group-open:text-[#4ef2d9]"
+        />
+      </summary>
+      <div className="px-5 pb-5 text-sm text-neutral-400 leading-relaxed">
+        {a}
+      </div>
+    </details>
   );
 }
 
