@@ -31,30 +31,51 @@ import { useEffect, useState } from "react";
  * MODE. Two distinct color systems: the app's brand mint vs the
  * flyer's customizable colors.
  *
+ * H-5.1 polish:
+ *   - Color reset moved from the loop-wrap snap into the share-sheet
+ *     exit window. Sheet slides down at 13.0; palette eases back to
+ *     default 13.0-13.5 (largely behind the receding sheet). At t=0
+ *     the loop wraps from a default-palette hold, so there is no
+ *     visible color snap any more.
+ *   - Each color transition stretched 0.4s → 0.6s with easeInOutCubic
+ *     so each swatch tap registers as "becoming" rather than "snap."
+ *     Three sequential 0.6s transitions chain end-to-end inside the
+ *     existing COLOR MODE budget (8.4-10.2).
+ *   - FORM ↔ COLOR crossfade extended from 0.2s symmetric to a 0.4s
+ *     picker fade overlapping a 0.2s form/summary fade — gives the
+ *     panel-content swap a settled feel rather than a flag-flip.
+ *   - Active-swatch position indicator added: a single mint vertical
+ *     bar that physically glides between rows via spring physics,
+ *     replacing the implicit "ring fades on row N, ring fades on row
+ *     N+1" hand-off that read as a jump.
+ *   - fadeOnly eased with easeInOutCubic for the same reason.
+ *
  * Timeline:
- *   0.0–3.0   HOLD POPULATED STATE — populated, slow Ken Burns, default palette
- *   3.0–3.6   PREVIEW → FORM transition (panels resize, content fades)
- *   3.6–5.1   address types
- *   5.3–5.86  price types
- *   5.95–6.35 beds / baths / sqft snap in
- *   6.5–7.4   feature 1 types
- *   7.5–7.85  feature 2 types
- *   7.9–8.25  feature 3 types
- *   8.1–8.3   form fields fade out, BRAND COLORS swatches fade in
- *   8.5–9.1   PRIMARY swatch active → mint→coral (preview price + badge animate)
- *   9.1–9.6   ACCENT swatch active → mint→coral (bullet dots animate on reveal)
- *   9.6–10.3  BACKGROUND swatch active → dark→navy (preview frame bg animates)
- *  10.1–10.3  hold new palette
- *  10.3–10.9  COLOR → PREVIEW transition (color picker fades out, summary in)
- *  10.9–11.6  Export PDF button pulses (now displaying custom palette)
+ *   0.0–3.0   HOLD POPULATED STATE — slow Ken Burns, default palette
+ *   3.0–3.6   PREVIEW → FORM transition
+ *   3.6–8.25  typing windows (address / price / stats / 3× features)
+ *   8.1–8.3   form fields fade out
+ *   8.1–8.5   color picker fades in (0.4s, overlaps form fade-out)
+ *   8.3–9.0   PRIMARY active; color transitions 8.4-9.0 (0.6s)
+ *   9.0–9.6   ACCENT active; color transitions 9.0-9.6 (0.6s)
+ *   9.6–10.3  BACKGROUND active; color transitions 9.6-10.2 (0.6s)
+ *  10.2–10.3  hold new palette
+ *  10.3–10.7  color picker fades out (0.4s)
+ *  10.3–10.9  COLOR → PREVIEW panel resize
+ *  10.5–10.7  summary fades in (0.2s, overlaps picker fade-out tail)
+ *  10.9–11.6  Export PDF button pulses (custom palette visible)
  *  11.6–11.8  button tap
  *  11.8–12.4  loading state
- *  12.4–13.6  share sheet slides up
- *  13.6–14.0  hold
- *  14.0 = 0.0 wrap — palette snaps back to default
+ *  12.4–14.5  share sheet visible (slides up, holds ~1.8s pure hold
+ *             after spring settles — H-5.1b extended from 0.3s)
+ *  14.5       share sheet exit triggered (spring slides down ~0.3s)
+ *  14.5–15.3  palette resets to default (0.8s window, mostly hidden
+ *             behind the receding sheet)
+ *  15.3–15.6  hold preview at default palette
+ *  15.6 = 0.0 wrap — palette already default, no snap
  */
 
-const LOOP_S = 14;
+const LOOP_S = 15.6;
 const MINT = "#4ef2d9";
 
 // Default flyer palette (what the loop starts with) and the custom palette
@@ -145,26 +166,39 @@ function lerpColor(a: string, b: string, p: number): string {
 
 /** Returns the live color value at time t. Holds at `base` until
  *  transitionStart, eases to `custom` between transitionStart and
- *  transitionEnd, then holds at `custom` until the next loop wrap.
- *  At t=0 the function returns base again because t < transitionStart,
- *  so the loop reset is automatic — no separate reset window needed. */
+ *  transitionEnd, holds at `custom`, then optionally eases back to
+ *  `base` between resetStart and resetEnd before holding at base
+ *  through the rest of the loop. The reset window is what lets the
+ *  palette return to default during the share-sheet exit instead of
+ *  snapping at the loop boundary. */
 function colorCycle(
   t: number,
   base: string,
   custom: string,
   transitionStart: number,
-  transitionEnd: number
+  transitionEnd: number,
+  resetStart?: number,
+  resetEnd?: number
 ): string {
   if (t <= transitionStart) return base;
+  if (resetEnd !== undefined && t >= resetEnd) return base;
+  if (resetStart !== undefined && t >= resetStart) {
+    const span = (resetEnd ?? resetStart) - resetStart;
+    if (span <= 0) return base;
+    const p = easeInOutCubic((t - resetStart) / span);
+    return lerpColor(custom, base, p);
+  }
   if (t >= transitionEnd) return custom;
   const p = easeInOutCubic((t - transitionStart) / (transitionEnd - transitionStart));
   return lerpColor(base, custom, p);
 }
 
-/** Generic fade-in/hold/fade-out opacity. 0 outside the windows, 1
- *  between fadeInEnd and fadeOutStart, linearly tweened on either edge.
- *  Used for the form-fields ↔ color-picker ↔ summary crossfade in the
- *  form panel. */
+/** Generic fade-in/hold/fade-out opacity, eased with easeInOutCubic
+ *  on both edges so panel-content swaps feel "settled" rather than
+ *  flag-flip. Used for the form-fields ↔ color-picker ↔ summary
+ *  crossfade in the form panel. Linear opacity for these short fades
+ *  reads as too mechanical alongside the eased panel-resize and
+ *  color transitions. */
 function fadeOnly(
   t: number,
   fadeInStart: number,
@@ -173,9 +207,9 @@ function fadeOnly(
   fadeOutEnd: number
 ): number {
   if (t < fadeInStart) return 0;
-  if (t < fadeInEnd) return (t - fadeInStart) / (fadeInEnd - fadeInStart);
+  if (t < fadeInEnd) return easeInOutCubic((t - fadeInStart) / (fadeInEnd - fadeInStart));
   if (t < fadeOutStart) return 1;
-  if (t < fadeOutEnd) return 1 - (t - fadeOutStart) / (fadeOutEnd - fadeOutStart);
+  if (t < fadeOutEnd) return 1 - easeInOutCubic((t - fadeOutStart) / (fadeOutEnd - fadeOutStart));
   return 0;
 }
 
@@ -279,28 +313,35 @@ export default function ListingFlyerMockup() {
 
   // Live flyer palette. Stays at default through typing, eases to
   // custom during the relevant swatch-tap window in COLOR MODE, holds
-  // through PREVIEW + SHARE, snaps back to default at loop wrap (the
-  // colorCycle helper returns base when t < transitionStart, which is
-  // automatically true at t=0). Three independent transitions so the
-  // user sees each swatch animate in sequence.
-  const currentPrimary = colorCycle(t, FLYER_PRIMARY_DEFAULT, FLYER_PRIMARY_CUSTOM, 8.7, 9.1);
-  const currentAccent = colorCycle(t, FLYER_ACCENT_DEFAULT, FLYER_ACCENT_CUSTOM, 9.3, 9.6);
-  const currentBg = colorCycle(t, FLYER_BG_DEFAULT, FLYER_BG_CUSTOM, 9.8, 10.1);
+  // through PREVIEW + the extended SHARE hold, then eases back to
+  // default during the share-sheet exit (14.5-15.3) so the loop wrap
+  // is colorless — no visible palette snap. Each color uses a 0.6s
+  // forward transition (chained end-to-end across the COLOR MODE
+  // budget) and a shared 0.8s reset window aligned with the share-
+  // sheet slide-down.
+  const currentPrimary = colorCycle(t, FLYER_PRIMARY_DEFAULT, FLYER_PRIMARY_CUSTOM, 8.4, 9.0, 14.5, 15.3);
+  const currentAccent = colorCycle(t, FLYER_ACCENT_DEFAULT, FLYER_ACCENT_CUSTOM, 9.0, 9.6, 14.5, 15.3);
+  const currentBg = colorCycle(t, FLYER_BG_DEFAULT, FLYER_BG_CUSTOM, 9.6, 10.2, 14.5, 15.3);
 
   // Active swatch index for the picker. -1 means no swatch focused.
-  // Each window slightly outlasts its color transition so the focus
-  // ring lingers briefly after the color settles, before the eye
-  // jumps to the next.
+  // Each window covers its swatch's color-transition window plus a
+  // brief lead-in/linger so the indicator arrives just before the
+  // color starts changing and stays put through the change.
   const activeSwatch =
-    t >= 8.5 && t < 9.1 ? 0 : t >= 9.1 && t < 9.6 ? 1 : t >= 9.6 && t < 10.3 ? 2 : -1;
+    t >= 8.3 && t < 9.0 ? 0 : t >= 9.0 && t < 9.6 ? 1 : t >= 9.6 && t < 10.3 ? 2 : -1;
 
-  // Button + share-sheet timing — shifted +1.9s vs the pre-H-5 loop so
-  // each beat lands after the COLOR→PREVIEW transition completes at 10.9.
+  // Button + share-sheet timing. Sheet now holds visibly for ~1.8s
+  // (H-5.1b extended from 0.3s, brief found the original too quick
+  // to read) before exiting at 14.5. Spring (damping:26, stiffness:
+  // 280) settles in ~0.3s; the 0.8s color-reset window finishes at
+  // 15.3 with 0.3s of preview hold remaining before the loop wraps
+  // at 15.6. Loop end-state matches loop start-state (default
+  // palette, full preview, no share sheet) so the wrap is invisible.
   const buttonPulse = t >= 10.9 && t < 11.6;
   const buttonTap = t >= 11.6 && t < 11.8;
   const buttonLoading = t >= 11.8 && t < 12.4;
 
-  const shareSheetIn = t >= 12.4 && t < 14.0;
+  const shareSheetIn = t >= 12.4 && t < 14.5;
 
   // Three-mode layout. previewWeight drives both panels' flex-grow
   // inversely; PREVIEW at t=0..3 and 10.9..14, FORM/COLOR at t=3.6..10.3.
@@ -308,12 +349,13 @@ export default function ListingFlyerMockup() {
   const formWeight = 1 - previewWeight;
 
   // Form-panel content crossfade. Three stacked layers with independent
-  // opacity windows so each handoff is a clean fade rather than a flag-
-  // flip. Form fields fade out at 8.1-8.3 as the color picker fades in;
-  // picker fades out at 10.3-10.5 as the "ready to export" summary
-  // returns for the export beat.
+  // opacity windows; each handoff is an asymmetric overlap rather than
+  // a hard handoff: the picker fades over 0.4s on each side while the
+  // form fields and summary fade over 0.2s, so during the swap both
+  // layers are mid-opacity for a moment instead of one snapping in as
+  // the other snaps out. easeInOutCubic on each edge (via fadeOnly).
   const formFieldsOpacity = fadeOnly(t, 3.5, 3.7, 8.1, 8.3);
-  const colorPickerOpacity = fadeOnly(t, 8.1, 8.3, 10.3, 10.5);
+  const colorPickerOpacity = fadeOnly(t, 8.1, 8.5, 10.3, 10.7);
   // Summary visible at the loop boundaries (start + end), hidden in
   // the middle. Computed piecewise since fadeOnly assumes hidden-then-
   // visible-then-hidden, the inverse of what we need.
@@ -421,7 +463,9 @@ export default function ListingFlyerMockup() {
           </div>
         </div>
 
-        {/* Color picker */}
+        {/* Color picker. Rows wrapped in a relative container so the
+            sliding focus indicator can position itself absolutely
+            against row offsets. */}
         <div
           className="absolute inset-0 px-3 py-3 overflow-hidden flex flex-col gap-2"
           style={{
@@ -432,21 +476,46 @@ export default function ListingFlyerMockup() {
           <p className="text-[7px] uppercase tracking-[0.15em] text-neutral-500 flex-shrink-0">
             Brand colors
           </p>
-          <SwatchRow
-            label="Primary"
-            hex={currentPrimary}
-            active={activeSwatch === 0}
-          />
-          <SwatchRow
-            label="Accent"
-            hex={currentAccent}
-            active={activeSwatch === 1}
-          />
-          <SwatchRow
-            label="Background"
-            hex={currentBg}
-            active={activeSwatch === 2}
-          />
+          <div className="relative flex flex-col gap-2">
+            {/* Sliding focus indicator — single mint vertical bar that
+                physically glides between row positions via spring
+                physics. Replaces the prior "ring fades on row N as
+                ring fades on row N+1" hand-off, which read as a
+                jump. Y values map to row tops + 6px (each SwatchRow
+                is 40px tall with 8px gap; swatch starts at +6 inside
+                its row). Hidden when no row is active. */}
+            <motion.div
+              className="absolute left-0 top-0 w-[2px] rounded-full pointer-events-none"
+              style={{ backgroundColor: MINT, height: 28 }}
+              animate={{
+                y:
+                  activeSwatch === 0
+                    ? 6
+                    : activeSwatch === 1
+                      ? 54
+                      : activeSwatch === 2
+                        ? 102
+                        : 0,
+                opacity: activeSwatch >= 0 ? 1 : 0,
+              }}
+              transition={{ type: "spring", stiffness: 380, damping: 30 }}
+            />
+            <SwatchRow
+              label="Primary"
+              hex={currentPrimary}
+              active={activeSwatch === 0}
+            />
+            <SwatchRow
+              label="Accent"
+              hex={currentAccent}
+              active={activeSwatch === 1}
+            />
+            <SwatchRow
+              label="Background"
+              hex={currentBg}
+              active={activeSwatch === 2}
+            />
+          </div>
         </div>
 
         {/* Collapsed summary */}
