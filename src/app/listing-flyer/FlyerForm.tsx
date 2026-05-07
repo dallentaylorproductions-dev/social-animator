@@ -38,6 +38,19 @@ export function FlyerForm({
 }: FlyerFormProps) {
   const photoInputRef = useRef<HTMLInputElement>(null);
 
+  // Rotating placeholder examples for empty feature-bullet slots so a
+  // realtor browsing the form sees a range of valid bullet shapes
+  // (kitchen, location, condition, view, recency) rather than the
+  // same nudge five times. Filled slots show the user's text and
+  // never see these.
+  const FEATURE_PLACEHOLDERS = [
+    'e.g., "Chef\'s kitchen with quartz counters"',
+    'e.g., "Walking distance to schools"',
+    'e.g., "Pre-inspection complete"',
+    'e.g., "Mountain views"',
+    'e.g., "Recently renovated"',
+  ];
+
   const update = <K extends keyof FlyerDraft>(
     key: K,
     value: FlyerDraft[K]
@@ -133,7 +146,7 @@ export function FlyerForm({
         <TextInput
           value={draft.status}
           onChange={(v) => update("status", v)}
-          placeholder="Just Listed · Just Sold · Open House"
+          placeholder="Just Listed · Just Sold · Open House · Coming Soon · Price Reduced · Under Contract"
         />
       </Field>
 
@@ -145,7 +158,10 @@ export function FlyerForm({
         />
       </Field>
 
-      <Field label="Address line 2 (optional)">
+      <Field
+        label="Line 2 (optional)"
+        helper="City/state, open house date, or any custom context."
+      >
         <TextInput
           value={draft.addressLine2}
           onChange={(v) => update("addressLine2", v)}
@@ -196,7 +212,7 @@ export function FlyerForm({
               <TextInput
                 value={feature}
                 onChange={(v) => updateFeature(i, v)}
-                placeholder={`Feature ${i + 1} (e.g. "Chef's kitchen")`}
+                placeholder={FEATURE_PLACEHOLDERS[i % FEATURE_PLACEHOLDERS.length]}
               />
               <button
                 type="button"
@@ -333,10 +349,15 @@ export function FlyerForm({
 function Field({
   label,
   required,
+  helper,
   children,
 }: {
   label: string;
   required?: boolean;
+  /** Optional sub-label shown below the input. Style matches the
+   *  existing helper paragraphs on the Brand colors and MP4 duration
+   *  blocks (text-[10px] / neutral-600 / mt-2). */
+  helper?: string;
   children: React.ReactNode;
 }) {
   return (
@@ -346,6 +367,11 @@ function Field({
         {required && <span className="text-[#4ef2d9] ml-1">*</span>}
       </label>
       {children}
+      {helper && (
+        <p className="text-[10px] text-neutral-600 mt-2 leading-relaxed">
+          {helper}
+        </p>
+      )}
     </div>
   );
 }
