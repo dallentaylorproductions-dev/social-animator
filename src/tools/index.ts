@@ -1,5 +1,6 @@
 import { socialAnimatorManifest } from "./social-animator/manifest";
 import { listingFlyerManifest } from "./listing-flyer/manifest";
+import { listingPresentationManifest } from "./listing-presentation/manifest";
 import type { ToolManifest } from "./types";
 
 /**
@@ -9,15 +10,7 @@ import type { ToolManifest } from "./types";
 export const TOOLS: ToolManifest[] = [
   socialAnimatorManifest,
   listingFlyerManifest,
-  {
-    id: "listing-presentation",
-    name: "Listing Presentation One-Pager",
-    description:
-      "Polished pre-listing presentation page that makes you look like the obvious choice.",
-    icon: "Presentation",
-    route: "/listing-presentation",
-    status: "coming-soon",
-  },
+  listingPresentationManifest,
 ];
 
 export type { ToolManifest };
