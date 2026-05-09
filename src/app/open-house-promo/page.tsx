@@ -13,6 +13,7 @@ import {
 } from "@/tools/open-house-promo/engine/draft-storage";
 import { PromoForm } from "./PromoForm";
 import { PromoPreview } from "./PromoPreview";
+import { ExportButtons } from "./ExportButtons";
 
 const SAVE_DEBOUNCE_MS = 1500;
 
@@ -20,7 +21,7 @@ export default function OpenHousePromoPage() {
   const [draft, setDraft] = useState<PromoDraft>(EMPTY_DRAFT);
   const [hydrated, setHydrated] = useState(false);
   const [uploadError, setUploadError] = useState<string | null>(null);
-  const { settings: brand } = useBrandSettings();
+  const { settings: brand, logoImg: brandLogoImg } = useBrandSettings();
   const saveTimerRef = useRef<ReturnType<typeof setTimeout> | null>(null);
   const errorTimerRef = useRef<ReturnType<typeof setTimeout> | null>(null);
 
@@ -97,9 +98,16 @@ export default function OpenHousePromoPage() {
               Preview is an approximation — exported PDF may differ slightly
               in layout.
             </p>
+            <div className="hidden lg:block mt-5 pt-5 border-t border-neutral-800/60">
+              <ExportButtons
+                draft={draft}
+                brand={effectiveBrand}
+                brandLogoImg={brandLogoImg}
+              />
+            </div>
           </aside>
 
-          <section className="order-2 lg:order-1 pb-12 lg:pb-0">
+          <section className="order-2 lg:order-1 pb-32 lg:pb-0">
             <PromoForm
               draft={draft}
               onChange={setDraft}
@@ -108,6 +116,15 @@ export default function OpenHousePromoPage() {
               onUploadError={flashUploadError}
             />
           </section>
+
+          {/* Mobile-only sticky export bar */}
+          <div className="order-3 sticky bottom-0 z-20 -mx-6 px-6 py-3 bg-neutral-950 border-t border-neutral-800/60 shadow-[0_-4px_12px_rgba(0,0,0,0.4)] lg:hidden">
+            <ExportButtons
+              draft={draft}
+              brand={effectiveBrand}
+              brandLogoImg={brandLogoImg}
+            />
+          </div>
         </div>
       </div>
     </main>
