@@ -42,6 +42,10 @@ interface PromoDocumentProps {
   /** Pre-cropped thumbnail data URLs for photos[1..5] (up to 4
    *  entries). Empty array → no strip rendered. */
   thumbSrcs: string[];
+  /** True iff a thumb strip should render — controls hero region
+   *  height (220pt with strip, 250pt without) so the freed
+   *  vertical space goes back to the hero on single-photo drafts. */
+  hasThumbs: boolean;
 }
 
 /**
@@ -101,20 +105,21 @@ const styles = StyleSheet.create({
     opacity: 0.92,
   },
 
-  // Hero photo
+  // Hero photo. Height is supplied inline per render so the
+  // single-photo case (250pt) and multi-photo case (220pt — leaves
+  // room for the thumb strip) get distinct sizings without two
+  // duplicate style blocks.
   heroWrap: {
-    height: 240,
     width: "100%",
     overflow: "hidden",
     backgroundColor: "#1f2937",
   },
   hero: {
     width: "100%",
-    height: 240,
+    height: "100%",
     objectFit: "cover",
   },
   heroPlaceholder: {
-    height: 240,
     width: "100%",
     alignItems: "center",
     justifyContent: "center",
@@ -291,14 +296,6 @@ const styles = StyleSheet.create({
     textAlign: "center",
   },
 
-  // Optional notes block above footer
-  notesText: {
-    fontSize: 10.5,
-    lineHeight: 1.5,
-    marginTop: 16,
-    fontFamily: "Helvetica-Oblique",
-  },
-
   // Footer band
   footer: {
     position: "absolute",
@@ -329,6 +326,7 @@ export function PromoDocument({
   qrDataUrl,
   heroSrc,
   thumbSrcs,
+  hasThumbs,
 }: PromoDocumentProps) {
   const primary = brand.primaryColor || "#4ef2d9";
   // H-7i: accent drives only the small secondary labels —
@@ -354,7 +352,6 @@ export function PromoDocument({
   const showHighlights = highlights.length > 0;
   const showDescription = draft.description.trim().length > 0;
   const showQr = !!qrDataUrl;
-  const hasNotes = draft.eventNotes.trim().length > 0;
   const useTwoColHighlights = highlights.length >= 4;
   const splitAt = useTwoColHighlights
     ? Math.ceil(highlights.length / 2)
@@ -363,18 +360,25 @@ export function PromoDocument({
   const rightHighlights = highlights.slice(splitAt);
 
   const hasHero = !!heroSrc;
-  const hasThumbs = thumbSrcs.length > 0;
+  const heroHeight = hasThumbs ? 220 : 250;
 
   const dateLabel = draft.eventDate ? formatEventDate(draft.eventDate) : "";
   const timeLabel = formatTimeRange(draft.eventStartTime, draft.eventEndTime);
 
-  // Footer center text — prefers eventNotes, then qrTargetUrl
-  // (without scheme), then property address echo.
+  // Footer center text. eventNotes wins (the "Light refreshments
+  // served" / "RSVP appreciated" copy belongs at the bottom of the
+  // flyer where the eye lands last); falls back to a address +
+  // city compose so an empty notes field still anchors the footer
+  // with something orienting. Never reaches into propertyHighlights
+  // — that array is for the FEATURES bullet list and only the
+  // bullet list.
   const footerCenter = (() => {
-    if (draft.qrTargetUrl) {
-      return draft.qrTargetUrl.replace(/^https?:\/\//i, "");
-    }
-    return draft.propertyAddress || "Open House";
+    const notes = draft.eventNotes.trim();
+    if (notes) return notes;
+    const addressPart = draft.propertyAddress.trim();
+    const cityPart = draft.propertyCity.trim();
+    if (addressPart && cityPart) return `${addressPart}, ${cityPart}`;
+    return addressPart || "Open House";
   })();
 
   return (
@@ -411,14 +415,14 @@ export function PromoDocument({
 
         {/* ── Hero photo ──────────────────────────────────── */}
         {hasHero ? (
-          <View style={styles.heroWrap}>
+          <View style={[styles.heroWrap, { height: heroHeight }]}>
             <Image src={heroSrc!} style={styles.hero} />
           </View>
         ) : (
           <View
             style={[
               styles.heroPlaceholder,
-              { backgroundColor: "#1f2937" },
+              { backgroundColor: "#1f2937", height: heroHeight },
             ]}
           >
             <Text
@@ -604,14 +608,10 @@ export function PromoDocument({
             ) : null}
           </View>
 
-          {/* Optional notes */}
-          {hasNotes ? (
-            <Text
-              style={[styles.notesText, { color: textMuted }]}
-            >
-              {draft.eventNotes}
-            </Text>
-          ) : null}
+          {/* H-7j: event-notes block removed from the body. Notes
+              now live exclusively in the footer center text — that
+              avoids a redundant render and frees ~40pt of vertical
+              budget that the body was over-spending on tall drafts. */}
         </View>
 
         {/* ── Footer band ─────────────────────────────────── */}
