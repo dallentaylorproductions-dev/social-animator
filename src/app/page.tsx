@@ -20,7 +20,7 @@ import {
   ListingFlyerMp4Mockup,
   SocialAnimatorQACardMockup,
   SocialAnimatorMarketUpdateMockup,
-  ListingPresentationComingSoonMockup,
+  ListingPresentationLiveMockup,
 } from "@/components/ui/gallery-mockups";
 
 const GALLERY_ITEMS = [
@@ -53,11 +53,11 @@ const GALLERY_ITEMS = [
       "Show clients you know your market. Animated charts and stats branded to your team.",
   },
   {
-    mockup: <ListingPresentationComingSoonMockup />,
+    mockup: <ListingPresentationLiveMockup />,
     toolName: "Listing Presentation One-Pager",
-    feature: "Coming soon",
+    feature: "Print-ready PDF",
     tagline:
-      "Polished pre-listing presentation page that makes you look like the obvious choice when a homeowner is interviewing agents.",
+      "Polished pre-listing pitch document that wins the listing. Track record, marketing strategy, comparable sales, branded automatically.",
   },
 ];
 
