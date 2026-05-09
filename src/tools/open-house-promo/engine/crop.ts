@@ -1,0 +1,124 @@
+/**
+ * Focal-point cropping helpers shared across the open-house-promo's
+ * PDF, JPEG (via the PDF rasterization path), and MP4 outputs.
+ *
+ * Concept: each photo carries a focalX/focalY pair (0-100, percent
+ * of source dimensions) representing the point the user wants the
+ * crop to center on. The PDF renders pre-cropped data URLs (since
+ * react-pdf doesn't support object-position) and the MP4 renders
+ * pre-cropped HTMLCanvasElements (so Ken Burns can scale/translate
+ * the static crop without changing what's framed). The HTML preview
+ * uses the same focal-point values as a CSS object-position string.
+ */
+
+export interface FocalPoint {
+  /** 0-100 — percent of source width. 50 = horizontal center. */
+  focalX: number;
+  /** 0-100 — percent of source height. 50 = vertical center. */
+  focalY: number;
+}
+
+export const DEFAULT_FOCAL_X = 50;
+/** Real-estate exteriors typically have the house sitting below
+ *  center with sky above — a slight downward bias keeps the house
+ *  framed when the source is portrait. */
+export const DEFAULT_FOCAL_Y = 60;
+
+/**
+ * Compute the source rectangle (sx/sy/sw/sh suitable for
+ * ctx.drawImage) that fills `targetAspect`, centered on the
+ * focal point, clipping at source edges so we don't read outside
+ * the image bounds.
+ */
+export function computeCropRect(
+  sourceW: number,
+  sourceH: number,
+  targetAspect: number,
+  focalX: number,
+  focalY: number
+): { sx: number; sy: number; sw: number; sh: number } {
+  if (sourceW <= 0 || sourceH <= 0) {
+    return { sx: 0, sy: 0, sw: sourceW, sh: sourceH };
+  }
+  const sourceAspect = sourceW / sourceH;
+  let cropW: number;
+  let cropH: number;
+  if (sourceAspect > targetAspect) {
+    // Source wider than target — clip horizontally.
+    cropH = sourceH;
+    cropW = sourceH * targetAspect;
+  } else {
+    // Source taller than target — clip vertically.
+    cropW = sourceW;
+    cropH = sourceW / targetAspect;
+  }
+  const fx = clamp01(focalX / 100);
+  const fy = clamp01(focalY / 100);
+  // Center the crop on the focal point, then clamp so the crop
+  // window stays inside the source.
+  let sx = sourceW * fx - cropW / 2;
+  let sy = sourceH * fy - cropH / 2;
+  sx = Math.max(0, Math.min(sourceW - cropW, sx));
+  sy = Math.max(0, Math.min(sourceH - cropH, sy));
+  return { sx, sy, sw: cropW, sh: cropH };
+}
+
+/**
+ * Pre-crop a source image to exact target dimensions, centered on
+ * the focal point. Returns an offscreen HTMLCanvasElement suitable
+ * for canvas drawImage (MP4 path) or canvas.toDataURL (PDF path).
+ */
+export function cropToCanvas(
+  image: HTMLImageElement,
+  targetW: number,
+  targetH: number,
+  focalX: number,
+  focalY: number
+): HTMLCanvasElement {
+  const targetAspect = targetW / targetH;
+  const { sx, sy, sw, sh } = computeCropRect(
+    image.naturalWidth,
+    image.naturalHeight,
+    targetAspect,
+    focalX,
+    focalY
+  );
+  const canvas = document.createElement("canvas");
+  canvas.width = Math.max(1, Math.round(targetW));
+  canvas.height = Math.max(1, Math.round(targetH));
+  const ctx = canvas.getContext("2d");
+  if (!ctx) throw new Error("Canvas 2D context unavailable");
+  ctx.imageSmoothingEnabled = true;
+  ctx.imageSmoothingQuality = "high";
+  ctx.drawImage(image, sx, sy, sw, sh, 0, 0, canvas.width, canvas.height);
+  return canvas;
+}
+
+/**
+ * Convert focal-point values to a CSS object-position string
+ * (e.g., "50% 60%") for use on HTMLImageElement in the live
+ * preview. The browser handles the cropping natively.
+ */
+export function computeObjectPosition(focalX: number, focalY: number): string {
+  return `${clamp01(focalX / 100) * 100}% ${clamp01(focalY / 100) * 100}%`;
+}
+
+/**
+ * Decode a data URL (or any image src) into a fully-loaded
+ * HTMLImageElement. Resolves once paint-ready. Used by the export
+ * paths that need to materialize stored data URLs into images for
+ * canvas operations.
+ */
+export function srcToImage(src: string): Promise<HTMLImageElement> {
+  return new Promise((resolve, reject) => {
+    const img = new Image();
+    img.onload = () => resolve(img);
+    img.onerror = () => reject(new Error("Could not decode image src"));
+    img.src = src;
+  });
+}
+
+function clamp01(v: number): number {
+  if (!Number.isFinite(v)) return 0;
+  return Math.max(0, Math.min(1, v));
+}

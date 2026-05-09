@@ -58,11 +58,13 @@ export async function renderPromoMp4(
   const textMuted = pickContrastMuted(background);
   const onPrimary = pickContrastText(primary);
 
-  // Materialize hero photo (first non-empty data URL) and QR code.
-  // Both are nullable — the timeline handles missing images by
-  // rendering placeholders or skipping tracks.
-  const heroDataUrl = draft.photos[0] ?? null;
-  const heroImg = heroDataUrl ? await dataUrlToImage(heroDataUrl) : null;
+  // Materialize hero photo (first PhotoEntry) and QR code. Both
+  // are nullable — the timeline handles missing images by rendering
+  // placeholders or skipping tracks. H-7f introduced PhotoEntry's
+  // focal-point pair; for H-7f the MP4 still uses only the first
+  // photo (cycling across all photos lands in H-7g).
+  const heroPhoto = draft.photos[0] ?? null;
+  const heroImg = heroPhoto ? await dataUrlToImage(heroPhoto.src) : null;
 
   // QR code at high res (400px) so it scans cleanly when scaled
   // down inside the timeline's qrSize box (130-180pt).

@@ -28,6 +28,16 @@ interface PromoDocumentProps {
    *  outside the document so the qrcode async API doesn't need to
    *  participate in react-pdf's render lifecycle. */
   qrDataUrl: string | null;
+  /** Pre-cropped hero photo data URL (cropped to the hero region's
+   *  aspect on its focal point). Null when draft.photos is empty —
+   *  the document then shows the stencil placeholder. Pre-cropped
+   *  externally so the document doesn't need to do canvas work
+   *  during react-pdf's render lifecycle (and so the same crop
+   *  appears in PDF + JPEG). */
+  heroSrc: string | null;
+  /** Pre-cropped thumbnail data URLs for photos[1..5] (up to 4
+   *  entries). Empty array → no strip rendered. */
+  thumbSrcs: string[];
 }
 
 /**
@@ -118,6 +128,24 @@ const styles = StyleSheet.create({
     paddingHorizontal: MARGIN,
     paddingTop: 16,
     paddingBottom: 50,
+  },
+
+  // Thumb strip (between hero and property block)
+  thumbStrip: {
+    flexDirection: "row",
+    paddingHorizontal: MARGIN,
+    paddingTop: 6,
+    gap: 4,
+  },
+  thumbCell: {
+    flex: 1,
+    height: 50,
+    overflow: "hidden",
+  },
+  thumb: {
+    width: "100%",
+    height: 50,
+    objectFit: "cover",
   },
 
   // Property block
@@ -291,7 +319,13 @@ const styles = StyleSheet.create({
   },
 });
 
-export function PromoDocument({ draft, brand, qrDataUrl }: PromoDocumentProps) {
+export function PromoDocument({
+  draft,
+  brand,
+  qrDataUrl,
+  heroSrc,
+  thumbSrcs,
+}: PromoDocumentProps) {
   const primary = brand.primaryColor || "#4ef2d9";
   const accent = brand.accentColor || "#0a0a0a";
   const background = brand.backgroundColor || "#ffffff";
@@ -317,8 +351,8 @@ export function PromoDocument({ draft, brand, qrDataUrl }: PromoDocumentProps) {
   const leftHighlights = highlights.slice(0, splitAt);
   const rightHighlights = highlights.slice(splitAt);
 
-  const hero = draft.photos[0];
-  const hasHero = !!hero;
+  const hasHero = !!heroSrc;
+  const hasThumbs = thumbSrcs.length > 0;
 
   const dateLabel = draft.eventDate ? formatEventDate(draft.eventDate) : "";
   const timeLabel = formatTimeRange(draft.eventStartTime, draft.eventEndTime);
@@ -367,7 +401,7 @@ export function PromoDocument({ draft, brand, qrDataUrl }: PromoDocumentProps) {
         {/* ── Hero photo ──────────────────────────────────── */}
         {hasHero ? (
           <View style={styles.heroWrap}>
-            <Image src={hero} style={styles.hero} />
+            <Image src={heroSrc!} style={styles.hero} />
           </View>
         ) : (
           <View
@@ -386,6 +420,18 @@ export function PromoDocument({ draft, brand, qrDataUrl }: PromoDocumentProps) {
             </Text>
           </View>
         )}
+
+        {/* ── Thumb strip — up to 4 supplemental photos. Hidden
+            when there's only a hero (or no photos at all). ── */}
+        {hasThumbs ? (
+          <View style={styles.thumbStrip}>
+            {thumbSrcs.map((src, i) => (
+              <View key={i} style={styles.thumbCell}>
+                <Image src={src} style={styles.thumb} />
+              </View>
+            ))}
+          </View>
+        ) : null}
 
         {/* ── Body ──────────────────────────────────────── */}
         <View style={styles.body}>

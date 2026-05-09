@@ -3,6 +3,8 @@
 import { useRef } from "react";
 import {
   type PromoDraft,
+  type PhotoEntry,
+  makePhotoEntry,
   MAX_HIGHLIGHTS,
   MAX_PHOTOS,
   PHOTO_MAX_EDGE,
@@ -85,7 +87,8 @@ export function PromoForm({
             fileToCompressedDataUrl(f, PHOTO_MAX_EDGE, PHOTO_QUALITY)
           )
         );
-        update("photos", [...draft.photos, ...dataUrls]);
+        const newEntries = dataUrls.map((src) => makePhotoEntry(src));
+        update("photos", [...draft.photos, ...newEntries]);
       } catch (err) {
         onUploadError?.(
           err instanceof Error ? err.message : "Could not process photos"
@@ -109,6 +112,39 @@ export function PromoForm({
     if (target < 0 || target >= draft.photos.length) return;
     const next = [...draft.photos];
     [next[i], next[target]] = [next[target], next[i]];
+    update("photos", next);
+  };
+
+  /** Click handler for the photo thumbnail's focal-point overlay.
+   *  Maps the click coordinates inside the thumbnail to a 0-100
+   *  focal-point pair stored on the PhotoEntry. The thumbnail is
+   *  pre-cropped at object-fit: cover with object-position driven
+   *  by the focal point, so each click immediately re-frames the
+   *  thumbnail. */
+  const setFocalPoint = (
+    i: number,
+    e: React.MouseEvent<HTMLDivElement> | React.TouchEvent<HTMLDivElement>
+  ) => {
+    const el = e.currentTarget as HTMLElement;
+    const rect = el.getBoundingClientRect();
+    let clientX: number;
+    let clientY: number;
+    if ("touches" in e && e.touches.length > 0) {
+      clientX = e.touches[0].clientX;
+      clientY = e.touches[0].clientY;
+    } else if ("clientX" in e) {
+      clientX = e.clientX;
+      clientY = e.clientY;
+    } else {
+      return;
+    }
+    const fx = ((clientX - rect.left) / rect.width) * 100;
+    const fy = ((clientY - rect.top) / rect.height) * 100;
+    const focalX = Math.max(0, Math.min(100, fx));
+    const focalY = Math.max(0, Math.min(100, fy));
+    const next: PhotoEntry[] = draft.photos.map((p, idx) =>
+      idx === i ? { ...p, focalX, focalY } : p
+    );
     update("photos", next);
   };
 
@@ -291,55 +327,129 @@ export function PromoForm({
             onChange={handlePhotoSelect}
           />
           {draft.photos.length > 0 && (
-            <ul className="space-y-2 mb-3">
-              {draft.photos.map((url, i) => (
-                <li
-                  key={i}
-                  className="flex items-center gap-3 bg-neutral-900 border border-neutral-800 rounded-md p-2"
-                >
-                  {/* eslint-disable-next-line @next/next/no-img-element */}
-                  <img
-                    src={url}
-                    alt={`Photo ${i + 1}`}
-                    className="w-16 h-12 object-cover rounded flex-shrink-0"
-                  />
-                  <span className="flex-1 text-xs text-neutral-400 truncate">
-                    {i === 0 && (
-                      <span className="text-[#4ef2d9] mr-2">HERO</span>
-                    )}
-                    Photo {i + 1}
-                  </span>
-                  <div className="flex items-center gap-1">
-                    <button
-                      type="button"
-                      onClick={() => movePhoto(i, "up")}
-                      disabled={i === 0}
-                      className="px-2 py-1 text-xs text-neutral-400 hover:text-neutral-200 disabled:opacity-30 disabled:cursor-not-allowed"
-                      aria-label="Move up"
+            <>
+              <ul className="space-y-2 mb-2">
+                {draft.photos.map((photo, i) => (
+                  <li
+                    key={i}
+                    className="flex items-center gap-3 bg-neutral-900 border border-neutral-800 rounded-md p-2"
+                  >
+                    {/* Tappable focal-point thumbnail. The crosshair
+                        marks the current focal point; click anywhere
+                        moves it. object-position uses the live focal
+                        values so the thumbnail re-frames instantly. */}
+                    <div
+                      role="button"
+                      tabIndex={0}
+                      onClick={(e) => setFocalPoint(i, e)}
+                      onKeyDown={(e) => {
+                        // Arrow keys nudge focal point 5% per press
+                        // — useful for fine-tuning after a click.
+                        const step = 5;
+                        let dx = 0;
+                        let dy = 0;
+                        if (e.key === "ArrowLeft") dx = -step;
+                        else if (e.key === "ArrowRight") dx = step;
+                        else if (e.key === "ArrowUp") dy = -step;
+                        else if (e.key === "ArrowDown") dy = step;
+                        if (dx === 0 && dy === 0) return;
+                        e.preventDefault();
+                        const next: PhotoEntry[] = draft.photos.map(
+                          (p, idx) =>
+                            idx === i
+                              ? {
+                                  ...p,
+                                  focalX: Math.max(
+                                    0,
+                                    Math.min(100, p.focalX + dx)
+                                  ),
+                                  focalY: Math.max(
+                                    0,
+                                    Math.min(100, p.focalY + dy)
+                                  ),
+                                }
+                              : p
+                        );
+                        update("photos", next);
+                      }}
+                      className="relative w-20 h-14 rounded overflow-hidden flex-shrink-0 cursor-crosshair focus:outline-none focus:ring-2 focus:ring-[#4ef2d9]"
+                      aria-label={`Set focal point on photo ${i + 1}`}
                     >
-                      ↑
-                    </button>
-                    <button
-                      type="button"
-                      onClick={() => movePhoto(i, "down")}
-                      disabled={i === draft.photos.length - 1}
-                      className="px-2 py-1 text-xs text-neutral-400 hover:text-neutral-200 disabled:opacity-30 disabled:cursor-not-allowed"
-                      aria-label="Move down"
-                    >
-                      ↓
-                    </button>
-                    <button
-                      type="button"
-                      onClick={() => removePhoto(i)}
-                      className="px-2 py-1 text-xs text-red-400 hover:text-red-300"
-                      aria-label="Remove photo"
-                    >
-                      ✕
-                    </button>
-                  </div>
-                </li>
-              ))}
-            </ul>
+                      {/* eslint-disable-next-line @next/next/no-img-element */}
+                      <img
+                        src={photo.src}
+                        alt={`Photo ${i + 1}`}
+                        className="w-full h-full object-cover pointer-events-none"
+                        style={{
+                          objectPosition: `${photo.focalX}% ${photo.focalY}%`,
+                        }}
+                      />
+                      {/* Crosshair indicator — outer ring + inner dot,
+                          mint-tinted, drop shadow so it stays visible
+                          on light + dark photo regions. */}
+                      <div
+                        className="absolute pointer-events-none"
+                        style={{
+                          left: `${photo.focalX}%`,
+                          top: `${photo.focalY}%`,
+                          transform: "translate(-50%, -50%)",
+                          filter:
+                            "drop-shadow(0 0 2px rgba(0,0,0,0.6))",
+                        }}
+                      >
+                        <div
+                          className="w-4 h-4 rounded-full border-2 flex items-center justify-center"
+                          style={{ borderColor: "#4ef2d9" }}
+                        >
+                          <div
+                            className="w-1 h-1 rounded-full"
+                            style={{ backgroundColor: "#4ef2d9" }}
+                          />
+                        </div>
+                      </div>
+                    </div>
+                    <span className="flex-1 text-xs text-neutral-400 truncate">
+                      {i === 0 && (
+                        <span className="text-[#4ef2d9] mr-2">HERO</span>
+                      )}
+                      Photo {i + 1}
+                    </span>
+                    <div className="flex items-center gap-1">
+                      <button
+                        type="button"
+                        onClick={() => movePhoto(i, "up")}
+                        disabled={i === 0}
+                        className="px-2 py-1 text-xs text-neutral-400 hover:text-neutral-200 disabled:opacity-30 disabled:cursor-not-allowed"
+                        aria-label="Move up"
+                      >
+                        ↑
+                      </button>
+                      <button
+                        type="button"
+                        onClick={() => movePhoto(i, "down")}
+                        disabled={i === draft.photos.length - 1}
+                        className="px-2 py-1 text-xs text-neutral-400 hover:text-neutral-200 disabled:opacity-30 disabled:cursor-not-allowed"
+                        aria-label="Move down"
+                      >
+                        ↓
+                      </button>
+                      <button
+                        type="button"
+                        onClick={() => removePhoto(i)}
+                        className="px-2 py-1 text-xs text-red-400 hover:text-red-300"
+                        aria-label="Remove photo"
+                      >
+                        ✕
+                      </button>
+                    </div>
+                  </li>
+                ))}
+              </ul>
+              <p className="text-[10px] text-neutral-600 leading-relaxed mb-2">
+                Tap a photo to set its focal point — the crop will
+                center on what you tap. Arrow keys nudge by 5%.
+              </p>
+            </>
           )}
           {draft.photos.length < MAX_PHOTOS && (
             <button

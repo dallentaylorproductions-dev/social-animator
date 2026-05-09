@@ -7,7 +7,23 @@
  * survives reload without separate file handling. Multiple photos
  * push localStorage usage but stay well under the 5MB practical
  * quota (5 photos × 300KB = 1.5MB worst case).
+ *
+ * H-7f added focal-point per-photo so the crop honors what the
+ * realtor wants framed (the front door of a house is rarely at the
+ * geometric center of a phone photo). PhotoEntry replaces the
+ * earlier string[] shape; clampDraft migrates old drafts in-place.
  */
+
+import { DEFAULT_FOCAL_X, DEFAULT_FOCAL_Y } from "./crop";
+
+export interface PhotoEntry {
+  /** Compressed JPEG data URL (1600px max edge, q=0.85). */
+  src: string;
+  /** Horizontal focal point as a percent of source width (0-100). */
+  focalX: number;
+  /** Vertical focal point as a percent of source height (0-100). */
+  focalY: number;
+}
 
 export interface PromoDraft {
   // Event window
@@ -31,7 +47,8 @@ export interface PromoDraft {
   propertyHighlights: string[];
 
   // Photos — compressed data URLs (1600px max edge, JPEG q=0.85)
-  photos: string[];
+  // with per-photo focal-point pair for crop framing.
+  photos: PhotoEntry[];
 
   // QR target — fully-qualified URL ("https://..."). clampDraft
   // auto-prefixes "https://" for bare-domain input.
@@ -83,6 +100,36 @@ export const EMPTY_DRAFT: PromoDraft = {
   backgroundColor: "",
 };
 
+/** Build a fresh PhotoEntry from a compressed data URL with default
+ *  focal point (slight downward bias for typical real-estate
+ *  exteriors). Used by the form upload handler. */
+export function makePhotoEntry(src: string): PhotoEntry {
+  return {
+    src,
+    focalX: DEFAULT_FOCAL_X,
+    focalY: DEFAULT_FOCAL_Y,
+  };
+}
+
+function clampPhotoEntry(input: unknown): PhotoEntry | null {
+  // Old-format string is migrated to a PhotoEntry with default focal.
+  if (typeof input === "string" && input.startsWith("data:")) {
+    return makePhotoEntry(input);
+  }
+  if (!input || typeof input !== "object") return null;
+  const o = input as Record<string, unknown>;
+  if (typeof o.src !== "string" || !o.src.startsWith("data:")) return null;
+  const fx =
+    typeof o.focalX === "number" && Number.isFinite(o.focalX)
+      ? Math.max(0, Math.min(100, o.focalX))
+      : DEFAULT_FOCAL_X;
+  const fy =
+    typeof o.focalY === "number" && Number.isFinite(o.focalY)
+      ? Math.max(0, Math.min(100, o.focalY))
+      : DEFAULT_FOCAL_Y;
+  return { src: o.src, focalX: fx, focalY: fy };
+}
+
 const ISO_DATE_RE = /^\d{4}-\d{2}-\d{2}$/;
 const TIME_RE = /^\d{2}:\d{2}$/;
 
@@ -114,9 +161,10 @@ export function clampDraft(input: unknown): PromoDraft {
         .filter((s): s is string => typeof s === "string")
         .slice(0, MAX_HIGHLIGHTS)
     : [];
-  const photos = Array.isArray(o.photos)
+  const photos: PhotoEntry[] = Array.isArray(o.photos)
     ? o.photos
-        .filter((p): p is string => typeof p === "string" && p.startsWith("data:"))
+        .map(clampPhotoEntry)
+        .filter((p): p is PhotoEntry => p !== null)
         .slice(0, MAX_PHOTOS)
     : [];
 

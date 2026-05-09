@@ -72,7 +72,9 @@ export function PromoPreview({ draft, brand }: PromoPreviewProps) {
   const showQr = !!qrDataUrl;
   const hasNotes = draft.eventNotes.trim().length > 0;
 
-  const heroUrl = draft.photos[0];
+  const heroPhoto = draft.photos[0];
+  const thumbPhotos = draft.photos.slice(1, 5);
+  const showThumbStrip = thumbPhotos.length > 0;
   const dateLabel = draft.eventDate ? formatEventDate(draft.eventDate) : "";
   const timeLabel = formatTimeRange(draft.eventStartTime, draft.eventEndTime);
   const footerCenter = draft.qrTargetUrl
@@ -114,17 +116,21 @@ export function PromoPreview({ draft, brand }: PromoPreviewProps) {
         </p>
       </div>
 
-      {/* Hero */}
+      {/* Hero — single photo or stencil placeholder. object-position
+          honors the user's focal-point pick from the form. */}
       <div
         className="w-full overflow-hidden flex items-center justify-center"
         style={{ height: 180, backgroundColor: "#1f2937" }}
       >
-        {heroUrl ? (
+        {heroPhoto ? (
           // eslint-disable-next-line @next/next/no-img-element
           <img
-            src={heroUrl}
+            src={heroPhoto.src}
             alt="Hero"
             className="w-full h-full object-cover"
+            style={{
+              objectPosition: `${heroPhoto.focalX}% ${heroPhoto.focalY}%`,
+            }}
           />
         ) : (
           <p
@@ -135,6 +141,31 @@ export function PromoPreview({ draft, brand }: PromoPreviewProps) {
           </p>
         )}
       </div>
+
+      {/* Thumb strip — up to 4 thumbs of photos[1..5], hidden when
+          there's only a hero (photos.length <= 1). Each thumb honors
+          its own focal point. */}
+      {showThumbStrip && (
+        <div className="grid grid-cols-4 gap-1 px-2 pt-1.5">
+          {thumbPhotos.map((p, i) => (
+            <div
+              key={i}
+              className="overflow-hidden rounded-sm"
+              style={{ aspectRatio: "4 / 3", backgroundColor: "#1f2937" }}
+            >
+              {/* eslint-disable-next-line @next/next/no-img-element */}
+              <img
+                src={p.src}
+                alt={`Photo ${i + 2}`}
+                className="w-full h-full object-cover"
+                style={{
+                  objectPosition: `${p.focalX}% ${p.focalY}%`,
+                }}
+              />
+            </div>
+          ))}
+        </div>
+      )}
 
       {/* Body */}
       <div className="px-5 py-4 flex-1">
