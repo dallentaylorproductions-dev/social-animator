@@ -64,6 +64,57 @@ export function computeCropRect(
 }
 
 /**
+ * CONTAIN-fit a source image into a (boxW × boxH) canvas. Maintains
+ * the image's aspect ratio without cropping; fills any unused
+ * space (letterbox top/bottom OR pillarbox left/right) with
+ * `fillColor` so there are no transparent gaps. The full image is
+ * always visible — focal point isn't applicable to contain (the
+ * whole image shows), so callers don't need to pass focal coords.
+ *
+ * Used for the open-house-promo hero photo to guarantee the entire
+ * house is visible in PDF + MP4 even when the source aspect
+ * doesn't match the hero region's aspect — the previous COVER mode
+ * was clipping foundations / roofs depending on source orientation.
+ */
+export function containInBox(
+  image: HTMLImageElement,
+  boxW: number,
+  boxH: number,
+  fillColor: string
+): HTMLCanvasElement {
+  const canvas = document.createElement("canvas");
+  canvas.width = Math.max(1, Math.round(boxW));
+  canvas.height = Math.max(1, Math.round(boxH));
+  const ctx = canvas.getContext("2d");
+  if (!ctx) throw new Error("Canvas 2D context unavailable");
+  // Fill the entire box first — anything not covered by the image
+  // becomes a clean letterbox/pillarbox bar at the brand color.
+  ctx.fillStyle = fillColor;
+  ctx.fillRect(0, 0, canvas.width, canvas.height);
+  if (image.naturalWidth <= 0 || image.naturalHeight <= 0) return canvas;
+  const imageAspect = image.naturalWidth / image.naturalHeight;
+  const boxAspect = canvas.width / canvas.height;
+  let drawW: number;
+  let drawH: number;
+  if (imageAspect > boxAspect) {
+    // Image wider than box — fit width, letterbox top/bottom.
+    drawW = canvas.width;
+    drawH = canvas.width / imageAspect;
+  } else {
+    // Image taller than (or equal to) box — fit height, pillarbox
+    // left/right.
+    drawH = canvas.height;
+    drawW = canvas.height * imageAspect;
+  }
+  const drawX = (canvas.width - drawW) / 2;
+  const drawY = (canvas.height - drawH) / 2;
+  ctx.imageSmoothingEnabled = true;
+  ctx.imageSmoothingQuality = "high";
+  ctx.drawImage(image, drawX, drawY, drawW, drawH);
+  return canvas;
+}
+
+/**
  * Pre-crop a source image to exact target dimensions, centered on
  * the focal point. Returns an offscreen HTMLCanvasElement suitable
  * for canvas drawImage (MP4 path) or canvas.toDataURL (PDF path).

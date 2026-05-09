@@ -139,7 +139,9 @@ const styles = StyleSheet.create({
     paddingBottom: 50,
   },
 
-  // Thumb strip (between hero and property block)
+  // Thumb strip (between hero and property block). H-7m bumped
+  // cell height 50→87 (3:2 aspect at the cell's ~132pt width) so
+  // typical phone-camera real-estate photos fit edge-to-edge.
   thumbStrip: {
     flexDirection: "row",
     paddingHorizontal: MARGIN,
@@ -148,12 +150,12 @@ const styles = StyleSheet.create({
   },
   thumbCell: {
     flex: 1,
-    height: 50,
+    height: 87,
     overflow: "hidden",
   },
   thumb: {
     width: "100%",
-    height: 50,
+    height: 87,
     objectFit: "cover",
   },
 
@@ -360,7 +362,13 @@ export function PromoDocument({
   const rightHighlights = highlights.slice(splitAt);
 
   const hasHero = !!heroSrc;
-  const heroHeight = hasThumbs ? 220 : 250;
+  // H-7m: hero is now a fixed 3:2 box (540pt × 360pt at print)
+  // whether or not the thumb strip renders. CONTAIN-fit means
+  // letterbox/pillarbox bars fill any aspect mismatch with brand
+  // primary, so the hero region's height doesn't need to flex per
+  // draft state.
+  void hasThumbs;
+  const heroHeight = 360;
 
   const dateLabel = draft.eventDate ? formatEventDate(draft.eventDate) : "";
   const timeLabel = formatTimeRange(draft.eventStartTime, draft.eventEndTime);

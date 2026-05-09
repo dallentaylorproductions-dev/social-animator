@@ -20,7 +20,7 @@ import {
   type PromoMp4Assets,
 } from "./timeline";
 import { generateQrDataUrl } from "../output/qr";
-import { cropToCanvas, srcToImage } from "./crop";
+import { containInBox, cropToCanvas, srcToImage } from "./crop";
 
 /** Promo MP4 loop length in seconds. Re-exported for ExportButtons. */
 export const PROMO_DURATION_SEC = PROMO_TOTAL_SEC;
@@ -70,38 +70,36 @@ export async function renderPromoMp4(
 
   const isSquare = Math.abs(size.width - size.height) < 50;
 
-  // Hero region aspect derives from the timeline's layout. Keep
-  // these in sync with computeLayout in timeline.ts — if you
-  // change hero heights there, change them here too.
-  const heroRegionH = isSquare ? 480 : 600;
-  const heroRegionAspect = size.width / heroRegionH;
-  const HERO_TARGET_W = 1600;
-  const heroTargetH = Math.round(HERO_TARGET_W / heroRegionAspect);
+  // Hero region is now 3:2 for both aspects (matches the
+  // timeline's computeLayout) — 1080×720 on either reel or square.
+  // CONTAIN-fit means the entire user photo is visible regardless
+  // of source aspect; brand-primary fills any letterbox/pillarbox
+  // bars. Keep this in sync with computeLayout in timeline.ts.
+  const HERO_REGION_W = size.width;
+  const HERO_REGION_H = 720;
 
   const heroPhoto = draft.photos[0] ?? null;
   const hero = heroPhoto
-    ? await preCropToCanvas(heroPhoto, HERO_TARGET_W, heroTargetH)
+    ? await preContainToCanvas(heroPhoto, HERO_REGION_W, HERO_REGION_H, primary)
     : null;
 
-  // Thumb cell aspect (9:16 only — square skips the strip).
+  // Thumb cells now 3:2 aspect, matching the natural real-estate
+  // photo orientation. Square skips the strip entirely (per the
+  // H-7m layout — square is too tight to fit a usable strip).
   let thumbs: HTMLCanvasElement[] = [];
   if (!isSquare) {
     const margin = 50; // matches computeLayout's portrait margin
     const stripW = size.width - margin * 2;
-    const stripH = 180;
-    const padTop = 14;
-    const cellH = stripH - padTop;
     const gap = 12;
     const count = Math.min(4, Math.max(0, draft.photos.length - 1));
     if (count > 0) {
       const cellW = (stripW - gap * (count - 1)) / count;
-      const thumbAspect = cellW / cellH;
-      const THUMB_TARGET_W = 600;
-      const thumbTargetH = Math.round(THUMB_TARGET_W / thumbAspect);
+      // 3:2 aspect — height = cellW * 2/3.
+      const cellH = Math.round(cellW * (2 / 3));
       thumbs = await Promise.all(
         draft.photos
           .slice(1, 1 + count)
-          .map((p) => preCropToCanvas(p, THUMB_TARGET_W, thumbTargetH))
+          .map((p) => preCropToCanvas(p, Math.round(cellW), cellH))
       );
     }
   }
@@ -188,4 +186,17 @@ async function preCropToCanvas(
 ): Promise<HTMLCanvasElement> {
   const img = await srcToImage(photo.src);
   return cropToCanvas(img, targetW, targetH, photo.focalX, photo.focalY);
+}
+
+/** CONTAIN-fit a PhotoEntry into a fixed box with brand-color fill
+ *  on letterbox/pillarbox bars. Used for the hero photo so the
+ *  entire image is always visible regardless of source aspect. */
+async function preContainToCanvas(
+  photo: PhotoEntry,
+  boxW: number,
+  boxH: number,
+  fillColor: string
+): Promise<HTMLCanvasElement> {
+  const img = await srcToImage(photo.src);
+  return containInBox(img, boxW, boxH, fillColor);
 }

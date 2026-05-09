@@ -135,26 +135,32 @@ export function PromoPreview({ draft, brand }: PromoPreviewProps) {
         </p>
       </div>
 
-      {/* Hero — single photo or stencil placeholder. object-position
-          honors the user's focal-point pick from the form. */}
+      {/* Hero — H-7m switched from object-cover (over-cropping
+          tall source photos) to object-contain with brand-primary
+          fill. Box is fixed 3:2 so 3:2 source photos (the natural
+          phone-camera real-estate aspect) fit edge-to-edge; other
+          aspects get clean letterbox/pillarbox bars in the brand
+          color. focalX/focalY no longer affect framing here since
+          contain shows the full image — kept on PhotoEntry only
+          for the thumb-strip cells (which still use cover). */}
       <div
         className="w-full overflow-hidden flex items-center justify-center"
-        style={{ height: 180, backgroundColor: "#1f2937" }}
+        style={{
+          aspectRatio: "3 / 2",
+          backgroundColor: primary,
+        }}
       >
         {heroPhoto ? (
           // eslint-disable-next-line @next/next/no-img-element
           <img
             src={heroPhoto.src}
             alt="Hero"
-            className="w-full h-full object-cover"
-            style={{
-              objectPosition: `${heroPhoto.focalX}% ${heroPhoto.focalY}%`,
-            }}
+            className="w-full h-full object-contain"
           />
         ) : (
           <p
             className="font-bold uppercase"
-            style={{ fontSize: 28, letterSpacing: 6, color: primary, opacity: 0.6 }}
+            style={{ fontSize: 28, letterSpacing: 6, color: onPrimary, opacity: 0.6 }}
           >
             Open House
           </p>
@@ -162,15 +168,18 @@ export function PromoPreview({ draft, brand }: PromoPreviewProps) {
       </div>
 
       {/* Thumb strip — up to 4 thumbs of photos[1..5], hidden when
-          there's only a hero (photos.length <= 1). Each thumb honors
-          its own focal point. */}
+          there's only a hero (photos.length <= 1). H-7m: cells are
+          now 3:2 (matching the natural real-estate photo aspect) so
+          most phone-camera uploads fit edge-to-edge. Cover-fit
+          stays on thumbs since minor cropping is acceptable at
+          their small size; focal point still honored. */}
       {showThumbStrip && (
         <div className="grid grid-cols-4 gap-1 px-2 pt-1.5">
           {thumbPhotos.map((p, i) => (
             <div
               key={i}
               className="overflow-hidden rounded-sm"
-              style={{ aspectRatio: "4 / 3", backgroundColor: "#1f2937" }}
+              style={{ aspectRatio: "3 / 2", backgroundColor: "#1f2937" }}
             >
               {/* eslint-disable-next-line @next/next/no-img-element */}
               <img

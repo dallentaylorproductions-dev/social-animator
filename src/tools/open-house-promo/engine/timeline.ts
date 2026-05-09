@@ -105,27 +105,33 @@ function computeLayout(size: { width: number; height: number }): Layout {
   const margin = isSquare ? 40 : 50;
 
   if (isSquare) {
-    const header = { x: 0, y: 0, w: width, h: 110 };
-    const hero = { x: 0, y: header.h, w: width, h: 480 };
-    // 1:1 skips the thumb strip — too narrow at 4 thumbs.
-    const property = { x: 0, y: header.h + hero.h, w: width, h: 130 };
+    // 1:1 budget tight — hero gets 720pt (3:2 at 1080 wide) so a
+    // 3:2 source fits edge-to-edge, leaving 360pt for header +
+    // address/price + agent/QR + footer. H-7m: features list and
+    // thumb strip both skipped on square — too cramped at 1:1
+    // with the 3:2 hero locked in.
+    const header = { x: 0, y: 0, w: width, h: 100 };
+    const hero = { x: 0, y: header.h, w: width, h: 720 };
+    const property = { x: 0, y: header.h + hero.h, w: width, h: 95 };
+    // No features block on square — skip and route the agent/QR
+    // row into the freed vertical space.
     const features = {
       x: 0,
       y: header.h + hero.h + property.h,
       w: width,
-      h: 130,
+      h: 0,
     };
     const agentQr = {
       x: 0,
-      y: header.h + hero.h + property.h + features.h,
+      y: header.h + hero.h + property.h,
       w: width,
-      h: 150,
+      h: 105,
     };
     const footer = {
       x: 0,
-      y: height - 80,
+      y: height - 60,
       w: width,
-      h: 80,
+      h: 60,
     };
     return {
       isSquare,
@@ -140,9 +146,12 @@ function computeLayout(size: { width: number; height: number }): Layout {
     };
   }
 
-  // 9:16 portrait
-  const header = { x: 0, y: 0, w: width, h: 220 };
-  const hero = { x: 0, y: header.h, w: width, h: 600 };
+  // 9:16 portrait. Hero now 3:2 at 1080 wide → 720pt tall (was
+  // 600pt). Other blocks tightened to absorb the extra 120pt:
+  // header 220→200, property 240→220, features 220→200,
+  // agent+QR 320→280, footer 140→120.
+  const header = { x: 0, y: 0, w: width, h: 200 };
+  const hero = { x: 0, y: header.h, w: width, h: 720 };
   const thumbStrip = {
     x: margin,
     y: header.h + hero.h,
@@ -153,21 +162,21 @@ function computeLayout(size: { width: number; height: number }): Layout {
     x: 0,
     y: thumbStrip.y + thumbStrip.h,
     w: width,
-    h: 240,
+    h: 220,
   };
   const features = {
     x: 0,
     y: property.y + property.h,
     w: width,
-    h: 220,
+    h: 200,
   };
   const agentQr = {
     x: 0,
     y: features.y + features.h,
     w: width,
-    h: 320,
+    h: 280,
   };
-  const footer = { x: 0, y: height - 140, w: width, h: 140 };
+  const footer = { x: 0, y: height - 120, w: width, h: 120 };
   return {
     isSquare,
     header,
@@ -211,7 +220,11 @@ export function buildPromoTimeline(
         drawThumbStrip(ctx, layout.thumbStrip, assets.thumbs, t);
       }
       drawProperty(ctx, layout.property, state, layout, t);
-      drawFeatures(ctx, layout.features, state, layout, t);
+      // Square skips features (H-7m: 1:1 with a 720pt 3:2 hero
+      // doesn't have room for both features list AND agent/QR row).
+      if (layout.features.h > 0) {
+        drawFeatures(ctx, layout.features, state, layout, t);
+      }
       drawAgentQr(
         ctx,
         layout.agentQr,
@@ -301,22 +314,29 @@ function drawHero(
   photoCanvas: HTMLCanvasElement | null,
   t: number
 ): void {
-  // Hero region fill — visible while photo is null or the Ken
-  // Burns zoom briefly exposes edges (it doesn't, but defensive).
+  // H-7m: hero now uses CONTAIN-fit (brand-primary letterbox /
+  // pillarbox bars on aspect mismatches) so the entire photo is
+  // always visible. The pre-cropped canvas arrives at the hero
+  // region's exact dimensions with bars already painted; this
+  // function just blits it with Ken Burns scale on top.
   ctx.save();
   ctx.beginPath();
   ctx.rect(rect.x, rect.y, rect.w, rect.h);
   ctx.clip();
 
-  ctx.fillStyle = "#1f2937";
+  // Fill the region with brand primary first — both for the
+  // no-photo placeholder case and as a backstop if Ken Burns
+  // briefly exposes edges (the zoom math should keep edges
+  // covered; defensive).
+  ctx.fillStyle = state.primary;
   ctx.fillRect(rect.x, rect.y, rect.w, rect.h);
 
   if (!photoCanvas) {
     // Stenciled "OPEN HOUSE" placeholder text centered in the
     // region — same fallback as the static PDF.
-    ctx.fillStyle = state.primary;
+    ctx.fillStyle = state.onPrimary;
     ctx.globalAlpha = 0.6;
-    ctx.font = `bold ${Math.floor(rect.h * 0.18)}px Helvetica, Arial, sans-serif`;
+    ctx.font = `bold ${Math.floor(rect.h * 0.14)}px Helvetica, Arial, sans-serif`;
     ctx.textAlign = "center";
     ctx.textBaseline = "middle";
     ctx.fillText("OPEN HOUSE", rect.x + rect.w / 2, rect.y + rect.h / 2);
@@ -326,7 +346,10 @@ function drawHero(
 
   // Fade-in over 600ms starting at t=0.2.
   const fadeP = clamp01((t - 0.2) / 0.6);
-  // Ken Burns: scale 1.0 → 1.04 over 6s, linear.
+  // Ken Burns: scale 1.0 → 1.04 over 6s, linear. Scale around the
+  // region center; the photoCanvas is already CONTAIN-fit at the
+  // region size with bars painted, so scaling slightly amplifies
+  // the photo without revealing transparent edges.
   const burnP = clamp01(t / PROMO_TOTAL_SEC);
   const zoom = 1.0 + burnP * 0.04;
   const dw = rect.w * zoom;

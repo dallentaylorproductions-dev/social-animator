@@ -6,7 +6,7 @@ import { type BrandSettings } from "@/lib/brand";
 import { PromoDocument } from "./PromoDocument";
 import { generateQrDataUrl } from "./qr";
 import { pickContrastText } from "@/tools/listing-flyer/engine/contrast";
-import { cropToCanvas, srcToImage } from "../engine/crop";
+import { containInBox, cropToCanvas, srcToImage } from "../engine/crop";
 
 /**
  * Generate the open-house-promo PDF blob from the current draft.
@@ -37,39 +37,40 @@ export async function generatePdfBlob(
   const qrBg = brand.backgroundColor || "#ffffff";
   const qrDataUrl = await generateQrDataUrl(draft.qrTargetUrl, 400, qrFg, qrBg);
 
-  // PromoDocument page width = 612pt; body padding = 36pt each side
-  // → usable width = 540pt. Hero region height: 250pt when there's
-  // no thumb strip (single-photo case), 220pt when the strip
-  // renders below it (multi-photo).
-  const HERO_REGION_WIDTH_PT = 540;
+  // Hero box is now fixed 3:2 (540pt × 360pt) regardless of how
+  // many photos the draft has — the H-7m redesign moved the hero
+  // from COVER fit (which over-cropped roofs / foundations on tall
+  // source photos) to CONTAIN fit (full image always visible,
+  // brand-primary fill for any letterbox/pillarbox bars). 3:2 is
+  // the natural real-estate photo aspect, so most user uploads
+  // will fit edge-to-edge.
   const hasThumbs = draft.photos.length >= 2;
-  const heroRegionHeightPt = hasThumbs ? 220 : 250;
-  const heroAspect = HERO_REGION_WIDTH_PT / heroRegionHeightPt;
-
-  // 2000px wide hero gives ~3.7x oversample at print size and crisp
-  // display on retina screens. Height computed from the region's
-  // actual aspect so react-pdf's cover-fit doesn't have to crop a
-  // second time. JPEG q=0.92 keeps file size ~250-450KB per photo.
   const HERO_TARGET_W = 2000;
-  const heroTargetH = Math.round(HERO_TARGET_W / heroAspect);
+  const HERO_TARGET_H = Math.round(HERO_TARGET_W * (2 / 3)); // 3:2
 
   const heroPhoto = draft.photos[0] ?? null;
+  const heroFillColor = brand.primaryColor || "#4ef2d9";
   const heroSrc = heroPhoto
-    ? await preCropToDataUrl(heroPhoto, HERO_TARGET_W, heroTargetH, 0.92)
+    ? await preContainToDataUrl(
+        heroPhoto,
+        HERO_TARGET_W,
+        HERO_TARGET_H,
+        heroFillColor,
+        0.92
+      )
     : null;
 
-  // Thumb strip cell width: (540 - gap*3) / 4 ≈ 132pt at 4 thumbs.
-  // Cell height 50pt → cell aspect ~2.64:1. Pre-crop matches that
-  // aspect at 600px wide so the focal point is preserved.
+  // Thumb strip cells are now 3:2 too — the natural real-estate
+  // photo aspect. Each cell ~132pt × 88pt at print, pre-cropped at
+  // 600px wide / 400px tall so the focal point is preserved at
+  // high resolution.
   const THUMB_TARGET_W = 600;
-  const thumbCellWidth = (HERO_REGION_WIDTH_PT - 4 * 3) / 4;
-  const thumbAspect = thumbCellWidth / 50;
-  const thumbTargetH = Math.round(THUMB_TARGET_W / thumbAspect);
+  const THUMB_TARGET_H = Math.round(THUMB_TARGET_W * (2 / 3)); // 3:2
 
   const thumbPhotos = draft.photos.slice(1, 5);
   const thumbSrcs = await Promise.all(
     thumbPhotos.map((p) =>
-      preCropToDataUrl(p, THUMB_TARGET_W, thumbTargetH, 0.92)
+      preCropToDataUrl(p, THUMB_TARGET_W, THUMB_TARGET_H, 0.92)
     )
   );
 
@@ -94,7 +95,9 @@ export async function generatePdfBlob(
 }
 
 /** Decode a PhotoEntry, pre-crop on its focal point to exact target
- *  dimensions, and re-encode as JPEG at the requested quality. */
+ *  dimensions, and re-encode as JPEG at the requested quality.
+ *  COVER mode — used for thumbnails where the focal point matters
+ *  and minor cropping is acceptable. */
 async function preCropToDataUrl(
   photo: PhotoEntry,
   targetW: number,
@@ -109,6 +112,23 @@ async function preCropToDataUrl(
     photo.focalX,
     photo.focalY
   );
+  return canvas.toDataURL("image/jpeg", quality);
+}
+
+/** Decode a PhotoEntry, CONTAIN-fit into a fixed-size box with
+ *  brand-color fill for any letterbox/pillarbox bars, and re-encode
+ *  as JPEG. CONTAIN mode — used for the hero photo so the entire
+ *  image is always visible regardless of source aspect. Focal point
+ *  isn't applicable since nothing is cropped out. */
+async function preContainToDataUrl(
+  photo: PhotoEntry,
+  targetW: number,
+  targetH: number,
+  fillColor: string,
+  quality: number
+): Promise<string> {
+  const img = await srcToImage(photo.src);
+  const canvas = containInBox(img, targetW, targetH, fillColor);
   return canvas.toDataURL("image/jpeg", quality);
 }
 
