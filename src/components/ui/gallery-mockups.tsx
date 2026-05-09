@@ -334,72 +334,181 @@ function StatBlock({ label, value }: { label: string; value: string }) {
 /* ────────────────────────────────────────────────────────────────────── */
 
 /** US Letter portrait — coming-soon listing presentation one-pager. */
-export function ListingPresentationComingSoonMockup() {
+/**
+ * Stylized one-pager mirroring the actual PresentationDocument layout:
+ * dark header band, property block, agent block (headshot + bio
+ * lines), 4-tile track record, marketing-strategy bullets, 3-column
+ * comp grid, dark footer band. Replaces the H-0 "Coming Soon" mockup
+ * now that the tool ships in v1.25.
+ */
+export function ListingPresentationLiveMockup() {
   return (
     <div
-      className="bg-white text-neutral-900 rounded-md overflow-hidden shadow-2xl flex flex-col relative"
+      className="bg-white text-neutral-900 rounded-md overflow-hidden shadow-2xl flex flex-col"
       style={{ aspectRatio: "8.5 / 11", maxHeight: "100%", maxWidth: "100%" }}
     >
-      {/* Letterhead band */}
+      {/* Header band */}
       <div
-        className="px-3 py-2 flex items-center justify-between text-white flex-shrink-0"
+        className="px-3 py-2 flex items-center gap-2 text-white flex-shrink-0"
         style={{ backgroundColor: "#0a0a0a" }}
       >
-        <p className="text-[7px] uppercase tracking-[0.2em]" style={{ color: MINT }}>
-          Listing Presentation
-        </p>
-        <p className="text-[6px] text-neutral-400">Aaron Thomas Home Team</p>
-      </div>
-
-      {/* Content (subtly blurred so it reads as "polished doc, in progress") */}
-      <div
-        className="flex-1 px-4 py-4 space-y-2.5 min-h-0"
-        style={{ filter: "blur(1.5px)", opacity: 0.6 }}
-      >
-        <div className="space-y-1">
-          <div className="h-2 w-3/4 bg-neutral-300 rounded" />
-          <div className="h-1.5 w-1/2 bg-neutral-200 rounded" />
-        </div>
-        <div className="grid grid-cols-3 gap-2">
-          <div className="h-10 bg-neutral-200 rounded" />
-          <div className="h-10 bg-neutral-200 rounded" />
-          <div className="h-10 bg-neutral-200 rounded" />
-        </div>
-        <div className="space-y-1">
-          <div className="h-1.5 bg-neutral-200 rounded" />
-          <div className="h-1.5 bg-neutral-200 rounded" />
-          <div className="h-1.5 w-5/6 bg-neutral-200 rounded" />
-        </div>
-        <div className="h-12 bg-neutral-200 rounded" />
-        <div className="space-y-1">
-          <div className="h-1.5 w-2/3 bg-neutral-200 rounded" />
-          <div className="h-1.5 w-1/2 bg-neutral-200 rounded" />
-        </div>
-        <div className="grid grid-cols-2 gap-2">
-          <div className="h-8 bg-neutral-200 rounded" />
-          <div className="h-8 bg-neutral-200 rounded" />
-        </div>
-      </div>
-
-      {/* Coming-soon overlay */}
-      <div className="absolute inset-0 flex items-center justify-center">
         <div
-          className="px-5 py-3 rounded-md backdrop-blur-md text-center"
-          style={{
-            backgroundColor: "rgba(10, 10, 10, 0.85)",
-            border: `1px solid ${MINT}66`,
-          }}
+          className="h-5 w-5 rounded-sm flex items-center justify-center text-[6px] font-bold text-black"
+          style={{ backgroundColor: MINT }}
         >
+          AT
+        </div>
+        <div className="flex-1 min-w-0 leading-tight">
+          <p className="text-[7px] font-semibold">Aaron Thomas</p>
+          <p className="text-[5.5px] opacity-75">Aaron Thomas Home Team</p>
+        </div>
+        <div className="text-right text-[5.5px] opacity-85 leading-tight">
+          <div>(360) 555-0142</div>
+          <div>aaron@athomes.com</div>
+        </div>
+      </div>
+
+      {/* Body */}
+      <div className="flex-1 px-3 py-3 min-h-0 overflow-hidden flex flex-col gap-3">
+        {/* Property */}
+        <div>
           <p
-            className="text-[10px] font-extrabold uppercase tracking-[0.25em]"
+            className="text-[5px] font-bold uppercase tracking-[0.18em]"
             style={{ color: MINT }}
           >
-            Coming Soon
+            Presentation for
           </p>
-          <p className="text-[7px] text-neutral-400 mt-1.5">
-            Polished pre-listing presentation
+          <p className="text-[11px] font-bold leading-tight mt-0.5">
+            1247 Maple Heights Dr
+          </p>
+          <p className="text-[6px] text-neutral-500 mt-0.5">
+            Olympia, WA 98501
+          </p>
+          <p className="text-[5.5px] italic text-neutral-500 mt-1">
+            Prepared for John & Jane Smith
           </p>
         </div>
+
+        {/* Agent */}
+        <div>
+          <p
+            className="text-[5px] font-bold uppercase tracking-[0.18em]"
+            style={{ color: MINT }}
+          >
+            Meet your agent
+          </p>
+          <div className="flex items-start gap-2 mt-1.5">
+            <div
+              className="w-9 h-9 rounded-full flex items-center justify-center flex-shrink-0 text-[12px] font-bold text-black"
+              style={{ backgroundColor: MINT }}
+            >
+              A
+            </div>
+            <div className="flex-1 space-y-0.5 pt-0.5">
+              <div className="h-[3px] w-full bg-neutral-300 rounded" />
+              <div className="h-[3px] w-[92%] bg-neutral-300 rounded" />
+              <div className="h-[3px] w-[88%] bg-neutral-300 rounded" />
+              <div className="h-[3px] w-[60%] bg-neutral-300 rounded" />
+            </div>
+          </div>
+        </div>
+
+        {/* Track record */}
+        <div>
+          <p
+            className="text-[5px] font-bold uppercase tracking-[0.18em]"
+            style={{ color: MINT }}
+          >
+            Track record
+          </p>
+          <div className="grid grid-cols-4 gap-1 mt-1.5">
+            {[
+              { n: "47", l: "Sold" },
+              { n: "12", l: "Avg DOM" },
+              { n: "102%", l: "S/L" },
+              { n: "8", l: "Years" },
+            ].map((s, i) => (
+              <div key={i} className="bg-neutral-100 rounded px-1 py-1.5">
+                <p
+                  className="text-[10px] font-bold leading-none"
+                  style={{ color: MINT }}
+                >
+                  {s.n}
+                </p>
+                <p className="text-[4.5px] font-bold uppercase tracking-wider mt-0.5 text-neutral-500">
+                  {s.l}
+                </p>
+              </div>
+            ))}
+          </div>
+        </div>
+
+        {/* Marketing strategy */}
+        <div>
+          <p
+            className="text-[5px] font-bold uppercase tracking-[0.18em]"
+            style={{ color: MINT }}
+          >
+            Marketing strategy
+          </p>
+          <ul className="mt-1.5 space-y-0.5">
+            {[88, 76, 92].map((w, i) => (
+              <li key={i} className="flex items-center gap-1.5">
+                <span
+                  className="w-1 h-1 rounded-full flex-shrink-0"
+                  style={{ backgroundColor: MINT }}
+                />
+                <span
+                  className="block h-[2.5px] bg-neutral-300 rounded"
+                  style={{ width: `${w}%` }}
+                />
+              </li>
+            ))}
+          </ul>
+        </div>
+
+        {/* Comparable sales */}
+        <div>
+          <p
+            className="text-[5px] font-bold uppercase tracking-[0.18em]"
+            style={{ color: MINT }}
+          >
+            Recent comps
+          </p>
+          <div className="grid grid-cols-3 gap-1 mt-1.5">
+            {[
+              { p: "$675K", m: "8 DOM · 104%" },
+              { p: "$695K", m: "12 DOM · 101%" },
+              { p: "$682K", m: "9 DOM · 103%" },
+            ].map((c, i) => (
+              <div
+                key={i}
+                className="bg-neutral-100 rounded p-1 border border-neutral-200"
+              >
+                <div className="space-y-0.5">
+                  <div className="h-[2.5px] w-full bg-neutral-300 rounded" />
+                  <div className="h-[2.5px] w-3/4 bg-neutral-300 rounded" />
+                </div>
+                <p
+                  className="text-[8px] font-bold mt-1"
+                  style={{ color: MINT }}
+                >
+                  {c.p}
+                </p>
+                <p className="text-[4.5px] text-neutral-500 mt-0.5">{c.m}</p>
+              </div>
+            ))}
+          </div>
+        </div>
+      </div>
+
+      {/* Footer band */}
+      <div
+        className="px-3 py-1.5 flex items-center justify-between text-white text-[5.5px] flex-shrink-0"
+        style={{ backgroundColor: "#0a0a0a" }}
+      >
+        <span>Aaron Thomas · License #1234</span>
+        <span className="opacity-85">athomes.com</span>
       </div>
     </div>
   );
