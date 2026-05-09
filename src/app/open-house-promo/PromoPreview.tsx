@@ -87,9 +87,18 @@ export function PromoPreview({ draft, brand }: PromoPreviewProps) {
   const showThumbStrip = thumbPhotos.length > 0;
   const dateLabel = draft.eventDate ? formatEventDate(draft.eventDate) : "";
   const timeLabel = formatTimeRange(draft.eventStartTime, draft.eventEndTime);
-  const footerCenter = draft.qrTargetUrl
-    ? draft.qrTargetUrl.replace(/^https?:\/\//i, "")
-    : draft.propertyAddress || "Open House";
+  // Footer center text — matches PromoDocument's logic exactly so
+  // the live preview tracks the export. eventNotes wins; falls back
+  // to address+city compose. Earlier preview rendered qrTargetUrl
+  // here, which produced live-preview/PDF drift on smoke tests.
+  const footerCenter = (() => {
+    const notes = draft.eventNotes.trim();
+    if (notes) return notes;
+    const addressPart = draft.propertyAddress.trim();
+    const cityPart = draft.propertyCity.trim();
+    if (addressPart && cityPart) return `${addressPart}, ${cityPart}`;
+    return addressPart || "Open House";
+  })();
 
   return (
     <div

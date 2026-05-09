@@ -474,8 +474,11 @@ export function PromoDocument({
             ) : null}
           </View>
 
-          {/* Highlights — bullet dots use accent (H-7h) so the
-              per-promo accent picker drives a visible element. */}
+          {/* Highlights — H-7l extracted FeatureBullet so both
+              columns route through one component. The previous
+              dual-render-path let H-7i's bullet-color fix update
+              column 1 but miss column 2 (which kept showing the
+              earlier H-7h accent-colored bullets). */}
           {showHighlights ? (
             <>
               <Text style={[styles.sectionLabel, { color: primary }]}>
@@ -484,22 +487,12 @@ export function PromoDocument({
               <View style={styles.highlightsList}>
                 <View style={styles.highlightCol}>
                   {leftHighlights.map((h, i) => (
-                    <View key={i} style={styles.highlightRow}>
-                      <View
-                        style={[
-                          styles.highlightBullet,
-                          { backgroundColor: primary },
-                        ]}
-                      />
-                      <Text
-                        style={[
-                          styles.highlightText,
-                          { color: textPrimary },
-                        ]}
-                      >
-                        {h}
-                      </Text>
-                    </View>
+                    <FeatureBullet
+                      key={`l-${i}`}
+                      text={h}
+                      bulletColor={primary}
+                      textColor={textPrimary}
+                    />
                   ))}
                 </View>
                 {useTwoColHighlights ? (
@@ -507,22 +500,12 @@ export function PromoDocument({
                     <View style={styles.highlightColGap} />
                     <View style={styles.highlightCol}>
                       {rightHighlights.map((h, i) => (
-                        <View key={i} style={styles.highlightRow}>
-                          <View
-                            style={[
-                              styles.highlightBullet,
-                              { backgroundColor: accent },
-                            ]}
-                          />
-                          <Text
-                            style={[
-                              styles.highlightText,
-                              { color: textPrimary },
-                            ]}
-                          >
-                            {h}
-                          </Text>
-                        </View>
+                        <FeatureBullet
+                          key={`r-${i}`}
+                          text={h}
+                          bulletColor={primary}
+                          textColor={textPrimary}
+                        />
                       ))}
                     </View>
                   </>
@@ -632,5 +615,35 @@ export function PromoDocument({
         </View>
       </Page>
     </Document>
+  );
+}
+
+/**
+ * Single source of truth for a feature-list bullet (dot + text).
+ * Both columns of the two-column highlights layout route through
+ * this component, eliminating the dual render paths that let
+ * H-7i's bullet-color fix update column 1 but miss column 2.
+ */
+function FeatureBullet({
+  text,
+  bulletColor,
+  textColor,
+}: {
+  text: string;
+  bulletColor: string;
+  textColor: string;
+}) {
+  return (
+    <View style={styles.highlightRow}>
+      <View
+        style={[
+          styles.highlightBullet,
+          { backgroundColor: bulletColor },
+        ]}
+      />
+      <Text style={[styles.highlightText, { color: textColor }]}>
+        {text}
+      </Text>
+    </View>
   );
 }
