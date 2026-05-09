@@ -327,7 +327,11 @@ export function PromoDocument({
   thumbSrcs,
 }: PromoDocumentProps) {
   const primary = brand.primaryColor || "#4ef2d9";
-  const accent = brand.accentColor || "#0a0a0a";
+  // H-7h: accent now drives the secondary-brand elements
+  // (highlights bullets, "PRESENTING" label, "SCAN FOR DETAILS"
+  // label). Default falls back to a yellow-green that reads on
+  // both the white default background and dark overrides.
+  const accent = brand.accentColor || "#9fbd0a";
   const background = brand.backgroundColor || "#ffffff";
 
   // Auto-flip text colors so the page stays readable on any
@@ -436,7 +440,7 @@ export function PromoDocument({
         {/* ── Body ──────────────────────────────────────── */}
         <View style={styles.body}>
           {/* Property */}
-          <Text style={[styles.propertyKicker, { color: primary }]}>
+          <Text style={[styles.propertyKicker, { color: accent }]}>
             Presenting
           </Text>
           <View style={styles.propertyRow}>
@@ -459,7 +463,8 @@ export function PromoDocument({
             ) : null}
           </View>
 
-          {/* Highlights */}
+          {/* Highlights — bullet dots use accent (H-7h) so the
+              per-promo accent picker drives a visible element. */}
           {showHighlights ? (
             <>
               <Text style={[styles.sectionLabel, { color: primary }]}>
@@ -472,7 +477,7 @@ export function PromoDocument({
                       <View
                         style={[
                           styles.highlightBullet,
-                          { backgroundColor: primary },
+                          { backgroundColor: accent },
                         ]}
                       />
                       <Text
@@ -495,7 +500,7 @@ export function PromoDocument({
                           <View
                             style={[
                               styles.highlightBullet,
-                              { backgroundColor: primary },
+                              { backgroundColor: accent },
                             ]}
                           />
                           <Text
@@ -582,7 +587,10 @@ export function PromoDocument({
             {showQr ? (
               <View style={styles.qrBlock}>
                 <Image src={qrDataUrl!} style={styles.qrImage} />
-                <Text style={[styles.qrLabel, { color: primary }]}>
+                {/* H-7h: SCAN FOR DETAILS uses accent so it pairs
+                    with the highlights bullets and PRESENTING
+                    label as the secondary-brand color group. */}
+                <Text style={[styles.qrLabel, { color: accent }]}>
                   Scan for details
                 </Text>
               </View>

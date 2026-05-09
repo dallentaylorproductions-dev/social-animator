@@ -33,6 +33,10 @@ const QR_DEBOUNCE_MS = 500;
  */
 export function PromoPreview({ draft, brand }: PromoPreviewProps) {
   const primary = brand.primaryColor || "#4ef2d9";
+  // H-7h: accent now drives "PRESENTING" label, highlights bullet
+  // dots, and the "Scan for details" caption — mirrors the same
+  // assignments in PromoDocument so the preview tracks the export.
+  const accent = brand.accentColor || "#9fbd0a";
   const background = brand.backgroundColor || "#ffffff";
 
   const textPrimary = pickContrastText(background);
@@ -172,7 +176,7 @@ export function PromoPreview({ draft, brand }: PromoPreviewProps) {
         {/* Property */}
         <p
           className="text-[8px] font-bold uppercase tracking-[0.18em]"
-          style={{ color: primary }}
+          style={{ color: accent }}
         >
           Presenting
         </p>
@@ -217,7 +221,7 @@ export function PromoPreview({ draft, brand }: PromoPreviewProps) {
                   >
                     <span
                       className="mt-1 inline-block w-1 h-1 rounded-full flex-shrink-0"
-                      style={{ backgroundColor: primary }}
+                      style={{ backgroundColor: accent }}
                     />
                     <span className="flex-1">{h}</span>
                   </li>
@@ -319,7 +323,7 @@ export function PromoPreview({ draft, brand }: PromoPreviewProps) {
               />
               <p
                 className="text-[6px] font-bold uppercase tracking-[0.15em] mt-1 text-center"
-                style={{ color: primary }}
+                style={{ color: accent }}
               >
                 Scan for details
               </p>
