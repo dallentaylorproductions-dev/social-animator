@@ -6,7 +6,7 @@ import {
   formatTimeRange,
   formatEventDate,
 } from "./types";
-import { type BrandSettings } from "@/lib/brand";
+import { type BrandSettings, formatPhone, effectiveBrandAccent } from "@/lib/brand";
 import { renderTimelineToWebm } from "@/tools/listing-flyer/engine/render-mp4";
 import { webmToMp4, WARMUP_MS } from "@/engine/export";
 import {
@@ -22,8 +22,7 @@ import {
 import { generateQrDataUrl } from "../output/qr";
 import { cropToCanvas, srcToImage } from "./crop";
 
-/** Promo MP4 loop length in seconds. Matches the timeline budget in
- *  buildPromoTimeline. Re-exported for ExportButtons. */
+/** Promo MP4 loop length in seconds. Re-exported for ExportButtons. */
 export const PROMO_DURATION_SEC = PROMO_TOTAL_SEC;
 
 export type RenderSize = { width: number; height: number };
@@ -34,17 +33,24 @@ export interface RenderProgressUpdate {
 }
 
 /**
- * Render the promo to MP4 at the given size. Materializes hero +
- * QR images on demand, pre-crops each scene's photo to the output
- * dimensions on its focal point, and feeds the resulting canvases
- * to buildPromoTimeline. Reuses the listing-flyer's
- * renderTimelineToWebm + ffmpeg.wasm webmToMp4 pipeline — the
- * rendering engine is fully generic across Timeline-based templates.
+ * Render the open-house-promo MP4 at the given size.
  *
- * Photo cycling: scenes 2/3/4 each take one photo. With < 3 photos,
- * we cycle from photos[0]/[1]/[2] with focal-point variants of the
- * same source photo so each scene visually differs even when the
- * realtor only uploaded one image (selectScenePhotos below).
+ * H-7k redesign: animates the static flyer composition (one
+ * vertical stack with subtle motion) instead of cycling through
+ * multiple scenes. Mirrors the PromoDocument layout so the MP4
+ * reads as the same artifact as the PDF, just animated.
+ *
+ * Photo prep:
+ *   hero (photos[0]):  pre-cropped to the hero region's aspect
+ *   thumbs (9:16 only): photos[1..4] pre-cropped to the thumb
+ *                       cell aspect
+ *   1:1 ignores the thumb strip — too narrow for 4 thumbs at
+ *   readable size.
+ *
+ * All photos honor their stored focalX/focalY. Pre-cropping
+ * happens here (HTMLCanvasElement) so the timeline can run
+ * synchronously through rAF without async image loads in the
+ * paint loop.
  */
 export async function renderPromoMp4(
   draft: PromoDraft,
@@ -54,58 +60,73 @@ export async function renderPromoMp4(
   brandLogoImg: HTMLImageElement | null,
   onProgress?: (update: RenderProgressUpdate) => void
 ): Promise<Blob> {
-  // brandLogoImg currently unused in the MP4 — the H-7g redesign
-  // dropped the logo overlay for a photo-first composition. Kept
-  // in the signature for source-compat with ExportButtons; suppress
-  // unused warning.
-  void brandLogoImg;
-
   const primary = brand.primaryColor || "#4ef2d9";
-  const accent = brand.accentColor || "#9fbd0a";
-  const background = brand.backgroundColor || "#0a0a0a";
+  const accent = effectiveBrandAccent(brand);
+  const background = brand.backgroundColor || "#ffffff";
 
   const textPrimary = pickContrastText(background);
   const textMuted = pickContrastMuted(background);
   const onPrimary = pickContrastText(primary);
-  const onAccent = pickContrastText(accent);
 
-  // Pick which photo + focal point each scene uses, with fallbacks
-  // for sparse photo arrays.
-  const sceneSelections = selectScenePhotos(draft.photos);
+  const isSquare = Math.abs(size.width - size.height) < 50;
 
-  // Materialize source images once and cache by index — multiple
-  // scenes may reference the same source photo when there are <3
-  // uploaded.
-  const sourceCache = new Map<number, HTMLImageElement>();
-  async function getSource(originalIdx: number): Promise<HTMLImageElement> {
-    const cached = sourceCache.get(originalIdx);
-    if (cached) return cached;
-    const photo = draft.photos[originalIdx];
-    const img = await srcToImage(photo.src);
-    sourceCache.set(originalIdx, img);
-    return img;
+  // Hero region aspect derives from the timeline's layout. Keep
+  // these in sync with computeLayout in timeline.ts — if you
+  // change hero heights there, change them here too.
+  const heroRegionH = isSquare ? 480 : 600;
+  const heroRegionAspect = size.width / heroRegionH;
+  const HERO_TARGET_W = 1600;
+  const heroTargetH = Math.round(HERO_TARGET_W / heroRegionAspect);
+
+  const heroPhoto = draft.photos[0] ?? null;
+  const hero = heroPhoto
+    ? await preCropToCanvas(heroPhoto, HERO_TARGET_W, heroTargetH)
+    : null;
+
+  // Thumb cell aspect (9:16 only — square skips the strip).
+  let thumbs: HTMLCanvasElement[] = [];
+  if (!isSquare) {
+    const margin = 50; // matches computeLayout's portrait margin
+    const stripW = size.width - margin * 2;
+    const stripH = 180;
+    const padTop = 14;
+    const cellH = stripH - padTop;
+    const gap = 12;
+    const count = Math.min(4, Math.max(0, draft.photos.length - 1));
+    if (count > 0) {
+      const cellW = (stripW - gap * (count - 1)) / count;
+      const thumbAspect = cellW / cellH;
+      const THUMB_TARGET_W = 600;
+      const thumbTargetH = Math.round(THUMB_TARGET_W / thumbAspect);
+      thumbs = await Promise.all(
+        draft.photos
+          .slice(1, 1 + count)
+          .map((p) => preCropToCanvas(p, THUMB_TARGET_W, thumbTargetH))
+      );
+    }
   }
 
-  // Pre-crop each scene's photo to (size.width, size.height) on
-  // its (possibly variant) focal point. Null when no photos exist.
-  const [scene2, scene3, scene4] = await Promise.all(
-    sceneSelections.map(async (sel) => {
-      if (!sel) return null;
-      const img = await getSource(sel.originalIdx);
-      return cropToCanvas(img, size.width, size.height, sel.focalX, sel.focalY);
-    })
-  );
-
-  // QR — high-res for scene 5 (sized ~600px on 1080-wide canvas).
-  // Always black-on-white for scanner reliability — independent of
-  // brand bg, since the QR scene's bg is brand primary.
+  // QR — high res. Always black-on-white for scanner reliability;
+  // the timeline draws a white card behind it for contrast against
+  // any primary bg.
   const qrDataUrl = await generateQrDataUrl(
     draft.qrTargetUrl,
     600,
     "#000000",
     "#ffffff"
   );
-  const qrImg = qrDataUrl ? await srcToImage(qrDataUrl) : null;
+  const qrImage = qrDataUrl ? await srcToImage(qrDataUrl) : null;
+
+  // Footer center text mirrors the PDF logic: eventNotes wins,
+  // address+city falls back, never propertyHighlights.
+  const footerCenter = (() => {
+    const notes = draft.eventNotes.trim();
+    if (notes) return notes;
+    const addressPart = draft.propertyAddress.trim();
+    const cityPart = draft.propertyCity.trim();
+    if (addressPart && cityPart) return `${addressPart}, ${cityPart}`;
+    return addressPart || "Open House";
+  })();
 
   const state: PromoMp4State = {
     primary,
@@ -114,22 +135,28 @@ export async function renderPromoMp4(
     textPrimary,
     textMuted,
     onPrimary,
-    onAccent,
+    title: "Open House",
+    dateLabel: draft.eventDate ? formatEventDate(draft.eventDate) : "",
+    timeLabel: formatTimeRange(draft.eventStartTime, draft.eventEndTime),
     address: draft.propertyAddress,
     city: draft.propertyCity,
     price: draft.listingPrice,
-    dateLabel: draft.eventDate ? formatEventDate(draft.eventDate) : "",
-    timeLabel: formatTimeRange(draft.eventStartTime, draft.eventEndTime),
     highlights: draft.propertyHighlights
       .map((h) => h.trim())
       .filter(Boolean),
+    agentName: brand.agentName || "Your name",
+    brokerage: brand.brokerage || "",
+    phone: formatPhone(brand.contactPhone) || "",
+    email: brand.contactEmail || "",
+    licenseNumber: brand.licenseNumber || "",
+    footerCenter,
   };
 
   const assets: PromoMp4Assets = {
-    scene2,
-    scene3,
-    scene4,
-    qrImage: qrImg,
+    hero,
+    thumbs,
+    qrImage,
+    brandLogo: brandLogoImg,
   };
 
   const timeline = buildPromoTimeline(state, size, assets);
@@ -154,63 +181,11 @@ export async function renderPromoMp4(
   return mp4;
 }
 
-interface SceneSelection {
-  /** Index into draft.photos for the source image. */
-  originalIdx: number;
-  focalX: number;
-  focalY: number;
-}
-
-/**
- * Decide which photo + focal point each of the three photo scenes
- * (2/3/4) uses, with sensible fallbacks for sparse photo arrays:
- *
- *   0 photos: every scene null. Timeline renders brand-bg fallback
- *             with text-only content.
- *   1 photo:  all three scenes reuse photos[0] with focal-point
- *             nudges (±10% horizontal) so each scene reads as
- *             visually distinct rather than three identical frames.
- *   2 photos: scene 2 = photos[0], scenes 3 & 4 = photos[1].
- *   3+ photos: scenes 2/3/4 = photos[0/1/2]. photos[3] and photos[4]
- *              still appear in the PDF thumb strip — they're not
- *              ignored, just unused in the MP4 (which is already
- *              dense at 7.5s).
- */
-function selectScenePhotos(
-  photos: PhotoEntry[]
-): [SceneSelection | null, SceneSelection | null, SceneSelection | null] {
-  if (photos.length === 0) return [null, null, null];
-  if (photos.length === 1) {
-    const p = photos[0];
-    return [
-      { originalIdx: 0, focalX: p.focalX, focalY: p.focalY },
-      {
-        originalIdx: 0,
-        focalX: clampPercent(p.focalX - 10),
-        focalY: p.focalY,
-      },
-      {
-        originalIdx: 0,
-        focalX: clampPercent(p.focalX + 10),
-        focalY: p.focalY,
-      },
-    ];
-  }
-  if (photos.length === 2) {
-    return [
-      { originalIdx: 0, focalX: photos[0].focalX, focalY: photos[0].focalY },
-      { originalIdx: 1, focalX: photos[1].focalX, focalY: photos[1].focalY },
-      { originalIdx: 1, focalX: photos[1].focalX, focalY: photos[1].focalY },
-    ];
-  }
-  // 3+ photos
-  return [
-    { originalIdx: 0, focalX: photos[0].focalX, focalY: photos[0].focalY },
-    { originalIdx: 1, focalX: photos[1].focalX, focalY: photos[1].focalY },
-    { originalIdx: 2, focalX: photos[2].focalX, focalY: photos[2].focalY },
-  ];
-}
-
-function clampPercent(v: number): number {
-  return Math.max(0, Math.min(100, v));
+async function preCropToCanvas(
+  photo: PhotoEntry,
+  targetW: number,
+  targetH: number
+): Promise<HTMLCanvasElement> {
+  const img = await srcToImage(photo.src);
+  return cropToCanvas(img, targetW, targetH, photo.focalX, photo.focalY);
 }
