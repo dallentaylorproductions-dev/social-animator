@@ -11,7 +11,7 @@ import {
   PHOTO_QUALITY,
   normalizeUrl,
 } from "@/tools/open-house-promo/engine/types";
-import { type BrandSettings } from "@/lib/brand";
+import { type BrandSettings, effectiveBrandAccent } from "@/lib/brand";
 
 interface PromoFormProps {
   draft: PromoDraft;
@@ -149,8 +149,11 @@ export function PromoForm({
   };
 
   // ── Color overrides ───────────────────────────────────────
+  // Brand accent falls through to a darker-shade-of-primary when
+  // unset (or set to legacy default white). Reset button below
+  // routes back to this same effective brand value.
   const effectivePrimary = draft.primaryColor || brand.primaryColor;
-  const effectiveAccent = draft.accentColor || brand.accentColor;
+  const effectiveAccent = draft.accentColor || effectiveBrandAccent(brand);
   const effectiveBackground =
     draft.backgroundColor || brand.backgroundColor || "#ffffff";
   const hasColorOverride =

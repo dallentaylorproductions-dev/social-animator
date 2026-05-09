@@ -6,7 +6,11 @@ import {
   formatTimeRange,
   formatEventDate,
 } from "@/tools/open-house-promo/engine/types";
-import { type BrandSettings, formatPhone } from "@/lib/brand";
+import {
+  type BrandSettings,
+  formatPhone,
+  effectiveBrandAccent,
+} from "@/lib/brand";
 import {
   pickContrastText,
   pickContrastMuted,
@@ -33,10 +37,12 @@ const QR_DEBOUNCE_MS = 500;
  */
 export function PromoPreview({ draft, brand }: PromoPreviewProps) {
   const primary = brand.primaryColor || "#4ef2d9";
-  // H-7h: accent now drives "PRESENTING" label, highlights bullet
-  // dots, and the "Scan for details" caption — mirrors the same
-  // assignments in PromoDocument so the preview tracks the export.
-  const accent = brand.accentColor || "#9fbd0a";
+  // H-7i: accent drives only "PRESENTING" + "Scan for details"
+  // labels. Bullets reverted to primary so they pair with the
+  // FEATURES section header. effectiveBrandAccent auto-derives a
+  // darker shade from primary when the user hasn't explicitly
+  // chosen an accent.
+  const accent = effectiveBrandAccent(brand);
   const background = brand.backgroundColor || "#ffffff";
 
   const textPrimary = pickContrastText(background);
@@ -221,7 +227,7 @@ export function PromoPreview({ draft, brand }: PromoPreviewProps) {
                   >
                     <span
                       className="mt-1 inline-block w-1 h-1 rounded-full flex-shrink-0"
-                      style={{ backgroundColor: accent }}
+                      style={{ backgroundColor: primary }}
                     />
                     <span className="flex-1">{h}</span>
                   </li>

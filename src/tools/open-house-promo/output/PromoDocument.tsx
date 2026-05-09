@@ -13,7 +13,11 @@ import {
   formatTimeRange,
   formatEventDate,
 } from "../engine/types";
-import { type BrandSettings, formatPhone } from "@/lib/brand";
+import {
+  type BrandSettings,
+  formatPhone,
+  effectiveBrandAccent,
+} from "@/lib/brand";
 import {
   pickContrastText,
   pickContrastMuted,
@@ -327,11 +331,14 @@ export function PromoDocument({
   thumbSrcs,
 }: PromoDocumentProps) {
   const primary = brand.primaryColor || "#4ef2d9";
-  // H-7h: accent now drives the secondary-brand elements
-  // (highlights bullets, "PRESENTING" label, "SCAN FOR DETAILS"
-  // label). Default falls back to a yellow-green that reads on
-  // both the white default background and dark overrides.
-  const accent = brand.accentColor || "#9fbd0a";
+  // H-7i: accent drives only the small secondary labels —
+  // "PRESENTING" above the address and "SCAN FOR DETAILS" under
+  // the QR. Bullets reverted back to primary in H-7i so the
+  // FEATURES label and its bullets read as one unit.
+  // effectiveBrandAccent auto-derives a darker shade from primary
+  // when the user hasn't explicitly chosen an accent (legacy
+  // default was #ffffff, which is invisible on white pages).
+  const accent = effectiveBrandAccent(brand);
   const background = brand.backgroundColor || "#ffffff";
 
   // Auto-flip text colors so the page stays readable on any
@@ -477,7 +484,7 @@ export function PromoDocument({
                       <View
                         style={[
                           styles.highlightBullet,
-                          { backgroundColor: accent },
+                          { backgroundColor: primary },
                         ]}
                       />
                       <Text
