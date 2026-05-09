@@ -514,6 +514,144 @@ export function ListingPresentationLiveMockup() {
   );
 }
 
+/**
+ * Stylized open-house flyer matching the actual PromoDocument:
+ * mint-bg header band ("OPEN HOUSE" + date + time), hero photo,
+ * property block (address + price), highlights bullets, agent
+ * info + QR code row, mint-bg footer band. Same Aaron Thomas
+ * placeholder content as the other gallery mockups for
+ * consistency. The QR code is rendered as a static stylized SVG
+ * pattern (not a real scannable code) — it's a marketing
+ * illustration, not a working QR.
+ */
+export function OpenHousePromoMockup() {
+  return (
+    <div
+      className="bg-white text-neutral-900 rounded-md overflow-hidden shadow-2xl flex flex-col"
+      style={{ aspectRatio: "8.5 / 11", maxHeight: "100%", maxWidth: "100%" }}
+    >
+      {/* Header band */}
+      <div
+        className="px-3 py-2 flex flex-col items-center justify-center text-center text-black flex-shrink-0"
+        style={{ backgroundColor: MINT }}
+      >
+        <p
+          className="font-extrabold uppercase"
+          style={{ fontSize: 11, letterSpacing: 3 }}
+        >
+          Open House
+        </p>
+        <p
+          className="font-bold mt-0.5"
+          style={{ fontSize: 6, letterSpacing: 0.5 }}
+        >
+          Saturday, May 15
+        </p>
+        <p className="text-[5px] opacity-85">12 PM – 3 PM</p>
+      </div>
+
+      {/* Hero photo */}
+      <div className="relative w-full overflow-hidden flex-shrink-0" style={{ height: "32%" }}>
+        <PropertyHero src={PHOTOS.exterior} alt="Open house property" />
+      </div>
+
+      {/* Body */}
+      <div className="flex-1 px-3 py-2.5 flex flex-col gap-2 min-h-0">
+        {/* Property */}
+        <div>
+          <p
+            className="text-[5px] font-bold uppercase tracking-[0.18em]"
+            style={{ color: MINT }}
+          >
+            Presenting
+          </p>
+          <div className="flex items-end justify-between gap-2 mt-0.5">
+            <p className="text-[9px] font-bold leading-tight">
+              1247 Maple Heights Dr
+            </p>
+            <p
+              className="text-[9px] font-bold whitespace-nowrap"
+              style={{ color: MINT }}
+            >
+              $685,000
+            </p>
+          </div>
+          <p className="text-[5.5px] text-neutral-500">Olympia, WA 98501</p>
+        </div>
+
+        {/* Features */}
+        <div>
+          <p
+            className="text-[5px] font-bold uppercase tracking-[0.18em]"
+            style={{ color: MINT }}
+          >
+            Features
+          </p>
+          <ul className="mt-1 grid grid-cols-2 gap-x-3 gap-y-0.5">
+            {["4BR / 3BA", "0.25 acres", "Renovated kitchen", "Mountain views"].map(
+              (h, i) => (
+                <li
+                  key={i}
+                  className="flex items-center gap-1 text-[6px]"
+                >
+                  <span
+                    className="w-[3px] h-[3px] rounded-full flex-shrink-0"
+                    style={{ backgroundColor: MINT }}
+                  />
+                  <span>{h}</span>
+                </li>
+              )
+            )}
+          </ul>
+        </div>
+
+        {/* Agent + QR row */}
+        <div className="mt-auto flex items-stretch gap-2">
+          <div className="flex-1 flex flex-col justify-center">
+            <div className="flex items-center gap-1.5">
+              <div
+                className="h-5 w-5 rounded-sm flex items-center justify-center text-[6px] font-bold text-black flex-shrink-0"
+                style={{ backgroundColor: MINT }}
+              >
+                AT
+              </div>
+              <div className="leading-tight min-w-0">
+                <p className="text-[7px] font-bold truncate">Aaron Thomas</p>
+                <p className="text-[5.5px] text-neutral-500 truncate">
+                  Aaron Thomas Home Team
+                </p>
+              </div>
+            </div>
+            <p className="text-[5.5px] mt-1">(360) 555-0142</p>
+            <p className="text-[5.5px] truncate">aaron@athomes.com</p>
+          </div>
+          {/* Stylized QR — 6×6 grid of squares with two larger
+              finder-style corners. Not a real scannable code; this
+              is a marketing illustration. */}
+          <div className="w-12 flex flex-col items-center flex-shrink-0">
+            <StylizedQr />
+            <p
+              className="text-[5px] font-bold uppercase tracking-[0.15em] mt-1 text-center"
+              style={{ color: MINT }}
+            >
+              Scan
+            </p>
+          </div>
+        </div>
+      </div>
+
+      {/* Footer band */}
+      <div
+        className="px-3 py-1 flex items-center justify-between text-black text-[5px] font-bold flex-shrink-0"
+        style={{ backgroundColor: MINT }}
+      >
+        <span className="flex-1 text-center">athomes.com/open-house</span>
+        <span className="opacity-85">License #1234</span>
+      </div>
+    </div>
+  );
+}
+
 /* ────────────────────────────────────────────────────────────────────── */
 
 /** Property hero photo. Plain <img> with object-cover; gradient
@@ -556,6 +694,45 @@ function PhotoTile({
         loading="lazy"
         className="absolute inset-0 w-full h-full object-cover"
       />
+    </div>
+  );
+}
+
+/** Stylized QR illustration — 7×7 grid with three finder-pattern
+ *  corners. Not a real scannable code; this lives only inside the
+ *  marketing mockup. Pattern is hard-coded so it stays visually
+ *  consistent across renders. */
+function StylizedQr() {
+  // Finder-pattern positions (TL/TR/BL) and a sparse data grid.
+  // 1 = filled, 0 = empty. 7×7 module grid.
+  const grid: number[][] = [
+    [1, 1, 1, 0, 1, 1, 1],
+    [1, 0, 1, 0, 0, 0, 1],
+    [1, 1, 1, 1, 0, 1, 1],
+    [0, 0, 1, 0, 1, 0, 0],
+    [1, 1, 0, 1, 0, 0, 1],
+    [1, 0, 0, 0, 0, 1, 0],
+    [1, 1, 1, 0, 1, 0, 1],
+  ];
+  return (
+    <div
+      className="grid bg-black p-[2px] rounded-sm"
+      style={{
+        gridTemplateColumns: "repeat(7, 1fr)",
+        gridTemplateRows: "repeat(7, 1fr)",
+        width: 40,
+        height: 40,
+        gap: 1,
+      }}
+    >
+      {grid.flat().map((cell, i) => (
+        <div
+          key={i}
+          style={{
+            backgroundColor: cell ? "#ffffff" : "#000000",
+          }}
+        />
+      ))}
     </div>
   );
 }

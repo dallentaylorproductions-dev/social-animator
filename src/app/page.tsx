@@ -21,6 +21,7 @@ import {
   SocialAnimatorQACardMockup,
   SocialAnimatorMarketUpdateMockup,
   ListingPresentationLiveMockup,
+  OpenHousePromoMockup,
 } from "@/components/ui/gallery-mockups";
 
 const GALLERY_ITEMS = [
@@ -58,6 +59,13 @@ const GALLERY_ITEMS = [
     feature: "Print-ready PDF",
     tagline:
       "Polished pre-listing pitch document that wins the listing. Track record, marketing strategy, comparable sales, branded automatically.",
+  },
+  {
+    mockup: <OpenHousePromoMockup />,
+    toolName: "Open House Promo Generator",
+    feature: "PDF + Reel + Square + QR",
+    tagline:
+      "Complete promo bundle for any open house. Vertical reel, square post, printable flyer, QR code — all from one form.",
   },
 ];
 
