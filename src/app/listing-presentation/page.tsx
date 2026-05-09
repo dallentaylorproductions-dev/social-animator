@@ -13,6 +13,7 @@ import {
 } from "@/tools/listing-presentation/engine/draft-storage";
 import { PresentationForm } from "./PresentationForm";
 import { PresentationPreview } from "./PresentationPreview";
+import { ExportButtons } from "./ExportButtons";
 
 const SAVE_DEBOUNCE_MS = 1500;
 
@@ -102,9 +103,12 @@ export default function ListingPresentationPage() {
               Preview is an approximation — exported PDF may differ slightly
               in layout.
             </p>
+            <div className="hidden lg:block mt-5 pt-5 border-t border-neutral-800/60">
+              <ExportButtons draft={draft} brand={effectiveBrand} />
+            </div>
           </aside>
 
-          <section className="order-2 lg:order-1 pb-12 lg:pb-0">
+          <section className="order-2 lg:order-1 pb-32 lg:pb-0">
             <PresentationForm
               draft={draft}
               onChange={setDraft}
@@ -113,6 +117,12 @@ export default function ListingPresentationPage() {
               onUploadError={flashUploadError}
             />
           </section>
+
+          {/* Mobile-only sticky export bar — pinned to viewport bottom so
+              the user can export without scrolling back up to the preview. */}
+          <div className="order-3 sticky bottom-0 z-20 -mx-6 px-6 py-3 bg-neutral-950 border-t border-neutral-800/60 shadow-[0_-4px_12px_rgba(0,0,0,0.4)] lg:hidden">
+            <ExportButtons draft={draft} brand={effectiveBrand} />
+          </div>
         </div>
       </div>
     </main>
