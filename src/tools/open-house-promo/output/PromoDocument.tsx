@@ -80,37 +80,38 @@ const styles = StyleSheet.create({
     color: "#0a0a0a",
   },
 
-  // Header band
+  // Header band — H-7p tightened to ~56pt total to free vertical
+  // budget for the body content.
   header: {
     paddingHorizontal: MARGIN,
-    paddingVertical: 14,
+    paddingVertical: 8,
     alignItems: "center",
     justifyContent: "center",
   },
   headerTitle: {
-    fontSize: 28,
+    fontSize: 24,
     fontFamily: "Helvetica-Bold",
     letterSpacing: 4,
     textTransform: "uppercase",
   },
   headerDate: {
-    fontSize: 12,
+    fontSize: 11,
     fontFamily: "Helvetica-Bold",
-    marginTop: 4,
+    marginTop: 2,
     letterSpacing: 0.6,
   },
   headerTime: {
-    fontSize: 11,
-    marginTop: 1,
+    fontSize: 10,
     opacity: 0.92,
   },
 
-  // Hero photo. Height is supplied inline per render so the
-  // single-photo case (250pt) and multi-photo case (220pt — leaves
-  // room for the thumb strip) get distinct sizings without two
-  // duplicate style blocks.
+  // Hero photo. H-7p hard-caps the height at 270pt regardless of
+  // how many photos the draft has — predictable layout, no flex.
+  // The blur-fill composition (H-7o) handles aspect mismatches
+  // gracefully so a fixed box height isn't a quality compromise.
   heroWrap: {
     width: "100%",
+    height: 270,
     overflow: "hidden",
     backgroundColor: "#1f2937",
   },
@@ -132,16 +133,19 @@ const styles = StyleSheet.create({
     opacity: 0.55,
   },
 
-  // Body wrapper
+  // Body wrapper — H-7p reduced paddings to claw back vertical
+  // space (top 16→8, bottom 50→24). Bottom is now just enough to
+  // clear the absolute footer with a few pt of breathing room.
   body: {
     paddingHorizontal: MARGIN,
-    paddingTop: 16,
-    paddingBottom: 50,
+    paddingTop: 8,
+    paddingBottom: 24,
   },
 
-  // Thumb strip (between hero and property block). H-7m bumped
-  // cell height 50→87 (3:2 aspect at the cell's ~132pt width) so
-  // typical phone-camera real-estate photos fit edge-to-edge.
+  // Thumb strip (between hero and property block). H-7p reduced
+  // cell height 87→80 to absorb hero/header trims without losing
+  // 3:2 aspect (cell width ~132pt; height 88pt is exact 3:2 but
+  // 80pt reads close enough at this scale).
   thumbStrip: {
     flexDirection: "row",
     paddingHorizontal: MARGIN,
@@ -150,12 +154,12 @@ const styles = StyleSheet.create({
   },
   thumbCell: {
     flex: 1,
-    height: 87,
+    height: 80,
     overflow: "hidden",
   },
   thumb: {
     width: "100%",
-    height: 87,
+    height: 80,
     objectFit: "cover",
   },
 
@@ -190,14 +194,15 @@ const styles = StyleSheet.create({
     fontFamily: "Helvetica-Bold",
   },
 
-  // Section labels (FEATURES, etc.)
+  // Section labels (FEATURES, etc.) — H-7p reduced marginTop
+  // 16→10 to compress inter-block gaps.
   sectionLabel: {
     fontSize: 8,
     fontFamily: "Helvetica-Bold",
     letterSpacing: 1.4,
     textTransform: "uppercase",
-    marginBottom: 6,
-    marginTop: 16,
+    marginBottom: 4,
+    marginTop: 10,
   },
 
   // Highlights
@@ -228,16 +233,18 @@ const styles = StyleSheet.create({
     flex: 1,
   },
 
-  // Description
+  // Description — H-7p tightened lineHeight 1.55→1.35 and
+  // pre-truncates to ~140 chars in the render path so a long
+  // description doesn't push other blocks to page 2.
   descriptionText: {
-    fontSize: 11,
-    lineHeight: 1.55,
+    fontSize: 10,
+    lineHeight: 1.35,
   },
 
   // Agent + QR row
   agentQrRow: {
     flexDirection: "row",
-    marginTop: 18,
+    marginTop: 12,
     alignItems: "stretch",
   },
   agentBlock: {
@@ -362,13 +369,9 @@ export function PromoDocument({
   const rightHighlights = highlights.slice(splitAt);
 
   const hasHero = !!heroSrc;
-  // H-7m: hero is now a fixed 3:2 box (540pt × 360pt at print)
-  // whether or not the thumb strip renders. CONTAIN-fit means
-  // letterbox/pillarbox bars fill any aspect mismatch with brand
-  // primary, so the hero region's height doesn't need to flex per
-  // draft state.
+  // hasThumbs only affects whether the strip renders — hero
+  // height is fixed 270pt regardless (set in the heroWrap style).
   void hasThumbs;
-  const heroHeight = 360;
 
   const dateLabel = draft.eventDate ? formatEventDate(draft.eventDate) : "";
   const timeLabel = formatTimeRange(draft.eventStartTime, draft.eventEndTime);
@@ -423,14 +426,14 @@ export function PromoDocument({
 
         {/* ── Hero photo ──────────────────────────────────── */}
         {hasHero ? (
-          <View style={[styles.heroWrap, { height: heroHeight }]}>
+          <View style={styles.heroWrap}>
             <Image src={heroSrc!} style={styles.hero} />
           </View>
         ) : (
           <View
             style={[
               styles.heroPlaceholder,
-              { backgroundColor: "#1f2937", height: heroHeight },
+              { backgroundColor: "#1f2937", height: 270 },
             ]}
           >
             <Text
@@ -522,15 +525,19 @@ export function PromoDocument({
             </>
           ) : null}
 
-          {/* Description */}
+          {/* Description — H-7p pre-truncates at 140 chars with
+              an ellipsis so a long pitch doesn't push other
+              blocks to page 2. The form's helper text already
+              hints "1-2 sentence pitch", so most users stay
+              under the cap; truncation only fires on outliers. */}
           {showDescription ? (
             <Text
               style={[
                 styles.descriptionText,
-                { color: textPrimary, marginTop: 16 },
+                { color: textPrimary, marginTop: 8 },
               ]}
             >
-              {draft.description}
+              {truncate(draft.description, 140)}
             </Text>
           ) : null}
 
@@ -624,6 +631,16 @@ export function PromoDocument({
       </Page>
     </Document>
   );
+}
+
+/** Truncate to maxChars with an ellipsis suffix. Trims trailing
+ *  whitespace before appending the ellipsis so the result never
+ *  has " …" with a stray space. Called only on the description
+ *  field — long descriptions push the page-2 risk on multi-photo
+ *  drafts. */
+function truncate(s: string, maxChars: number): string {
+  if (s.length <= maxChars) return s;
+  return s.slice(0, maxChars).trimEnd() + "…";
 }
 
 /**
