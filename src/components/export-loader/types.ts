@@ -35,4 +35,17 @@ export interface ExportProgress {
   livePreviewUrl?: string;
   /** Aspect of the video being exported — drives LiveThumbnail sizing. */
   aspect?: "reel" | "square";
+  /**
+   * H-7.2.2b: the export handler flips this to true after every
+   * selected format has finished rendering and the share-sheet /
+   * download is about to fire. The loader holds for ~800ms in
+   * celebration mode (checkmark + sparkles + "ready!" headline)
+   * before the handler clears progress to dismiss the loader.
+   */
+  celebrate?: boolean;
+  /**
+   * Property address from the draft, woven into rendering-stage
+   * copy. Falls back to generic copy when undefined or empty.
+   */
+  addressLabel?: string;
 }

@@ -197,6 +197,7 @@ export function ExportButtons({
     // shared across reel + square so the user sees one continuous
     // timer rather than two separate per-size timers.
     const startedAt = Date.now();
+    const addressLabel = draft.addressLine1.trim() || undefined;
     const emit = (
       stage: ExportStage,
       stagePercent: number,
@@ -214,6 +215,7 @@ export function ExportButtons({
         overallPercent: overallProgress(stage, stagePercent),
         elapsedMs: Date.now() - startedAt,
         label,
+        addressLabel,
         ...extra,
       });
 
@@ -366,6 +368,13 @@ export function ExportButtons({
         setTimeout(() => setMp4State({ kind: "idle" }), 5000);
       }
       emit("finalizing", 100);
+      // Celebration moment held by the loader for ~800ms before
+      // clearing. Same pattern as the Open House Promo handler;
+      // signals "done" before the share sheet / downloads fire.
+      setExportProgress((prev) =>
+        prev ? { ...prev, celebrate: true } : prev
+      );
+      await new Promise((r) => setTimeout(r, 800));
     } catch (err) {
       console.error("[flyer mp4]", err);
       setMp4State({

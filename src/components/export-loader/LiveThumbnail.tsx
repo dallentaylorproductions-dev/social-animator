@@ -1,7 +1,6 @@
 "use client";
 
 import { useEffect, useState } from "react";
-import { motion, AnimatePresence } from "framer-motion";
 
 interface LiveThumbnailProps {
   /** Object URL of the most recent frame preview, or null/undefined
@@ -17,11 +16,20 @@ interface LiveThumbnailProps {
 
 /**
  * Live preview of the video being assembled. The frame-render
- * engine emits a JPEG object URL every 10 frames; this component
- * displays the most recent one with a smooth crossfade between
- * updates. Reads as a real-time miniature of the export coming
- * together, which makes the multi-minute wait feel productive
- * rather than dead.
+ * engine emits a JPEG object URL every ~1s; this component holds
+ * the previous thumbnail visible until the new one's <img> has
+ * actually loaded (via onLoad), at which point the new one fades
+ * in over the old. The previous blob URL is revoked by the engine
+ * 500ms later, which gives us comfortable headroom for the
+ * crossfade.
+ *
+ * H-7.2.2b rewrote the swap logic. The earlier crossfade-on-prop
+ * approach (key={url} inside AnimatePresence) caused visible
+ * strobing because the engine revoked URLs faster than the
+ * animation could fade out — the <img> would try to render an
+ * already-freed blob and show a broken-image fallback for a
+ * frame. The onLoad-driven swap keeps the previous frame on
+ * screen until the new one is ready to display.
  *
  * Falls back to a stenciled placeholder when no thumbnail is
  * available yet (preparing stage, or iOS path which doesn't
@@ -33,9 +41,18 @@ export function LiveThumbnail({
   glowColor,
   reducedMotion,
 }: LiveThumbnailProps) {
-  // Reel cards are 9:16 portrait; square cards are 1:1. Fixed
-  // pixel dims keep the loader card layout stable as the inner
-  // image swaps in.
+  // displayedUrl = currently shown image; pendingUrl = next image
+  // being preloaded. Once pending's onLoad fires we promote it to
+  // displayed and clear pending.
+  const [displayedUrl, setDisplayedUrl] = useState<string | null>(null);
+  const [pendingUrl, setPendingUrl] = useState<string | null>(null);
+
+  useEffect(() => {
+    if (!url) return;
+    if (url === displayedUrl) return;
+    setPendingUrl(url);
+  }, [url, displayedUrl]);
+
   const dims =
     aspect === "reel"
       ? { width: 90, height: 160 }
@@ -52,40 +69,42 @@ export function LiveThumbnail({
           backgroundColor: "#0a0a0a",
         }}
       >
-        {url ? (
-          reducedMotion ? (
-            <Image url={url} />
-          ) : (
-            <AnimatePresence mode="popLayout">
-              <motion.div
-                key={url}
-                initial={{ opacity: 0 }}
-                animate={{ opacity: 1 }}
-                exit={{ opacity: 0 }}
-                transition={{ duration: 0.2 }}
-                className="absolute inset-0"
-              >
-                <Image url={url} />
-              </motion.div>
-            </AnimatePresence>
-          )
-        ) : (
+        {displayedUrl && (
+          // eslint-disable-next-line @next/next/no-img-element
+          <img
+            src={displayedUrl}
+            alt=""
+            aria-hidden
+            className="absolute inset-0 w-full h-full object-cover"
+          />
+        )}
+        {pendingUrl && (
+          // eslint-disable-next-line @next/next/no-img-element
+          <img
+            src={pendingUrl}
+            alt=""
+            aria-hidden
+            onLoad={() => {
+              setDisplayedUrl(pendingUrl);
+              setPendingUrl(null);
+            }}
+            onError={() => {
+              // Old blob revoked too early or other load failure.
+              // Drop the pending URL; current displayed frame
+              // stays on screen until the next emit arrives.
+              setPendingUrl(null);
+            }}
+            className="absolute inset-0 w-full h-full object-cover transition-opacity duration-200"
+            style={{
+              opacity: reducedMotion ? 1 : 0.999, // ensure transition triggers
+            }}
+          />
+        )}
+        {!displayedUrl && !pendingUrl && (
           <Placeholder glowColor={glowColor} reducedMotion={reducedMotion} />
         )}
       </div>
     </div>
-  );
-}
-
-function Image({ url }: { url: string }) {
-  return (
-    // eslint-disable-next-line @next/next/no-img-element
-    <img
-      src={url}
-      alt=""
-      aria-hidden
-      className="w-full h-full object-cover"
-    />
   );
 }
 
@@ -96,24 +115,14 @@ function Placeholder({
   glowColor: string;
   reducedMotion: boolean;
 }) {
-  if (reducedMotion) {
-    return (
-      <div
-        className="w-full h-full flex items-center justify-center"
-        style={{ color: glowColor + "AA" }}
-      >
-        <span className="text-[10px] uppercase tracking-[0.2em]">Preview</span>
-      </div>
-    );
-  }
   return (
-    <motion.div
-      className="w-full h-full flex items-center justify-center"
-      animate={{ opacity: [0.3, 0.7, 0.3] }}
-      transition={{ duration: 2, repeat: Infinity, ease: "easeInOut" }}
+    <div
+      className={`w-full h-full flex items-center justify-center ${
+        reducedMotion ? "" : "animate-pulse"
+      }`}
       style={{ color: glowColor + "AA" }}
     >
       <span className="text-[10px] uppercase tracking-[0.2em]">Preview</span>
-    </motion.div>
+    </div>
   );
 }

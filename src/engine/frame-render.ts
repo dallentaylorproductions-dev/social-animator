@@ -179,10 +179,17 @@ async function renderFrameByFrame(
 
   // Live preview thumbnail — emitted every THUMB_EVERY frames as a
   // small JPEG object URL so the loader can show a crossfading
-  // miniature of the export coming together. Previous URLs are
-  // revoked as new ones arrive to keep the page's blob registry
-  // bounded.
-  const THUMB_EVERY = 10;
+  // miniature of the export coming together.
+  //
+  // H-7.2.2b dropped the capture frequency 10→30 (~1 thumb per
+  // second @ 30fps) AND switched from immediate revoke to a
+  // 500ms-delayed revoke. The old immediate-revoke pattern was
+  // tearing down the previous URL before the LiveThumbnail
+  // component's crossfade had a chance to render it, producing
+  // visible strobing + occasional broken-image fallbacks. The
+  // delay gives the new <img> time to swap in via its onLoad
+  // handler before the old blob disappears.
+  const THUMB_EVERY = 30;
   let lastThumbUrl: string | null = null;
 
   for (let i = 0; i < totalFrames; i++) {
@@ -198,15 +205,20 @@ async function renderFrameByFrame(
     const filename = frameFilename(i);
     await ffmpeg.writeFile(filename, buffer);
 
-    // Capture a thumbnail every THUMB_EVERY frames. JPEG q=0.7
+    // Capture a thumbnail every THUMB_EVERY frames. JPEG q=0.6
     // is plenty for a 90×160 / 140×140 preview and encodes much
-    // faster than another PNG.
+    // faster than another PNG. The previous URL is revoked on a
+    // 500ms timer (see THUMB_EVERY block above) so the LiveThumbnail
+    // crossfade has time to swap before the source blob is freed.
     let livePreviewUrl: string | undefined;
     if (i % THUMB_EVERY === 0 || i === totalFrames - 1) {
-      const thumbBlob = await canvasToBlob(canvas, "image/jpeg", 0.7);
-      if (lastThumbUrl) URL.revokeObjectURL(lastThumbUrl);
+      const thumbBlob = await canvasToBlob(canvas, "image/jpeg", 0.6);
+      const previousUrl = lastThumbUrl;
       lastThumbUrl = URL.createObjectURL(thumbBlob);
       livePreviewUrl = lastThumbUrl;
+      if (previousUrl) {
+        setTimeout(() => URL.revokeObjectURL(previousUrl), 500);
+      }
     }
 
     onProgress?.({
@@ -281,6 +293,15 @@ async function renderFrameByFrame(
       await ffmpeg.deleteFile("output.mp4");
     } catch {
       // best-effort
+    }
+    // Revoke the final thumbnail URL after a generous 2s delay so
+    // the loader's completion celebration has time to keep
+    // displaying it. The blob owner (the page) has already gotten
+    // its mp4 result by this point — the only remaining consumer
+    // is the loader UI which dismisses well within 2s.
+    if (lastThumbUrl) {
+      const toRevoke = lastThumbUrl;
+      setTimeout(() => URL.revokeObjectURL(toRevoke), 2000);
     }
   }
 }

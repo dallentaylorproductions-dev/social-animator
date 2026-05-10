@@ -8,9 +8,11 @@ import {
   pickContrastMuted,
 } from "@/tools/listing-flyer/engine/contrast";
 import type { ExportProgress } from "./types";
-import { STAGE_DEFS, STAGE_ORDER } from "./stages";
+import { STAGE_ORDER, personalizedStageCopy } from "./stages";
 import { LiveThumbnail } from "./LiveThumbnail";
 import { RotatingTip } from "./RotatingTip";
+import { HouseWalker } from "./HouseWalker";
+import { CompletionCelebration } from "./CompletionCelebration";
 
 interface ExportLoaderProps {
   progress: ExportProgress;
@@ -43,7 +45,9 @@ export function ExportLoader({ progress, brand }: ExportLoaderProps) {
     return () => clearInterval(id);
   }, []);
 
-  const def = STAGE_DEFS[progress.stage];
+  const def = personalizedStageCopy(progress.stage, {
+    address: progress.addressLabel,
+  });
   const primary = brand.primaryColor || "#4ef2d9";
   const cardBg = brand.backgroundColor || "#ffffff";
   const textColor = pickContrastText(cardBg);
@@ -72,6 +76,32 @@ export function ExportLoader({ progress, brand }: ExportLoaderProps) {
     progress.stage === "rendering" &&
     typeof progress.frameIndex === "number" &&
     typeof progress.totalFrames === "number";
+
+  // Celebration overlay short-circuits the regular progress UI
+  // once every selected format has been rendered. The handler
+  // holds for ~800ms in this state, then clears progress to
+  // dismiss the loader and fire the share sheet / downloads.
+  if (progress.celebrate) {
+    return (
+      <div
+        className="fixed inset-0 z-50 flex items-center justify-center bg-black/65 backdrop-blur-sm p-4"
+        role="status"
+        aria-live="polite"
+      >
+        <div
+          className="w-full max-w-md rounded-2xl shadow-2xl overflow-hidden"
+          style={{ backgroundColor: cardBg }}
+        >
+          <CompletionCelebration
+            color={primary}
+            cardBg={cardBg}
+            textColor={textColor}
+            reducedMotion={reducedMotion}
+          />
+        </div>
+      </div>
+    );
+  }
 
   return (
     <div
@@ -124,6 +154,12 @@ export function ExportLoader({ progress, brand }: ExportLoaderProps) {
           url={progress.livePreviewUrl ?? null}
           aspect={aspect}
           glowColor={primary}
+          reducedMotion={reducedMotion}
+        />
+
+        <HouseWalker
+          percent={overallPct}
+          color={primary}
           reducedMotion={reducedMotion}
         />
 

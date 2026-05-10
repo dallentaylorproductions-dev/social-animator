@@ -11,8 +11,11 @@ import {
   Zap,
   Home,
   Smartphone,
+  TrendingUp,
+  Brain,
+  Target,
 } from "lucide-react";
-import { EXPORT_TIPS, shuffleTips, type TipIcon } from "./tips";
+import { EXPORT_TIPS, buildTipRotation, type TipIcon } from "./tips";
 
 const ROTATION_MS = 5000;
 const FADE_MS = 400;
@@ -35,6 +38,9 @@ const ICON_MAP: Record<TipIcon, typeof Sparkles> = {
   zap: Zap,
   home: Home,
   smartphone: Smartphone,
+  "trending-up": TrendingUp,
+  brain: Brain,
+  target: Target,
 };
 
 /**
@@ -44,7 +50,7 @@ const ICON_MAP: Record<TipIcon, typeof Sparkles> = {
  * is suppressed when prefers-reduced-motion is set.
  */
 export function RotatingTip({ reducedMotion, iconColor, textColor }: RotatingTipProps) {
-  const tips = useMemo(() => shuffleTips(EXPORT_TIPS), []);
+  const tips = useMemo(() => buildTipRotation(EXPORT_TIPS), []);
   const [index, setIndex] = useState(0);
 
   useEffect(() => {

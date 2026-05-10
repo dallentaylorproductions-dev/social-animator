@@ -10,6 +10,18 @@ interface StageDef {
 }
 
 /**
+ * Per-export personalization context. H-7.2.2b: stage copy now
+ * weaves in the actual listing address when available, so the
+ * wait reads as "we're working on YOUR house" instead of generic
+ * "preparing your video" boilerplate. Empty values fall through
+ * to a tasteful generic phrasing.
+ */
+export interface StageContext {
+  /** Property street address, if the draft has one. */
+  address?: string;
+}
+
+/**
  * Stage definitions drive both the loader UI (title + copy) and the
  * overall-progress mapping. Copy is intentionally educational —
  * each stage reinforces a positioning beat (privacy, quality,
@@ -33,7 +45,7 @@ interface StageDef {
 export const STAGE_DEFS: Record<ExportStage, StageDef> = {
   preparing: {
     title: "Preparing your assets",
-    copy: "Compressing photos at print quality. Your photos stay on your device — never uploaded.",
+    copy: "Polishing photos at print quality. Your photos stay on your device — never uploaded.",
     overallStart: 0,
     overallEnd: 10,
   },
@@ -45,7 +57,7 @@ export const STAGE_DEFS: Record<ExportStage, StageDef> = {
   },
   encoding: {
     title: "Encoding for social platforms",
-    copy: "Optimizing at the bitrate that survives platform recompression.",
+    copy: "Optimizing at the bitrate that survives Instagram and TikTok recompression.",
     overallStart: 65,
     overallEnd: 95,
   },
@@ -56,6 +68,38 @@ export const STAGE_DEFS: Record<ExportStage, StageDef> = {
     overallEnd: 100,
   },
 };
+
+/**
+ * Personalized stage title/copy. Falls back to the generic
+ * STAGE_DEFS values when no listing context is available. Address
+ * is woven into the rendering stage title because that's the
+ * longest stage — the user sees that title for most of the wait,
+ * so the personalization beat pays off.
+ */
+export function personalizedStageCopy(
+  stage: ExportStage,
+  ctx: StageContext
+): { title: string; copy: string } {
+  const def = STAGE_DEFS[stage];
+  const address = ctx.address?.trim();
+  if (!address) return { title: def.title, copy: def.copy };
+
+  switch (stage) {
+    case "preparing":
+      return {
+        title: def.title,
+        copy: `Polishing photos for ${address}. Your photos stay on your device — never uploaded.`,
+      };
+    case "rendering":
+      return {
+        title: `Crafting ${address}`,
+        copy: def.copy,
+      };
+    case "encoding":
+    case "finalizing":
+      return { title: def.title, copy: def.copy };
+  }
+}
 
 export const STAGE_ORDER: ExportStage[] = [
   "preparing",

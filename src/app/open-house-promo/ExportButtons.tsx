@@ -210,6 +210,7 @@ export function ExportButtons({
     // covering both sizes so the user sees a continuous timer
     // across the reel→square transition.
     const startedAt = Date.now();
+    const addressLabel = draft.propertyAddress.trim() || undefined;
     const emit = (
       stage: ExportStage,
       stagePercent: number,
@@ -227,6 +228,7 @@ export function ExportButtons({
         overallPercent: overallProgress(stage, stagePercent),
         elapsedMs: Date.now() - startedAt,
         label,
+        addressLabel,
         ...extra,
       });
 
@@ -345,6 +347,13 @@ export function ExportButtons({
         setTimeout(() => setMp4State({ kind: "idle" }), 5000);
       }
       emit("finalizing", 100);
+      // Celebration moment — held by the loader for ~800ms before
+      // we clear progress. Gives the user a satisfying beat that
+      // signals "done" before the share sheet appears.
+      setExportProgress((prev) =>
+        prev ? { ...prev, celebrate: true } : prev
+      );
+      await new Promise((r) => setTimeout(r, 800));
     } catch (err) {
       console.error("[promo mp4]", err);
       setMp4State({
