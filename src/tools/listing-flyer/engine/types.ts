@@ -32,6 +32,36 @@ export interface FlyerDraft {
    * only the trailing static dwell scales with this value.
    */
   duration: number;
+
+  /**
+   * MP4 format selection. H-7.2.2a added per-export opt-in. Reel
+   * is the recommended default (vertical reels dominate realtor
+   * social distribution); square is opt-in for agents who also
+   * want an Instagram-feed asset. Rendering one format halves
+   * the wait time vs always rendering both.
+   */
+  exportFormats: ExportFormatSelection;
+}
+
+export interface ExportFormatSelection {
+  /** 9:16 vertical — Stories, Reels, TikTok. */
+  reel: boolean;
+  /** 1:1 square — Instagram feed, Facebook. */
+  square: boolean;
+}
+
+/**
+ * Coerce stored exportFormats into a valid selection. Pre-H-7.2.2a
+ * drafts won't have this field; default to reel-only. Defensive
+ * against the both-false state — must render at least one format.
+ */
+export function clampExportFormats(input: unknown): ExportFormatSelection {
+  if (!input || typeof input !== "object") return { reel: true, square: false };
+  const o = input as Record<string, unknown>;
+  const reel = typeof o.reel === "boolean" ? o.reel : true;
+  const square = typeof o.square === "boolean" ? o.square : false;
+  if (!reel && !square) return { reel: true, square: false };
+  return { reel, square };
 }
 
 export const MIN_DURATION = 5;
@@ -68,6 +98,7 @@ export const EMPTY_DRAFT: FlyerDraft = {
   accentColor: "",
   backgroundColor: "",
   duration: DEFAULT_DURATION,
+  exportFormats: { reel: true, square: false },
 };
 
 export const MAX_PHOTOS = 5;

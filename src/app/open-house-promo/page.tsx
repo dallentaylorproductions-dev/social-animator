@@ -114,6 +114,9 @@ export default function OpenHousePromoPage() {
                 draft={draft}
                 brand={effectiveBrand}
                 brandLogoImg={brandLogoImg}
+                onUpdateFormats={(next) =>
+                  setDraft((d) => ({ ...d, exportFormats: next }))
+                }
               />
             </div>
           </aside>
@@ -128,12 +131,19 @@ export default function OpenHousePromoPage() {
             />
           </section>
 
-          {/* Mobile-only sticky export bar */}
-          <div className="order-3 sticky bottom-0 z-20 -mx-6 px-6 py-3 bg-neutral-950 border-t border-neutral-800/60 shadow-[0_-4px_12px_rgba(0,0,0,0.4)] lg:hidden">
+          {/* Mobile sticky export bar — fixed-positioned (see same
+              comment in src/app/listing-flyer/page.tsx). `sticky
+              bottom-0` is unreliable on iOS Safari with flex
+              layout; the bar pops behind the viewport edge while
+              scrolling. */}
+          <div className="fixed bottom-0 left-0 right-0 z-30 px-6 py-3 bg-neutral-950/95 backdrop-blur border-t border-neutral-800/60 shadow-[0_-4px_12px_rgba(0,0,0,0.4)] lg:hidden">
             <ExportButtons
               draft={draft}
               brand={effectiveBrand}
               brandLogoImg={brandLogoImg}
+              onUpdateFormats={(next) =>
+                setDraft((d) => ({ ...d, exportFormats: next }))
+              }
             />
           </div>
         </div>

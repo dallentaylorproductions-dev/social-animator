@@ -164,10 +164,18 @@ async function renderFrameByFrame(
 
   const ffmpeg = await getFFmpeg();
 
-  // Defensive cleanup: in case a previous export failed mid-way
-  // and left frames behind, scrub the slot range we're about to
-  // use. Best-effort — deleteFile throws on missing files.
-  await cleanupFrameFiles(totalFrames);
+  // Defensive cleanup before render. Two leak sources to scrub:
+  //   1. A previous render that crashed mid-loop and left frames
+  //      behind in ffmpeg's virtual filesystem.
+  //   2. A previous render that was LONGER than this one and
+  //      cleaned up only its own range — leftover frame_NNNNN.png
+  //      files past `totalFrames` would still be present and get
+  //      picked up by the upcoming `frame_%05d.png` demuxer,
+  //      polluting the encode.
+  // Scrubbing the worst-case range (MAX_DURATION × fps = 450)
+  // every time covers both. Best-effort — deleteFile throws on
+  // missing files which we swallow.
+  await cleanupFrameFiles(MAX_FRAME_SLOTS);
 
   // Live preview thumbnail — emitted every THUMB_EVERY frames as a
   // small JPEG object URL so the loader can show a crossfading
@@ -264,8 +272,11 @@ async function renderFrameByFrame(
     // Memory cleanup: delete the PNG sequence + output file from
     // ffmpeg.wasm's virtual filesystem so subsequent exports in
     // the same session don't accumulate the prior export's
-    // ~225-900MB working set.
-    await cleanupFrameFiles(totalFrames);
+    // ~225-900MB working set. Scrub the worst-case range so a
+    // future shorter render's defensive cleanup catches any
+    // missed slots (see comment at the top of the function for
+    // why this matters).
+    await cleanupFrameFiles(MAX_FRAME_SLOTS);
     try {
       await ffmpeg.deleteFile("output.mp4");
     } catch {
@@ -273,6 +284,15 @@ async function renderFrameByFrame(
     }
   }
 }
+
+/**
+ * Worst-case slot count for the PNG sequence cleanup loop.
+ * 15s × 30fps = 450 frames is the longest export the duration
+ * slider allows (MAX_MP4_DURATION). Anything past that doesn't
+ * exist on disk, so deleteFile no-ops harmlessly inside the
+ * best-effort catch.
+ */
+const MAX_FRAME_SLOTS = 15 * 30;
 
 /**
  * Create a render-target canvas at the requested size. Prefers

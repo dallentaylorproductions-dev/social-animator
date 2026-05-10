@@ -206,6 +206,9 @@ export default function ListingFlyerPage() {
                 photos={photos}
                 brand={effectiveBrand}
                 brandLogoImg={brandLogoImg}
+                onUpdateFormats={(next) =>
+                  setDraft((d) => ({ ...d, exportFormats: next }))
+                }
               />
             </div>
           </aside>
@@ -223,12 +226,21 @@ export default function ListingFlyerPage() {
             />
           </section>
 
-          <div className="order-3 sticky bottom-0 z-20 -mx-6 px-6 py-3 bg-neutral-950 border-t border-neutral-800/60 shadow-[0_-4px_12px_rgba(0,0,0,0.4)] lg:hidden">
+          {/* Mobile sticky export bar — fixed-positioned because
+              `sticky bottom-0` is unreliable on iOS Safari when the
+              parent uses flex layout (the bar pops behind the
+              viewport edge when scrolling). `fixed` to viewport is
+              the iOS-friendly equivalent; form keeps `pb-32` so the
+              last field isn't hidden behind the bar. */}
+          <div className="fixed bottom-0 left-0 right-0 z-30 px-6 py-3 bg-neutral-950/95 backdrop-blur border-t border-neutral-800/60 shadow-[0_-4px_12px_rgba(0,0,0,0.4)] lg:hidden">
             <ExportButtons
               draft={draft}
               photos={photos}
               brand={effectiveBrand}
               brandLogoImg={brandLogoImg}
+              onUpdateFormats={(next) =>
+                setDraft((d) => ({ ...d, exportFormats: next }))
+              }
             />
           </div>
         </div>
