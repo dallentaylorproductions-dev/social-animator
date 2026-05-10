@@ -222,7 +222,16 @@ export async function webmToMp4(
     // dominant quality lever) stays at 18; only encode-time/size
     // efficiency changes between presets. `fast` cuts encode time
     // ~2x at the cost of ~5-10% larger output — acceptable trade.
+    //
+    // H-7.1 added a duration-aware fallback: at 11-15s the same
+    // `fast` preset would push reel encode toward 75-100s. Drop
+    // to `veryfast` for those longer videos so the upper bound
+    // stays under ~60s. CRF still 18, so the perceived quality
+    // step is small (~10% larger file, slightly less compression
+    // efficiency); the user gets back ~30% encode-time reduction
+    // when they pick a long duration.
     // Applies to all MP4 exports (Listing Flyer + Open House Promo).
+    const preset = durationSec > 10 ? "veryfast" : "fast";
     const warmupSec = warmupMs / 1000;
     await ffmpeg.exec([
       "-i",
@@ -240,7 +249,7 @@ export async function webmToMp4(
       "-profile:v",
       "high",
       "-preset",
-      "fast",
+      preset,
       "-crf",
       "18",
       "-pix_fmt",

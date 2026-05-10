@@ -46,7 +46,47 @@ import { drawImageContain } from "@/engine/draw";
  * QR pulse: sin-wave 1.0 ± 0.02, 1s period, active 4-6s.
  */
 
-export const PROMO_TOTAL_SEC = 6;
+/** Default duration when no explicit value is supplied (e.g. by
+ *  callers that haven't migrated to the H-7.1 slider). 6s
+ *  preserves the pre-slider behavior — Ken Burns at 1.05 end-zoom,
+ *  QR pulse 4-6s — exactly. */
+export const PROMO_DEFAULT_DURATION_SEC = 6;
+
+/** Entrance ends at this absolute time regardless of total duration
+ *  — the intro should feel snappy whether the user picks 5s or
+ *  15s. Static dwell + Ken Burns + QR pulse fill whatever time
+ *  remains after the entrance. */
+export const ENTRANCE_END_MS = 1550;
+
+/** QR pulse occupies the last QR_PULSE_DURATION_MS of the loop.
+ *  At 6s default: pulse 4-6s. At 15s: pulse 13-15s. */
+export const QR_PULSE_DURATION_MS = 2000;
+
+/**
+ * Ken Burns end-zoom scales linearly with duration so the
+ * per-second zoom rate stays comparable across user-picked
+ * durations: at 6s the hero zooms 1.0 → 1.05 (~0.83%/s);
+ * at 15s it zooms 1.0 → 1.086 (~0.57%/s — a bit slower per-second
+ * but covers more total distance over a longer window).
+ */
+function kenBurnsEndScale(durationSec: number): number {
+  return 1.05 + (durationSec - PROMO_DEFAULT_DURATION_SEC) * 0.004;
+}
+
+/** Animation parameters derived from a chosen duration. Keeps
+ *  the math in one place so timeline tracks, render-mp4, and the
+ *  ExportButtons progress UI all reference identical numbers. */
+export function computeAnimationParams(durationSec: number) {
+  const totalMs = durationSec * 1000;
+  return {
+    totalMs,
+    totalSec: durationSec,
+    entranceEndMs: ENTRANCE_END_MS,
+    qrPulseStartMs: Math.max(ENTRANCE_END_MS, totalMs - QR_PULSE_DURATION_MS),
+    qrPulseEndMs: totalMs,
+    kenBurnsEnd: kenBurnsEndScale(durationSec),
+  };
+}
 
 const SAFE_X = 80;
 const SAFE_Y = 60;
@@ -95,22 +135,33 @@ export interface PromoMp4Assets {
 export function buildPromoTimeline(
   state: PromoMp4State,
   size: { width: number; height: number },
-  assets: PromoMp4Assets
+  assets: PromoMp4Assets,
+  durationSec: number = PROMO_DEFAULT_DURATION_SEC
 ): Timeline {
   const tracks: Track[] = [];
+  const params = computeAnimationParams(durationSec);
 
   tracks.push({
     id: "flyer",
     start: 0,
-    duration: PROMO_TOTAL_SEC,
+    duration: params.totalSec,
     easing: linear,
     onUpdate: (p, ctx) => {
-      const t = p * PROMO_TOTAL_SEC;
-      renderFrame(ctx, t, size, state, assets);
+      const t = p * params.totalSec;
+      renderFrame(ctx, t, size, state, assets, params);
     },
   });
 
   return new Timeline(tracks);
+}
+
+interface AnimationParams {
+  totalMs: number;
+  totalSec: number;
+  entranceEndMs: number;
+  qrPulseStartMs: number;
+  qrPulseEndMs: number;
+  kenBurnsEnd: number;
 }
 
 function renderFrame(
@@ -118,7 +169,8 @@ function renderFrame(
   t: number,
   size: { width: number; height: number },
   state: PromoMp4State,
-  assets: PromoMp4Assets
+  assets: PromoMp4Assets,
+  params: AnimationParams
 ): void {
   const isSquare = Math.abs(size.width - size.height) < 50;
 
@@ -130,7 +182,7 @@ function renderFrame(
   // the text inside it animates.
   drawHeaderBar(ctx, size, state, isSquare);
 
-  drawHeroPhoto(ctx, t, size, state, assets, isSquare);
+  drawHeroPhoto(ctx, t, size, state, assets, isSquare, params);
   drawHeaderText(ctx, t, size, state, isSquare);
 
   if (!isSquare && assets.thumbs.length > 0) {
@@ -144,7 +196,7 @@ function renderFrame(
     drawDescriptionBlock(ctx, t, state);
   }
 
-  drawAgentQrRow(ctx, t, size, state, assets, isSquare);
+  drawAgentQrRow(ctx, t, size, state, assets, isSquare, params);
   drawFooterBar(ctx, t, size, state, isSquare);
 
   if (DEBUG_SAFE_AREA) drawSafeAreaDebug(ctx, size);
@@ -274,7 +326,8 @@ function drawHeroPhoto(
   size: { width: number; height: number },
   state: PromoMp4State,
   assets: PromoMp4Assets,
-  isSquare: boolean
+  isSquare: boolean,
+  params: AnimationParams
 ): void {
   const e = blockEntrance(t, ENTRANCE_SCHEDULE.heroPhoto);
   if (e.opacity <= 0) return;
@@ -318,8 +371,12 @@ function drawHeroPhoto(
   // Centered zoom. Foreground canvas has transparent margins
   // around the contain-fit photo, so the blur backdrop shows
   // through wherever the photo doesn't reach.
-  const burnP = clamp01(t / PROMO_TOTAL_SEC);
-  const zoom = 1.0 + burnP * 0.05;
+  // Ken Burns runs across the full duration. End-zoom scales with
+  // duration (params.kenBurnsEnd) so per-second zoom rate stays
+  // comparable across user-picked lengths — at 6s default the
+  // hero zooms to 1.05; at 15s it zooms to 1.086.
+  const burnP = clamp01(t / params.totalSec);
+  const zoom = 1.0 + burnP * (params.kenBurnsEnd - 1.0);
   const dw = heroW * zoom;
   const dh = heroH * zoom;
   const dx = (heroW - dw) / 2;
@@ -605,7 +662,8 @@ function drawAgentQrRow(
   size: { width: number; height: number },
   state: PromoMp4State,
   assets: PromoMp4Assets,
-  isSquare: boolean
+  isSquare: boolean,
+  params: AnimationParams
 ): void {
   const e = blockEntrance(t, ENTRANCE_SCHEDULE.agentQrRow);
   if (e.opacity <= 0) return;
@@ -615,9 +673,9 @@ function drawAgentQrRow(
   ctx.globalAlpha *= e.opacity;
 
   if (isSquare) {
-    drawAgentQrSquare(ctx, t, size, state, assets);
+    drawAgentQrSquare(ctx, t, size, state, assets, params);
   } else {
-    drawAgentQrReel(ctx, t, size, state, assets);
+    drawAgentQrReel(ctx, t, size, state, assets, params);
   }
   ctx.restore();
 }
@@ -627,7 +685,8 @@ function drawAgentQrReel(
   t: number,
   size: { width: number; height: number },
   state: PromoMp4State,
-  assets: PromoMp4Assets
+  assets: PromoMp4Assets,
+  params: AnimationParams
 ): void {
   // Section: y=1540-1750 (210 tall) — H-7x shifted +70 to fit
   // the 240×160 thumb strip + content above.
@@ -669,7 +728,7 @@ function drawAgentQrReel(
   // Reel QR — 200×200 card at x=760, y=1550. labelCx = 860,
   // labelY = 1550 + 200 + 16 = 1766 (glyph top with textBaseline
   // "top"). 90px breathing room before the y=1840 footer.
-  drawQrCard(ctx, t, state, assets, {
+  drawQrCard(ctx, t, state, assets, params, {
     cardX: 760,
     cardY: 1550,
     cardSize: 200,
@@ -686,7 +745,8 @@ function drawAgentQrSquare(
   t: number,
   size: { width: number; height: number },
   state: PromoMp4State,
-  assets: PromoMp4Assets
+  assets: PromoMp4Assets,
+  params: AnimationParams
 ): void {
   // Section: y=905-1010 (105 tall) per H-7v. QR shrunk 100→85,
   // shifted up 920→905 so the SCAN label clears the footer
@@ -733,7 +793,7 @@ function drawAgentQrSquare(
   // SCAN label top (round-7 smoke test read 8/10 as visually
   // overlapping even though the math was correct). label glyph
   // bottom ≈ y=1014; footer top y=1020 → 6px clearance.
-  drawQrCard(ctx, t, state, assets, {
+  drawQrCard(ctx, t, state, assets, params, {
     cardX: 880,
     cardY: 905,
     cardSize: 85,
@@ -761,12 +821,16 @@ function drawQrCard(
   t: number,
   state: PromoMp4State,
   assets: PromoMp4Assets,
+  params: AnimationParams,
   spec: QrCardSpec
 ): void {
   if (!assets.qrImage) return;
 
-  // Pulse: sin-wave 1.0 ± 0.02, 1s period, active 4-6s.
-  const pulseT = Math.max(0, t - 4.0);
+  // Pulse: sin-wave 1.0 ± 0.02, 1s period. Active in the last
+  // QR_PULSE_DURATION_MS of the loop — at 6s default that's 4-6s,
+  // at 15s it's 13-15s. Subtle "tap me" cue right before loop wrap.
+  const pulseStartSec = params.qrPulseStartMs / 1000;
+  const pulseT = Math.max(0, t - pulseStartSec);
   const pulse = pulseT > 0
     ? 1.0 + Math.sin((pulseT / 1.0) * Math.PI * 2) * 0.02
     : 1.0;
