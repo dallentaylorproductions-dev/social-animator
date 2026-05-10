@@ -95,14 +95,14 @@ export async function renderPromoMp4(
     ? await preBlurFillLayered(heroPhoto, HERO_REGION_W, HERO_REGION_H)
     : null;
 
-  // H-7t restored the thumb strip on reel — H-7s spec called for
-  // it, but the H-7r→H-7s transition left thumb materialization
-  // disabled. Cells are 240×90 (8:3 aspect) matching the
-  // timeline's strip layout. Square skips thumbs (no room).
+  // Thumb strip cells (reel only) — H-7x bumped 240×90 (8:3) →
+  // 240×160 (3:2 native real-estate photo aspect, no top/bottom
+  // truncation on typical phone sources). Keep dims in sync with
+  // the timeline's thumb strip layout.
   let thumbs: HTMLCanvasElement[] = [];
   if (!isSquare && draft.photos.length > 1) {
     thumbs = await Promise.all(
-      draft.photos.slice(1, 5).map((p) => preCropToCanvas(p, 240, 90))
+      draft.photos.slice(1, 5).map((p) => preCropToCanvas(p, 240, 160))
     );
   }
 

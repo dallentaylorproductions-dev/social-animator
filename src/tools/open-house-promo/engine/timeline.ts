@@ -341,12 +341,14 @@ function drawThumbStrip(
   const e = blockEntrance(t, ENTRANCE_SCHEDULE.thumbStrip);
   if (e.opacity <= 0) return;
 
-  // y=930-1020 per the H-7t reel gap rhythm. Cells 240×90 (8:3
-  // aspect), 20px gap between thumbs. Total strip width 1020px,
-  // centered: x_start = (1080-1020)/2 = 30.
+  // y=930-1090 per H-7x. Cells 240×160 (3:2 — natural real-estate
+  // photo aspect, no top/bottom truncation on typical phone-camera
+  // sources). 20px gap between thumbs. Total strip width 1020px,
+  // centered: x_start = (1080-1020)/2 = 30. Content below shifted
+  // down 70px to absorb the strip's increased height.
   const stripY = 930;
   const cellW = 240;
-  const cellH = 90;
+  const cellH = 160;
   const gap = 20;
   const count = Math.min(4, assets.thumbs.length);
   const totalW = count * cellW + (count - 1) * gap;
@@ -421,26 +423,27 @@ function drawPropertyBlock(
       ctx.fillText(state.price, size.width - 80, 705);
     }
   } else {
-    // Reel section: y=1060-1180 (120 tall)
+    // Reel section: y=1130-1250 (120 tall) — H-7x shifted +70
+    // from 1060 to absorb the bigger thumb strip above.
     ctx.fillStyle = state.accent;
     ctx.font = `bold 22px Helvetica, Arial, sans-serif`;
-    drawSpaced(ctx, "PRESENTING", padX, 1085, 3);
+    drawSpaced(ctx, "PRESENTING", padX, 1155, 3);
 
     ctx.fillStyle = "#ffffff";
     ctx.font = `bold 56px Helvetica, Arial, sans-serif`;
-    ctx.fillText(state.address || "Property address", padX, 1140);
+    ctx.fillText(state.address || "Property address", padX, 1210);
 
     if (state.city) {
       ctx.fillStyle = "rgba(255, 255, 255, 0.78)";
       ctx.font = `28px Helvetica, Arial, sans-serif`;
-      ctx.fillText(state.city, padX, 1175);
+      ctx.fillText(state.city, padX, 1245);
     }
 
     if (state.price) {
       ctx.fillStyle = state.primary;
       ctx.font = `bold 60px Helvetica, Arial, sans-serif`;
       ctx.textAlign = "right";
-      ctx.fillText(state.price, size.width - padX, 1140);
+      ctx.fillText(state.price, size.width - padX, 1210);
     }
   }
   ctx.restore();
@@ -503,17 +506,17 @@ function drawFeaturesBlock(
       state.primary
     );
   } else {
-    // Reel section: y=1220-1340 (120 tall)
+    // Reel section: y=1290-1410 (120 tall) — H-7x shifted +70.
     // 3-row col1, 2-row col2 at 30px row spacing fits comfortably.
     ctx.fillStyle = state.primary;
     ctx.font = `bold 22px Helvetica, Arial, sans-serif`;
-    drawSpaced(ctx, "FEATURES", 130, 1245, 3);
+    drawSpaced(ctx, "FEATURES", 130, 1315, 3);
 
     drawFeatureColumn(
       ctx,
       col1,
       130,
-      [1278, 1308, 1338],
+      [1348, 1378, 1408],
       28,
       state.primary
     );
@@ -521,7 +524,7 @@ function drawFeaturesBlock(
       ctx,
       col2,
       580,
-      [1278, 1308, 1338],
+      [1348, 1378, 1408],
       28,
       state.primary
     );
@@ -568,15 +571,27 @@ function drawDescriptionBlock(
   if (e.opacity <= 0) return;
 
   const padX = 100;
+  const fontSize = 22;
+  const lineHeight = Math.round(fontSize * 1.35);
+  // Reel canvas 1080 wide; description column padded 100px each
+  // side → 880px usable. wrapText measures against the live
+  // ctx.font, so set it before calling.
+  const maxWidth = 1080 - padX * 2;
+
   ctx.save();
   ctx.translate(0, e.translateY);
   ctx.globalAlpha *= e.opacity;
   ctx.fillStyle = "rgba(255, 255, 255, 0.85)";
-  ctx.font = `22px Helvetica, Arial, sans-serif`;
+  ctx.font = `${fontSize}px Helvetica, Arial, sans-serif`;
   ctx.textAlign = "left";
-  ctx.textBaseline = "alphabetic";
-  // Reel section y=1380-1430 (50 tall, single line)
-  ctx.fillText(state.description, padX, 1410);
+  ctx.textBaseline = "top";
+  // Reel description y=1450 (H-7x shifted down 70px from 1380 to
+  // make room for the 240×160 thumb strip above).
+  const yTop = 1450;
+  const lines = wrapText(ctx, state.description, maxWidth, 2);
+  for (let i = 0; i < lines.length; i++) {
+    ctx.fillText(lines[i], padX, yTop + i * lineHeight);
+  }
   ctx.restore();
 }
 
@@ -614,48 +629,49 @@ function drawAgentQrReel(
   state: PromoMp4State,
   assets: PromoMp4Assets
 ): void {
-  // Section: y=1470-1680 (210 tall)
+  // Section: y=1540-1750 (210 tall) — H-7x shifted +70 to fit
+  // the 240×160 thumb strip + content above.
   const padX = 100;
 
   if (assets.brandLogo) {
-    drawImageContain(ctx, assets.brandLogo, padX, 1485, 64, 64);
+    drawImageContain(ctx, assets.brandLogo, padX, 1555, 64, 64);
   } else {
     ctx.fillStyle = state.primary;
-    ctx.fillRect(padX, 1485, 64, 64);
+    ctx.fillRect(padX, 1555, 64, 64);
     ctx.fillStyle = state.onPrimary;
     ctx.font = `bold 14px Helvetica, Arial, sans-serif`;
     ctx.textAlign = "center";
     ctx.textBaseline = "middle";
-    ctx.fillText("LOGO", padX + 32, 1517);
+    ctx.fillText("LOGO", padX + 32, 1587);
   }
 
   ctx.textAlign = "left";
   ctx.textBaseline = "alphabetic";
   ctx.fillStyle = "#ffffff";
   ctx.font = `bold 32px Helvetica, Arial, sans-serif`;
-  ctx.fillText(state.agentName || "Your name", padX + 80, 1520);
+  ctx.fillText(state.agentName || "Your name", padX + 80, 1590);
 
   if (state.brokerage) {
     ctx.fillStyle = "rgba(255, 255, 255, 0.78)";
     ctx.font = `22px Helvetica, Arial, sans-serif`;
-    ctx.fillText(state.brokerage, padX + 80, 1555);
+    ctx.fillText(state.brokerage, padX + 80, 1625);
   }
 
   ctx.fillStyle = "#ffffff";
   ctx.font = `24px Helvetica, Arial, sans-serif`;
   if (state.phone) {
-    ctx.fillText(state.phone, padX, 1620);
+    ctx.fillText(state.phone, padX, 1690);
   }
   if (state.email) {
-    ctx.fillText(state.email, padX, 1660);
+    ctx.fillText(state.email, padX, 1730);
   }
 
-  // Reel QR — 200×200 card centered in the right column at
-  // x=760-960. Label center derives from the card rectangle:
-  // labelCx = 760 + 100 = 860, labelY = 1480 + 200 + 16 = 1696.
+  // Reel QR — 200×200 card at x=760, y=1550. labelCx = 860,
+  // labelY = 1550 + 200 + 16 = 1766 (glyph top with textBaseline
+  // "top"). 90px breathing room before the y=1840 footer.
   drawQrCard(ctx, t, state, assets, {
     cardX: 760,
-    cardY: 1480,
+    cardY: 1550,
     cardSize: 200,
     cardPad: 12,
     labelGap: 16,
@@ -712,18 +728,19 @@ function drawAgentQrSquare(
     ctx.fillText(state.email, padX, 995);
   }
 
-  // Square QR — 85×85 card at x=880, y=905. Label center derives
-  // from the card rectangle: labelCx = 880 + 42.5 = 922.5,
-  // labelY = 905 + 85 + 8 = 998. With 10pt label, glyph bottom
-  // ≈ y=1005, leaving ~15px clearance above the y=1020 footer.
+  // Square QR — 85×85 card at x=880, y=905. labelGap 10 + labelSize
+  // 12 give a clearer perceived gap between QR bottom and the
+  // SCAN label top (round-7 smoke test read 8/10 as visually
+  // overlapping even though the math was correct). label glyph
+  // bottom ≈ y=1014; footer top y=1020 → 6px clearance.
   drawQrCard(ctx, t, state, assets, {
     cardX: 880,
     cardY: 905,
     cardSize: 85,
     cardPad: 6,
-    labelGap: 8,
-    labelSize: 10,
-    labelSpacing: 1,
+    labelGap: 10,
+    labelSize: 12,
+    labelSpacing: 1.2,
   });
   void size;
 }
@@ -861,6 +878,73 @@ function drawSafeAreaDebug(
   ctx.lineTo(size.width, size.height - SAFE_Y);
   ctx.stroke();
   ctx.restore();
+}
+
+/**
+ * Greedy word-wrap into up to `maxLines` lines of `maxWidth`
+ * pixels, with an ellipsis appended to the last line if the
+ * input runs longer. Uses `ctx.measureText` against the
+ * already-set font, so the caller must set ctx.font BEFORE
+ * calling. Returns the lines as an array; the caller iterates
+ * and renders each at its own y offset.
+ *
+ * Why we need this: the description block was rendering as a
+ * single fillText call with no width constraint — long
+ * descriptions ran off the right edge of the canvas. The
+ * upstream render-mp4.ts pre-truncate at 140 chars caps the
+ * total length but doesn't enforce visual width per line.
+ */
+function wrapText(
+  ctx: CanvasRenderingContext2D,
+  text: string,
+  maxWidth: number,
+  maxLines: number = 2
+): string[] {
+  if (!text) return [];
+  const words = text.split(/\s+/).filter(Boolean);
+  if (words.length === 0) return [];
+
+  const lines: string[] = [];
+  let current = "";
+
+  for (let i = 0; i < words.length; i++) {
+    const candidate = current ? `${current} ${words[i]}` : words[i];
+    if (
+      ctx.measureText(candidate).width > maxWidth &&
+      current.length > 0
+    ) {
+      lines.push(current);
+      if (lines.length >= maxLines) {
+        current = "";
+        // Mark that we still had more words — the last line will
+        // get an ellipsis appended below.
+        break;
+      }
+      current = words[i];
+    } else {
+      current = candidate;
+    }
+  }
+  if (current && lines.length < maxLines) {
+    lines.push(current);
+  }
+
+  // If there's still input we didn't consume, append "…" to the
+  // last line, trimming characters off its tail until the line +
+  // ellipsis fits within maxWidth.
+  const consumed = lines.join(" ").split(/\s+/).filter(Boolean).length;
+  if (consumed < words.length && lines.length === maxLines) {
+    let last = lines[maxLines - 1];
+    while (
+      last.length > 0 &&
+      ctx.measureText(`${last}…`).width > maxWidth
+    ) {
+      last = last.slice(0, -1);
+    }
+    lines[maxLines - 1] = `${last.trimEnd()}…`;
+  }
+
+  return lines;
 }
 
 function clamp01(v: number): number {
