@@ -39,6 +39,27 @@ import { drawImageContain } from "@/engine/draw";
 
 export const PROMO_TOTAL_SEC = 6;
 
+/**
+ * Horizontal safe-area inset enforced on every text-drawing call
+ * in the timeline. Instagram + TikTok crop ~7-8% of the safe area
+ * on small screens, but more importantly: the H-7g layout had
+ * "PRESENTING" rendering as "ESENTING" because drawSpaced was
+ * centering text around an x-coordinate that was meant to be the
+ * left edge. Bumping the layout margin to 80 (and fixing
+ * drawSpaced to respect textAlign — see below) gives all text a
+ * full character of horizontal breathing room from any edge.
+ */
+const SAFE_X = 80;
+/** Vertical safe-area inset. Smaller than SAFE_X because the
+ *  header and footer bars define their own top/bottom edges and
+ *  enforce padding internally. Used by the visual debug overlay
+ *  for verification renders. */
+const SAFE_Y = 60;
+/** Visual debug for the safe-area boundaries. Flip true during
+ *  layout work to overlay dashed red lines at SAFE_X / SAFE_Y;
+ *  ship false. */
+const DEBUG_SAFE_AREA = false;
+
 export interface PromoMp4State {
   primary: string;
   accent: string;
@@ -102,7 +123,12 @@ interface Layout {
 function computeLayout(size: { width: number; height: number }): Layout {
   const { width, height } = size;
   const isSquare = Math.abs(width - height) < 50;
-  const margin = isSquare ? 40 : 50;
+  // Both aspects use SAFE_X so every text-drawing call gets the
+  // same horizontal breathing room. The earlier 40/50 margins
+  // were too tight against the canvas edge — combined with
+  // drawSpaced's centering bug, that's what produced "ESENTING"
+  // and "EATURES" in round-3 smoke tests.
+  const margin = SAFE_X;
 
   if (isSquare) {
     // 1:1 budget tight — hero gets 720pt (3:2 at 1080 wide) so a
@@ -235,6 +261,8 @@ export function buildPromoTimeline(
         t
       );
       drawFooter(ctx, layout.footer, state, layout);
+
+      if (DEBUG_SAFE_AREA) drawSafeAreaDebug(ctx, size);
     },
   });
 
@@ -689,6 +717,32 @@ function drawFooter(
 /* Helpers                                                          */
 /* ──────────────────────────────────────────────────────────────── */
 
+/** Visual debug overlay — dashed red lines at the safe-area
+ *  boundaries. Off in production; flip DEBUG_SAFE_AREA at the top
+ *  of the file when verifying layout work. */
+function drawSafeAreaDebug(
+  ctx: CanvasRenderingContext2D,
+  size: { width: number; height: number }
+): void {
+  ctx.save();
+  ctx.strokeStyle = "rgba(255, 0, 0, 0.7)";
+  ctx.lineWidth = 2;
+  ctx.setLineDash([10, 10]);
+  // Vertical safe-area lines (left + right inset by SAFE_X)
+  ctx.beginPath();
+  ctx.moveTo(SAFE_X, 0);
+  ctx.lineTo(SAFE_X, size.height);
+  ctx.moveTo(size.width - SAFE_X, 0);
+  ctx.lineTo(size.width - SAFE_X, size.height);
+  // Horizontal safe-area lines (top + bottom inset by SAFE_Y)
+  ctx.moveTo(0, SAFE_Y);
+  ctx.lineTo(size.width, SAFE_Y);
+  ctx.moveTo(0, size.height - SAFE_Y);
+  ctx.lineTo(size.width, size.height - SAFE_Y);
+  ctx.stroke();
+  ctx.restore();
+}
+
 function clamp01(v: number): number {
   if (!Number.isFinite(v)) return 0;
   return Math.max(0, Math.min(1, v));
@@ -720,11 +774,23 @@ function drawRoundedRect(
  * Draw text with manual letter-spacing. Canvas 2D doesn't support
  * letter-spacing natively. Used for headers and small all-caps
  * labels where the wide spacing is load-bearing for the design.
+ *
+ * Honors ctx.textAlign at call time:
+ *   "left"   → anchorX is the LEFT edge of the rendered string
+ *   "center" → anchorX is the horizontal center
+ *   "right"  → anchorX is the RIGHT edge
+ *
+ * H-7n: previously this function always centered around anchorX,
+ * which meant left-aligned callers (e.g. the PRESENTING / FEATURES
+ * labels) were rendering half the string off-canvas to the left
+ * of the body margin. Respecting textAlign fixes those clips
+ * without changing centered callers ("OPEN HOUSE" headline,
+ * "SCAN FOR DETAILS" caption).
  */
 function drawSpaced(
   ctx: CanvasRenderingContext2D,
   text: string,
-  centerX: number,
+  anchorX: number,
   y: number,
   spacing: number
 ): void {
@@ -737,14 +803,17 @@ function drawSpaced(
     total += w;
   }
   total += spacing * Math.max(0, text.length - 1);
-  let x = centerX - total / 2;
-  // Snap textAlign to "left" so each character draws at the
-  // computed x; we already positioned the start.
-  const prevAlign = ctx.textAlign;
+  const align = ctx.textAlign;
+  let x: number;
+  if (align === "center") x = anchorX - total / 2;
+  else if (align === "right" || align === "end") x = anchorX - total;
+  else x = anchorX; // "left" (default) and "start"
+  // Snap textAlign to "left" while drawing so each character
+  // draws at the computed x. Restore after.
   ctx.textAlign = "left";
   for (let i = 0; i < text.length; i++) {
     ctx.fillText(text[i], x, y);
     x += widths[i] + spacing;
   }
-  ctx.textAlign = prevAlign;
+  ctx.textAlign = align;
 }

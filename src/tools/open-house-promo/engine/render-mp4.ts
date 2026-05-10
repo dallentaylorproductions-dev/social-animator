@@ -88,7 +88,11 @@ export async function renderPromoMp4(
   // H-7m layout — square is too tight to fit a usable strip).
   let thumbs: HTMLCanvasElement[] = [];
   if (!isSquare) {
-    const margin = 50; // matches computeLayout's portrait margin
+    // Margin must match computeLayout's portrait margin (SAFE_X
+    // = 80 in timeline.ts as of H-7n). Hardcoded here for the
+    // pre-crop sizing math; if you change SAFE_X over there,
+    // mirror it here.
+    const margin = 80;
     const stripW = size.width - margin * 2;
     const gap = 12;
     const count = Math.min(4, Math.max(0, draft.photos.length - 1));
