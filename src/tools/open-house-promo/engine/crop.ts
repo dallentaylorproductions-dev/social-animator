@@ -115,6 +115,98 @@ export function containInBox(
 }
 
 /**
+ * Compose a layered blur-fill hero photo: a blurred + zoomed copy
+ * of the source on a background canvas, the original photo
+ * contain-fit on a separate foreground canvas (transparent
+ * everywhere outside the photo). Used by the MP4 path so the
+ * timeline can apply Ken Burns to the foreground only — leaving
+ * the blur backdrop static avoids amplifying compression artifacts
+ * that h.264 encoders produce on horizontal-frequency-rich blur
+ * regions when they pan/zoom.
+ *
+ * For static contexts (PDF / live preview) the simpler
+ * blurFillCompose composes both layers into one canvas.
+ */
+export function blurFillComposeLayered(
+  image: HTMLImageElement,
+  boxW: number,
+  boxH: number,
+  options?: {
+    blur?: number;
+    darken?: number;
+    maxScale?: number;
+  }
+): { background: HTMLCanvasElement; foreground: HTMLCanvasElement } {
+  const blur = options?.blur ?? 28;
+  const darken = options?.darken ?? 0.18;
+  const maxScale = options?.maxScale ?? 1.6;
+
+  const w = Math.max(1, Math.round(boxW));
+  const h = Math.max(1, Math.round(boxH));
+
+  // Background canvas — blur + darken only.
+  const background = document.createElement("canvas");
+  background.width = w;
+  background.height = h;
+  const bgCtx = background.getContext("2d");
+  if (!bgCtx) throw new Error("Canvas 2D context unavailable");
+
+  if (image.naturalWidth > 0 && image.naturalHeight > 0) {
+    bgCtx.imageSmoothingEnabled = true;
+    bgCtx.imageSmoothingQuality = "high";
+    const coverScale = Math.max(
+      w / image.naturalWidth,
+      h / image.naturalHeight
+    );
+    const bgScale = Math.min(coverScale, maxScale) * 1.1;
+    const bgW = image.naturalWidth * bgScale;
+    const bgH = image.naturalHeight * bgScale;
+    const bgX = (w - bgW) / 2;
+    const bgY = (h - bgH) / 2;
+    bgCtx.save();
+    bgCtx.filter = `blur(${blur}px)`;
+    bgCtx.drawImage(image, bgX, bgY, bgW, bgH);
+    bgCtx.filter = "none";
+    bgCtx.restore();
+    if (darken > 0) {
+      bgCtx.fillStyle = `rgba(0, 0, 0, ${darken})`;
+      bgCtx.fillRect(0, 0, w, h);
+    }
+  } else {
+    // No image — fall back to a dark fill so the background isn't
+    // transparent (the timeline's renderFrame paints black behind
+    // everything anyway, but defensive).
+    bgCtx.fillStyle = "#1f2937";
+    bgCtx.fillRect(0, 0, w, h);
+  }
+
+  // Foreground canvas — original photo contain-fit, transparent
+  // margins. Drawn on top of the background by the timeline; the
+  // transparent margins let the blur backdrop show through.
+  const foreground = document.createElement("canvas");
+  foreground.width = w;
+  foreground.height = h;
+  const fgCtx = foreground.getContext("2d");
+  if (!fgCtx) throw new Error("Canvas 2D context unavailable");
+
+  if (image.naturalWidth > 0 && image.naturalHeight > 0) {
+    fgCtx.imageSmoothingEnabled = true;
+    fgCtx.imageSmoothingQuality = "high";
+    const containScale = Math.min(
+      w / image.naturalWidth,
+      h / image.naturalHeight
+    );
+    const fgW = image.naturalWidth * containScale;
+    const fgH = image.naturalHeight * containScale;
+    const fgX = (w - fgW) / 2;
+    const fgY = (h - fgH) / 2;
+    fgCtx.drawImage(image, fgX, fgY, fgW, fgH);
+  }
+
+  return { background, foreground };
+}
+
+/**
  * Compose a blur-fill hero photo: a blurred + zoomed copy of the
  * source as the background layer, with the original photo
  * contain-fit on top. Replaces solid brand-color letterbox /

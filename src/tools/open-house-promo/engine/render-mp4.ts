@@ -20,7 +20,12 @@ import {
   type PromoMp4Assets,
 } from "./timeline";
 import { generateQrDataUrl } from "../output/qr";
-import { blurFillCompose, cropToCanvas, srcToImage } from "./crop";
+import {
+  blurFillCompose,
+  blurFillComposeLayered,
+  cropToCanvas,
+  srcToImage,
+} from "./crop";
 
 /** Promo MP4 loop length in seconds. Re-exported for ExportButtons. */
 export const PROMO_DURATION_SEC = PROMO_TOTAL_SEC;
@@ -72,26 +77,34 @@ export async function renderPromoMp4(
 
   const isSquare = Math.abs(size.width - size.height) < 50;
 
-  // Hero region (H-7r): full body region (canvas height minus
-  // the persistent header bar). Reel: 1080×1760 (1920 - 160 header).
-  // Square: 1080×960 (1080 - 120 header). The blur-fill composite
-  // fills this region so the hero scene reads as full-bleed below
-  // the header. Keep these in sync with computeLayout in
-  // timeline.ts (header heights 160 reel / 120 square).
-  const HEADER_H = isSquare ? 120 : 160;
+  // Hero region (H-7t): reel 1080×720 (3:2 cap), square 1080×540
+  // (2:1 cap). H-7t splits the blur-fill into two layers
+  // (background + foreground) so Ken Burns can zoom only the
+  // foreground photo while the blur backdrop stays static — the
+  // blur backdrop's horizontal-frequency-rich pixels were
+  // amplifying h.264 compression banding when scaled per frame.
+  // Heavier blur (56px) + heavier darken (50%) further mask any
+  // residual artifacts and let the foreground photo pop against
+  // a more dramatic backdrop. Keep these heights in sync with the
+  // hero region in timeline.ts.
   const HERO_REGION_W = size.width;
-  const HERO_REGION_H = size.height - HEADER_H;
+  const HERO_REGION_H = isSquare ? 540 : 720;
 
   const heroPhoto = draft.photos[0] ?? null;
-  const hero = heroPhoto
-    ? await preBlurFillToCanvas(heroPhoto, HERO_REGION_W, HERO_REGION_H)
+  const heroLayered = heroPhoto
+    ? await preBlurFillLayered(heroPhoto, HERO_REGION_W, HERO_REGION_H)
     : null;
 
-  // H-7r dropped the thumb strip — the multi-scene composition
-  // doesn't render thumbs (the hero photo gets full-bleed scene
-  // 2 instead). PromoMp4Assets still has the field for shape
-  // stability with ExportButtons; pass an empty array.
-  const thumbs: HTMLCanvasElement[] = [];
+  // H-7t restored the thumb strip on reel — H-7s spec called for
+  // it, but the H-7r→H-7s transition left thumb materialization
+  // disabled. Cells are 240×90 (8:3 aspect) matching the
+  // timeline's strip layout. Square skips thumbs (no room).
+  let thumbs: HTMLCanvasElement[] = [];
+  if (!isSquare && draft.photos.length > 1) {
+    thumbs = await Promise.all(
+      draft.photos.slice(1, 5).map((p) => preCropToCanvas(p, 240, 90))
+    );
+  }
 
   // QR — high res. Always black-on-white for scanner reliability;
   // the timeline draws a white card behind it for contrast against
@@ -147,7 +160,8 @@ export async function renderPromoMp4(
   };
 
   const assets: PromoMp4Assets = {
-    hero,
+    heroBackground: heroLayered?.background ?? null,
+    heroForeground: heroLayered?.foreground ?? null,
     thumbs,
     qrImage,
     brandLogo: brandLogoImg,
@@ -184,16 +198,28 @@ async function preCropToCanvas(
   return cropToCanvas(img, targetW, targetH, photo.focalX, photo.focalY);
 }
 
-/** Compose a blur-fill canvas for the hero photo. Blurred zoomed
- *  copy fills the box as the background; original photo
- *  contain-fit on top. Replaces the H-7m containInBox helper
- *  whose solid-color bars looked unprofessional on aspect
- *  mismatches. */
-async function preBlurFillToCanvas(
+/** Compose a layered blur-fill for the hero photo. Background
+ *  canvas holds the blurred + darkened backdrop; foreground holds
+ *  the contain-fit original photo with transparent margins. The
+ *  timeline draws background statically, then applies Ken Burns
+ *  scale/translate to foreground only — keeping the
+ *  horizontal-frequency-rich blur layer stable across frames so
+ *  h.264 doesn't band it. Heavier blur (56px) + heavier darken
+ *  (50%) for the MP4 path so any residual compression artifacts
+ *  are masked. */
+async function preBlurFillLayered(
   photo: PhotoEntry,
   boxW: number,
   boxH: number
-): Promise<HTMLCanvasElement> {
+): Promise<{ background: HTMLCanvasElement; foreground: HTMLCanvasElement }> {
   const img = await srcToImage(photo.src);
-  return blurFillCompose(img, boxW, boxH);
+  return blurFillComposeLayered(img, boxW, boxH, {
+    blur: 56,
+    darken: 0.5,
+  });
 }
+
+// Re-export the static blurFillCompose name as unused — keep the
+// import so it doesn't break if some other code path references
+// it (currently none in render-mp4 do).
+void blurFillCompose;

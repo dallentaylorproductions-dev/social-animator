@@ -3,47 +3,47 @@ import { linear } from "@/engine/easing";
 import { drawImageContain } from "@/engine/draw";
 
 /**
- * Open House Promo MP4 — single canvas composition mirroring the
- * static PDF flyer, animated for 6 seconds (FINAL architecture
- * after the H-7g/H-7q/H-7r rounds). All elements visible from
- * t=0 to t=6 with staggered fade-ins; no scenes, no crossfades,
- * no scene cycling. The composition itself stays put — motion
- * comes from the staggered intro, hero Ken Burns, and a final
- * QR pulse.
+ * Open House Promo MP4 — single-canvas animate-the-flyer composition
+ * (FINAL architecture, locked in H-7s and refined in H-7t). Layout
+ * mirrors the static PDF flyer; motion comes from a staggered
+ * rising-translate + fade entrance, hero Ken Burns on the foreground
+ * layer only, and a final QR pulse.
  *
- * Layout mirrors PromoDocument exactly so the MP4 reads as the
- * animated version of the PDF:
+ * H-7t fixes (round 5 smoke test):
+ *   - Hero blur backdrop is now drawn as a separate static layer
+ *     (background canvas), with Ken Burns applied only to the
+ *     foreground photo layer. Keeping the blurred high-frequency
+ *     pixels stable across frames stops h.264 from amplifying
+ *     compression banding stripes. Blur strength bumped 28→56,
+ *     darken 0.18→0.5 (only for MP4) to make residual artifacts
+ *     less visible against a more dramatic backdrop.
+ *   - Thumb strip now renders on reel — H-7r had disabled thumb
+ *     materialization in render-mp4, leaving the timeline's
+ *     drawThumbStrip permanently dormant.
+ *   - Entrance animation upgraded from opacity-only fade to
+ *     translate-up + fade ("rises into place"). Each block starts
+ *     60px below its final y position, eases up via cubic ease-out
+ *     while opacity rises 0 → 1.
+ *   - Features render route fixed to a single source of truth
+ *     iterating up to 5 highlights across 2 columns in BOTH reel
+ *     and square — same drift bug we hit in PDF column-2 (H-7l).
+ *   - Reel layout retimed to a consistent 40px gap rhythm between
+ *     content blocks, with intentional 160pt slack above the
+ *     footer (agent + QR room to breathe).
  *
- *   Header bar   (primary fill)    "OPEN HOUSE" + date + time
- *   Hero photo   (blur-fill, KB)   photos[0] full-bleed below header
- *   Thumb strip  (reel only)       photos[1..4] in 4-column row
- *   Property     (left + right)    PRESENTING + address + price
- *   Features     (reel only)       FEATURES + 3 bullets, 2-column
- *   Description  (reel only)       1-2 lines, ellipsis on overflow
- *   Agent + QR   (split row)       logo+name+contact / QR + SCAN
- *   Footer bar   (primary fill)    eventNotes + license
+ * Stagger schedule (ms):
+ *      0-600  hero photo    (longer ease, eye anchor)
+ *    200-600  header text
+ *    400-800  thumb strip   (reel only)
+ *    600-1000 property block
+ *    800-1200 features block (both aspects)
+ *   1000-1400 description    (reel only)
+ *   1200-1600 agent + QR row
+ *   1400-1800 footer text
+ *   1800+     all content static
  *
- * Background: pure black (#000000) outside the primary-color bars
- * (header + footer). Property/features/description body text reads
- * as white-on-black; hero photo block fills its own region;
- * white-card behind QR keeps it scannable on dark bg.
- *
- * Staggered fade-in schedule (ms, all 0 → 1):
- *   0-400    hero photo
- *   200-600  header text (bar itself never animates — always present)
- *   400-800  thumb strip (reel)
- *   600-1000 property block
- *   800-1200 features (reel)
- *  1000-1400 description (reel)
- *  1200-1600 agent + QR row
- *  1400-1800 footer text
- *  1800+    all content static at full opacity
- *
- * Hero Ken Burns: scale 1.0 → 1.05 over the full 6s, applied to
- * the blur-fill composite canvas (so the blurred background scales
- * with the foreground photo as one unit).
- *
- * QR pulse: sin-wave 1.0 ± 0.02 with 1s period, active 4-6s.
+ * Hero Ken Burns: scale 1.0 → 1.05 over 6s, foreground only.
+ * QR pulse: sin-wave 1.0 ± 0.02, 1s period, active 4-6s.
  */
 
 export const PROMO_TOTAL_SEC = 6;
@@ -52,7 +52,6 @@ const SAFE_X = 80;
 const SAFE_Y = 60;
 const DEBUG_SAFE_AREA = false;
 
-/** Page background — pure black outside the primary-color bars. */
 const BG_BLACK = "#000000";
 
 export interface PromoMp4State {
@@ -70,7 +69,6 @@ export interface PromoMp4State {
   city: string;
   price: string;
   highlights: string[];
-  /** Pre-truncated description (≤140 chars, ellipsis on overflow). */
   description: string;
   agentName: string;
   brokerage: string;
@@ -81,7 +79,14 @@ export interface PromoMp4State {
 }
 
 export interface PromoMp4Assets {
-  hero: HTMLCanvasElement | null;
+  /** Static blur backdrop for the hero region — drawn unscaled
+   *  every frame so h.264 doesn't band the high-frequency blur
+   *  pixels across a per-frame Ken Burns scale. */
+  heroBackground: HTMLCanvasElement | null;
+  /** Original photo contain-fit on a transparent canvas at the
+   *  hero region's exact size. Ken Burns scale applies to this
+   *  layer only. */
+  heroForeground: HTMLCanvasElement | null;
   thumbs: HTMLCanvasElement[];
   qrImage: HTMLImageElement | null;
   brandLogo: HTMLImageElement | null;
@@ -121,41 +126,57 @@ function renderFrame(
   ctx.fillStyle = BG_BLACK;
   ctx.fillRect(0, 0, size.width, size.height);
 
-  // Header BAR (always opaque from t=0; only the text inside
-  // animates in).
+  // Header bar — always present at full opacity from t=0; only
+  // the text inside it animates.
   drawHeaderBar(ctx, size, state, isSquare);
 
-  // Hero photo block (with Ken Burns + fade-in).
   drawHeroPhoto(ctx, t, size, state, assets, isSquare);
-
-  // Header TEXT (200-600ms fade).
   drawHeaderText(ctx, t, size, state, isSquare);
 
-  // Thumb strip (reel only, 400-800ms fade).
   if (!isSquare && assets.thumbs.length > 0) {
     drawThumbStrip(ctx, t, size, assets);
   }
 
-  // Property block (600-1000ms fade).
   drawPropertyBlock(ctx, t, size, state, isSquare);
+  drawFeaturesBlock(ctx, t, size, state, isSquare);
 
-  // Features block (reel only, 800-1200ms fade).
-  if (!isSquare) {
-    drawFeaturesBlock(ctx, t, state);
-  }
-
-  // Description (reel only, 1000-1400ms fade).
   if (!isSquare && state.description) {
     drawDescriptionBlock(ctx, t, state);
   }
 
-  // Agent + QR row (1200-1600ms fade, with QR pulse 4-6s).
   drawAgentQrRow(ctx, t, size, state, assets, isSquare);
-
-  // Footer bar (bar always opaque; text fades 1400-1800ms).
   drawFooterBar(ctx, t, size, state, isSquare);
 
   if (DEBUG_SAFE_AREA) drawSafeAreaDebug(ctx, size);
+}
+
+/* ──────────────────────────────────────────────────────────────── */
+/* Entrance animation                                               */
+/* ──────────────────────────────────────────────────────────────── */
+
+interface Entrance {
+  opacity: number;
+  translateY: number;
+}
+
+/** Rising-translate + fade entrance. Block starts 60px below its
+ *  final y position with opacity 0; eases up to (translateY 0,
+ *  opacity 1) over `durationMs` starting at `startMs`. Cubic
+ *  ease-out so the motion accelerates out and decelerates in. */
+function blockEntrance(
+  t: number,
+  startMs: number,
+  durationMs: number
+): Entrance {
+  const elapsedMs = t * 1000 - startMs;
+  if (elapsedMs <= 0) return { opacity: 0, translateY: 60 };
+  if (elapsedMs >= durationMs) return { opacity: 1, translateY: 0 };
+  const progress = elapsedMs / durationMs;
+  const eased = 1 - Math.pow(1 - progress, 3);
+  return {
+    opacity: eased,
+    translateY: 60 * (1 - eased),
+  };
 }
 
 /* ──────────────────────────────────────────────────────────────── */
@@ -180,16 +201,12 @@ function drawHeaderText(
   state: PromoMp4State,
   isSquare: boolean
 ): void {
-  const opacity = fadeAt(t, 0.2, 0.4);
-  if (opacity <= 0) return;
+  const e = blockEntrance(t, 200, 400);
+  if (e.opacity <= 0) return;
 
   const titleSize = isSquare ? 44 : 56;
   const dateSize = isSquare ? 22 : 24;
   const timeSize = isSquare ? 16 : 18;
-  // Baselines per the H-7s spec — title baseline at 60 (reel) /
-  // 50 (square) gives the glyph top a 60+ px top safe-area
-  // (alphabetic-baseline ascent of bold 56pt is ~42px; 60-42=18px
-  // top inset on reel, well clear of canvas edge).
   const titleBaselineY = isSquare ? 50 : 60;
   const dateBaselineY = isSquare ? 78 : 92;
   const timeBaselineY = isSquare ? 96 : 116;
@@ -197,7 +214,8 @@ function drawHeaderText(
   const cx = size.width / 2;
 
   ctx.save();
-  ctx.globalAlpha *= opacity;
+  ctx.translate(0, e.translateY);
+  ctx.globalAlpha *= e.opacity;
   ctx.fillStyle = state.onPrimary;
   ctx.textAlign = "center";
   ctx.textBaseline = "alphabetic";
@@ -218,7 +236,7 @@ function drawHeaderText(
 }
 
 /* ──────────────────────────────────────────────────────────────── */
-/* Hero photo                                                       */
+/* Hero photo (layered: static blur + Ken-Burns'd foreground)       */
 /* ──────────────────────────────────────────────────────────────── */
 
 function drawHeroPhoto(
@@ -229,21 +247,23 @@ function drawHeroPhoto(
   assets: PromoMp4Assets,
   isSquare: boolean
 ): void {
-  const opacity = fadeAt(t, 0.0, 0.4);
-  if (opacity <= 0) return;
+  const e = blockEntrance(t, 0, 600);
+  if (e.opacity <= 0) return;
 
-  const headerH = isSquare ? 100 : 130;
-  const heroY = headerH;
-  const heroH = isSquare ? 600 : 720;
+  // Layout: header 130 reel / 100 square. Hero starts 40px below
+  // the header on reel (gap rhythm), 20px below on square (tighter).
+  const heroY = isSquare ? 120 : 170;
+  const heroH = isSquare ? 540 : 720;
   const heroW = size.width;
 
   ctx.save();
-  ctx.globalAlpha *= opacity;
+  ctx.translate(0, e.translateY);
+  ctx.globalAlpha *= e.opacity;
   ctx.beginPath();
   ctx.rect(0, heroY, heroW, heroH);
   ctx.clip();
 
-  if (!assets.hero) {
+  if (!assets.heroBackground || !assets.heroForeground) {
     // No photo — render a stenciled placeholder so the region
     // still has a deliberate look.
     ctx.fillStyle = "#1f2937";
@@ -258,16 +278,22 @@ function drawHeroPhoto(
     return;
   }
 
-  // Ken Burns: scale 1.0 → 1.05 over the full 6s. Applied around
-  // the hero box center so the blur-fill composite stays centered
-  // as it zooms.
+  // Background blur layer — drawn at full size, no Ken Burns.
+  // Static across frames so h.264 doesn't compression-band the
+  // blur's horizontal-frequency-rich pixels.
+  ctx.drawImage(assets.heroBackground, 0, heroY, heroW, heroH);
+
+  // Foreground photo — Ken Burns scale 1.0 → 1.05 over 6s.
+  // Centered zoom. Foreground canvas has transparent margins
+  // around the contain-fit photo, so the blur backdrop shows
+  // through wherever the photo doesn't reach.
   const burnP = clamp01(t / PROMO_TOTAL_SEC);
   const zoom = 1.0 + burnP * 0.05;
   const dw = heroW * zoom;
   const dh = heroH * zoom;
   const dx = (heroW - dw) / 2;
   const dy = heroY + (heroH - dh) / 2;
-  ctx.drawImage(assets.hero, dx, dy, dw, dh);
+  ctx.drawImage(assets.heroForeground, dx, dy, dw, dh);
   ctx.restore();
 }
 
@@ -281,19 +307,23 @@ function drawThumbStrip(
   size: { width: number; height: number },
   assets: PromoMp4Assets
 ): void {
-  const opacity = fadeAt(t, 0.4, 0.4);
-  if (opacity <= 0) return;
+  const e = blockEntrance(t, 400, 400);
+  if (e.opacity <= 0) return;
 
-  const stripY = 860;
-  const cellH = 90;
+  // y=930-1020 per the H-7t reel gap rhythm. Cells 240×90 (8:3
+  // aspect), 20px gap between thumbs. Total strip width 1020px,
+  // centered: x_start = (1080-1020)/2 = 30.
+  const stripY = 930;
   const cellW = 240;
+  const cellH = 90;
   const gap = 20;
   const count = Math.min(4, assets.thumbs.length);
   const totalW = count * cellW + (count - 1) * gap;
   const startX = (size.width - totalW) / 2;
 
   ctx.save();
-  ctx.globalAlpha *= opacity;
+  ctx.translate(0, e.translateY);
+  ctx.globalAlpha *= e.opacity;
   for (let i = 0; i < count; i++) {
     const cx = startX + i * (cellW + gap);
     ctx.save();
@@ -327,117 +357,173 @@ function drawPropertyBlock(
   state: PromoMp4State,
   isSquare: boolean
 ): void {
-  const opacity = fadeAt(t, 0.6, 0.4);
-  if (opacity <= 0) return;
+  const e = blockEntrance(t, 600, 400);
+  if (e.opacity <= 0) return;
 
   const padX = isSquare ? 80 : 100;
   ctx.save();
-  ctx.globalAlpha *= opacity;
+  ctx.translate(0, e.translateY);
+  ctx.globalAlpha *= e.opacity;
   ctx.textAlign = "left";
   ctx.textBaseline = "alphabetic";
 
   if (isSquare) {
-    // PRESENTING (accent) — y=740
+    // Square section: y=680-790 (110 tall)
     ctx.fillStyle = state.accent;
     ctx.font = `bold 18px Helvetica, Arial, sans-serif`;
-    drawSpaced(ctx, "PRESENTING", padX, 740, 2);
+    drawSpaced(ctx, "PRESENTING", padX, 700, 2);
 
-    // Address (white) — y=790
     ctx.fillStyle = "#ffffff";
     ctx.font = `bold 36px Helvetica, Arial, sans-serif`;
-    ctx.fillText(state.address || "Property address", padX, 790);
+    ctx.fillText(state.address || "Property address", padX, 745);
 
-    // City (muted) — y=820
     if (state.city) {
       ctx.fillStyle = "rgba(255, 255, 255, 0.78)";
       ctx.font = `20px Helvetica, Arial, sans-serif`;
-      ctx.fillText(state.city, padX, 820);
+      ctx.fillText(state.city, padX, 775);
     }
 
-    // Price (primary, right-aligned) — y=790 same baseline as address
     if (state.price) {
       ctx.fillStyle = state.primary;
       ctx.font = `bold 40px Helvetica, Arial, sans-serif`;
       ctx.textAlign = "right";
-      ctx.fillText(state.price, size.width - 80, 790);
+      ctx.fillText(state.price, size.width - 80, 745);
     }
   } else {
-    // Reel layout
-    // PRESENTING (accent) — y=1010
+    // Reel section: y=1060-1180 (120 tall)
     ctx.fillStyle = state.accent;
     ctx.font = `bold 22px Helvetica, Arial, sans-serif`;
-    drawSpaced(ctx, "PRESENTING", padX, 1010, 3);
+    drawSpaced(ctx, "PRESENTING", padX, 1085, 3);
 
-    // Address (white) — y=1075
     ctx.fillStyle = "#ffffff";
     ctx.font = `bold 56px Helvetica, Arial, sans-serif`;
-    ctx.fillText(state.address || "Property address", padX, 1075);
+    ctx.fillText(state.address || "Property address", padX, 1140);
 
-    // City (muted) — y=1115
     if (state.city) {
       ctx.fillStyle = "rgba(255, 255, 255, 0.78)";
       ctx.font = `28px Helvetica, Arial, sans-serif`;
-      ctx.fillText(state.city, padX, 1115);
+      ctx.fillText(state.city, padX, 1175);
     }
 
-    // Price (primary, right-aligned) — y=1075 same as address
     if (state.price) {
       ctx.fillStyle = state.primary;
       ctx.font = `bold 60px Helvetica, Arial, sans-serif`;
       ctx.textAlign = "right";
-      ctx.fillText(state.price, size.width - padX, 1075);
+      ctx.fillText(state.price, size.width - padX, 1140);
     }
   }
   ctx.restore();
 }
 
 /* ──────────────────────────────────────────────────────────────── */
-/* Features block (reel only)                                       */
+/* Features block (both aspects, 2-column up to 5)                  */
 /* ──────────────────────────────────────────────────────────────── */
 
 function drawFeaturesBlock(
   ctx: CanvasRenderingContext2D,
   t: number,
-  state: PromoMp4State
+  size: { width: number; height: number },
+  state: PromoMp4State,
+  isSquare: boolean
 ): void {
-  const opacity = fadeAt(t, 0.8, 0.4);
-  if (opacity <= 0) return;
+  const e = blockEntrance(t, 800, 400);
+  if (e.opacity <= 0) return;
 
-  const highlights = state.highlights.slice(0, 3);
+  // Single source of truth: filter once, slice once, then split
+  // into two columns. Both columns iterate through the SAME
+  // helper with the SAME color tokens — eliminates the column-2
+  // drift bug (H-7l in PDF, now matching that fix in MP4).
+  const highlights = state.highlights
+    .filter((h) => h && h.trim() !== "")
+    .slice(0, 5);
   if (highlights.length === 0) return;
 
-  const padX = 100;
-  const labelY = 1240;
-  const dotR = 7;
-  const colCount = highlights.length >= 4 ? 2 : 1;
-  void colCount; // 3-bullet layout uses single column at this width
-  const bulletYs = [1295, 1345, 1395];
+  const col1 = highlights.slice(0, 3);
+  const col2 = highlights.slice(3, 5);
 
   ctx.save();
-  ctx.globalAlpha *= opacity;
+  ctx.translate(0, e.translateY);
+  ctx.globalAlpha *= e.opacity;
   ctx.textAlign = "left";
   ctx.textBaseline = "alphabetic";
 
-  // FEATURES label (primary)
-  ctx.fillStyle = state.primary;
-  ctx.font = `bold 22px Helvetica, Arial, sans-serif`;
-  drawSpaced(ctx, "FEATURES", padX, labelY, 3);
-
-  // Bullets — primary dot + white text. Single column at 100pt
-  // padding fits 3 bullets cleanly; if highlights.length > 3 the
-  // extra bullets just don't render in MP4 (PDF still has them
-  // in its 2-column layout).
-  ctx.font = `28px Helvetica, Arial, sans-serif`;
-  for (let i = 0; i < highlights.length; i++) {
-    const y = bulletYs[i];
+  if (isSquare) {
+    // Square section: y=810-900 (90 tall)
+    // Label + 2 bullet rows per column at 36px row spacing.
+    // Square caps to 4 highlights in practice (2+2) — col1 also
+    // slices to 2 since we only have ~80px of bullet area below
+    // the label.
     ctx.fillStyle = state.primary;
+    ctx.font = `bold 16px Helvetica, Arial, sans-serif`;
+    drawSpaced(ctx, "FEATURES", 80, 822, 2);
+
+    drawFeatureColumn(
+      ctx,
+      col1.slice(0, 2),
+      80,
+      [854, 890],
+      18,
+      state.primary
+    );
+    drawFeatureColumn(
+      ctx,
+      col2.slice(0, 2),
+      580,
+      [854, 890],
+      18,
+      state.primary
+    );
+  } else {
+    // Reel section: y=1220-1340 (120 tall)
+    // 3-row col1, 2-row col2 at 30px row spacing fits comfortably.
+    ctx.fillStyle = state.primary;
+    ctx.font = `bold 22px Helvetica, Arial, sans-serif`;
+    drawSpaced(ctx, "FEATURES", 130, 1245, 3);
+
+    drawFeatureColumn(
+      ctx,
+      col1,
+      130,
+      [1278, 1308, 1338],
+      28,
+      state.primary
+    );
+    drawFeatureColumn(
+      ctx,
+      col2,
+      580,
+      [1278, 1308, 1338],
+      28,
+      state.primary
+    );
+  }
+  void size;
+  ctx.restore();
+}
+
+/** Draw one column of bullet+text rows. Same helper for both
+ *  columns and both aspects so color/font/spacing tokens stay
+ *  identical across renders. */
+function drawFeatureColumn(
+  ctx: CanvasRenderingContext2D,
+  items: string[],
+  x: number,
+  baselineYs: number[],
+  fontSize: number,
+  bulletColor: string
+): void {
+  const dotR = Math.max(5, Math.round(fontSize / 4));
+  ctx.font = `${fontSize}px Helvetica, Arial, sans-serif`;
+  ctx.textBaseline = "alphabetic";
+  for (let i = 0; i < items.length && i < baselineYs.length; i++) {
+    const y = baselineYs[i];
+    ctx.fillStyle = bulletColor;
     ctx.beginPath();
-    ctx.arc(padX + dotR, y - 8, dotR, 0, Math.PI * 2);
+    ctx.arc(x + dotR, y - fontSize * 0.32, dotR, 0, Math.PI * 2);
     ctx.fill();
     ctx.fillStyle = "#ffffff";
-    ctx.fillText(highlights[i], padX + dotR * 2 + 12, y);
+    ctx.fillText(items[i], x + dotR * 2 + 12, y);
   }
-  ctx.restore();
 }
 
 /* ──────────────────────────────────────────────────────────────── */
@@ -449,18 +535,19 @@ function drawDescriptionBlock(
   t: number,
   state: PromoMp4State
 ): void {
-  const opacity = fadeAt(t, 1.0, 0.4);
-  if (opacity <= 0) return;
+  const e = blockEntrance(t, 1000, 400);
+  if (e.opacity <= 0) return;
 
   const padX = 100;
   ctx.save();
-  ctx.globalAlpha *= opacity;
+  ctx.translate(0, e.translateY);
+  ctx.globalAlpha *= e.opacity;
   ctx.fillStyle = "rgba(255, 255, 255, 0.85)";
   ctx.font = `22px Helvetica, Arial, sans-serif`;
   ctx.textAlign = "left";
   ctx.textBaseline = "alphabetic";
-  // Single-line render — description is pre-truncated upstream.
-  ctx.fillText(state.description, padX, 1450);
+  // Reel section y=1380-1430 (50 tall, single line)
+  ctx.fillText(state.description, padX, 1410);
   ctx.restore();
 }
 
@@ -476,11 +563,12 @@ function drawAgentQrRow(
   assets: PromoMp4Assets,
   isSquare: boolean
 ): void {
-  const opacity = fadeAt(t, 1.2, 0.4);
-  if (opacity <= 0) return;
+  const e = blockEntrance(t, 1200, 400);
+  if (e.opacity <= 0) return;
 
   ctx.save();
-  ctx.globalAlpha *= opacity;
+  ctx.translate(0, e.translateY);
+  ctx.globalAlpha *= e.opacity;
 
   if (isSquare) {
     drawAgentQrSquare(ctx, t, size, state, assets);
@@ -497,53 +585,53 @@ function drawAgentQrReel(
   state: PromoMp4State,
   assets: PromoMp4Assets
 ): void {
+  // Section: y=1470-1680 (210 tall)
   const padX = 100;
-  // Agent block (left) — logo + name + brokerage on top row,
-  // phone + email below.
+
   if (assets.brandLogo) {
-    drawImageContain(ctx, assets.brandLogo, padX, 1530, 64, 64);
+    drawImageContain(ctx, assets.brandLogo, padX, 1485, 64, 64);
   } else {
     ctx.fillStyle = state.primary;
-    ctx.fillRect(padX, 1530, 64, 64);
+    ctx.fillRect(padX, 1485, 64, 64);
     ctx.fillStyle = state.onPrimary;
     ctx.font = `bold 14px Helvetica, Arial, sans-serif`;
     ctx.textAlign = "center";
     ctx.textBaseline = "middle";
-    ctx.fillText("LOGO", padX + 32, 1562);
+    ctx.fillText("LOGO", padX + 32, 1517);
   }
 
   ctx.textAlign = "left";
   ctx.textBaseline = "alphabetic";
   ctx.fillStyle = "#ffffff";
   ctx.font = `bold 32px Helvetica, Arial, sans-serif`;
-  ctx.fillText(state.agentName || "Your name", padX + 80, 1565);
+  ctx.fillText(state.agentName || "Your name", padX + 80, 1520);
 
   if (state.brokerage) {
     ctx.fillStyle = "rgba(255, 255, 255, 0.78)";
     ctx.font = `22px Helvetica, Arial, sans-serif`;
-    ctx.fillText(state.brokerage, padX + 80, 1600);
+    ctx.fillText(state.brokerage, padX + 80, 1555);
   }
 
   ctx.fillStyle = "#ffffff";
   ctx.font = `24px Helvetica, Arial, sans-serif`;
   if (state.phone) {
-    ctx.fillText(state.phone, padX, 1665);
+    ctx.fillText(state.phone, padX, 1620);
   }
   if (state.email) {
-    ctx.fillText(state.email, padX, 1705);
+    ctx.fillText(state.email, padX, 1660);
   }
 
-  // QR block (right) — 200×200 white card at x=740, y=1535.
   drawQrCard(ctx, t, state, assets, {
     cardX: 740,
-    cardY: 1535,
+    cardY: 1490,
     cardSize: 200,
     cardPad: 12,
     labelCx: 860,
-    labelY: 1770,
+    labelY: 1725,
     labelSize: 18,
     labelSpacing: 2.5,
   });
+  void size;
 }
 
 function drawAgentQrSquare(
@@ -553,43 +641,44 @@ function drawAgentQrSquare(
   state: PromoMp4State,
   assets: PromoMp4Assets
 ): void {
+  // Section: y=920-1020 (100 tall)
   const padX = 80;
-  // Agent block compressed — logo + name + brokerage only.
+
   if (assets.brandLogo) {
-    drawImageContain(ctx, assets.brandLogo, padX, 890, 48, 48);
+    drawImageContain(ctx, assets.brandLogo, padX, 925, 48, 48);
   } else {
     ctx.fillStyle = state.primary;
-    ctx.fillRect(padX, 890, 48, 48);
+    ctx.fillRect(padX, 925, 48, 48);
     ctx.fillStyle = state.onPrimary;
     ctx.font = `bold 11px Helvetica, Arial, sans-serif`;
     ctx.textAlign = "center";
     ctx.textBaseline = "middle";
-    ctx.fillText("LOGO", padX + 24, 914);
+    ctx.fillText("LOGO", padX + 24, 949);
   }
 
   ctx.textAlign = "left";
   ctx.textBaseline = "alphabetic";
   ctx.fillStyle = "#ffffff";
-  ctx.font = `bold 22px Helvetica, Arial, sans-serif`;
-  ctx.fillText(state.agentName || "Your name", padX + 60, 918);
+  ctx.font = `bold 20px Helvetica, Arial, sans-serif`;
+  ctx.fillText(state.agentName || "Your name", padX + 60, 950);
 
   if (state.brokerage) {
     ctx.fillStyle = "rgba(255, 255, 255, 0.78)";
-    ctx.font = `16px Helvetica, Arial, sans-serif`;
-    ctx.fillText(state.brokerage, padX + 60, 945);
+    ctx.font = `14px Helvetica, Arial, sans-serif`;
+    ctx.fillText(state.brokerage, padX + 60, 974);
   }
 
-  // QR block (right) — 160×160 white card at x=720, y=890.
   drawQrCard(ctx, t, state, assets, {
-    cardX: 720,
-    cardY: 890,
-    cardSize: 160,
-    cardPad: 10,
-    labelCx: 800,
-    labelY: 1075,
-    labelSize: 14,
-    labelSpacing: 1.5,
+    cardX: 760,
+    cardY: 920,
+    cardSize: 100,
+    cardPad: 8,
+    labelCx: 810,
+    labelY: 1040,
+    labelSize: 12,
+    labelSpacing: 1.2,
   });
+  void size;
 }
 
 interface QrCardSpec {
@@ -612,8 +701,7 @@ function drawQrCard(
 ): void {
   if (!assets.qrImage) return;
 
-  // QR pulse: sin-wave 1.0 ± 0.02, 1s period, active 4-6s.
-  // Subtle eye-draw at end of loop without distracting earlier.
+  // Pulse: sin-wave 1.0 ± 0.02, 1s period, active 4-6s.
   const pulseT = Math.max(0, t - 4.0);
   const pulse = pulseT > 0
     ? 1.0 + Math.sin((pulseT / 1.0) * Math.PI * 2) * 0.02
@@ -627,14 +715,12 @@ function drawQrCard(
   const innerY = cardY + spec.cardPad * pulse;
 
   ctx.save();
-  // White card background
   ctx.fillStyle = "#ffffff";
   drawRoundedRect(ctx, cardX, cardY, cardSize, cardSize, 8);
   ctx.fill();
   ctx.drawImage(assets.qrImage, innerX, innerY, innerSize, innerSize);
   ctx.restore();
 
-  // SCAN FOR DETAILS label (accent)
   ctx.save();
   ctx.fillStyle = state.accent;
   ctx.font = `bold ${spec.labelSize}px Helvetica, Arial, sans-serif`;
@@ -657,21 +743,22 @@ function drawFooterBar(
 ): void {
   const h = isSquare ? 60 : 80;
   const y = size.height - h;
-  // Bar always opaque (no fade — anchors the bottom from t=0).
+  // Bar: always opaque from t=0 (anchors the bottom).
   ctx.fillStyle = state.primary;
   ctx.fillRect(0, y, size.width, h);
 
-  // Footer text fades in 1400-1800ms.
-  const textOpacity = fadeAt(t, 1.4, 0.4);
-  if (textOpacity <= 0) return;
+  // Text: rises into place 1400-1800ms.
+  const e = blockEntrance(t, 1400, 400);
+  if (e.opacity <= 0) return;
 
   const centerSize = isSquare ? 14 : 18;
   const licSize = isSquare ? 12 : 14;
-  const baselineY = isSquare ? size.height - 22 : size.height - 35;
+  const baselineY = isSquare ? size.height - 22 : size.height - 32;
   const padX = 80;
 
   ctx.save();
-  ctx.globalAlpha *= textOpacity;
+  ctx.translate(0, e.translateY);
+  ctx.globalAlpha *= e.opacity;
   ctx.fillStyle = state.onPrimary;
   ctx.font = `bold ${centerSize}px Helvetica, Arial, sans-serif`;
   ctx.textAlign = "center";
@@ -695,15 +782,6 @@ function drawFooterBar(
 /* ──────────────────────────────────────────────────────────────── */
 /* Helpers                                                          */
 /* ──────────────────────────────────────────────────────────────── */
-
-/** Linear opacity that rises from 0 → 1 over `dur` seconds
- *  starting at `start`. Holds at 1 after start+dur. The staggered
- *  fade-in schedule is just a sequence of (start, dur) pairs. */
-function fadeAt(t: number, start: number, dur: number): number {
-  if (t < start) return 0;
-  if (t >= start + dur) return 1;
-  return (t - start) / dur;
-}
 
 function drawSafeAreaDebug(
   ctx: CanvasRenderingContext2D,
