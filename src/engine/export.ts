@@ -18,10 +18,22 @@ const FFMPEG_CDN = "https://unpkg.com/@ffmpeg/core@0.12.10/dist/umd";
  *
  * H-1.8g bumped 5000 → 5500 to absorb a residual ~1s captureStream
  * "stabilization tail" surfacing as black frames at the start of the
- * trimmed output. Same `-ss WARMUP/1000` placement, just more skip on
- * both ends of the pipeline (recorder records longer, ffmpeg trims more).
+ * trimmed output.
+ *
+ * H-7.1.1 split the constant into a device-gated function: desktop
+ * Chromium/WebKit start emitting captureStream frames within ~200ms,
+ * so 1500ms is plenty of headroom — saves ~4s of recording floor per
+ * export. Mobile (iOS + Android) keeps the 5500ms value to preserve
+ * MediaRecorder reliability on Safari, which is the original reason
+ * the warmup exists. Same `-ss warmup/1000` placement on both paths,
+ * the value just shrinks on desktop.
  */
-export const WARMUP_MS = 5500;
+const WARMUP_MS_DESKTOP = 1500;
+const WARMUP_MS_MOBILE = 5500;
+
+export function getWarmupMs(): number {
+  return isMobileDevice() ? WARMUP_MS_MOBILE : WARMUP_MS_DESKTOP;
+}
 
 let ffmpegInstance: FFmpeg | null = null;
 let ffmpegLoadPromise: Promise<FFmpeg> | null = null;
@@ -68,7 +80,7 @@ export async function recordCanvas(
   onProgress?: (progress: number) => void,
   // Defaults to 0 so existing Social Animator callers (ExportButton,
   // BatchExportButton) get unchanged behavior. The listing-flyer path
-  // explicitly opts in to WARMUP_MS via renderTimelineToWebm.
+  // explicitly opts in to getWarmupMs() via renderTimelineToWebm.
   warmupMs: number = 0
 ): Promise<Blob> {
   const stream = canvas.captureStream(fps);
@@ -101,9 +113,15 @@ export async function recordCanvas(
     `[MP4-DEBUG] recordCanvas: mobile=${isMobile} mime=${mimeType} canvas=${canvas.width}x${canvas.height} duration=${durationSec}s warmup=${(warmupMs / 1000).toFixed(1)}s total=${totalSec.toFixed(1)}s`
   );
 
+  // H-7.1.1: 8M → 4M. The captured webm is intermediate — ffmpeg
+  // re-encodes at CRF 18, which is the actual quality lever. Our
+  // content is mostly static (Ken Burns subtle zoom, fade-in text,
+  // QR pulse) with no high-motion scenes that need 8Mbps source
+  // headroom. Halving the source bitrate halves ffmpeg input bytes,
+  // shaving meaningful encode time off every export.
   const recorder = new MediaRecorder(stream, {
     mimeType,
-    videoBitsPerSecond: 8_000_000,
+    videoBitsPerSecond: 4_000_000,
   });
   const chunks: Blob[] = [];
   let chunkCount = 0;
@@ -177,7 +195,7 @@ export async function webmToMp4(
   durationSec: number,
   onProgress?: (progress: number) => void,
   // 0 default = no input skip (existing Social Animator callers). The
-  // listing-flyer path passes WARMUP_MS explicitly to trim the warmup
+  // listing-flyer path passes getWarmupMs() explicitly to trim the warmup
   // section recorded ahead of the animation timeline.
   warmupMs: number = 0
 ): Promise<Blob> {
@@ -209,29 +227,18 @@ export async function webmToMp4(
     //  - -t trims output to exactly durationSec
     //  - -r 30 normalizes output framerate at the output stage
     //
-    // H-7v bumped encoding quality: ultrafast/crf22 → fast/crf18 +
-    // High profile. Earlier reasoning ("Instagram re-encodes anyway")
-    // was wrong — Instagram's re-encode is lossy-on-lossy, so a softer
-    // source compounds into visibly fuzzy text after upload. CRF 18
-    // is "visually lossless".
-    //
-    // H-7w stepped the preset back from `medium` to `fast` after
-    // round-7 timing showed browser ffmpeg.wasm running 3-5x slower
-    // than native, pushing 6s reel encode past 60s — past the UX
-    // threshold where users wonder if the export hung. CRF (the
-    // dominant quality lever) stays at 18; only encode-time/size
-    // efficiency changes between presets. `fast` cuts encode time
-    // ~2x at the cost of ~5-10% larger output — acceptable trade.
-    //
-    // H-7.1 added a duration-aware fallback: at 11-15s the same
-    // `fast` preset would push reel encode toward 75-100s. Drop
-    // to `veryfast` for those longer videos so the upper bound
-    // stays under ~60s. CRF still 18, so the perceived quality
-    // step is small (~10% larger file, slightly less compression
-    // efficiency); the user gets back ~30% encode-time reduction
-    // when they pick a long duration.
-    // Applies to all MP4 exports (Listing Flyer + Open House Promo).
-    const preset = durationSec > 10 ? "veryfast" : "fast";
+    // Encoding history:
+    //   H-7v:   ultrafast/crf22 → fast/crf18 + High profile
+    //           (Instagram re-encode compounds softness on softness)
+    //   H-7w:   `medium` → `fast` (encode time was past 60s UX threshold)
+    //   H-7.1:  duration-aware `fast` ≤10s, `veryfast` >10s
+    //   H-7.1.1 single preset `ultrafast` for all durations. CRF 18
+    //           still does the heavy lifting on quality — preset only
+    //           controls encode-time vs file-size tradeoff. ffmpeg.wasm
+    //           runs 3-5x slower than native; `ultrafast` is what
+    //           makes 5s desktop export land under 30s. File grows
+    //           ~25% vs `fast` but stays well within social upload
+    //           limits, and visual quality after CRF 18 is unchanged.
     const warmupSec = warmupMs / 1000;
     await ffmpeg.exec([
       "-i",
@@ -249,7 +256,7 @@ export async function webmToMp4(
       "-profile:v",
       "high",
       "-preset",
-      preset,
+      "ultrafast",
       "-crf",
       "18",
       "-pix_fmt",

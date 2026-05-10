@@ -20,7 +20,7 @@ import {
   isMobileDevice,
   shareOrDownload,
   webmToMp4,
-  WARMUP_MS,
+  getWarmupMs,
 } from "@/engine/export";
 import { type BrandSettings } from "@/lib/brand";
 
@@ -264,7 +264,7 @@ export function ExportButtons({
             setMp4State({ kind: "running", phase: sz.convertingPhase, progress: p }),
           // Trim the captureStream warmup from the start of the webm so
           // the final MP4 length matches the duration slider exactly.
-          WARMUP_MS
+          getWarmupMs()
         );
 
         renderedMp4s.push({ label: sz.label, blob: mp4 });

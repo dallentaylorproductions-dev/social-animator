@@ -8,7 +8,7 @@ import {
 } from "./types";
 import { type BrandSettings, formatPhone, effectiveBrandAccent } from "@/lib/brand";
 import { renderTimelineToWebm } from "@/tools/listing-flyer/engine/render-mp4";
-import { webmToMp4, WARMUP_MS } from "@/engine/export";
+import { webmToMp4, getWarmupMs } from "@/engine/export";
 import {
   pickContrastText,
   pickContrastMuted,
@@ -190,7 +190,7 @@ export async function renderPromoMp4(
     size,
     durationSec,
     (p) => onProgress?.({ phase: "converting", progress: p }),
-    WARMUP_MS
+    getWarmupMs()
   );
 
   return mp4;
