@@ -11,6 +11,7 @@ import {
   loadDraft,
   saveDraft,
 } from "@/tools/open-house-promo/engine/draft-storage";
+import { getFFmpeg } from "@/engine/export";
 import { PromoForm } from "./PromoForm";
 import { PromoPreview } from "./PromoPreview";
 import { ExportButtons } from "./ExportButtons";
@@ -28,6 +29,16 @@ export default function OpenHousePromoPage() {
   useEffect(() => {
     setDraft(loadDraft());
     setHydrated(true);
+  }, []);
+
+  // Pre-warm ffmpeg.wasm at page level (instead of per-ExportButtons
+  // instance) so the ~10MB core load fires once on mount and runs
+  // alongside form-filling. By the time the user clicks Render, the
+  // singleton in src/engine/export.ts is hot. Mirrors the pattern in
+  // src/app/listing-flyer/page.tsx. Silent catch — the export path
+  // retries the same getFFmpeg() singleton if this fails.
+  useEffect(() => {
+    getFFmpeg().catch(() => {});
   }, []);
 
   useEffect(() => {

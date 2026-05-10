@@ -19,7 +19,6 @@ import {
 } from "@/tools/open-house-promo/engine/render-mp4";
 import {
   downloadBlob,
-  getFFmpeg,
   isMobileDevice,
   shareOrDownload,
 } from "@/engine/export";
@@ -69,14 +68,6 @@ export function ExportButtons({
   const [qrState, setQrState] = useState<SimpleState>({ kind: "idle" });
   const [mp4State, setMp4State] = useState<Mp4State>({ kind: "idle" });
   const hiddenCanvasRef = useRef<HTMLCanvasElement>(null);
-
-  // Pre-warm ffmpeg.wasm on mount so the first MP4 export doesn't
-  // wait on a ~10MB core load. Same pattern the listing-flyer page
-  // uses; silent catch since the actual export will retry the
-  // singleton.
-  useEffect(() => {
-    getFFmpeg().catch(() => {});
-  }, []);
 
   // Transition to "done" once both reel + square have been saved.
   // useEffect avoids a race between the two save handlers.
