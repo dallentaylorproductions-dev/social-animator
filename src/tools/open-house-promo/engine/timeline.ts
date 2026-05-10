@@ -159,25 +159,54 @@ interface Entrance {
   translateY: number;
 }
 
-/** Rising-translate + fade entrance. Block starts 60px below its
- *  final y position with opacity 0; eases up to (translateY 0,
- *  opacity 1) over `durationMs` starting at `startMs`. Cubic
- *  ease-out so the motion accelerates out and decelerates in. */
-function blockEntrance(
-  t: number,
-  startMs: number,
-  durationMs: number
-): Entrance {
+/** Quintic ease-out — smoother arrival than cubic on short rises.
+ *  H-7u upgraded from cubic because the previous motion read as
+ *  too abrupt at the end of each block's entrance. */
+function quintEaseOut(progress: number): number {
+  return 1 - Math.pow(1 - progress, 5);
+}
+
+/** Uniform entrance constants — every block uses the SAME duration
+ *  and rise distance so the composition's motion reads as one
+ *  rhythm rather than several conflicting ones. Distance bumped
+ *  60→90 so the rise feels intentional (the smaller value read
+ *  as "twitchy" in round-5 smoke tests). */
+const ENTRANCE_DURATION_MS = 500;
+const ENTRANCE_TRANSLATE_PX = 90;
+
+/** Rising-translate + fade entrance. Block starts ENTRANCE_TRANSLATE_PX
+ *  below its final y position with opacity 0; eases up to
+ *  (translateY 0, opacity 1) over ENTRANCE_DURATION_MS starting
+ *  at `startMs`. */
+function blockEntrance(t: number, startMs: number): Entrance {
   const elapsedMs = t * 1000 - startMs;
-  if (elapsedMs <= 0) return { opacity: 0, translateY: 60 };
-  if (elapsedMs >= durationMs) return { opacity: 1, translateY: 0 };
-  const progress = elapsedMs / durationMs;
-  const eased = 1 - Math.pow(1 - progress, 3);
+  if (elapsedMs <= 0)
+    return { opacity: 0, translateY: ENTRANCE_TRANSLATE_PX };
+  if (elapsedMs >= ENTRANCE_DURATION_MS)
+    return { opacity: 1, translateY: 0 };
+  const progress = elapsedMs / ENTRANCE_DURATION_MS;
+  const eased = quintEaseOut(progress);
   return {
     opacity: eased,
-    translateY: 60 * (1 - eased),
+    translateY: ENTRANCE_TRANSLATE_PX * (1 - eased),
   };
 }
+
+/** Stagger schedule — uniform 150ms between block starts. All
+ *  entrances complete by 1.55s so the composition settles
+ *  together rather than at varying times. Identical for both
+ *  reel and square; the square just doesn't render the entries
+ *  for blocks it skips (thumbStrip, description). */
+const ENTRANCE_SCHEDULE = {
+  heroPhoto: 0,
+  headerText: 150,
+  thumbStrip: 300,
+  propertyBlock: 450,
+  featuresBlock: 600,
+  description: 750,
+  agentQrRow: 900,
+  footerText: 1050,
+} as const;
 
 /* ──────────────────────────────────────────────────────────────── */
 /* Header                                                           */
@@ -201,7 +230,7 @@ function drawHeaderText(
   state: PromoMp4State,
   isSquare: boolean
 ): void {
-  const e = blockEntrance(t, 200, 400);
+  const e = blockEntrance(t, ENTRANCE_SCHEDULE.headerText);
   if (e.opacity <= 0) return;
 
   const titleSize = isSquare ? 44 : 56;
@@ -247,13 +276,15 @@ function drawHeroPhoto(
   assets: PromoMp4Assets,
   isSquare: boolean
 ): void {
-  const e = blockEntrance(t, 0, 600);
+  const e = blockEntrance(t, ENTRANCE_SCHEDULE.heroPhoto);
   if (e.opacity <= 0) return;
 
   // Layout: header 130 reel / 100 square. Hero starts 40px below
-  // the header on reel (gap rhythm), 20px below on square (tighter).
+  // the header on reel (gap rhythm), 20px below on square. H-7u
+  // shrank square hero 540→500 to make room for a 130pt features
+  // section that fits 3 bullets in column 1.
   const heroY = isSquare ? 120 : 170;
-  const heroH = isSquare ? 540 : 720;
+  const heroH = isSquare ? 500 : 720;
   const heroW = size.width;
 
   ctx.save();
@@ -307,7 +338,7 @@ function drawThumbStrip(
   size: { width: number; height: number },
   assets: PromoMp4Assets
 ): void {
-  const e = blockEntrance(t, 400, 400);
+  const e = blockEntrance(t, ENTRANCE_SCHEDULE.thumbStrip);
   if (e.opacity <= 0) return;
 
   // y=930-1020 per the H-7t reel gap rhythm. Cells 240×90 (8:3
@@ -357,7 +388,7 @@ function drawPropertyBlock(
   state: PromoMp4State,
   isSquare: boolean
 ): void {
-  const e = blockEntrance(t, 600, 400);
+  const e = blockEntrance(t, ENTRANCE_SCHEDULE.propertyBlock);
   if (e.opacity <= 0) return;
 
   const padX = isSquare ? 80 : 100;
@@ -368,26 +399,26 @@ function drawPropertyBlock(
   ctx.textBaseline = "alphabetic";
 
   if (isSquare) {
-    // Square section: y=680-790 (110 tall)
+    // Square section: y=640-750 (110 tall) per H-7u layout.
     ctx.fillStyle = state.accent;
     ctx.font = `bold 18px Helvetica, Arial, sans-serif`;
-    drawSpaced(ctx, "PRESENTING", padX, 700, 2);
+    drawSpaced(ctx, "PRESENTING", padX, 660, 2);
 
     ctx.fillStyle = "#ffffff";
     ctx.font = `bold 36px Helvetica, Arial, sans-serif`;
-    ctx.fillText(state.address || "Property address", padX, 745);
+    ctx.fillText(state.address || "Property address", padX, 705);
 
     if (state.city) {
       ctx.fillStyle = "rgba(255, 255, 255, 0.78)";
       ctx.font = `20px Helvetica, Arial, sans-serif`;
-      ctx.fillText(state.city, padX, 775);
+      ctx.fillText(state.city, padX, 735);
     }
 
     if (state.price) {
       ctx.fillStyle = state.primary;
       ctx.font = `bold 40px Helvetica, Arial, sans-serif`;
       ctx.textAlign = "right";
-      ctx.fillText(state.price, size.width - 80, 745);
+      ctx.fillText(state.price, size.width - 80, 705);
     }
   } else {
     // Reel section: y=1060-1180 (120 tall)
@@ -426,7 +457,7 @@ function drawFeaturesBlock(
   state: PromoMp4State,
   isSquare: boolean
 ): void {
-  const e = blockEntrance(t, 800, 400);
+  const e = blockEntrance(t, ENTRANCE_SCHEDULE.featuresBlock);
   if (e.opacity <= 0) return;
 
   // Single source of truth: filter once, slice once, then split
@@ -448,28 +479,26 @@ function drawFeaturesBlock(
   ctx.textBaseline = "alphabetic";
 
   if (isSquare) {
-    // Square section: y=810-900 (90 tall)
-    // Label + 2 bullet rows per column at 36px row spacing.
-    // Square caps to 4 highlights in practice (2+2) — col1 also
-    // slices to 2 since we only have ~80px of bullet area below
-    // the label.
+    // Square section: y=770-900 (130 tall) per H-7u — bumped from
+    // 90 so 3 bullets fit in column 1 at 28px row spacing without
+    // the 3rd item dropping off (round-6 fix).
     ctx.fillStyle = state.primary;
     ctx.font = `bold 16px Helvetica, Arial, sans-serif`;
-    drawSpaced(ctx, "FEATURES", 80, 822, 2);
+    drawSpaced(ctx, "FEATURES", 80, 790, 2);
 
     drawFeatureColumn(
       ctx,
-      col1.slice(0, 2),
+      col1,
       80,
-      [854, 890],
+      [820, 848, 876],
       18,
       state.primary
     );
     drawFeatureColumn(
       ctx,
-      col2.slice(0, 2),
+      col2,
       580,
-      [854, 890],
+      [820, 848, 876],
       18,
       state.primary
     );
@@ -535,7 +564,7 @@ function drawDescriptionBlock(
   t: number,
   state: PromoMp4State
 ): void {
-  const e = blockEntrance(t, 1000, 400);
+  const e = blockEntrance(t, ENTRANCE_SCHEDULE.description);
   if (e.opacity <= 0) return;
 
   const padX = 100;
@@ -563,7 +592,7 @@ function drawAgentQrRow(
   assets: PromoMp4Assets,
   isSquare: boolean
 ): void {
-  const e = blockEntrance(t, 1200, 400);
+  const e = blockEntrance(t, ENTRANCE_SCHEDULE.agentQrRow);
   if (e.opacity <= 0) return;
 
   ctx.save();
@@ -747,8 +776,8 @@ function drawFooterBar(
   ctx.fillStyle = state.primary;
   ctx.fillRect(0, y, size.width, h);
 
-  // Text: rises into place 1400-1800ms.
-  const e = blockEntrance(t, 1400, 400);
+  // Text: rises into place per the uniform schedule.
+  const e = blockEntrance(t, ENTRANCE_SCHEDULE.footerText);
   if (e.opacity <= 0) return;
 
   const centerSize = isSquare ? 14 : 18;
