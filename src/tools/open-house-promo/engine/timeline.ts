@@ -650,13 +650,15 @@ function drawAgentQrReel(
     ctx.fillText(state.email, padX, 1660);
   }
 
+  // Reel QR — 200×200 card centered in the right column at
+  // x=760-960. Label center derives from the card rectangle:
+  // labelCx = 760 + 100 = 860, labelY = 1480 + 200 + 16 = 1696.
   drawQrCard(ctx, t, state, assets, {
-    cardX: 740,
-    cardY: 1490,
+    cardX: 760,
+    cardY: 1480,
     cardSize: 200,
     cardPad: 12,
-    labelCx: 860,
-    labelY: 1725,
+    labelGap: 16,
     labelSize: 18,
     labelSpacing: 2.5,
   });
@@ -670,42 +672,58 @@ function drawAgentQrSquare(
   state: PromoMp4State,
   assets: PromoMp4Assets
 ): void {
-  // Section: y=920-1020 (100 tall)
+  // Section: y=905-1010 (105 tall) per H-7v. QR shrunk 100→85,
+  // shifted up 920→905 so the SCAN label clears the footer
+  // (footer starts y=1020).
   const padX = 80;
 
+  // Logo 40×40 at top-left of the section.
   if (assets.brandLogo) {
-    drawImageContain(ctx, assets.brandLogo, padX, 925, 48, 48);
+    drawImageContain(ctx, assets.brandLogo, padX, 905, 40, 40);
   } else {
     ctx.fillStyle = state.primary;
-    ctx.fillRect(padX, 925, 48, 48);
+    ctx.fillRect(padX, 905, 40, 40);
     ctx.fillStyle = state.onPrimary;
-    ctx.font = `bold 11px Helvetica, Arial, sans-serif`;
+    ctx.font = `bold 10px Helvetica, Arial, sans-serif`;
     ctx.textAlign = "center";
     ctx.textBaseline = "middle";
-    ctx.fillText("LOGO", padX + 24, 949);
+    ctx.fillText("LOGO", padX + 20, 925);
   }
 
   ctx.textAlign = "left";
   ctx.textBaseline = "alphabetic";
   ctx.fillStyle = "#ffffff";
-  ctx.font = `bold 20px Helvetica, Arial, sans-serif`;
-  ctx.fillText(state.agentName || "Your name", padX + 60, 950);
+  ctx.font = `bold 18px Helvetica, Arial, sans-serif`;
+  ctx.fillText(state.agentName || "Your name", padX + 50, 930);
 
   if (state.brokerage) {
     ctx.fillStyle = "rgba(255, 255, 255, 0.78)";
-    ctx.font = `14px Helvetica, Arial, sans-serif`;
-    ctx.fillText(state.brokerage, padX + 60, 974);
+    ctx.font = `13px Helvetica, Arial, sans-serif`;
+    ctx.fillText(state.brokerage, padX + 50, 950);
   }
 
+  // Phone + email below the logo row — 14pt fits if both present.
+  ctx.fillStyle = "#ffffff";
+  ctx.font = `14px Helvetica, Arial, sans-serif`;
+  if (state.phone) {
+    ctx.fillText(state.phone, padX, 975);
+  }
+  if (state.email) {
+    ctx.fillText(state.email, padX, 995);
+  }
+
+  // Square QR — 85×85 card at x=880, y=905. Label center derives
+  // from the card rectangle: labelCx = 880 + 42.5 = 922.5,
+  // labelY = 905 + 85 + 8 = 998. With 10pt label, glyph bottom
+  // ≈ y=1005, leaving ~15px clearance above the y=1020 footer.
   drawQrCard(ctx, t, state, assets, {
-    cardX: 760,
-    cardY: 920,
-    cardSize: 100,
-    cardPad: 8,
-    labelCx: 810,
-    labelY: 1040,
-    labelSize: 12,
-    labelSpacing: 1.2,
+    cardX: 880,
+    cardY: 905,
+    cardSize: 85,
+    cardPad: 6,
+    labelGap: 8,
+    labelSize: 10,
+    labelSpacing: 1,
   });
   void size;
 }
@@ -715,8 +733,8 @@ interface QrCardSpec {
   cardY: number;
   cardSize: number;
   cardPad: number;
-  labelCx: number;
-  labelY: number;
+  /** Vertical gap between QR card bottom and label baseline. */
+  labelGap: number;
   labelSize: number;
   labelSpacing: number;
 }
@@ -750,12 +768,21 @@ function drawQrCard(
   ctx.drawImage(assets.qrImage, innerX, innerY, innerSize, innerSize);
   ctx.restore();
 
+  // Label position is derived from the QR card's nominal (un-pulsed)
+  // rectangle so the label stays centered to the card and doesn't
+  // wobble with the pulse animation. Single source of truth: card
+  // x + width/2 for horizontal center, card bottom + labelGap for
+  // baseline. Replaces the round-7 bug where labelCx was hand-typed
+  // separately from cardX and could drift out of alignment.
+  const labelCx = spec.cardX + spec.cardSize / 2;
+  const labelY = spec.cardY + spec.cardSize + spec.labelGap;
+
   ctx.save();
   ctx.fillStyle = state.accent;
   ctx.font = `bold ${spec.labelSize}px Helvetica, Arial, sans-serif`;
   ctx.textAlign = "center";
   ctx.textBaseline = "alphabetic";
-  drawSpaced(ctx, "SCAN FOR DETAILS", spec.labelCx, spec.labelY, spec.labelSpacing);
+  drawSpaced(ctx, "SCAN FOR DETAILS", labelCx, labelY, spec.labelSpacing);
   ctx.restore();
 }
 

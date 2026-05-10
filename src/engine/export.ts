@@ -208,8 +208,15 @@ export async function webmToMp4(
     //    against the rAF loop finishing slightly short of target)
     //  - -t trims output to exactly durationSec
     //  - -r 30 normalizes output framerate at the output stage
-    //  - ultrafast preset trades file size for speed (Instagram re-encodes
-    //    anyway, so file size doesn't matter; speed shaves ~30-50% off conversion)
+    //
+    // H-7v bumped encoding quality: ultrafast/crf22 → medium/crf18 +
+    // High profile. Earlier reasoning ("Instagram re-encodes anyway")
+    // was wrong — Instagram's re-encode is lossy-on-lossy, so a softer
+    // source compounds into visibly fuzzy text after upload. CRF 18
+    // is "visually lossless"; medium preset takes ~2x the encode time
+    // (still well under a minute for 6s) but produces output that
+    // survives Instagram's recompression with sharp text edges.
+    // Applies to all MP4 exports (Listing Flyer + Open House Promo).
     const warmupSec = warmupMs / 1000;
     await ffmpeg.exec([
       "-i",
@@ -224,10 +231,12 @@ export async function webmToMp4(
       "30",
       "-c:v",
       "libx264",
+      "-profile:v",
+      "high",
       "-preset",
-      "ultrafast",
+      "medium",
       "-crf",
-      "22",
+      "18",
       "-pix_fmt",
       "yuv420p",
       "-movflags",
