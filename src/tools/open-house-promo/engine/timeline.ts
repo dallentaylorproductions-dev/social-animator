@@ -1,63 +1,42 @@
 import { Timeline, type Track } from "@/engine/timeline";
-import { easeOutCubic, easeOutQuad, linear } from "@/engine/easing";
+import { linear } from "@/engine/easing";
 import { drawImageContain } from "@/engine/draw";
 
 /**
- * Open House Promo MP4 — animated flyer composition mirroring the
- * static PDF layout. Replaces H-7g's multi-scene approach (title
- * card → photo+price → photo+highlights → photo+event → QR card),
- * which read as cheap-template; this redesign keeps the entire
- * flyer onscreen and adds subtle motion (Ken Burns + staggered
- * element fade-ins) to give it cinematic polish.
+ * Open House Promo MP4 — animated flyer composition.
  *
- * Total runtime: 6 seconds, 30fps. Both 9:16 (1080×1920) and 1:1
- * (1080×1080) render the same vertical stack of blocks; only sizes
- * and which-blocks-render adapt to the aspect (1:1 drops the thumb
- * strip and tightens the agent block).
+ * H-7q rewrite: motion simplified to opening fade-in + Ken Burns
+ * + final QR pulse only (the per-block staggered entrances added
+ * in H-7k read as "busy" on smoke tests). Square layout
+ * restructured as a clean 2-column content row (address/price
+ * LEFT, QR RIGHT) instead of stacking everything — the prior
+ * stacked layout produced "Olympia" ghosting where the city line
+ * overlapped agent text. Header gets a top-anchored, safe-area-
+ * respecting text layout so "OPEN HOUSE" never clips at the
+ * canvas top edge.
  *
- * Composition (top → bottom, mirrors PromoDocument):
+ * Composition (top → bottom) — adapts to aspect:
  *   Header bar    primary-bg, "OPEN HOUSE" + date + time
- *   Hero photo    photos[0], focal-cropped, Ken Burns 1.0→1.04
- *   Thumb strip   (9:16 only) photos[1..4] in a 4-column row
- *   Property      "PRESENTING" + address + price
- *   Features      "FEATURES" + 3 primary-bullet bullets
- *   Agent + QR    logo + agent name (left) + QR + label (right)
- *   Footer bar    primary-bg, notes / address echo + license
+ *   Hero photo    photos[0] blur-fill (H-7o)
+ *   Thumb strip   (reel only) photos[1..4] in a 4-column row
+ *   Content row   reel: address/price stacked, then features,
+ *                       then agent + QR (full-width sections)
+ *                 square: address/price LEFT, QR RIGHT (2-col,
+ *                       no features, no agent block)
+ *   Footer bar    primary-bg, eventNotes / address echo + license
  *
- * Motion:
- *   0.00-0.50s  header slides in from top + headline fades
- *   0.20-0.80s  hero fade-in + Ken Burns starts (continues 0..6s)
- *   0.80-1.40s  thumb strip staggered fade (9:16 only, 100ms each)
- *   1.40-2.00s  property block slides up from below + fades
- *   2.00-2.60s  features block fades
- *   2.60-3.20s  agent + QR row slides up + fades
- *   3.20-6.00s  hold + Ken Burns continues + QR gentle pulse
- *               (scale 1.00→1.02→1.00 sin wave on 2s period)
- *   Footer is present from t=0 (anchors the composition; no entry
- *   animation since it's the load-bearing bottom of the layout)
+ * Motion (simplified):
+ *   0.00-0.40s  opening fade-in: full canvas opacity 0 → 1
+ *   0.00-6.00s  hero Ken Burns scale 1.0 → 1.04 (linear)
+ *   3.50-6.00s  QR sin-wave pulse 1.0 → 1.02 → 1.0 (2s period)
+ *   All other elements: static, drawn at full opacity from t=0
+ *   (after the global fade-in covers the first 400ms).
  */
 
 export const PROMO_TOTAL_SEC = 6;
 
-/**
- * Horizontal safe-area inset enforced on every text-drawing call
- * in the timeline. Instagram + TikTok crop ~7-8% of the safe area
- * on small screens, but more importantly: the H-7g layout had
- * "PRESENTING" rendering as "ESENTING" because drawSpaced was
- * centering text around an x-coordinate that was meant to be the
- * left edge. Bumping the layout margin to 80 (and fixing
- * drawSpaced to respect textAlign — see below) gives all text a
- * full character of horizontal breathing room from any edge.
- */
 const SAFE_X = 80;
-/** Vertical safe-area inset. Smaller than SAFE_X because the
- *  header and footer bars define their own top/bottom edges and
- *  enforce padding internally. Used by the visual debug overlay
- *  for verification renders. */
 const SAFE_Y = 60;
-/** Visual debug for the safe-area boundaries. Flip true during
- *  layout work to overlay dashed red lines at SAFE_X / SAFE_Y;
- *  ship false. */
 const DEBUG_SAFE_AREA = false;
 
 export interface PromoMp4State {
@@ -67,30 +46,23 @@ export interface PromoMp4State {
   textPrimary: string;
   textMuted: string;
   onPrimary: string;
-  // Content
-  title: string; // always "OPEN HOUSE"
+  title: string;
   dateLabel: string;
   timeLabel: string;
   address: string;
   city: string;
   price: string;
-  highlights: string[]; // top 3 used in MP4
+  highlights: string[];
   agentName: string;
   brokerage: string;
   phone: string;
   email: string;
   licenseNumber: string;
-  /** Footer center text — eventNotes-or-address (computed upstream
-   *  in render-mp4 so the MP4 footer matches the PDF footer). */
   footerCenter: string;
 }
 
 export interface PromoMp4Assets {
-  /** Hero photo pre-cropped to the hero region's aspect on the
-   *  user's focal point. Null = render brand-bg fallback. */
   hero: HTMLCanvasElement | null;
-  /** Thumb-strip photos, each pre-cropped to the thumb cell aspect.
-   *  9:16 uses up to 4; 1:1 ignores this asset entirely. */
   thumbs: HTMLCanvasElement[];
   qrImage: HTMLImageElement | null;
   brandLogo: HTMLImageElement | null;
@@ -107,112 +79,62 @@ interface Layout {
   isSquare: boolean;
   header: Rect;
   hero: Rect;
-  thumbStrip: Rect | null; // null on 1:1
-  property: Rect;
-  features: Rect;
-  agentQr: Rect;
+  thumbStrip: Rect | null;
+  content: Rect;
   footer: Rect;
-  margin: number;
 }
 
-/**
- * Compute the vertical-stack layout for a given canvas size. 9:16
- * has room for the full stack including thumb strip; 1:1 drops the
- * strip and tightens every block.
- */
 function computeLayout(size: { width: number; height: number }): Layout {
   const { width, height } = size;
   const isSquare = Math.abs(width - height) < 50;
-  // Both aspects use SAFE_X so every text-drawing call gets the
-  // same horizontal breathing room. The earlier 40/50 margins
-  // were too tight against the canvas edge — combined with
-  // drawSpaced's centering bug, that's what produced "ESENTING"
-  // and "EATURES" in round-3 smoke tests.
-  const margin = SAFE_X;
 
   if (isSquare) {
-    // 1:1 budget tight — hero gets 720pt (3:2 at 1080 wide) so a
-    // 3:2 source fits edge-to-edge, leaving 360pt for header +
-    // address/price + agent/QR + footer. H-7m: features list and
-    // thumb strip both skipped on square — too cramped at 1:1
-    // with the 3:2 hero locked in.
+    // 1:1 — header / hero / 2-col content / footer.
     const header = { x: 0, y: 0, w: width, h: 100 };
-    const hero = { x: 0, y: header.h, w: width, h: 720 };
-    const property = { x: 0, y: header.h + hero.h, w: width, h: 95 };
-    // No features block on square — skip and route the agent/QR
-    // row into the freed vertical space.
-    const features = {
+    const hero = { x: 0, y: header.h, w: width, h: 600 };
+    const content = {
       x: 0,
-      y: header.h + hero.h + property.h,
+      y: header.h + hero.h,
       w: width,
-      h: 0,
+      h: 320,
     };
-    const agentQr = {
-      x: 0,
-      y: header.h + hero.h + property.h,
-      w: width,
-      h: 105,
-    };
-    const footer = {
-      x: 0,
-      y: height - 60,
-      w: width,
-      h: 60,
-    };
+    const footer = { x: 0, y: height - 60, w: width, h: 60 };
     return {
       isSquare,
       header,
       hero,
       thumbStrip: null,
-      property,
-      features,
-      agentQr,
+      content,
       footer,
-      margin,
     };
   }
 
-  // 9:16 portrait. Hero now 3:2 at 1080 wide → 720pt tall (was
-  // 600pt). Other blocks tightened to absorb the extra 120pt:
-  // header 220→200, property 240→220, features 220→200,
-  // agent+QR 320→280, footer 140→120.
+  // 9:16 portrait. Vertical stack with thumb strip inside hero
+  // section. Content row is the remaining vertical space; its
+  // sub-blocks (property / features / agent+QR) lay out
+  // top-to-bottom inside drawContentReel.
   const header = { x: 0, y: 0, w: width, h: 200 };
   const hero = { x: 0, y: header.h, w: width, h: 720 };
   const thumbStrip = {
-    x: margin,
+    x: SAFE_X,
     y: header.h + hero.h,
-    w: width - margin * 2,
-    h: 180,
+    w: width - SAFE_X * 2,
+    h: 160,
   };
-  const property = {
+  const content = {
     x: 0,
     y: thumbStrip.y + thumbStrip.h,
     w: width,
-    h: 220,
+    h: height - 100 - (thumbStrip.y + thumbStrip.h),
   };
-  const features = {
-    x: 0,
-    y: property.y + property.h,
-    w: width,
-    h: 200,
-  };
-  const agentQr = {
-    x: 0,
-    y: features.y + features.h,
-    w: width,
-    h: 280,
-  };
-  const footer = { x: 0, y: height - 120, w: width, h: 120 };
+  const footer = { x: 0, y: height - 100, w: width, h: 100 };
   return {
     isSquare,
     header,
     hero,
     thumbStrip,
-    property,
-    features,
-    agentQr,
+    content,
     footer,
-    margin,
   };
 }
 
@@ -224,11 +146,6 @@ export function buildPromoTimeline(
   const layout = computeLayout(size);
   const tracks: Track[] = [];
 
-  // Single track running for the full duration. Easier to reason
-  // about animation timing as one continuous timeline rather than
-  // splitting block draws across many tracks — and the canvas-2D
-  // composition is naturally serial anyway (we paint each block in
-  // a fixed z-order on every frame).
   tracks.push({
     id: "flyer",
     start: 0,
@@ -240,27 +157,28 @@ export function buildPromoTimeline(
       ctx.fillStyle = state.background;
       ctx.fillRect(0, 0, size.width, size.height);
 
-      drawHeader(ctx, layout.header, state, t);
+      // Global opening fade-in: 0 → 1 over first 400ms. Applies
+      // to every block draw on top, so the entire frame fades
+      // in as one unit. Replaces the per-block staggered
+      // entrances from H-7k that read as busy on smoke tests.
+      const openingFade = clamp01(t / 0.4);
+
+      ctx.save();
+      ctx.globalAlpha = openingFade;
+
+      drawHeader(ctx, layout.header, state);
       drawHero(ctx, layout.hero, state, assets.hero, t);
       if (layout.thumbStrip && assets.thumbs.length > 0) {
-        drawThumbStrip(ctx, layout.thumbStrip, assets.thumbs, t);
+        drawThumbStrip(ctx, layout.thumbStrip, assets.thumbs);
       }
-      drawProperty(ctx, layout.property, state, layout, t);
-      // Square skips features (H-7m: 1:1 with a 720pt 3:2 hero
-      // doesn't have room for both features list AND agent/QR row).
-      if (layout.features.h > 0) {
-        drawFeatures(ctx, layout.features, state, layout, t);
+      if (layout.isSquare) {
+        drawContentSquare(ctx, layout.content, state, assets, t);
+      } else {
+        drawContentReel(ctx, layout.content, state, assets, t);
       }
-      drawAgentQr(
-        ctx,
-        layout.agentQr,
-        state,
-        assets.qrImage,
-        assets.brandLogo,
-        layout,
-        t
-      );
-      drawFooter(ctx, layout.footer, state, layout);
+      drawFooter(ctx, layout.footer, state);
+
+      ctx.restore();
 
       if (DEBUG_SAFE_AREA) drawSafeAreaDebug(ctx, size);
     },
@@ -276,62 +194,51 @@ export function buildPromoTimeline(
 function drawHeader(
   ctx: CanvasRenderingContext2D,
   rect: Rect,
-  state: PromoMp4State,
-  t: number
+  state: PromoMp4State
 ): void {
-  // Slide in from top: translateY -rect.h → 0 over 500ms with
-  // easeOutCubic. Header is fully present after 0.5s.
-  const slideP = clamp01(t / 0.5);
-  const eased = easeOutCubic(slideP);
-  const yOffset = -rect.h * (1 - eased);
-
-  ctx.save();
-  ctx.translate(0, yOffset);
   ctx.fillStyle = state.primary;
   ctx.fillRect(rect.x, rect.y, rect.w, rect.h);
 
-  // Headline + date + time fade in slightly after the slide
-  // starts so the slide motion reads first.
-  const textP = clamp01((t - 0.1) / 0.5);
-  if (textP > 0) {
-    const cx = rect.x + rect.w / 2;
-    const cy = rect.y + rect.h / 2;
+  const isSquare = rect.h < 150;
+  const titleSize = isSquare ? 56 : 80;
+  const dateSize = isSquare ? 22 : 30;
+  const timeSize = isSquare ? 18 : 24;
+  // Top inset inside the header band — relaxed from full SAFE_Y
+  // since the band itself provides visual containment from the
+  // canvas edge. This is the value that fixes the H-7q
+  // "OPEN HOUSE" partial-clip bug from round 4: at H-7k the
+  // headline was alphabetic-baseline-anchored and could push
+  // its glyph top past y=0.
+  const padTop = isSquare ? 14 : 22;
 
-    const isSquare = rect.h < 150;
-    const titleSize = isSquare ? 60 : 96;
-    const dateSize = isSquare ? 24 : 32;
-    const timeSize = isSquare ? 20 : 26;
+  const cx = rect.x + rect.w / 2;
+  // Title: top-anchored. textBaseline "top" makes y the glyph
+  // top, so the headline can never clip the canvas top regardless
+  // of font metrics.
+  ctx.save();
+  ctx.fillStyle = state.onPrimary;
+  ctx.textAlign = "center";
+  ctx.textBaseline = "top";
+  ctx.font = `bold ${titleSize}px Helvetica, Arial, sans-serif`;
+  drawSpaced(
+    ctx,
+    state.title.toUpperCase(),
+    cx,
+    rect.y + padTop,
+    isSquare ? 4 : 8
+  );
 
-    ctx.save();
-    ctx.globalAlpha = textP;
-    ctx.fillStyle = state.onPrimary;
-    ctx.textAlign = "center";
-    ctx.textBaseline = "alphabetic";
-    ctx.font = `bold ${titleSize}px Helvetica, Arial, sans-serif`;
-    drawSpaced(
-      ctx,
-      state.title.toUpperCase(),
-      cx,
-      cy - (state.dateLabel || state.timeLabel ? titleSize * 0.05 : -titleSize * 0.3),
-      isSquare ? 4 : 8
-    );
-
-    if (state.dateLabel) {
-      ctx.font = `bold ${dateSize}px Helvetica, Arial, sans-serif`;
-      ctx.fillText(state.dateLabel, cx, cy + titleSize * 0.55 + dateSize * 0.5);
-    }
-    if (state.timeLabel) {
-      ctx.font = `${timeSize}px Helvetica, Arial, sans-serif`;
-      ctx.globalAlpha *= 0.9;
-      ctx.fillText(
-        state.timeLabel,
-        cx,
-        cy + titleSize * 0.55 + dateSize * 0.5 + timeSize * 1.4
-      );
-    }
-    ctx.restore();
+  let y = rect.y + padTop + titleSize + (isSquare ? 4 : 8);
+  if (state.dateLabel) {
+    ctx.font = `bold ${dateSize}px Helvetica, Arial, sans-serif`;
+    ctx.fillText(state.dateLabel, cx, y);
+    y += dateSize + 4;
   }
-
+  if (state.timeLabel) {
+    ctx.font = `${timeSize}px Helvetica, Arial, sans-serif`;
+    ctx.globalAlpha *= 0.9;
+    ctx.fillText(state.timeLabel, cx, y);
+  }
   ctx.restore();
 }
 
@@ -342,26 +249,15 @@ function drawHero(
   photoCanvas: HTMLCanvasElement | null,
   t: number
 ): void {
-  // H-7m: hero now uses CONTAIN-fit (brand-primary letterbox /
-  // pillarbox bars on aspect mismatches) so the entire photo is
-  // always visible. The pre-cropped canvas arrives at the hero
-  // region's exact dimensions with bars already painted; this
-  // function just blits it with Ken Burns scale on top.
   ctx.save();
   ctx.beginPath();
   ctx.rect(rect.x, rect.y, rect.w, rect.h);
   ctx.clip();
 
-  // Fill the region with brand primary first — both for the
-  // no-photo placeholder case and as a backstop if Ken Burns
-  // briefly exposes edges (the zoom math should keep edges
-  // covered; defensive).
   ctx.fillStyle = state.primary;
   ctx.fillRect(rect.x, rect.y, rect.w, rect.h);
 
   if (!photoCanvas) {
-    // Stenciled "OPEN HOUSE" placeholder text centered in the
-    // region — same fallback as the static PDF.
     ctx.fillStyle = state.onPrimary;
     ctx.globalAlpha = 0.6;
     ctx.font = `bold ${Math.floor(rect.h * 0.14)}px Helvetica, Arial, sans-serif`;
@@ -372,20 +268,16 @@ function drawHero(
     return;
   }
 
-  // Fade-in over 600ms starting at t=0.2.
-  const fadeP = clamp01((t - 0.2) / 0.6);
-  // Ken Burns: scale 1.0 → 1.04 over 6s, linear. Scale around the
-  // region center; the photoCanvas is already CONTAIN-fit at the
-  // region size with bars painted, so scaling slightly amplifies
-  // the photo without revealing transparent edges.
+  // Ken Burns: scale 1.0 → 1.04 over 6s, linear. The pre-composed
+  // photoCanvas is already blur-filled at the region's exact size,
+  // so scaling it amplifies the foreground photo without revealing
+  // any transparent edges.
   const burnP = clamp01(t / PROMO_TOTAL_SEC);
   const zoom = 1.0 + burnP * 0.04;
   const dw = rect.w * zoom;
   const dh = rect.h * zoom;
   const dx = rect.x + (rect.w - dw) / 2;
   const dy = rect.y + (rect.h - dh) / 2;
-
-  ctx.globalAlpha = fadeP;
   ctx.drawImage(photoCanvas, dx, dy, dw, dh);
   ctx.restore();
 }
@@ -393,41 +285,24 @@ function drawHero(
 function drawThumbStrip(
   ctx: CanvasRenderingContext2D,
   rect: Rect,
-  thumbs: HTMLCanvasElement[],
-  t: number
+  thumbs: HTMLCanvasElement[]
 ): void {
-  // Top padding inside the strip region for breathing room.
   const padTop = 14;
   const cellH = rect.h - padTop;
   const gap = 12;
   const count = Math.min(4, thumbs.length);
   const cellW = (rect.w - gap * (count - 1)) / count;
-
   for (let i = 0; i < count; i++) {
-    // Stagger each thumb's fade-in 100ms apart, starting at 0.8s.
-    const startT = 0.8 + i * 0.1;
-    const fadeP = clamp01((t - startT) / 0.4);
-    if (fadeP <= 0) continue;
     const cx = rect.x + i * (cellW + gap);
     const cy = rect.y + padTop;
     ctx.save();
-    ctx.globalAlpha = fadeP;
-    // Slight slide-up on entry (10pt) so the fade has motion.
-    const slideOffset = (1 - fadeP) * 10;
-    ctx.translate(0, slideOffset);
-    // Clip to a rounded rect for a softer thumb edge.
     const r = 12;
     ctx.beginPath();
     ctx.moveTo(cx + r, cy);
     ctx.lineTo(cx + cellW - r, cy);
     ctx.quadraticCurveTo(cx + cellW, cy, cx + cellW, cy + r);
     ctx.lineTo(cx + cellW, cy + cellH - r);
-    ctx.quadraticCurveTo(
-      cx + cellW,
-      cy + cellH,
-      cx + cellW - r,
-      cy + cellH
-    );
+    ctx.quadraticCurveTo(cx + cellW, cy + cellH, cx + cellW - r, cy + cellH);
     ctx.lineTo(cx + r, cy + cellH);
     ctx.quadraticCurveTo(cx, cy + cellH, cx, cy + cellH - r);
     ctx.lineTo(cx, cy + r);
@@ -439,253 +314,307 @@ function drawThumbStrip(
   }
 }
 
-function drawProperty(
+function drawContentReel(
   ctx: CanvasRenderingContext2D,
   rect: Rect,
   state: PromoMp4State,
-  layout: Layout,
+  assets: PromoMp4Assets,
   t: number
 ): void {
-  // Slide up from below + fade over 600ms starting at 1.4s.
-  const p = clamp01((t - 1.4) / 0.6);
-  if (p <= 0) return;
-  const eased = easeOutQuad(p);
-  const yOffset = (1 - eased) * 30;
+  // Reel content: vertical stack — property block, features, then
+  // agent + QR side-by-side at the bottom.
+  const padX = SAFE_X;
+  const padY = 24;
+  let y = rect.y + padY;
 
-  const isSquare = layout.isSquare;
-  const padX = layout.margin;
-  const kickerSize = isSquare ? 18 : 24;
-  const addressSize = isSquare ? 44 : 64;
-  const citySize = isSquare ? 22 : 28;
-  const priceSize = isSquare ? 56 : 84;
+  // PRESENTING + address + city + price
+  const kickerSize = 24;
+  const addressSize = 56;
+  const citySize = 26;
+  const priceSize = 76;
 
   ctx.save();
-  ctx.translate(0, yOffset);
-  ctx.globalAlpha = p;
-
-  let y = rect.y + 24;
-
-  // PRESENTING (accent)
   ctx.fillStyle = state.accent;
   ctx.font = `bold ${kickerSize}px Helvetica, Arial, sans-serif`;
   ctx.textAlign = "left";
-  ctx.textBaseline = "alphabetic";
-  drawSpaced(ctx, "PRESENTING", padX, y, isSquare ? 2 : 3);
-  y += kickerSize + (isSquare ? 12 : 18);
+  ctx.textBaseline = "top";
+  drawSpaced(ctx, "PRESENTING", padX, y, 3);
+  y += kickerSize + 12;
 
-  // Address (textPrimary)
   if (state.address) {
     ctx.fillStyle = state.textPrimary;
     ctx.font = `bold ${addressSize}px Helvetica, Arial, sans-serif`;
-    ctx.fillText(state.address, padX, y + addressSize * 0.85);
-    y += addressSize + 6;
+    ctx.fillText(state.address, padX, y);
+    y += addressSize + 4;
   }
   if (state.city) {
     ctx.fillStyle = state.textMuted;
     ctx.font = `${citySize}px Helvetica, Arial, sans-serif`;
-    ctx.fillText(state.city, padX, y + citySize);
-    y += citySize + (isSquare ? 6 : 12);
+    ctx.fillText(state.city, padX, y);
+    y += citySize + 8;
   }
-  // Price (primary, large, right-aligned to give the property
-  // block room for both address and price on a single eye-line).
   if (state.price) {
     ctx.fillStyle = state.primary;
     ctx.font = `bold ${priceSize}px Helvetica, Arial, sans-serif`;
-    ctx.textAlign = "right";
-    ctx.fillText(
-      state.price,
-      rect.x + rect.w - padX,
-      rect.y + rect.h - 16
-    );
+    ctx.fillText(state.price, padX, y);
+    y += priceSize + 18;
   }
   ctx.restore();
-}
 
-function drawFeatures(
-  ctx: CanvasRenderingContext2D,
-  rect: Rect,
-  state: PromoMp4State,
-  layout: Layout,
-  t: number
-): void {
-  const p = clamp01((t - 2.0) / 0.6);
-  if (p <= 0) return;
-
-  const isSquare = layout.isSquare;
-  const padX = layout.margin;
-  const labelSize = isSquare ? 18 : 24;
-  const bulletSize = isSquare ? 26 : 34;
-  const bulletGap = isSquare ? 16 : 22;
-  const bulletDotR = isSquare ? 6 : 8;
-
+  // Features list (3 max) — primary bullets + textPrimary text.
   const highlights = state.highlights.slice(0, 3);
-  if (highlights.length === 0) return;
+  if (highlights.length > 0) {
+    const labelSize = 22;
+    const bulletSize = 30;
+    const bulletGap = 10;
+    const bulletDotR = 7;
 
-  ctx.save();
-  ctx.globalAlpha = p;
-
-  let y = rect.y + 22;
-
-  // FEATURES label (primary)
-  ctx.fillStyle = state.primary;
-  ctx.font = `bold ${labelSize}px Helvetica, Arial, sans-serif`;
-  ctx.textAlign = "left";
-  ctx.textBaseline = "alphabetic";
-  drawSpaced(ctx, "FEATURES", padX, y, isSquare ? 2 : 3);
-  y += labelSize + (isSquare ? 16 : 22);
-
-  // Bullets — primary dot + textPrimary text, one per line.
-  ctx.font = `${bulletSize}px Helvetica, Arial, sans-serif`;
-  ctx.textBaseline = "middle";
-  highlights.forEach((h) => {
-    const lineY = y + bulletSize / 2;
+    ctx.save();
     ctx.fillStyle = state.primary;
-    ctx.beginPath();
-    ctx.arc(padX + bulletDotR, lineY, bulletDotR, 0, Math.PI * 2);
-    ctx.fill();
-    ctx.fillStyle = state.textPrimary;
-    ctx.fillText(h, padX + bulletDotR * 2 + (isSquare ? 14 : 22), lineY);
-    y += bulletSize + bulletGap;
-  });
+    ctx.font = `bold ${labelSize}px Helvetica, Arial, sans-serif`;
+    ctx.textAlign = "left";
+    ctx.textBaseline = "top";
+    drawSpaced(ctx, "FEATURES", padX, y, 3);
+    y += labelSize + 14;
 
-  ctx.restore();
+    ctx.font = `${bulletSize}px Helvetica, Arial, sans-serif`;
+    ctx.textBaseline = "middle";
+    for (const h of highlights) {
+      const lineY = y + bulletSize / 2;
+      ctx.fillStyle = state.primary;
+      ctx.beginPath();
+      ctx.arc(padX + bulletDotR, lineY, bulletDotR, 0, Math.PI * 2);
+      ctx.fill();
+      ctx.fillStyle = state.textPrimary;
+      ctx.fillText(h, padX + bulletDotR * 2 + 18, lineY);
+      y += bulletSize + bulletGap;
+    }
+    ctx.restore();
+    y += 8;
+  }
+
+  // Agent block (left) + QR block (right) at the bottom of the
+  // content row — anchor to rect bottom so any extra slack lands
+  // above between features and agent rather than below.
+  const bottomRowH = 200;
+  const bottomY = rect.y + rect.h - bottomRowH;
+  const splitX = rect.x + rect.w * 0.6;
+  drawAgentBlock(
+    ctx,
+    {
+      x: rect.x,
+      y: bottomY,
+      w: splitX - rect.x,
+      h: bottomRowH,
+    },
+    state,
+    assets.brandLogo,
+    /* compact */ false
+  );
+  drawQrBlock(
+    ctx,
+    {
+      x: splitX,
+      y: bottomY,
+      w: rect.x + rect.w - splitX,
+      h: bottomRowH,
+    },
+    state,
+    assets.qrImage,
+    t,
+    /* sizeMode */ "reel"
+  );
 }
 
-function drawAgentQr(
+function drawContentSquare(
   ctx: CanvasRenderingContext2D,
   rect: Rect,
   state: PromoMp4State,
-  qrImage: HTMLImageElement | null,
-  brandLogo: HTMLImageElement | null,
-  layout: Layout,
+  assets: PromoMp4Assets,
   t: number
 ): void {
-  const p = clamp01((t - 2.6) / 0.6);
-  if (p <= 0) return;
-  const eased = easeOutQuad(p);
-  const yOffset = (1 - eased) * 30;
+  // Square content: 2-column row. LEFT is address/price stack,
+  // RIGHT is QR + SCAN. No features list, no agent block — square
+  // is too tight for that density (the round-4 "Olympia ghosting"
+  // bug came from cramming agent text into the same vertical
+  // space as the city line).
+  const padX = SAFE_X;
+  const padY = 16;
+  const splitX = rect.x + rect.w * 0.55;
 
-  const isSquare = layout.isSquare;
-  const padX = layout.margin;
+  // LEFT column: PRESENTING + address + city + price
+  let y = rect.y + padY;
+  const kickerSize = 18;
+  const addressSize = 42;
+  const citySize = 20;
+  const priceSize = 50;
 
   ctx.save();
-  ctx.translate(0, yOffset);
-  ctx.globalAlpha = p;
+  ctx.fillStyle = state.accent;
+  ctx.font = `bold ${kickerSize}px Helvetica, Arial, sans-serif`;
+  ctx.textAlign = "left";
+  ctx.textBaseline = "top";
+  drawSpaced(ctx, "PRESENTING", padX, y, 2);
+  y += kickerSize + 8;
 
-  // Two-column split: agent block on the left (~60% width), QR on
-  // the right (~40% width with internal padding).
-  const splitX = rect.x + rect.w * 0.6;
-
-  // ── Agent block ──────────────────────────────────────────
-  const logoSize = isSquare ? 50 : 80;
-  const nameSize = isSquare ? 26 : 36;
-  const brokerageSize = isSquare ? 18 : 24;
-  const contactSize = isSquare ? 16 : 22;
-
-  let agentY = rect.y + 24;
-  if (brandLogo) {
-    drawImageContain(ctx, brandLogo, padX, agentY, logoSize, logoSize);
-  } else {
-    // Fallback square with mint color and "LOGO" stenciled
+  if (state.address) {
+    ctx.fillStyle = state.textPrimary;
+    ctx.font = `bold ${addressSize}px Helvetica, Arial, sans-serif`;
+    ctx.fillText(state.address, padX, y);
+    y += addressSize + 4;
+  }
+  if (state.city) {
+    ctx.fillStyle = state.textMuted;
+    ctx.font = `${citySize}px Helvetica, Arial, sans-serif`;
+    ctx.fillText(state.city, padX, y);
+    y += citySize + 10;
+  }
+  if (state.price) {
     ctx.fillStyle = state.primary;
-    ctx.fillRect(padX, agentY, logoSize, logoSize);
+    ctx.font = `bold ${priceSize}px Helvetica, Arial, sans-serif`;
+    ctx.fillText(state.price, padX, y);
+  }
+  ctx.restore();
+
+  // RIGHT column: QR + SCAN FOR DETAILS
+  drawQrBlock(
+    ctx,
+    {
+      x: splitX,
+      y: rect.y,
+      w: rect.x + rect.w - splitX,
+      h: rect.h,
+    },
+    state,
+    assets.qrImage,
+    t,
+    /* sizeMode */ "square"
+  );
+}
+
+function drawAgentBlock(
+  ctx: CanvasRenderingContext2D,
+  rect: Rect,
+  state: PromoMp4State,
+  brandLogo: HTMLImageElement | null,
+  _compact: boolean
+): void {
+  const padX = SAFE_X;
+  const logoSize = 70;
+  const nameSize = 32;
+  const brokerageSize = 22;
+  const contactSize = 20;
+
+  ctx.save();
+  ctx.textBaseline = "top";
+
+  // Logo (or fallback square)
+  const logoY = rect.y;
+  if (brandLogo) {
+    drawImageContain(ctx, brandLogo, padX, logoY, logoSize, logoSize);
+  } else {
+    ctx.fillStyle = state.primary;
+    ctx.fillRect(padX, logoY, logoSize, logoSize);
     ctx.fillStyle = state.onPrimary;
     ctx.font = `bold ${Math.floor(logoSize * 0.22)}px Helvetica, Arial, sans-serif`;
     ctx.textAlign = "center";
     ctx.textBaseline = "middle";
-    ctx.fillText("LOGO", padX + logoSize / 2, agentY + logoSize / 2);
+    ctx.fillText("LOGO", padX + logoSize / 2, logoY + logoSize / 2);
+    ctx.textBaseline = "top";
   }
 
-  // Agent name to right of logo
+  // Name + brokerage to the right of logo
+  const nameX = padX + logoSize + 18;
   ctx.textAlign = "left";
-  ctx.textBaseline = "alphabetic";
   ctx.fillStyle = state.textPrimary;
   ctx.font = `bold ${nameSize}px Helvetica, Arial, sans-serif`;
-  const nameX = padX + logoSize + (isSquare ? 14 : 20);
-  let nameY = agentY + nameSize;
-  ctx.fillText(state.agentName || "Your name", nameX, nameY);
-  nameY += brokerageSize + 4;
+  ctx.fillText(state.agentName || "Your name", nameX, logoY + 4);
   if (state.brokerage) {
-    ctx.font = `${brokerageSize}px Helvetica, Arial, sans-serif`;
     ctx.fillStyle = state.textMuted;
-    ctx.fillText(state.brokerage, nameX, nameY);
+    ctx.font = `${brokerageSize}px Helvetica, Arial, sans-serif`;
+    ctx.fillText(state.brokerage, nameX, logoY + 4 + nameSize + 4);
   }
 
-  agentY += logoSize + (isSquare ? 14 : 22);
-  // Phone + email lines below the logo row
+  // Phone + email below the logo row
+  let contactY = rect.y + logoSize + 18;
   ctx.fillStyle = state.textPrimary;
   ctx.font = `${contactSize}px Helvetica, Arial, sans-serif`;
   if (state.phone) {
-    ctx.fillText(state.phone, padX, agentY + contactSize);
-    agentY += contactSize + 6;
+    ctx.fillText(state.phone, padX, contactY);
+    contactY += contactSize + 4;
   }
   if (state.email) {
-    ctx.fillText(state.email, padX, agentY + contactSize);
+    ctx.fillText(state.email, padX, contactY);
   }
 
-  // ── QR block ─────────────────────────────────────────────
-  if (qrImage) {
-    // Gentle pulse: scale 1.0 → 1.02 → 1.0 over 2s, repeating after
-    // the entry animation finishes (~3.2s). sin-wave is smoother
-    // than a stepwise scale.
-    const pulseT = Math.max(0, t - 3.2);
-    const pulse = Math.sin((pulseT / 2) * Math.PI * 2) * 0.01 + 1.0;
+  ctx.restore();
+}
 
-    const qrSize = isSquare ? 110 : 200;
-    const qrCardPad = isSquare ? 8 : 14;
-    const qrCenterX = splitX + (rect.x + rect.w - splitX) / 2;
-    const qrCenterY = rect.y + 24 + qrSize / 2;
-    const drawW = qrSize * pulse;
-    const drawH = qrSize * pulse;
-    const drawX = qrCenterX - drawW / 2;
-    const drawY = qrCenterY - drawH / 2;
+function drawQrBlock(
+  ctx: CanvasRenderingContext2D,
+  rect: Rect,
+  state: PromoMp4State,
+  qrImage: HTMLImageElement | null,
+  t: number,
+  sizeMode: "reel" | "square"
+): void {
+  if (!qrImage) return;
+  const qrSize = sizeMode === "square" ? 220 : 200;
+  const cardPad = sizeMode === "square" ? 12 : 14;
+  const labelSize = sizeMode === "square" ? 16 : 22;
 
-    // White card behind QR — keeps it scannable on any primary bg.
-    ctx.fillStyle = "#ffffff";
-    drawRoundedRect(
-      ctx,
-      drawX - qrCardPad,
-      drawY - qrCardPad,
-      drawW + qrCardPad * 2,
-      drawH + qrCardPad * 2,
-      isSquare ? 6 : 10
-    );
-    ctx.fill();
-    ctx.drawImage(qrImage, drawX, drawY, drawW, drawH);
+  // QR pulse: sin-wave 1.0 → 1.02 → 1.0 over 2s, starting at 3.5s.
+  // Subtle "tap me" cue without being distracting.
+  const pulseT = Math.max(0, t - 3.5);
+  const pulse = pulseT > 0 ? Math.sin((pulseT / 2) * Math.PI * 2) * 0.01 + 1.0 : 1.0;
+  const drawW = qrSize * pulse;
+  const drawH = qrSize * pulse;
+  const cx = rect.x + rect.w / 2;
+  const cy = rect.y + rect.h / 2 - labelSize;
+  const drawX = cx - drawW / 2;
+  const drawY = cy - drawH / 2;
 
-    // SCAN FOR DETAILS label below QR (accent — load-bearing for
-    // the secondary brand color in this layout).
-    const labelSize = isSquare ? 14 : 20;
-    ctx.fillStyle = state.accent;
-    ctx.font = `bold ${labelSize}px Helvetica, Arial, sans-serif`;
-    ctx.textAlign = "center";
-    ctx.textBaseline = "alphabetic";
-    drawSpaced(
-      ctx,
-      "SCAN FOR DETAILS",
-      qrCenterX,
-      drawY + drawH + qrCardPad + labelSize + 8,
-      isSquare ? 1.5 : 2.5
-    );
-  }
+  ctx.save();
+  // White card behind QR
+  ctx.fillStyle = "#ffffff";
+  drawRoundedRect(
+    ctx,
+    drawX - cardPad,
+    drawY - cardPad,
+    drawW + cardPad * 2,
+    drawH + cardPad * 2,
+    sizeMode === "square" ? 8 : 12
+  );
+  ctx.fill();
+  ctx.drawImage(qrImage, drawX, drawY, drawW, drawH);
 
+  // SCAN FOR DETAILS label below — accent color (load-bearing
+  // for accent in the MP4 alongside PDF + preview).
+  ctx.fillStyle = state.accent;
+  ctx.font = `bold ${labelSize}px Helvetica, Arial, sans-serif`;
+  ctx.textAlign = "center";
+  ctx.textBaseline = "top";
+  drawSpaced(
+    ctx,
+    "SCAN FOR DETAILS",
+    cx,
+    drawY + drawH + cardPad + 12,
+    sizeMode === "square" ? 1.5 : 2.5
+  );
   ctx.restore();
 }
 
 function drawFooter(
   ctx: CanvasRenderingContext2D,
   rect: Rect,
-  state: PromoMp4State,
-  layout: Layout
+  state: PromoMp4State
 ): void {
-  const isSquare = layout.isSquare;
-  // Footer always visible — no animation. Anchors the bottom of
-  // the layout from t=0.
+  const isSquare = rect.h < 80;
   ctx.fillStyle = state.primary;
   ctx.fillRect(rect.x, rect.y, rect.w, rect.h);
 
-  const padX = layout.margin;
-  const centerSize = isSquare ? 18 : 28;
+  const padX = SAFE_X;
+  const centerSize = isSquare ? 18 : 26;
   const licSize = isSquare ? 12 : 18;
 
   ctx.save();
@@ -707,7 +636,7 @@ function drawFooter(
     ctx.fillText(
       `License #${state.licenseNumber.replace(/^#/, "")}`,
       rect.x + rect.w - padX,
-      rect.y + rect.h - padX / 2
+      rect.y + rect.h - padX / 4
     );
   }
   ctx.restore();
@@ -717,9 +646,6 @@ function drawFooter(
 /* Helpers                                                          */
 /* ──────────────────────────────────────────────────────────────── */
 
-/** Visual debug overlay — dashed red lines at the safe-area
- *  boundaries. Off in production; flip DEBUG_SAFE_AREA at the top
- *  of the file when verifying layout work. */
 function drawSafeAreaDebug(
   ctx: CanvasRenderingContext2D,
   size: { width: number; height: number }
@@ -728,13 +654,11 @@ function drawSafeAreaDebug(
   ctx.strokeStyle = "rgba(255, 0, 0, 0.7)";
   ctx.lineWidth = 2;
   ctx.setLineDash([10, 10]);
-  // Vertical safe-area lines (left + right inset by SAFE_X)
   ctx.beginPath();
   ctx.moveTo(SAFE_X, 0);
   ctx.lineTo(SAFE_X, size.height);
   ctx.moveTo(size.width - SAFE_X, 0);
   ctx.lineTo(size.width - SAFE_X, size.height);
-  // Horizontal safe-area lines (top + bottom inset by SAFE_Y)
   ctx.moveTo(0, SAFE_Y);
   ctx.lineTo(size.width, SAFE_Y);
   ctx.moveTo(0, size.height - SAFE_Y);
@@ -770,23 +694,6 @@ function drawRoundedRect(
   ctx.closePath();
 }
 
-/**
- * Draw text with manual letter-spacing. Canvas 2D doesn't support
- * letter-spacing natively. Used for headers and small all-caps
- * labels where the wide spacing is load-bearing for the design.
- *
- * Honors ctx.textAlign at call time:
- *   "left"   → anchorX is the LEFT edge of the rendered string
- *   "center" → anchorX is the horizontal center
- *   "right"  → anchorX is the RIGHT edge
- *
- * H-7n: previously this function always centered around anchorX,
- * which meant left-aligned callers (e.g. the PRESENTING / FEATURES
- * labels) were rendering half the string off-canvas to the left
- * of the body margin. Respecting textAlign fixes those clips
- * without changing centered callers ("OPEN HOUSE" headline,
- * "SCAN FOR DETAILS" caption).
- */
 function drawSpaced(
   ctx: CanvasRenderingContext2D,
   text: string,
@@ -807,9 +714,7 @@ function drawSpaced(
   let x: number;
   if (align === "center") x = anchorX - total / 2;
   else if (align === "right" || align === "end") x = anchorX - total;
-  else x = anchorX; // "left" (default) and "start"
-  // Snap textAlign to "left" while drawing so each character
-  // draws at the computed x. Restore after.
+  else x = anchorX;
   ctx.textAlign = "left";
   for (let i = 0; i < text.length; i++) {
     ctx.fillText(text[i], x, y);
