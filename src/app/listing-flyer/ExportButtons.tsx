@@ -23,6 +23,9 @@ import {
   getWarmupMs,
 } from "@/engine/export";
 import { type BrandSettings } from "@/lib/brand";
+import { ExportLoader } from "@/components/export-loader/ExportLoader";
+import type { ExportProgress, ExportStage } from "@/components/export-loader/types";
+import { overallProgress } from "@/components/export-loader/stages";
 
 interface ExportButtonsProps {
   draft: FlyerDraft;
@@ -84,6 +87,7 @@ export function ExportButtons({
   const [pdfState, setPdfState] = useState<PdfState>({ kind: "idle" });
   const [jpegState, setJpegState] = useState<JpegState>({ kind: "idle" });
   const [mp4State, setMp4State] = useState<Mp4State>({ kind: "idle" });
+  const [exportProgress, setExportProgress] = useState<ExportProgress | null>(null);
   const hiddenCanvasRef = useRef<HTMLCanvasElement>(null);
 
   const validationError = validateForExport(draft, photos.length);
@@ -179,7 +183,25 @@ export function ExportButtons({
 
     setMp4State({ kind: "running", phase: "preparing", progress: 0 });
 
+    // Single wall-clock origin for the loader's elapsed counter,
+    // shared across reel + square so the user sees one continuous
+    // timer rather than two separate per-size timers.
+    const startedAt = Date.now();
+    const emit = (
+      stage: ExportStage,
+      stagePercent: number,
+      label?: string
+    ) =>
+      setExportProgress({
+        stage,
+        stagePercent,
+        overallPercent: overallProgress(stage, stagePercent),
+        elapsedMs: Date.now() - startedAt,
+        label,
+      });
+
     try {
+      emit("preparing", 0);
       // Pre-load ffmpeg in parallel with photo readiness
       const ffmpegPromise = getFFmpeg();
 
@@ -194,6 +216,8 @@ export function ExportButtons({
       );
       const slug = addressSlug(draft.addressLine1);
 
+      emit("preparing", 100);
+
       // Sequential renders — never concurrent (memory)
       const sizes = [
         {
@@ -202,6 +226,7 @@ export function ExportButtons({
           height: 1920,
           renderingPhase: "rendering-reel" as const,
           convertingPhase: "converting-reel" as const,
+          loaderLabel: "Reel (1 of 2)",
         },
         {
           label: "square" as const,
@@ -209,6 +234,7 @@ export function ExportButtons({
           height: 1080,
           renderingPhase: "rendering-square" as const,
           convertingPhase: "converting-square" as const,
+          loaderLabel: "Square (2 of 2)",
         },
       ];
 
@@ -238,6 +264,7 @@ export function ExportButtons({
           phase: sz.renderingPhase,
           progress: 0,
         });
+        emit("rendering", 0, sz.loaderLabel);
 
         const webm = await renderTimelineToWebm(
           canvas,
@@ -245,8 +272,10 @@ export function ExportButtons({
           { width: sz.width, height: sz.height },
           draft.duration,
           state.background ?? "#0a0a0a",
-          (p) =>
-            setMp4State({ kind: "running", phase: sz.renderingPhase, progress: p })
+          (p) => {
+            setMp4State({ kind: "running", phase: sz.renderingPhase, progress: p });
+            emit("rendering", p * 100, sz.loaderLabel);
+          }
         );
 
         setMp4State({
@@ -254,14 +283,17 @@ export function ExportButtons({
           phase: sz.convertingPhase,
           progress: 0,
         });
+        emit("encoding", 0, sz.loaderLabel);
         await ffmpegPromise;
 
         const mp4 = await webmToMp4(
           webm,
           { width: sz.width, height: sz.height },
           draft.duration,
-          (p) =>
-            setMp4State({ kind: "running", phase: sz.convertingPhase, progress: p }),
+          (p) => {
+            setMp4State({ kind: "running", phase: sz.convertingPhase, progress: p });
+            emit("encoding", p * 100, sz.loaderLabel);
+          },
           // Trim the captureStream warmup from the start of the webm so
           // the final MP4 length matches the duration slider exactly.
           getWarmupMs()
@@ -283,6 +315,8 @@ export function ExportButtons({
       const reelFilename = `${slug}-reel.mp4`;
       const squareFilename = `${slug}-square.mp4`;
 
+      emit("finalizing", 50);
+
       if (isMobileDevice()) {
         setMp4State({
           kind: "ready",
@@ -301,12 +335,18 @@ export function ExportButtons({
         setMp4State({ kind: "done" });
         setTimeout(() => setMp4State({ kind: "idle" }), 5000);
       }
+      emit("finalizing", 100);
     } catch (err) {
       console.error("[flyer mp4]", err);
       setMp4State({
         kind: "error",
         message: err instanceof Error ? err.message : String(err),
       });
+    } finally {
+      // Loader closes after the pipeline completes. On mobile, the
+      // share-sheet handoff happens via separate Save Reel / Save
+      // Square buttons after this returns.
+      setExportProgress(null);
     }
   };
 
@@ -342,6 +382,9 @@ export function ExportButtons({
 
   return (
     <div className="space-y-3">
+      {exportProgress && (
+        <ExportLoader progress={exportProgress} brand={brand} />
+      )}
       <button
         type="button"
         onClick={handlePdfExport}

@@ -23,6 +23,9 @@ import {
   shareOrDownload,
 } from "@/engine/export";
 import { type BrandSettings } from "@/lib/brand";
+import { ExportLoader } from "@/components/export-loader/ExportLoader";
+import type { ExportProgress, ExportStage } from "@/components/export-loader/types";
+import { overallProgress } from "@/components/export-loader/stages";
 
 interface ExportButtonsProps {
   draft: PromoDraft;
@@ -67,6 +70,7 @@ export function ExportButtons({
   const [jpegState, setJpegState] = useState<SimpleState>({ kind: "idle" });
   const [qrState, setQrState] = useState<SimpleState>({ kind: "idle" });
   const [mp4State, setMp4State] = useState<Mp4State>({ kind: "idle" });
+  const [exportProgress, setExportProgress] = useState<ExportProgress | null>(null);
   const hiddenCanvasRef = useRef<HTMLCanvasElement>(null);
 
   // Transition to "done" once both reel + square have been saved.
@@ -190,18 +194,37 @@ export function ExportButtons({
     }
     setMp4State({ kind: "running", phase: "preparing", progress: 0 });
 
+    // Single wall-clock origin for the loader's elapsed counter,
+    // covering both sizes so the user sees a continuous timer
+    // across the reel→square transition.
+    const startedAt = Date.now();
+    const emit = (
+      stage: ExportStage,
+      stagePercent: number,
+      label?: string
+    ) =>
+      setExportProgress({
+        stage,
+        stagePercent,
+        overallPercent: overallProgress(stage, stagePercent),
+        elapsedMs: Date.now() - startedAt,
+        label,
+      });
+
     try {
+      emit("preparing", 50);
       // Sequential renders, never concurrent (memory pressure on
       // mobile). Render BOTH first, then surface share sheets only
       // after both blobs are in hand — same pattern v1.19+ uses for
       // the flyer's reel/square pair.
       const sizes = [
-        { label: "reel" as const, width: 1080, height: 1920, phase: "rendering-reel" as const },
-        { label: "square" as const, width: 1080, height: 1080, phase: "rendering-square" as const },
+        { label: "reel" as const, width: 1080, height: 1920, phase: "rendering-reel" as const, loaderLabel: "Reel (1 of 2)" },
+        { label: "square" as const, width: 1080, height: 1080, phase: "rendering-square" as const, loaderLabel: "Square (2 of 2)" },
       ];
       const rendered: Array<{ label: string; blob: Blob }> = [];
       for (const sz of sizes) {
         setMp4State({ kind: "running", phase: sz.phase, progress: 0 });
+        emit("rendering", 0, sz.loaderLabel);
         const onProgress = (update: RenderProgressUpdate) => {
           // Combine render+convert progress into a single 0..1
           // bar — render takes ~2/3 of wall time on a typical
@@ -215,6 +238,14 @@ export function ExportButtons({
             phase: sz.phase,
             progress: combined,
           });
+          // Map engine phases onto the 4-stage loader model:
+          //   "rendering"  → "rendering" stage  (recording floor)
+          //   "converting" → "encoding"  stage  (ffmpeg)
+          if (update.phase === "rendering") {
+            emit("rendering", update.progress * 100, sz.loaderLabel);
+          } else {
+            emit("encoding", update.progress * 100, sz.loaderLabel);
+          }
         };
         const blob = await renderPromoMp4(
           draft,
@@ -231,6 +262,8 @@ export function ExportButtons({
       const squareBlob = rendered[1].blob;
       const reelFilename = `${filenamePrefix}-reel.mp4`;
       const squareFilename = `${filenamePrefix}-square.mp4`;
+
+      emit("finalizing", 50);
 
       if (isMobileDevice()) {
         // iOS Safari user-gesture-token expires across the ~30s
@@ -251,12 +284,18 @@ export function ExportButtons({
         setMp4State({ kind: "done" });
         setTimeout(() => setMp4State({ kind: "idle" }), 5000);
       }
+      emit("finalizing", 100);
     } catch (err) {
       console.error("[promo mp4]", err);
       setMp4State({
         kind: "error",
         message: err instanceof Error ? err.message : String(err),
       });
+    } finally {
+      // Loader closes once the pipeline finishes (success OR error).
+      // On mobile success, the share-sheet handoff happens via the
+      // separate Save Reel / Save Square buttons after this returns.
+      setExportProgress(null);
     }
   };
 
@@ -288,6 +327,9 @@ export function ExportButtons({
 
   return (
     <div className="space-y-5">
+      {exportProgress && (
+        <ExportLoader progress={exportProgress} brand={brand} />
+      )}
       {/* PRINT & SHARE group */}
       <div className="space-y-3">
         <p className="text-[9px] uppercase tracking-[0.18em] text-neutral-500">
