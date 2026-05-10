@@ -11,6 +11,7 @@ import {
   loadDraft,
   saveDraft,
 } from "@/tools/open-house-promo/engine/draft-storage";
+import { getFFmpeg } from "@/engine/export";
 import { PromoForm } from "./PromoForm";
 import { PromoPreview } from "./PromoPreview";
 import { ExportButtons } from "./ExportButtons";
@@ -28,6 +29,16 @@ export default function OpenHousePromoPage() {
   useEffect(() => {
     setDraft(loadDraft());
     setHydrated(true);
+  }, []);
+
+  // Pre-warm ffmpeg.wasm at page level (instead of per-ExportButtons
+  // instance) so the ~10MB core load fires once on mount and runs
+  // alongside form-filling. By the time the user clicks Render, the
+  // singleton in src/engine/export.ts is hot. Mirrors the pattern in
+  // src/app/listing-flyer/page.tsx. Silent catch — the export path
+  // retries the same getFFmpeg() singleton if this fails.
+  useEffect(() => {
+    getFFmpeg().catch(() => {});
   }, []);
 
   useEffect(() => {
@@ -81,8 +92,12 @@ export default function OpenHousePromoPage() {
 
         <BrandBanner configured={brandConfigured} />
 
+        {/* H-7.2.3a: bottom-of-scroll exports — see commentary in
+            src/app/listing-flyer/page.tsx for the full rationale.
+            Single ExportButtons instance, lg:col-span-2 row below
+            the form + preview columns on desktop. */}
         <div className="flex flex-col gap-6 lg:grid lg:grid-cols-[1fr_420px] lg:gap-10 mt-6">
-          <aside className="order-1 lg:order-2 sticky top-0 z-20 -mx-6 lg:mx-0 px-6 lg:px-0 pt-3 lg:pt-6 pb-3 lg:pb-0 bg-neutral-950 lg:bg-transparent border-b border-neutral-800/60 lg:border-0 shadow-md shadow-black/40 lg:shadow-none lg:self-start">
+          <aside className="lg:order-2 sticky top-0 z-20 -mx-6 lg:mx-0 px-6 lg:px-0 pt-3 lg:pt-6 pb-3 lg:pb-0 bg-neutral-950 lg:bg-transparent border-b border-neutral-800/60 lg:border-0 shadow-md shadow-black/40 lg:shadow-none lg:self-start">
             <p className="text-[10px] uppercase tracking-[0.15em] text-neutral-500 mb-3">
               Live preview
             </p>
@@ -98,16 +113,9 @@ export default function OpenHousePromoPage() {
               Preview is an approximation — exported PDF may differ slightly
               in layout.
             </p>
-            <div className="hidden lg:block mt-5 pt-5 border-t border-neutral-800/60">
-              <ExportButtons
-                draft={draft}
-                brand={effectiveBrand}
-                brandLogoImg={brandLogoImg}
-              />
-            </div>
           </aside>
 
-          <section className="order-2 lg:order-1 pb-32 lg:pb-0">
+          <section className="lg:order-1">
             <PromoForm
               draft={draft}
               onChange={setDraft}
@@ -117,12 +125,14 @@ export default function OpenHousePromoPage() {
             />
           </section>
 
-          {/* Mobile-only sticky export bar */}
-          <div className="order-3 sticky bottom-0 z-20 -mx-6 px-6 py-3 bg-neutral-950 border-t border-neutral-800/60 shadow-[0_-4px_12px_rgba(0,0,0,0.4)] lg:hidden">
+          <div className="lg:order-3 lg:col-span-2 pt-5 mt-2 border-t border-neutral-800/60">
             <ExportButtons
               draft={draft}
               brand={effectiveBrand}
               brandLogoImg={brandLogoImg}
+              onUpdateFormats={(next) =>
+                setDraft((d) => ({ ...d, exportFormats: next }))
+              }
             />
           </div>
         </div>

@@ -69,6 +69,20 @@ export interface PromoDraft {
   // fixed at 0-1.55s so the intro feels snappy regardless of
   // total length; Ken Burns and QR pulse scale to fit.
   mp4DurationSeconds: number;
+
+  // MP4 format selection. H-7.2.2a added per-export opt-in. Reel
+  // is the recommended default since vertical reels dominate
+  // realtor social distribution; square is opt-in when the agent
+  // also wants an Instagram-feed asset. Rendering one format
+  // halves the wait time vs always rendering both.
+  exportFormats: ExportFormatSelection;
+}
+
+export interface ExportFormatSelection {
+  /** 9:16 vertical — Stories, Reels, TikTok. */
+  reel: boolean;
+  /** 1:1 square — Instagram feed, Facebook. */
+  square: boolean;
 }
 
 export const MIN_MP4_DURATION = 5;
@@ -123,6 +137,7 @@ export const EMPTY_DRAFT: PromoDraft = {
   accentColor: "",
   backgroundColor: "",
   mp4DurationSeconds: DEFAULT_MP4_DURATION,
+  exportFormats: { reel: true, square: false },
 };
 
 /** Build a fresh PhotoEntry from a compressed data URL with default
@@ -211,7 +226,24 @@ export function clampDraft(input: unknown): PromoDraft {
     // Old drafts (pre-H-7.1) won't have this field; default to
     // 6s preserves their original render behavior.
     mp4DurationSeconds: clampMp4Duration(o.mp4DurationSeconds),
+    exportFormats: clampExportFormats(o.exportFormats),
   };
+}
+
+/**
+ * Coerce stored exportFormats into a valid selection. Pre-H-7.2.2a
+ * drafts won't have this field, so we default to reel-only (the
+ * new recommended behavior). Also defensive against both-false
+ * states — must render at least one format, so force reel on if
+ * the user somehow saved an empty selection.
+ */
+function clampExportFormats(input: unknown): ExportFormatSelection {
+  if (!input || typeof input !== "object") return { reel: true, square: false };
+  const o = input as Record<string, unknown>;
+  const reel = typeof o.reel === "boolean" ? o.reel : true;
+  const square = typeof o.square === "boolean" ? o.square : false;
+  if (!reel && !square) return { reel: true, square: false };
+  return { reel, square };
 }
 
 /**

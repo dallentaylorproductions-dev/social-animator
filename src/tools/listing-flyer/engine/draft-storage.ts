@@ -1,4 +1,9 @@
-import { type FlyerDraft, EMPTY_DRAFT, clampDuration } from "./types";
+import {
+  type FlyerDraft,
+  EMPTY_DRAFT,
+  clampDuration,
+  clampExportFormats,
+} from "./types";
 
 const STORAGE_KEY = "listingFlyer:draft";
 
@@ -34,6 +39,8 @@ export function loadDraft(): FlyerDraft {
       // Clamp to [MIN_DURATION, MAX_DURATION]; missing field (drafts saved
       // before H-1.6) falls through to the DEFAULT_DURATION inside clampDuration.
       duration: clampDuration(parsed.duration),
+      // Missing field (drafts saved before H-7.2.2a) defaults to reel-only.
+      exportFormats: clampExportFormats(parsed.exportFormats),
     };
   } catch {
     return EMPTY_DRAFT;

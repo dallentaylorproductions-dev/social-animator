@@ -92,8 +92,6 @@ const SAFE_X = 80;
 const SAFE_Y = 60;
 const DEBUG_SAFE_AREA = false;
 
-const BG_BLACK = "#000000";
-
 export interface PromoMp4State {
   primary: string;
   accent: string;
@@ -174,8 +172,13 @@ function renderFrame(
 ): void {
   const isSquare = Math.abs(size.width - size.height) < 50;
 
-  // Page background — solid black behind everything else.
-  ctx.fillStyle = BG_BLACK;
+  // H-7.2.3b: page background tracks brand. Previously hardcoded
+  // BG_BLACK, which silently overrode the user's brand profile bg
+  // (and per-promo override) — the live preview displayed the
+  // correct color but the exported MP4 was always black underneath.
+  // state.background is computed upstream in render-mp4.ts from the
+  // effective brand color with the standard fall-throughs.
+  ctx.fillStyle = state.background;
   ctx.fillRect(0, 0, size.width, size.height);
 
   // Header bar — always present at full opacity from t=0; only
@@ -463,12 +466,12 @@ function drawPropertyBlock(
     ctx.font = `bold 18px Helvetica, Arial, sans-serif`;
     drawSpaced(ctx, "PRESENTING", padX, 660, 2);
 
-    ctx.fillStyle = "#ffffff";
+    ctx.fillStyle = state.textPrimary;
     ctx.font = `bold 36px Helvetica, Arial, sans-serif`;
     ctx.fillText(state.address || "Property address", padX, 705);
 
     if (state.city) {
-      ctx.fillStyle = "rgba(255, 255, 255, 0.78)";
+      ctx.fillStyle = state.textMuted;
       ctx.font = `20px Helvetica, Arial, sans-serif`;
       ctx.fillText(state.city, padX, 735);
     }
@@ -486,12 +489,12 @@ function drawPropertyBlock(
     ctx.font = `bold 22px Helvetica, Arial, sans-serif`;
     drawSpaced(ctx, "PRESENTING", padX, 1155, 3);
 
-    ctx.fillStyle = "#ffffff";
+    ctx.fillStyle = state.textPrimary;
     ctx.font = `bold 56px Helvetica, Arial, sans-serif`;
     ctx.fillText(state.address || "Property address", padX, 1210);
 
     if (state.city) {
-      ctx.fillStyle = "rgba(255, 255, 255, 0.78)";
+      ctx.fillStyle = state.textMuted;
       ctx.font = `28px Helvetica, Arial, sans-serif`;
       ctx.fillText(state.city, padX, 1245);
     }
@@ -552,7 +555,8 @@ function drawFeaturesBlock(
       80,
       [820, 848, 876],
       18,
-      state.primary
+      state.primary,
+      state.textPrimary
     );
     drawFeatureColumn(
       ctx,
@@ -560,7 +564,8 @@ function drawFeaturesBlock(
       580,
       [820, 848, 876],
       18,
-      state.primary
+      state.primary,
+      state.textPrimary
     );
   } else {
     // Reel section: y=1290-1410 (120 tall) — H-7x shifted +70.
@@ -575,7 +580,8 @@ function drawFeaturesBlock(
       130,
       [1348, 1378, 1408],
       28,
-      state.primary
+      state.primary,
+      state.textPrimary
     );
     drawFeatureColumn(
       ctx,
@@ -583,7 +589,8 @@ function drawFeaturesBlock(
       580,
       [1348, 1378, 1408],
       28,
-      state.primary
+      state.primary,
+      state.textPrimary
     );
   }
   void size;
@@ -592,14 +599,17 @@ function drawFeaturesBlock(
 
 /** Draw one column of bullet+text rows. Same helper for both
  *  columns and both aspects so color/font/spacing tokens stay
- *  identical across renders. */
+ *  identical across renders. H-7.2.3b added textColor — was
+ *  hardcoded "#ffffff", which broke when the brand profile used
+ *  a light page background. */
 function drawFeatureColumn(
   ctx: CanvasRenderingContext2D,
   items: string[],
   x: number,
   baselineYs: number[],
   fontSize: number,
-  bulletColor: string
+  bulletColor: string,
+  textColor: string
 ): void {
   const dotR = Math.max(5, Math.round(fontSize / 4));
   ctx.font = `${fontSize}px Helvetica, Arial, sans-serif`;
@@ -610,7 +620,7 @@ function drawFeatureColumn(
     ctx.beginPath();
     ctx.arc(x + dotR, y - fontSize * 0.32, dotR, 0, Math.PI * 2);
     ctx.fill();
-    ctx.fillStyle = "#ffffff";
+    ctx.fillStyle = textColor;
     ctx.fillText(items[i], x + dotR * 2 + 12, y);
   }
 }
@@ -638,7 +648,7 @@ function drawDescriptionBlock(
   ctx.save();
   ctx.translate(0, e.translateY);
   ctx.globalAlpha *= e.opacity;
-  ctx.fillStyle = "rgba(255, 255, 255, 0.85)";
+  ctx.fillStyle = state.textMuted;
   ctx.font = `${fontSize}px Helvetica, Arial, sans-serif`;
   ctx.textAlign = "left";
   ctx.textBaseline = "top";
@@ -706,17 +716,17 @@ function drawAgentQrReel(
 
   ctx.textAlign = "left";
   ctx.textBaseline = "alphabetic";
-  ctx.fillStyle = "#ffffff";
+  ctx.fillStyle = state.textPrimary;
   ctx.font = `bold 32px Helvetica, Arial, sans-serif`;
   ctx.fillText(state.agentName || "Your name", padX + 80, 1590);
 
   if (state.brokerage) {
-    ctx.fillStyle = "rgba(255, 255, 255, 0.78)";
+    ctx.fillStyle = state.textMuted;
     ctx.font = `22px Helvetica, Arial, sans-serif`;
     ctx.fillText(state.brokerage, padX + 80, 1625);
   }
 
-  ctx.fillStyle = "#ffffff";
+  ctx.fillStyle = state.textPrimary;
   ctx.font = `24px Helvetica, Arial, sans-serif`;
   if (state.phone) {
     ctx.fillText(state.phone, padX, 1690);
@@ -768,18 +778,18 @@ function drawAgentQrSquare(
 
   ctx.textAlign = "left";
   ctx.textBaseline = "alphabetic";
-  ctx.fillStyle = "#ffffff";
+  ctx.fillStyle = state.textPrimary;
   ctx.font = `bold 18px Helvetica, Arial, sans-serif`;
   ctx.fillText(state.agentName || "Your name", padX + 50, 930);
 
   if (state.brokerage) {
-    ctx.fillStyle = "rgba(255, 255, 255, 0.78)";
+    ctx.fillStyle = state.textMuted;
     ctx.font = `13px Helvetica, Arial, sans-serif`;
     ctx.fillText(state.brokerage, padX + 50, 950);
   }
 
   // Phone + email below the logo row — 14pt fits if both present.
-  ctx.fillStyle = "#ffffff";
+  ctx.fillStyle = state.textPrimary;
   ctx.font = `14px Helvetica, Arial, sans-serif`;
   if (state.phone) {
     ctx.fillText(state.phone, padX, 975);

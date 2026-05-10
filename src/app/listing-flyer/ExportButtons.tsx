@@ -4,13 +4,13 @@ import { useEffect, useRef, useState } from "react";
 import {
   type FlyerDraft,
   type FlyerPhoto,
+  type ExportFormatSelection,
   addressSlug,
   validateForExport,
 } from "@/tools/listing-flyer/engine/types";
 import { clearDraft, saveDraft } from "@/tools/listing-flyer/engine/draft-storage";
 import { waitForPhoto } from "@/tools/listing-flyer/engine/photos";
 import { mapFlyerToShowcase } from "@/tools/listing-flyer/engine/template-mapping";
-import { renderTimelineToWebm } from "@/tools/listing-flyer/engine/render-mp4";
 import { exportJpegFromDraft } from "@/tools/listing-flyer/engine/jpeg-export";
 import { generatePdfBlob } from "@/tools/listing-flyer/output/pdf-export";
 import { listingShowcaseTemplate } from "@/templates/listing-showcase";
@@ -19,10 +19,12 @@ import {
   getFFmpeg,
   isMobileDevice,
   shareOrDownload,
-  webmToMp4,
-  getWarmupMs,
 } from "@/engine/export";
+import { renderTimelineToMp4 } from "@/engine/frame-render";
 import { type BrandSettings } from "@/lib/brand";
+import { ExportLoader } from "@/components/export-loader/ExportLoader";
+import type { ExportProgress, ExportStage } from "@/components/export-loader/types";
+import { overallProgress } from "@/components/export-loader/stages";
 
 interface ExportButtonsProps {
   draft: FlyerDraft;
@@ -35,6 +37,13 @@ interface ExportButtonsProps {
   /** Materialized brand logo from useBrandSettings — passed into MP4 export
    * so the listing-showcase template can render it in the agent card. */
   brandLogoImg: HTMLImageElement | null;
+  /**
+   * Apply a new format selection back to the page-level draft.
+   * Wired up by the parent page (listing-flyer/page.tsx).
+   * H-7.2.2a moved format selection into the export bar so it sits
+   * next to the action it controls.
+   */
+  onUpdateFormats: (next: ExportFormatSelection) => void;
 }
 
 type PdfState =
@@ -56,20 +65,22 @@ type Mp4Phase =
   | "rendering-square"
   | "converting-square";
 
+/**
+ * Mobile two-step state. H-7.2.2a allows the user to opt out of
+ * either format, so reel/square blobs are nullable — only the
+ * selected formats produce a blob. The "ready" transition still
+ * fires once all selected formats have rendered.
+ */
 type Mp4State =
   | { kind: "idle" }
   | { kind: "running"; phase: Mp4Phase; progress: number }
-  // Mobile two-step: render finished, blobs are held in state, waiting on
-  // a fresh user gesture (tap on Save Reel / Save Square) to call
-  // navigator.share. iOS Safari's user-gesture token expires across the
-  // long render, so calling share() automatically after render fails.
   | {
       kind: "ready";
-      reelBlob: Blob;
-      reelFilename: string;
+      reelBlob: Blob | null;
+      reelFilename: string | null;
       reelSaved: boolean;
-      squareBlob: Blob;
-      squareFilename: string;
+      squareBlob: Blob | null;
+      squareFilename: string | null;
       squareSaved: boolean;
     }
   | { kind: "done" }
@@ -80,13 +91,16 @@ export function ExportButtons({
   photos,
   brand,
   brandLogoImg,
+  onUpdateFormats,
 }: ExportButtonsProps) {
   const [pdfState, setPdfState] = useState<PdfState>({ kind: "idle" });
   const [jpegState, setJpegState] = useState<JpegState>({ kind: "idle" });
   const [mp4State, setMp4State] = useState<Mp4State>({ kind: "idle" });
+  const [exportProgress, setExportProgress] = useState<ExportProgress | null>(null);
   const hiddenCanvasRef = useRef<HTMLCanvasElement>(null);
 
   const validationError = validateForExport(draft, photos.length);
+  const hasAnyFormat = draft.exportFormats.reel || draft.exportFormats.square;
   const isBusy =
     pdfState.kind === "generating" ||
     jpegState.kind === "generating" ||
@@ -94,15 +108,15 @@ export function ExportButtons({
     mp4State.kind === "ready";
   const canExport = !validationError && !isBusy;
 
-  // When the user has saved both reel + square in the ready state,
-  // transition to "done" + clear the draft. Done in useEffect so the two
-  // save handlers don't race each other on the both-saved check.
+  // Transition to "done" once every selected format has been
+  // saved. A format counts as "done" if it wasn't selected (blob
+  // is null) OR was selected and saved. useEffect avoids races
+  // between the two save handlers.
   useEffect(() => {
-    if (
-      mp4State.kind === "ready" &&
-      mp4State.reelSaved &&
-      mp4State.squareSaved
-    ) {
+    if (mp4State.kind !== "ready") return;
+    const reelDone = !mp4State.reelBlob || mp4State.reelSaved;
+    const squareDone = !mp4State.squareBlob || mp4State.squareSaved;
+    if (reelDone && squareDone) {
       clearDraft();
       setMp4State({ kind: "done" });
       const t = setTimeout(() => setMp4State({ kind: "idle" }), 3000);
@@ -179,7 +193,34 @@ export function ExportButtons({
 
     setMp4State({ kind: "running", phase: "preparing", progress: 0 });
 
+    // Single wall-clock origin for the loader's elapsed counter,
+    // shared across reel + square so the user sees one continuous
+    // timer rather than two separate per-size timers.
+    const startedAt = Date.now();
+    const addressLabel = draft.addressLine1.trim() || undefined;
+    const emit = (
+      stage: ExportStage,
+      stagePercent: number,
+      label?: string,
+      extra?: {
+        frameIndex?: number;
+        totalFrames?: number;
+        livePreviewUrl?: string;
+        aspect?: "reel" | "square";
+      }
+    ) =>
+      setExportProgress({
+        stage,
+        stagePercent,
+        overallPercent: overallProgress(stage, stagePercent),
+        elapsedMs: Date.now() - startedAt,
+        label,
+        addressLabel,
+        ...extra,
+      });
+
     try {
+      emit("preparing", 0);
       // Pre-load ffmpeg in parallel with photo readiness
       const ffmpegPromise = getFFmpeg();
 
@@ -194,14 +235,21 @@ export function ExportButtons({
       );
       const slug = addressSlug(draft.addressLine1);
 
-      // Sequential renders — never concurrent (memory)
-      const sizes = [
+      emit("preparing", 100);
+
+      // H-7.2.2a: filter the size list by the user's format
+      // selection. Default is reel-only; common-case wait time
+      // halves vs always rendering both. Sequential renders stay
+      // — concurrent is still ruled out by mobile memory pressure.
+      const allSizes = [
         {
           label: "reel" as const,
           width: 1080,
           height: 1920,
           renderingPhase: "rendering-reel" as const,
           convertingPhase: "converting-reel" as const,
+          aspect: "reel" as const,
+          enabled: draft.exportFormats.reel,
         },
         {
           label: "square" as const,
@@ -209,19 +257,29 @@ export function ExportButtons({
           height: 1080,
           renderingPhase: "rendering-square" as const,
           convertingPhase: "converting-square" as const,
+          aspect: "square" as const,
+          enabled: draft.exportFormats.square,
         },
       ];
+      const sizes = allSizes.filter((s) => s.enabled);
+      const formatLabel = (sz: (typeof sizes)[number], i: number) =>
+        sizes.length === 1
+          ? sz.aspect === "reel"
+            ? "Reel"
+            : "Square"
+          : `${sz.aspect === "reel" ? "Reel" : "Square"} (${i + 1} of ${sizes.length})`;
 
-      // Render BOTH MP4s first, then surface share sheets sequentially.
-      // H-1.8b's interleaved variant (render-share-render-share) caused
-      // square iOS regressions and desktop black-frame intros — the
-      // share-sheet interruption between renders changed canvas /
-      // captureStream state in ways the warmup buffer couldn't absorb.
-      // v1.19 back-to-back rendering doesn't have that problem; the UX
-      // cost is one ~30s wait instead of two ~15s waits separated by a
-      // share sheet.
+      // Render selected MP4s first, then surface share sheets
+      // sequentially. H-1.8b's interleaved variant
+      // (render-share-render-share) caused square iOS regressions
+      // and desktop black-frame intros — the share-sheet
+      // interruption between renders changed canvas /
+      // captureStream state in ways the warmup buffer couldn't
+      // absorb. Back-to-back rendering doesn't have that problem.
       const renderedMp4s: Array<{ label: string; blob: Blob }> = [];
-      for (const sz of sizes) {
+      for (let i = 0; i < sizes.length; i++) {
+        const sz = sizes[i];
+        const loaderLabel = formatLabel(sz, i);
         // Section header for any [MP4-DEBUG] devtools session.
         console.log(
           `[MP4-DEBUG] === ${sz.label} (${sz.width}x${sz.height}) ===`
@@ -238,33 +296,36 @@ export function ExportButtons({
           phase: sz.renderingPhase,
           progress: 0,
         });
+        emit("rendering", 0, loaderLabel, { aspect: sz.aspect });
+        await ffmpegPromise;
 
-        const webm = await renderTimelineToWebm(
+        // Unified entry point: iOS Safari → MediaRecorder + webmToMp4
+        // (existing path, preserves iOS reliability); everything else
+        // → frame-by-frame + ffmpeg PNG-sequence (new H-7.2.1a path,
+        // eliminates real-time canvas paint constraint that was
+        // capping vertical 1080×1920 quality).
+        const mp4 = await renderTimelineToMp4(
           canvas,
           timeline,
           { width: sz.width, height: sz.height },
           draft.duration,
           state.background ?? "#0a0a0a",
-          (p) =>
-            setMp4State({ kind: "running", phase: sz.renderingPhase, progress: p })
-        );
-
-        setMp4State({
-          kind: "running",
-          phase: sz.convertingPhase,
-          progress: 0,
-        });
-        await ffmpegPromise;
-
-        const mp4 = await webmToMp4(
-          webm,
-          { width: sz.width, height: sz.height },
-          draft.duration,
-          (p) =>
-            setMp4State({ kind: "running", phase: sz.convertingPhase, progress: p }),
-          // Trim the captureStream warmup from the start of the webm so
-          // the final MP4 length matches the duration slider exactly.
-          getWarmupMs()
+          (p) => {
+            if (p.phase === "rendering") {
+              setMp4State({ kind: "running", phase: sz.renderingPhase, progress: p.progress });
+              emit("rendering", p.progress * 100, loaderLabel, {
+                frameIndex: p.frameIndex,
+                totalFrames: p.totalFrames,
+                livePreviewUrl: p.livePreviewUrl,
+                aspect: sz.aspect,
+              });
+            } else if (p.phase === "encoding") {
+              setMp4State({ kind: "running", phase: sz.convertingPhase, progress: p.progress });
+              emit("encoding", p.progress * 100, loaderLabel, { aspect: sz.aspect });
+            }
+            // "finalizing" sub-phase is engine-internal; the export
+            // handler emits its own finalizing stage after the loop.
+          }
         );
 
         renderedMp4s.push({ label: sz.label, blob: mp4 });
@@ -278,10 +339,14 @@ export function ExportButtons({
       // / "Save Square" buttons; each tap is a fresh gesture that
       // navigator.share will honor. Desktop has no gesture issue, so we
       // skip the extra clicks and trigger downloads inline.
-      const reelBlob = renderedMp4s[0].blob;
-      const squareBlob = renderedMp4s[1].blob;
-      const reelFilename = `${slug}-reel.mp4`;
-      const squareFilename = `${slug}-square.mp4`;
+      const reelEntry = renderedMp4s.find((r) => r.label === "reel") ?? null;
+      const squareEntry = renderedMp4s.find((r) => r.label === "square") ?? null;
+      const reelBlob = reelEntry?.blob ?? null;
+      const squareBlob = squareEntry?.blob ?? null;
+      const reelFilename = reelBlob ? `${slug}-reel.mp4` : null;
+      const squareFilename = squareBlob ? `${slug}-square.mp4` : null;
+
+      emit("finalizing", 50);
 
       if (isMobileDevice()) {
         setMp4State({
@@ -293,27 +358,42 @@ export function ExportButtons({
           squareFilename,
           squareSaved: false,
         });
-        // Draft clears via the useEffect once both files have been saved.
+        // Draft clears via the useEffect once every selected format
+        // has been saved.
       } else {
-        downloadBlob(reelBlob, reelFilename);
-        downloadBlob(squareBlob, squareFilename);
+        if (reelBlob && reelFilename) downloadBlob(reelBlob, reelFilename);
+        if (squareBlob && squareFilename) downloadBlob(squareBlob, squareFilename);
         clearDraft();
         setMp4State({ kind: "done" });
         setTimeout(() => setMp4State({ kind: "idle" }), 5000);
       }
+      emit("finalizing", 100);
+      // Celebration moment held by the loader for ~800ms before
+      // clearing. Same pattern as the Open House Promo handler;
+      // signals "done" before the share sheet / downloads fire.
+      setExportProgress((prev) =>
+        prev ? { ...prev, celebrate: true } : prev
+      );
+      await new Promise((r) => setTimeout(r, 800));
     } catch (err) {
       console.error("[flyer mp4]", err);
       setMp4State({
         kind: "error",
         message: err instanceof Error ? err.message : String(err),
       });
+    } finally {
+      // Loader closes after the pipeline completes. On mobile, the
+      // share-sheet handoff happens via separate Save Reel / Save
+      // Square buttons after this returns.
+      setExportProgress(null);
     }
   };
 
   const handleSaveReel = async () => {
     if (mp4State.kind !== "ready") return;
-    const ready = mp4State;
-    const result = await shareOrDownload(ready.reelBlob, ready.reelFilename);
+    const { reelBlob, reelFilename } = mp4State;
+    if (!reelBlob || !reelFilename) return;
+    const result = await shareOrDownload(reelBlob, reelFilename);
     if (result !== "shared" && result !== "downloaded") return;
     setMp4State((prev) =>
       prev.kind === "ready" ? { ...prev, reelSaved: true } : prev
@@ -322,11 +402,9 @@ export function ExportButtons({
 
   const handleSaveSquare = async () => {
     if (mp4State.kind !== "ready") return;
-    const ready = mp4State;
-    const result = await shareOrDownload(
-      ready.squareBlob,
-      ready.squareFilename
-    );
+    const { squareBlob, squareFilename } = mp4State;
+    if (!squareBlob || !squareFilename) return;
+    const result = await shareOrDownload(squareBlob, squareFilename);
     if (result !== "shared" && result !== "downloaded") return;
     setMp4State((prev) =>
       prev.kind === "ready" ? { ...prev, squareSaved: true } : prev
@@ -342,6 +420,9 @@ export function ExportButtons({
 
   return (
     <div className="space-y-3">
+      {exportProgress && (
+        <ExportLoader progress={exportProgress} brand={brand} />
+      )}
       <button
         type="button"
         onClick={handlePdfExport}
@@ -372,7 +453,9 @@ export function ExportButtons({
         <div className="bg-neutral-900 border border-neutral-800 rounded-md p-3 space-y-3">
           <div className="flex items-start justify-between gap-2">
             <p className="text-[11px] text-neutral-300 leading-snug">
-              Videos rendered. Tap each one to save to Photos.
+              {mp4State.reelBlob && mp4State.squareBlob
+                ? "Videos rendered. Tap each one to save to Photos."
+                : "Video rendered. Tap to save to Photos."}
             </p>
             <button
               type="button"
@@ -383,36 +466,51 @@ export function ExportButtons({
               ✕
             </button>
           </div>
-          <button
-            type="button"
-            onClick={handleSaveReel}
-            disabled={mp4State.reelSaved}
-            className="w-full bg-[#4ef2d9] hover:bg-[#3ad9c0] text-black rounded-md px-4 py-3 text-sm font-semibold transition disabled:bg-neutral-800 disabled:text-neutral-400 disabled:cursor-default"
-          >
-            {mp4State.reelSaved ? "Reel saved ✓" : "Save Reel to Photos"}
-          </button>
-          <button
-            type="button"
-            onClick={handleSaveSquare}
-            disabled={mp4State.squareSaved}
-            className="w-full bg-[#4ef2d9] hover:bg-[#3ad9c0] text-black rounded-md px-4 py-3 text-sm font-semibold transition disabled:bg-neutral-800 disabled:text-neutral-400 disabled:cursor-default"
-          >
-            {mp4State.squareSaved ? "Square saved ✓" : "Save Square to Photos"}
-          </button>
+          {mp4State.reelBlob && (
+            <button
+              type="button"
+              onClick={handleSaveReel}
+              disabled={mp4State.reelSaved}
+              className="w-full bg-[#4ef2d9] hover:bg-[#3ad9c0] text-black rounded-md px-4 py-3 text-sm font-semibold transition disabled:bg-neutral-800 disabled:text-neutral-400 disabled:cursor-default"
+            >
+              {mp4State.reelSaved ? "Reel saved ✓" : "Save Reel to Photos"}
+            </button>
+          )}
+          {mp4State.squareBlob && (
+            <button
+              type="button"
+              onClick={handleSaveSquare}
+              disabled={mp4State.squareSaved}
+              className="w-full bg-[#4ef2d9] hover:bg-[#3ad9c0] text-black rounded-md px-4 py-3 text-sm font-semibold transition disabled:bg-neutral-800 disabled:text-neutral-400 disabled:cursor-default"
+            >
+              {mp4State.squareSaved ? "Square saved ✓" : "Save Square to Photos"}
+            </button>
+          )}
         </div>
       ) : (
-        <button
-          type="button"
-          onClick={handleMp4Export}
-          disabled={!canExport}
-          title={validationError ?? undefined}
-          className="w-full bg-neutral-800 hover:bg-neutral-700 text-neutral-200 rounded-md px-4 py-3 text-sm font-semibold transition disabled:opacity-60 disabled:cursor-not-allowed"
-        >
-          {mp4State.kind === "idle" && "Export Animated Version (MP4)"}
-          {mp4State.kind === "running" && mp4StatusText(mp4State)}
-          {mp4State.kind === "done" && "Both videos saved ✓"}
-          {mp4State.kind === "error" && "Try again — Export Animated Version"}
-        </button>
+        <>
+          <FormatCheckboxes
+            formats={draft.exportFormats}
+            onChange={onUpdateFormats}
+            disabled={isBusy}
+          />
+          <button
+            type="button"
+            onClick={handleMp4Export}
+            disabled={!canExport || !hasAnyFormat}
+            title={validationError ?? undefined}
+            className="w-full bg-neutral-800 hover:bg-neutral-700 text-neutral-200 rounded-md px-4 py-3 text-sm font-semibold transition disabled:opacity-60 disabled:cursor-not-allowed"
+          >
+            {mp4State.kind === "idle" && renderButtonLabel(draft.exportFormats)}
+            {mp4State.kind === "running" && mp4StatusText(mp4State)}
+            {mp4State.kind === "done" && "Saved ✓"}
+            {mp4State.kind === "error" && "Try again — Export Animated Version"}
+          </button>
+          <p className="text-[11px] text-neutral-500 leading-snug">
+            Rendering one format is faster than both. Pick what you&apos;ll
+            actually post.
+          </p>
+        </>
       )}
 
       {validationError && (
@@ -466,12 +564,67 @@ function mp4StatusText(state: { phase: Mp4Phase; progress: number }): string {
     case "preparing":
       return "Preparing…";
     case "rendering-reel":
-      return `Rendering Reel… ${pct}% (1 of 2)`;
+      return `Rendering Reel… ${pct}%`;
     case "converting-reel":
       return `Converting Reel… ${pct}%`;
     case "rendering-square":
-      return `Rendering Square… ${pct}% (2 of 2)`;
+      return `Rendering Square… ${pct}%`;
     case "converting-square":
       return `Converting Square… ${pct}%`;
   }
+}
+
+function renderButtonLabel(formats: ExportFormatSelection): string {
+  if (formats.reel && formats.square) return "Export Animated Version (MP4)";
+  if (formats.reel) return "Export Reel (MP4)";
+  if (formats.square) return "Export Square (MP4)";
+  return "Pick a format above";
+}
+
+/**
+ * Format-selection checkboxes shown above the render button.
+ * Default selection is reel-only (H-7.2.2a) since vertical reels
+ * dominate realtor social distribution. Square is opt-in. The
+ * onChange callback writes back through to the page-level draft
+ * so the selection persists in localStorage across reloads.
+ */
+function FormatCheckboxes({
+  formats,
+  onChange,
+  disabled,
+}: {
+  formats: ExportFormatSelection;
+  onChange: (next: ExportFormatSelection) => void;
+  disabled: boolean;
+}) {
+  const toggle = (key: "reel" | "square", value: boolean) => {
+    onChange({ ...formats, [key]: value });
+  };
+  return (
+    <div className="space-y-2 bg-neutral-900/40 border border-neutral-800/60 rounded-md p-3">
+      <label className="flex items-center gap-3 text-[12px] cursor-pointer">
+        <input
+          type="checkbox"
+          checked={formats.reel}
+          onChange={(e) => toggle("reel", e.target.checked)}
+          disabled={disabled}
+          className="accent-[#4ef2d9] h-4 w-4"
+        />
+        <span className="flex-1 text-neutral-200">Reel (9:16)</span>
+        <span className="text-[10px] uppercase tracking-[0.12em] text-[#4ef2d9]">
+          Recommended
+        </span>
+      </label>
+      <label className="flex items-center gap-3 text-[12px] cursor-pointer">
+        <input
+          type="checkbox"
+          checked={formats.square}
+          onChange={(e) => toggle("square", e.target.checked)}
+          disabled={disabled}
+          className="accent-[#4ef2d9] h-4 w-4"
+        />
+        <span className="flex-1 text-neutral-200">Square (1:1)</span>
+      </label>
+    </div>
+  );
 }

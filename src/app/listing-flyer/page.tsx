@@ -166,14 +166,18 @@ export default function ListingFlyerPage() {
 
         <BrandBanner configured={brandConfigured} />
 
-        {/* Mobile portrait flow (top to bottom):
-              [order-1] sticky preview, top-pinned, ~30vh
-              [order-2] scrollable form, bottom-padded so last field clears the export bar
-              [order-3] sticky export action bar, bottom-pinned
-            Desktop (lg:): 2-col grid; preview+exports in the right aside,
-            form fills the left column. Mobile-only export bar is lg:hidden. */}
+        {/* H-7.2.3a: bottom-of-scroll exports.
+              Mobile (default flex-col): preview top (sticky), form middle,
+              exports at the bottom of the document flow (no fixed/sticky
+              bar — that was unreliable on iOS Safari with flex parents).
+              Desktop (lg:grid): 2-col layout for form + preview; exports
+              span both columns underneath via lg:col-span-2. The single
+              ExportButtons instance also fixes a latent bug where two
+              copies (desktop-aside + mobile-bar) both fired their mount
+              useEffect — the prewarm hoist in H-7.2a left a stale second
+              copy here that this restructure removes. */}
         <div className="flex flex-col gap-6 lg:grid lg:grid-cols-[1fr_420px] lg:gap-10 mt-6">
-          <aside className="order-1 lg:order-2 sticky top-0 z-20 -mx-6 lg:mx-0 px-6 lg:px-0 pt-3 lg:pt-6 pb-3 lg:pb-0 bg-neutral-950 lg:bg-transparent border-b border-neutral-800/60 lg:border-0 shadow-md shadow-black/40 lg:shadow-none lg:self-start">
+          <aside className="lg:order-2 sticky top-0 z-20 -mx-6 lg:mx-0 px-6 lg:px-0 pt-3 lg:pt-6 pb-3 lg:pb-0 bg-neutral-950 lg:bg-transparent border-b border-neutral-800/60 lg:border-0 shadow-md shadow-black/40 lg:shadow-none lg:self-start">
             <p className="text-[10px] uppercase tracking-[0.15em] text-neutral-500 mb-3">
               Live preview
             </p>
@@ -200,17 +204,9 @@ export default function ListingFlyerPage() {
               Preview is an approximation — exported PDF may differ slightly
               in layout.
             </p>
-            <div className="hidden lg:block mt-5 pt-5 border-t border-neutral-800/60">
-              <ExportButtons
-                draft={draft}
-                photos={photos}
-                brand={effectiveBrand}
-                brandLogoImg={brandLogoImg}
-              />
-            </div>
           </aside>
 
-          <section className="order-2 lg:order-1 pb-32 lg:pb-0">
+          <section className="lg:order-1">
             <FlyerForm
               draft={draft}
               onChange={setDraft}
@@ -223,12 +219,15 @@ export default function ListingFlyerPage() {
             />
           </section>
 
-          <div className="order-3 sticky bottom-0 z-20 -mx-6 px-6 py-3 bg-neutral-950 border-t border-neutral-800/60 shadow-[0_-4px_12px_rgba(0,0,0,0.4)] lg:hidden">
+          <div className="lg:order-3 lg:col-span-2 pt-5 mt-2 border-t border-neutral-800/60">
             <ExportButtons
               draft={draft}
               photos={photos}
               brand={effectiveBrand}
               brandLogoImg={brandLogoImg}
+              onUpdateFormats={(next) =>
+                setDraft((d) => ({ ...d, exportFormats: next }))
+              }
             />
           </div>
         </div>
