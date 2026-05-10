@@ -1,47 +1,59 @@
 import { Timeline, type Track } from "@/engine/timeline";
-import { easeOutCubic, linear } from "@/engine/easing";
+import { linear } from "@/engine/easing";
+import { drawImageContain } from "@/engine/draw";
 
 /**
- * Open House Promo MP4 — multi-scene composition with persistent
- * header bar (H-7r). Reverts the H-7q "animate the flyer" approach
- * back to the H-7g multi-scene direction, but with all the
- * refinements we built in between (blur-fill hero from H-7o,
- * focal-point crops from H-7f, generous safe-area padding from
- * H-7n, hard-capped layout dimensions from H-7p).
+ * Open House Promo MP4 — single canvas composition mirroring the
+ * static PDF flyer, animated for 6 seconds (FINAL architecture
+ * after the H-7g/H-7q/H-7r rounds). All elements visible from
+ * t=0 to t=6 with staggered fade-ins; no scenes, no crossfades,
+ * no scene cycling. The composition itself stays put — motion
+ * comes from the staggered intro, hero Ken Burns, and a final
+ * QR pulse.
  *
- * Key refinement vs the original H-7g attempt: the header BAR
- * (color/shape) never animates. Only the TEXT inside the header
- * animates in once during scene 1, then sits static for the rest
- * of the 6-second loop. This persistent-header continuity is what
- * makes the composition feel intentional rather than "scenes that
- * appear and disappear."
+ * Layout mirrors PromoDocument exactly so the MP4 reads as the
+ * animated version of the PDF:
  *
- * Total runtime: 6 seconds. Three scenes:
- *   0.0–1.8s  Title card    full-bleed primary, address + price
- *                            + JOIN US date repeat below header
- *   1.8–4.5s  Hero + overlay hero photo blur-filled, bottom
- *                            gradient scrim with address/price/
- *                            highlight pills
- *   4.5–6.0s  QR card        full-bleed primary, large QR centered
- *                            with SCAN FOR DETAILS label
+ *   Header bar   (primary fill)    "OPEN HOUSE" + date + time
+ *   Hero photo   (blur-fill, KB)   photos[0] full-bleed below header
+ *   Thumb strip  (reel only)       photos[1..4] in 4-column row
+ *   Property     (left + right)    PRESENTING + address + price
+ *   Features     (reel only)       FEATURES + 3 bullets, 2-column
+ *   Description  (reel only)       1-2 lines, ellipsis on overflow
+ *   Agent + QR   (split row)       logo+name+contact / QR + SCAN
+ *   Footer bar   (primary fill)    eventNotes + license
  *
- * Z-order on every frame:
- *   1. Page background fallback
- *   2. Header bar (always primary color, no animation)
- *   3. Active scene body (clipped to body region, crossfading
- *      300ms at scene boundaries)
- *   4. Header text (animates in during scene 1 only, then static)
+ * Background: pure black (#000000) outside the primary-color bars
+ * (header + footer). Property/features/description body text reads
+ * as white-on-black; hero photo block fills its own region;
+ * white-card behind QR keeps it scannable on dark bg.
  *
- * Aspect-aware: same scene structure for 1080×1920 reel and
- * 1080×1080 square; only sizes and positions adapt.
+ * Staggered fade-in schedule (ms, all 0 → 1):
+ *   0-400    hero photo
+ *   200-600  header text (bar itself never animates — always present)
+ *   400-800  thumb strip (reel)
+ *   600-1000 property block
+ *   800-1200 features (reel)
+ *  1000-1400 description (reel)
+ *  1200-1600 agent + QR row
+ *  1400-1800 footer text
+ *  1800+    all content static at full opacity
+ *
+ * Hero Ken Burns: scale 1.0 → 1.05 over the full 6s, applied to
+ * the blur-fill composite canvas (so the blurred background scales
+ * with the foreground photo as one unit).
+ *
+ * QR pulse: sin-wave 1.0 ± 0.02 with 1s period, active 4-6s.
  */
 
 export const PROMO_TOTAL_SEC = 6;
 
 const SAFE_X = 80;
 const SAFE_Y = 60;
-const TRANSITION_SEC = 0.3;
 const DEBUG_SAFE_AREA = false;
+
+/** Page background — pure black outside the primary-color bars. */
+const BG_BLACK = "#000000";
 
 export interface PromoMp4State {
   primary: string;
@@ -50,7 +62,6 @@ export interface PromoMp4State {
   textPrimary: string;
   textMuted: string;
   onPrimary: string;
-  /** Auto-flipped against accent — used for highlight pill text. */
   onAccent: string;
   title: string;
   dateLabel: string;
@@ -59,6 +70,8 @@ export interface PromoMp4State {
   city: string;
   price: string;
   highlights: string[];
+  /** Pre-truncated description (≤140 chars, ellipsis on overflow). */
+  description: string;
   agentName: string;
   brokerage: string;
   phone: string;
@@ -74,67 +87,11 @@ export interface PromoMp4Assets {
   brandLogo: HTMLImageElement | null;
 }
 
-interface Rect {
-  x: number;
-  y: number;
-  w: number;
-  h: number;
-}
-
-interface Layout {
-  canvas: { w: number; h: number };
-  isSquare: boolean;
-  header: Rect;
-  body: Rect;
-}
-
-function computeLayout(size: { width: number; height: number }): Layout {
-  const isSquare = Math.abs(size.width - size.height) < 50;
-  const headerH = isSquare ? 120 : 160;
-  return {
-    canvas: { w: size.width, h: size.height },
-    isSquare,
-    header: { x: 0, y: 0, w: size.width, h: headerH },
-    body: {
-      x: 0,
-      y: headerH,
-      w: size.width,
-      h: size.height - headerH,
-    },
-  };
-}
-
-interface SceneCtx {
-  ctx: CanvasRenderingContext2D;
-  /** Global timeline time in seconds (0..6). */
-  t: number;
-  /** Time relative to this scene's start (0..sceneDuration). */
-  sceneT: number;
-  layout: Layout;
-  state: PromoMp4State;
-  assets: PromoMp4Assets;
-}
-
-type SceneRenderer = (sc: SceneCtx) => void;
-
-interface Scene {
-  start: number;
-  end: number;
-  render: SceneRenderer;
-}
-
-const SCENES: Scene[] = [
-  { start: 0, end: 1.8, render: renderTitleScene },
-  { start: 1.8, end: 4.5, render: renderHeroScene },
-  { start: 4.5, end: 6.0, render: renderQrScene },
-];
-
 export function buildPromoTimeline(
   state: PromoMp4State,
   size: { width: number; height: number },
   assets: PromoMp4Assets
 ): Timeline {
-  const layout = computeLayout(size);
   const tracks: Track[] = [];
 
   tracks.push({
@@ -144,7 +101,7 @@ export function buildPromoTimeline(
     easing: linear,
     onUpdate: (p, ctx) => {
       const t = p * PROMO_TOTAL_SEC;
-      renderFrame(ctx, t, layout, state, assets);
+      renderFrame(ctx, t, size, state, assets);
     },
   });
 
@@ -154,523 +111,603 @@ export function buildPromoTimeline(
 function renderFrame(
   ctx: CanvasRenderingContext2D,
   t: number,
-  layout: Layout,
+  size: { width: number; height: number },
   state: PromoMp4State,
   assets: PromoMp4Assets
 ): void {
-  const { canvas } = layout;
+  const isSquare = Math.abs(size.width - size.height) < 50;
 
-  // 1. Page background fallback. Scenes paint over this; it's
-  // visible only if a scene leaves transparent gaps (none should).
-  ctx.fillStyle = state.background;
-  ctx.fillRect(0, 0, canvas.w, canvas.h);
+  // Page background — solid black behind everything else.
+  ctx.fillStyle = BG_BLACK;
+  ctx.fillRect(0, 0, size.width, size.height);
 
-  // 2. Header bar — always present, no animation. Primary color
-  // band the full width of the canvas. Drawn before scenes so
-  // the body-region clip below prevents scene content from
-  // bleeding into the header area.
-  drawHeaderBar(ctx, layout, state);
+  // Header BAR (always opaque from t=0; only the text inside
+  // animates in).
+  drawHeaderBar(ctx, size, state, isSquare);
 
-  // 3. Active scene with optional crossfade. Body-region clip
-  // ensures scene content stays below the header — the header
-  // bar persists visually across scene boundaries.
-  ctx.save();
-  ctx.beginPath();
-  ctx.rect(layout.body.x, layout.body.y, layout.body.w, layout.body.h);
-  ctx.clip();
+  // Hero photo block (with Ken Burns + fade-in).
+  drawHeroPhoto(ctx, t, size, state, assets, isSquare);
 
-  const sceneInfo = findScene(t);
-  const active = sceneInfo.active;
-  const prev = sceneInfo.prev;
-  const fadeIn = sceneInfo.fadeIn;
+  // Header TEXT (200-600ms fade).
+  drawHeaderText(ctx, t, size, state, isSquare);
 
-  const sceneT = (s: Scene) => t - s.start;
-
-  if (prev && fadeIn < 1) {
-    // Crossfade: previous scene fading out, active scene fading in.
-    ctx.save();
-    ctx.globalAlpha = 1 - fadeIn;
-    prev.render({
-      ctx,
-      t,
-      sceneT: sceneT(prev),
-      layout,
-      state,
-      assets,
-    });
-    ctx.restore();
-    ctx.save();
-    ctx.globalAlpha = fadeIn;
-    active.render({
-      ctx,
-      t,
-      sceneT: sceneT(active),
-      layout,
-      state,
-      assets,
-    });
-    ctx.restore();
-  } else {
-    active.render({
-      ctx,
-      t,
-      sceneT: sceneT(active),
-      layout,
-      state,
-      assets,
-    });
+  // Thumb strip (reel only, 400-800ms fade).
+  if (!isSquare && assets.thumbs.length > 0) {
+    drawThumbStrip(ctx, t, size, assets);
   }
-  ctx.restore();
 
-  // 4. Header text — animates in during scene 1 (0-1.3s), then
-  // static for the rest of the loop. Drawn last so it's on top
-  // of everything else (defensive — scene clip already prevents
-  // overlap, but z-order matters when scenes are full-bleed-primary
-  // and the header-bar's bottom edge would otherwise be the only
-  // visual boundary).
-  drawHeaderText(ctx, t, layout, state);
+  // Property block (600-1000ms fade).
+  drawPropertyBlock(ctx, t, size, state, isSquare);
 
-  if (DEBUG_SAFE_AREA) drawSafeAreaDebug(ctx, canvas);
-}
-
-function findScene(t: number): {
-  active: Scene;
-  prev: Scene | null;
-  fadeIn: number;
-} {
-  for (let i = 0; i < SCENES.length; i++) {
-    const s = SCENES[i];
-    if (t < s.end || i === SCENES.length - 1) {
-      const fadeIn =
-        i === 0 ? 1 : Math.min(1, (t - s.start) / TRANSITION_SEC);
-      return {
-        active: s,
-        prev: i > 0 && fadeIn < 1 ? SCENES[i - 1] : null,
-        fadeIn,
-      };
-    }
+  // Features block (reel only, 800-1200ms fade).
+  if (!isSquare) {
+    drawFeaturesBlock(ctx, t, state);
   }
-  return { active: SCENES[SCENES.length - 1], prev: null, fadeIn: 1 };
+
+  // Description (reel only, 1000-1400ms fade).
+  if (!isSquare && state.description) {
+    drawDescriptionBlock(ctx, t, state);
+  }
+
+  // Agent + QR row (1200-1600ms fade, with QR pulse 4-6s).
+  drawAgentQrRow(ctx, t, size, state, assets, isSquare);
+
+  // Footer bar (bar always opaque; text fades 1400-1800ms).
+  drawFooterBar(ctx, t, size, state, isSquare);
+
+  if (DEBUG_SAFE_AREA) drawSafeAreaDebug(ctx, size);
 }
 
 /* ──────────────────────────────────────────────────────────────── */
-/* Persistent header                                                */
+/* Header                                                           */
 /* ──────────────────────────────────────────────────────────────── */
 
 function drawHeaderBar(
   ctx: CanvasRenderingContext2D,
-  layout: Layout,
-  state: PromoMp4State
+  size: { width: number; height: number },
+  state: PromoMp4State,
+  isSquare: boolean
 ): void {
+  const h = isSquare ? 100 : 130;
   ctx.fillStyle = state.primary;
-  ctx.fillRect(layout.header.x, layout.header.y, layout.header.w, layout.header.h);
+  ctx.fillRect(0, 0, size.width, h);
 }
 
 function drawHeaderText(
   ctx: CanvasRenderingContext2D,
   t: number,
-  layout: Layout,
-  state: PromoMp4State
+  size: { width: number; height: number },
+  state: PromoMp4State,
+  isSquare: boolean
 ): void {
-  const isSquare = layout.isSquare;
-  const titleSize = isSquare ? 48 : 64;
-  const dateSize = isSquare ? 22 : 28;
-  const timeSize = isSquare ? 16 : 22;
-  // y values are alphabetic-baseline positions inside the header band.
-  const titleBaselineY = isSquare ? 55 : 70;
-  const dateBaselineY = isSquare ? 90 : 110;
-  const timeBaselineY = isSquare ? 108 : 138;
+  const opacity = fadeAt(t, 0.2, 0.4);
+  if (opacity <= 0) return;
 
-  // Per-element entrance progress. Each element fades in + slides
-  // down a few px to its resting baseline. After 1.3s all three
-  // are at full opacity and resting position; the values stay
-  // computed-but-static for the rest of the loop (cheap).
-  const titleP = clamp01((t - 0.2) / 0.6);
-  const dateP = clamp01((t - 0.6) / 0.4);
-  const timeP = clamp01((t - 0.9) / 0.4);
+  const titleSize = isSquare ? 44 : 56;
+  const dateSize = isSquare ? 22 : 24;
+  const timeSize = isSquare ? 16 : 18;
+  // Baselines per the H-7s spec — title baseline at 60 (reel) /
+  // 50 (square) gives the glyph top a 60+ px top safe-area
+  // (alphabetic-baseline ascent of bold 56pt is ~42px; 60-42=18px
+  // top inset on reel, well clear of canvas edge).
+  const titleBaselineY = isSquare ? 50 : 60;
+  const dateBaselineY = isSquare ? 78 : 92;
+  const timeBaselineY = isSquare ? 96 : 116;
 
-  const titleEased = easeOutCubic(titleP);
-  const dateEased = easeOutCubic(dateP);
-  const timeEased = easeOutCubic(timeP);
-
-  const cx = layout.canvas.w / 2;
+  const cx = size.width / 2;
 
   ctx.save();
+  ctx.globalAlpha *= opacity;
   ctx.fillStyle = state.onPrimary;
   ctx.textAlign = "center";
   ctx.textBaseline = "alphabetic";
 
-  // Title
-  if (titleP > 0) {
-    const yOffset = (1 - titleEased) * 12;
-    ctx.save();
-    ctx.globalAlpha *= titleEased;
-    ctx.font = `bold ${titleSize}px Helvetica, Arial, sans-serif`;
-    drawSpaced(
-      ctx,
-      state.title.toUpperCase(),
-      cx,
-      titleBaselineY - yOffset,
-      isSquare ? 4 : 6
-    );
-    ctx.restore();
-  }
+  ctx.font = `bold ${titleSize}px Helvetica, Arial, sans-serif`;
+  drawSpaced(ctx, state.title.toUpperCase(), cx, titleBaselineY, isSquare ? 4 : 6);
 
-  // Date
-  if (dateP > 0 && state.dateLabel) {
-    const yOffset = (1 - dateEased) * 8;
-    ctx.save();
-    ctx.globalAlpha *= dateEased;
+  if (state.dateLabel) {
     ctx.font = `bold ${dateSize}px Helvetica, Arial, sans-serif`;
-    ctx.fillText(state.dateLabel, cx, dateBaselineY - yOffset);
-    ctx.restore();
+    ctx.fillText(state.dateLabel, cx, dateBaselineY);
   }
-
-  // Time (muted)
-  if (timeP > 0 && state.timeLabel) {
-    const yOffset = (1 - timeEased) * 6;
-    ctx.save();
-    ctx.globalAlpha *= timeEased * 0.85;
+  if (state.timeLabel) {
     ctx.font = `${timeSize}px Helvetica, Arial, sans-serif`;
-    ctx.fillText(state.timeLabel, cx, timeBaselineY - yOffset);
-    ctx.restore();
+    ctx.globalAlpha *= 0.85;
+    ctx.fillText(state.timeLabel, cx, timeBaselineY);
   }
-
   ctx.restore();
 }
 
 /* ──────────────────────────────────────────────────────────────── */
-/* Scene 1 — Title card (full-bleed primary)                        */
+/* Hero photo                                                       */
 /* ──────────────────────────────────────────────────────────────── */
 
-function renderTitleScene(sc: SceneCtx): void {
-  const { ctx, t, layout, state } = sc;
-  const isSquare = layout.isSquare;
-  const body = layout.body;
+function drawHeroPhoto(
+  ctx: CanvasRenderingContext2D,
+  t: number,
+  size: { width: number; height: number },
+  state: PromoMp4State,
+  assets: PromoMp4Assets,
+  isSquare: boolean
+): void {
+  const opacity = fadeAt(t, 0.0, 0.4);
+  if (opacity <= 0) return;
 
-  // Body fills with primary so the canvas reads as one continuous
-  // mint surface from header through bottom.
-  ctx.fillStyle = state.primary;
-  ctx.fillRect(body.x, body.y, body.w, body.h);
-
-  // Body content fades in starting at 0.4s, holds from 1.0s.
-  const bodyP = clamp01((t - 0.4) / 0.6);
-  if (bodyP <= 0) return;
+  const headerH = isSquare ? 100 : 130;
+  const heroY = headerH;
+  const heroH = isSquare ? 600 : 720;
+  const heroW = size.width;
 
   ctx.save();
-  ctx.globalAlpha *= bodyP;
-
-  const cx = body.x + body.w / 2;
-
-  if (isSquare) {
-    // Square: vertically centered between header bottom (120) and
-    // canvas bottom (1080). Center y around 600.
-    const centerY = body.y + body.h / 2;
-    const presentingY = centerY - 200;
-    const addressY = centerY - 140;
-    const cityY = centerY - 80;
-    const joinUsY = centerY + 20;
-    const dateY = centerY + 80;
-
-    drawCenteredSpaced(ctx, "PRESENTING", cx, presentingY, 16, state.onPrimary, 2);
-    drawCenteredText(
-      ctx,
-      state.address || "Property address",
-      cx,
-      addressY,
-      44,
-      state.onPrimary,
-      true
-    );
-    if (state.city) {
-      drawCenteredText(ctx, state.city, cx, cityY, 24, state.onPrimary, false, 0.85);
-    }
-    drawCenteredSpaced(ctx, "JOIN US", cx, joinUsY, 16, state.onPrimary, 2);
-    if (state.dateLabel) {
-      drawCenteredText(ctx, state.dateLabel, cx, dateY, 30, state.onPrimary, true);
-    }
-  } else {
-    // Reel: explicit y positions per the H-7r spec.
-    drawCenteredSpaced(ctx, "PRESENTING", cx, 600, 18, state.onPrimary, 3);
-    drawCenteredText(
-      ctx,
-      state.address || "Property address",
-      cx,
-      660,
-      60,
-      state.onPrimary,
-      true
-    );
-    if (state.city) {
-      drawCenteredText(ctx, state.city, cx, 730, 32, state.onPrimary, false, 0.85);
-    }
-    drawCenteredSpaced(ctx, "JOIN US", cx, 800, 18, state.onPrimary, 3);
-    if (state.dateLabel) {
-      drawCenteredText(ctx, state.dateLabel, cx, 850, 40, state.onPrimary, true);
-    }
-  }
-
-  ctx.restore();
-}
-
-/* ──────────────────────────────────────────────────────────────── */
-/* Scene 2 — Hero photo with bottom overlay                         */
-/* ──────────────────────────────────────────────────────────────── */
-
-function renderHeroScene(sc: SceneCtx): void {
-  const { ctx, sceneT, layout, state, assets } = sc;
-  const isSquare = layout.isSquare;
-  const body = layout.body;
-
-  // Hero photo fills the body region. blurFillCompose was called
-  // upstream with body.w × body.h dimensions so the canvas is
-  // exact-fit; Ken Burns scales it +5% over the scene duration.
-  ctx.save();
+  ctx.globalAlpha *= opacity;
   ctx.beginPath();
-  ctx.rect(body.x, body.y, body.w, body.h);
+  ctx.rect(0, heroY, heroW, heroH);
   ctx.clip();
 
-  if (assets.hero) {
-    const sceneDur = 2.7;
-    const burnP = clamp01(sceneT / sceneDur);
-    const zoom = 1.0 + burnP * 0.05;
-    const dw = body.w * zoom;
-    const dh = body.h * zoom;
-    const dx = body.x + (body.w - dw) / 2;
-    const dy = body.y + (body.h - dh) / 2;
-    ctx.drawImage(assets.hero, dx, dy, dw, dh);
-  } else {
-    // No hero — fall back to primary fill so the scene still has
-    // a deliberate look.
+  if (!assets.hero) {
+    // No photo — render a stenciled placeholder so the region
+    // still has a deliberate look.
+    ctx.fillStyle = "#1f2937";
+    ctx.fillRect(0, heroY, heroW, heroH);
     ctx.fillStyle = state.primary;
-    ctx.fillRect(body.x, body.y, body.w, body.h);
-  }
-  ctx.restore();
-
-  // Bottom gradient scrim
-  const scrimH = isSquare ? 240 : 320;
-  const scrimY = body.y + body.h - scrimH;
-  const grad = ctx.createLinearGradient(0, scrimY, 0, body.y + body.h);
-  grad.addColorStop(0, "rgba(0, 0, 0, 0)");
-  grad.addColorStop(1, "rgba(0, 0, 0, 0.78)");
-  ctx.save();
-  ctx.fillStyle = grad;
-  ctx.fillRect(body.x, scrimY, body.w, scrimH);
-  ctx.restore();
-
-  // Overlay content fades in at sceneT 0.2s, stagger 100ms each.
-  const padX = isSquare ? 80 : 100;
-  const bottomInset = isSquare ? 60 : 80;
-  const addressSize = isSquare ? 38 : 56;
-  const citySize = isSquare ? 20 : 28;
-  const priceSize = isSquare ? 40 : 60;
-  const pillTextSize = isSquare ? 18 : 22;
-  const pillPadH = isSquare ? 14 : 16;
-  const pillPadV = isSquare ? 6 : 8;
-  const pillGap = isSquare ? 10 : 12;
-  const maxPills = isSquare ? 2 : 3;
-
-  // Anchor address+city baseline near the bottom inset.
-  const addressBaselineY = body.y + body.h - bottomInset - citySize - 8;
-  const cityBaselineY = body.y + body.h - bottomInset;
-  // Price right-aligned on same baseline as address.
-  const priceBaselineY = addressBaselineY;
-
-  const aP = clamp01((sceneT - 0.2) / 0.4);
-  const cP = clamp01((sceneT - 0.3) / 0.4);
-  const pP = clamp01((sceneT - 0.4) / 0.4);
-  const pillP = clamp01((sceneT - 0.5) / 0.4);
-
-  // Address
-  if (aP > 0 && state.address) {
-    ctx.save();
-    ctx.globalAlpha *= aP;
-    ctx.fillStyle = "#ffffff";
-    ctx.font = `bold ${addressSize}px Helvetica, Arial, sans-serif`;
-    ctx.textAlign = "left";
-    ctx.textBaseline = "alphabetic";
-    ctx.fillText(state.address, body.x + padX, addressBaselineY);
-    ctx.restore();
-  }
-  // City
-  if (cP > 0 && state.city) {
-    ctx.save();
-    ctx.globalAlpha *= cP * 0.85;
-    ctx.fillStyle = "#ffffff";
-    ctx.font = `${citySize}px Helvetica, Arial, sans-serif`;
-    ctx.textAlign = "left";
-    ctx.textBaseline = "alphabetic";
-    ctx.fillText(state.city, body.x + padX, cityBaselineY);
-    ctx.restore();
-  }
-  // Price (right-aligned)
-  if (pP > 0 && state.price) {
-    ctx.save();
-    ctx.globalAlpha *= pP;
-    ctx.fillStyle = state.primary;
-    ctx.font = `bold ${priceSize}px Helvetica, Arial, sans-serif`;
-    ctx.textAlign = "right";
-    ctx.textBaseline = "alphabetic";
-    ctx.fillText(
-      state.price,
-      body.x + body.w - padX,
-      priceBaselineY
-    );
-    ctx.restore();
-  }
-
-  // Highlight pills row — above address row.
-  const pills = state.highlights.slice(0, maxPills);
-  if (pillP > 0 && pills.length > 0) {
-    const pillRowBaselineY =
-      addressBaselineY - addressSize - 24 - pillPadV;
-    ctx.save();
-    ctx.globalAlpha *= pillP;
-    ctx.font = `bold ${pillTextSize}px Helvetica, Arial, sans-serif`;
+    ctx.globalAlpha *= 0.6;
+    ctx.font = `bold ${Math.floor(heroH * 0.14)}px Helvetica, Arial, sans-serif`;
+    ctx.textAlign = "center";
     ctx.textBaseline = "middle";
-    ctx.textAlign = "left";
-    let pillX = body.x + padX;
-    const pillH = pillTextSize + pillPadV * 2;
-    for (const label of pills) {
-      const textW = ctx.measureText(label).width;
-      const pillW = textW + pillPadH * 2;
-      ctx.fillStyle = state.accent;
-      drawRoundedRect(ctx, pillX, pillRowBaselineY - pillH / 2, pillW, pillH, pillH / 2);
-      ctx.fill();
-      ctx.fillStyle = state.onAccent;
-      ctx.fillText(label, pillX + pillPadH, pillRowBaselineY);
-      pillX += pillW + pillGap;
-    }
+    ctx.fillText("OPEN HOUSE", size.width / 2, heroY + heroH / 2);
     ctx.restore();
+    return;
   }
+
+  // Ken Burns: scale 1.0 → 1.05 over the full 6s. Applied around
+  // the hero box center so the blur-fill composite stays centered
+  // as it zooms.
+  const burnP = clamp01(t / PROMO_TOTAL_SEC);
+  const zoom = 1.0 + burnP * 0.05;
+  const dw = heroW * zoom;
+  const dh = heroH * zoom;
+  const dx = (heroW - dw) / 2;
+  const dy = heroY + (heroH - dh) / 2;
+  ctx.drawImage(assets.hero, dx, dy, dw, dh);
+  ctx.restore();
 }
 
 /* ──────────────────────────────────────────────────────────────── */
-/* Scene 3 — QR card                                                */
+/* Thumb strip (reel only)                                          */
 /* ──────────────────────────────────────────────────────────────── */
 
-function renderQrScene(sc: SceneCtx): void {
-  const { ctx, sceneT, layout, state, assets } = sc;
-  const isSquare = layout.isSquare;
-  const body = layout.body;
+function drawThumbStrip(
+  ctx: CanvasRenderingContext2D,
+  t: number,
+  size: { width: number; height: number },
+  assets: PromoMp4Assets
+): void {
+  const opacity = fadeAt(t, 0.4, 0.4);
+  if (opacity <= 0) return;
 
-  // Body fills with primary — same as scene 1 — so QR lives on
-  // a clean brand-color surface that visually merges with the
-  // header bar.
-  ctx.fillStyle = state.primary;
-  ctx.fillRect(body.x, body.y, body.w, body.h);
-
-  if (!assets.qrImage) return;
-
-  // QR scale-in animation: 0.92 → 1.0 over first 500ms.
-  const qrP = clamp01(sceneT / 0.5);
-  const easedP = easeOutCubic(qrP);
-  const scale = 0.92 + easedP * 0.08;
-
-  const cardSize = isSquare ? 440 : 600;
-  const cardPad = 24; // internal white padding
-  const innerSize = cardSize - cardPad * 2; // QR display size
-
-  const cx = body.x + body.w / 2;
-  const cardTopY = isSquare ? 320 : 620;
-
-  const drawSize = cardSize * scale;
-  const drawX = cx - drawSize / 2;
-  const drawY = cardTopY + (cardSize - drawSize) / 2;
+  const stripY = 860;
+  const cellH = 90;
+  const cellW = 240;
+  const gap = 20;
+  const count = Math.min(4, assets.thumbs.length);
+  const totalW = count * cellW + (count - 1) * gap;
+  const startX = (size.width - totalW) / 2;
 
   ctx.save();
-  ctx.globalAlpha *= easedP;
+  ctx.globalAlpha *= opacity;
+  for (let i = 0; i < count; i++) {
+    const cx = startX + i * (cellW + gap);
+    ctx.save();
+    const r = 8;
+    ctx.beginPath();
+    ctx.moveTo(cx + r, stripY);
+    ctx.lineTo(cx + cellW - r, stripY);
+    ctx.quadraticCurveTo(cx + cellW, stripY, cx + cellW, stripY + r);
+    ctx.lineTo(cx + cellW, stripY + cellH - r);
+    ctx.quadraticCurveTo(cx + cellW, stripY + cellH, cx + cellW - r, stripY + cellH);
+    ctx.lineTo(cx + r, stripY + cellH);
+    ctx.quadraticCurveTo(cx, stripY + cellH, cx, stripY + cellH - r);
+    ctx.lineTo(cx, stripY + r);
+    ctx.quadraticCurveTo(cx, stripY, cx + r, stripY);
+    ctx.closePath();
+    ctx.clip();
+    ctx.drawImage(assets.thumbs[i], cx, stripY, cellW, cellH);
+    ctx.restore();
+  }
+  ctx.restore();
+}
 
-  // White card
+/* ──────────────────────────────────────────────────────────────── */
+/* Property block                                                   */
+/* ──────────────────────────────────────────────────────────────── */
+
+function drawPropertyBlock(
+  ctx: CanvasRenderingContext2D,
+  t: number,
+  size: { width: number; height: number },
+  state: PromoMp4State,
+  isSquare: boolean
+): void {
+  const opacity = fadeAt(t, 0.6, 0.4);
+  if (opacity <= 0) return;
+
+  const padX = isSquare ? 80 : 100;
+  ctx.save();
+  ctx.globalAlpha *= opacity;
+  ctx.textAlign = "left";
+  ctx.textBaseline = "alphabetic";
+
+  if (isSquare) {
+    // PRESENTING (accent) — y=740
+    ctx.fillStyle = state.accent;
+    ctx.font = `bold 18px Helvetica, Arial, sans-serif`;
+    drawSpaced(ctx, "PRESENTING", padX, 740, 2);
+
+    // Address (white) — y=790
+    ctx.fillStyle = "#ffffff";
+    ctx.font = `bold 36px Helvetica, Arial, sans-serif`;
+    ctx.fillText(state.address || "Property address", padX, 790);
+
+    // City (muted) — y=820
+    if (state.city) {
+      ctx.fillStyle = "rgba(255, 255, 255, 0.78)";
+      ctx.font = `20px Helvetica, Arial, sans-serif`;
+      ctx.fillText(state.city, padX, 820);
+    }
+
+    // Price (primary, right-aligned) — y=790 same baseline as address
+    if (state.price) {
+      ctx.fillStyle = state.primary;
+      ctx.font = `bold 40px Helvetica, Arial, sans-serif`;
+      ctx.textAlign = "right";
+      ctx.fillText(state.price, size.width - 80, 790);
+    }
+  } else {
+    // Reel layout
+    // PRESENTING (accent) — y=1010
+    ctx.fillStyle = state.accent;
+    ctx.font = `bold 22px Helvetica, Arial, sans-serif`;
+    drawSpaced(ctx, "PRESENTING", padX, 1010, 3);
+
+    // Address (white) — y=1075
+    ctx.fillStyle = "#ffffff";
+    ctx.font = `bold 56px Helvetica, Arial, sans-serif`;
+    ctx.fillText(state.address || "Property address", padX, 1075);
+
+    // City (muted) — y=1115
+    if (state.city) {
+      ctx.fillStyle = "rgba(255, 255, 255, 0.78)";
+      ctx.font = `28px Helvetica, Arial, sans-serif`;
+      ctx.fillText(state.city, padX, 1115);
+    }
+
+    // Price (primary, right-aligned) — y=1075 same as address
+    if (state.price) {
+      ctx.fillStyle = state.primary;
+      ctx.font = `bold 60px Helvetica, Arial, sans-serif`;
+      ctx.textAlign = "right";
+      ctx.fillText(state.price, size.width - padX, 1075);
+    }
+  }
+  ctx.restore();
+}
+
+/* ──────────────────────────────────────────────────────────────── */
+/* Features block (reel only)                                       */
+/* ──────────────────────────────────────────────────────────────── */
+
+function drawFeaturesBlock(
+  ctx: CanvasRenderingContext2D,
+  t: number,
+  state: PromoMp4State
+): void {
+  const opacity = fadeAt(t, 0.8, 0.4);
+  if (opacity <= 0) return;
+
+  const highlights = state.highlights.slice(0, 3);
+  if (highlights.length === 0) return;
+
+  const padX = 100;
+  const labelY = 1240;
+  const dotR = 7;
+  const colCount = highlights.length >= 4 ? 2 : 1;
+  void colCount; // 3-bullet layout uses single column at this width
+  const bulletYs = [1295, 1345, 1395];
+
+  ctx.save();
+  ctx.globalAlpha *= opacity;
+  ctx.textAlign = "left";
+  ctx.textBaseline = "alphabetic";
+
+  // FEATURES label (primary)
+  ctx.fillStyle = state.primary;
+  ctx.font = `bold 22px Helvetica, Arial, sans-serif`;
+  drawSpaced(ctx, "FEATURES", padX, labelY, 3);
+
+  // Bullets — primary dot + white text. Single column at 100pt
+  // padding fits 3 bullets cleanly; if highlights.length > 3 the
+  // extra bullets just don't render in MP4 (PDF still has them
+  // in its 2-column layout).
+  ctx.font = `28px Helvetica, Arial, sans-serif`;
+  for (let i = 0; i < highlights.length; i++) {
+    const y = bulletYs[i];
+    ctx.fillStyle = state.primary;
+    ctx.beginPath();
+    ctx.arc(padX + dotR, y - 8, dotR, 0, Math.PI * 2);
+    ctx.fill();
+    ctx.fillStyle = "#ffffff";
+    ctx.fillText(highlights[i], padX + dotR * 2 + 12, y);
+  }
+  ctx.restore();
+}
+
+/* ──────────────────────────────────────────────────────────────── */
+/* Description block (reel only)                                    */
+/* ──────────────────────────────────────────────────────────────── */
+
+function drawDescriptionBlock(
+  ctx: CanvasRenderingContext2D,
+  t: number,
+  state: PromoMp4State
+): void {
+  const opacity = fadeAt(t, 1.0, 0.4);
+  if (opacity <= 0) return;
+
+  const padX = 100;
+  ctx.save();
+  ctx.globalAlpha *= opacity;
+  ctx.fillStyle = "rgba(255, 255, 255, 0.85)";
+  ctx.font = `22px Helvetica, Arial, sans-serif`;
+  ctx.textAlign = "left";
+  ctx.textBaseline = "alphabetic";
+  // Single-line render — description is pre-truncated upstream.
+  ctx.fillText(state.description, padX, 1450);
+  ctx.restore();
+}
+
+/* ──────────────────────────────────────────────────────────────── */
+/* Agent + QR row                                                   */
+/* ──────────────────────────────────────────────────────────────── */
+
+function drawAgentQrRow(
+  ctx: CanvasRenderingContext2D,
+  t: number,
+  size: { width: number; height: number },
+  state: PromoMp4State,
+  assets: PromoMp4Assets,
+  isSquare: boolean
+): void {
+  const opacity = fadeAt(t, 1.2, 0.4);
+  if (opacity <= 0) return;
+
+  ctx.save();
+  ctx.globalAlpha *= opacity;
+
+  if (isSquare) {
+    drawAgentQrSquare(ctx, t, size, state, assets);
+  } else {
+    drawAgentQrReel(ctx, t, size, state, assets);
+  }
+  ctx.restore();
+}
+
+function drawAgentQrReel(
+  ctx: CanvasRenderingContext2D,
+  t: number,
+  size: { width: number; height: number },
+  state: PromoMp4State,
+  assets: PromoMp4Assets
+): void {
+  const padX = 100;
+  // Agent block (left) — logo + name + brokerage on top row,
+  // phone + email below.
+  if (assets.brandLogo) {
+    drawImageContain(ctx, assets.brandLogo, padX, 1530, 64, 64);
+  } else {
+    ctx.fillStyle = state.primary;
+    ctx.fillRect(padX, 1530, 64, 64);
+    ctx.fillStyle = state.onPrimary;
+    ctx.font = `bold 14px Helvetica, Arial, sans-serif`;
+    ctx.textAlign = "center";
+    ctx.textBaseline = "middle";
+    ctx.fillText("LOGO", padX + 32, 1562);
+  }
+
+  ctx.textAlign = "left";
+  ctx.textBaseline = "alphabetic";
   ctx.fillStyle = "#ffffff";
-  drawRoundedRect(ctx, drawX, drawY, drawSize, drawSize, isSquare ? 12 : 16);
-  ctx.fill();
+  ctx.font = `bold 32px Helvetica, Arial, sans-serif`;
+  ctx.fillText(state.agentName || "Your name", padX + 80, 1565);
 
-  // QR image inside card with internal padding
-  const qrDrawX = drawX + cardPad * scale;
-  const qrDrawY = drawY + cardPad * scale;
-  const qrDrawSize = innerSize * scale;
-  ctx.drawImage(assets.qrImage, qrDrawX, qrDrawY, qrDrawSize, qrDrawSize);
+  if (state.brokerage) {
+    ctx.fillStyle = "rgba(255, 255, 255, 0.78)";
+    ctx.font = `22px Helvetica, Arial, sans-serif`;
+    ctx.fillText(state.brokerage, padX + 80, 1600);
+  }
+
+  ctx.fillStyle = "#ffffff";
+  ctx.font = `24px Helvetica, Arial, sans-serif`;
+  if (state.phone) {
+    ctx.fillText(state.phone, padX, 1665);
+  }
+  if (state.email) {
+    ctx.fillText(state.email, padX, 1705);
+  }
+
+  // QR block (right) — 200×200 white card at x=740, y=1535.
+  drawQrCard(ctx, t, state, assets, {
+    cardX: 740,
+    cardY: 1535,
+    cardSize: 200,
+    cardPad: 12,
+    labelCx: 860,
+    labelY: 1770,
+    labelSize: 18,
+    labelSpacing: 2.5,
+  });
+}
+
+function drawAgentQrSquare(
+  ctx: CanvasRenderingContext2D,
+  t: number,
+  size: { width: number; height: number },
+  state: PromoMp4State,
+  assets: PromoMp4Assets
+): void {
+  const padX = 80;
+  // Agent block compressed — logo + name + brokerage only.
+  if (assets.brandLogo) {
+    drawImageContain(ctx, assets.brandLogo, padX, 890, 48, 48);
+  } else {
+    ctx.fillStyle = state.primary;
+    ctx.fillRect(padX, 890, 48, 48);
+    ctx.fillStyle = state.onPrimary;
+    ctx.font = `bold 11px Helvetica, Arial, sans-serif`;
+    ctx.textAlign = "center";
+    ctx.textBaseline = "middle";
+    ctx.fillText("LOGO", padX + 24, 914);
+  }
+
+  ctx.textAlign = "left";
+  ctx.textBaseline = "alphabetic";
+  ctx.fillStyle = "#ffffff";
+  ctx.font = `bold 22px Helvetica, Arial, sans-serif`;
+  ctx.fillText(state.agentName || "Your name", padX + 60, 918);
+
+  if (state.brokerage) {
+    ctx.fillStyle = "rgba(255, 255, 255, 0.78)";
+    ctx.font = `16px Helvetica, Arial, sans-serif`;
+    ctx.fillText(state.brokerage, padX + 60, 945);
+  }
+
+  // QR block (right) — 160×160 white card at x=720, y=890.
+  drawQrCard(ctx, t, state, assets, {
+    cardX: 720,
+    cardY: 890,
+    cardSize: 160,
+    cardPad: 10,
+    labelCx: 800,
+    labelY: 1075,
+    labelSize: 14,
+    labelSpacing: 1.5,
+  });
+}
+
+interface QrCardSpec {
+  cardX: number;
+  cardY: number;
+  cardSize: number;
+  cardPad: number;
+  labelCx: number;
+  labelY: number;
+  labelSize: number;
+  labelSpacing: number;
+}
+
+function drawQrCard(
+  ctx: CanvasRenderingContext2D,
+  t: number,
+  state: PromoMp4State,
+  assets: PromoMp4Assets,
+  spec: QrCardSpec
+): void {
+  if (!assets.qrImage) return;
+
+  // QR pulse: sin-wave 1.0 ± 0.02, 1s period, active 4-6s.
+  // Subtle eye-draw at end of loop without distracting earlier.
+  const pulseT = Math.max(0, t - 4.0);
+  const pulse = pulseT > 0
+    ? 1.0 + Math.sin((pulseT / 1.0) * Math.PI * 2) * 0.02
+    : 1.0;
+
+  const cardSize = spec.cardSize * pulse;
+  const cardX = spec.cardX + (spec.cardSize - cardSize) / 2;
+  const cardY = spec.cardY + (spec.cardSize - cardSize) / 2;
+  const innerSize = (spec.cardSize - spec.cardPad * 2) * pulse;
+  const innerX = cardX + spec.cardPad * pulse;
+  const innerY = cardY + spec.cardPad * pulse;
+
+  ctx.save();
+  // White card background
+  ctx.fillStyle = "#ffffff";
+  drawRoundedRect(ctx, cardX, cardY, cardSize, cardSize, 8);
+  ctx.fill();
+  ctx.drawImage(assets.qrImage, innerX, innerY, innerSize, innerSize);
   ctx.restore();
 
-  // SCAN FOR DETAILS label
-  const labelSize = isSquare ? 22 : 32;
-  const labelY = isSquare ? 800 : 1280;
-  // Address one-liner below
-  const addressSize = isSquare ? 18 : 24;
-  const addressY = isSquare ? 850 : 1340;
+  // SCAN FOR DETAILS label (accent)
+  ctx.save();
+  ctx.fillStyle = state.accent;
+  ctx.font = `bold ${spec.labelSize}px Helvetica, Arial, sans-serif`;
+  ctx.textAlign = "center";
+  ctx.textBaseline = "alphabetic";
+  drawSpaced(ctx, "SCAN FOR DETAILS", spec.labelCx, spec.labelY, spec.labelSpacing);
+  ctx.restore();
+}
 
-  // Both labels fade in slightly after the QR settles.
-  const labelP = clamp01((sceneT - 0.4) / 0.4);
-  if (labelP > 0) {
-    ctx.save();
-    ctx.globalAlpha *= labelP;
-    ctx.fillStyle = state.accent;
-    ctx.font = `bold ${labelSize}px Helvetica, Arial, sans-serif`;
-    ctx.textAlign = "center";
-    ctx.textBaseline = "alphabetic";
-    drawSpaced(ctx, "SCAN FOR DETAILS", cx, labelY, isSquare ? 2 : 3);
-    ctx.restore();
+/* ──────────────────────────────────────────────────────────────── */
+/* Footer                                                           */
+/* ──────────────────────────────────────────────────────────────── */
+
+function drawFooterBar(
+  ctx: CanvasRenderingContext2D,
+  t: number,
+  size: { width: number; height: number },
+  state: PromoMp4State,
+  isSquare: boolean
+): void {
+  const h = isSquare ? 60 : 80;
+  const y = size.height - h;
+  // Bar always opaque (no fade — anchors the bottom from t=0).
+  ctx.fillStyle = state.primary;
+  ctx.fillRect(0, y, size.width, h);
+
+  // Footer text fades in 1400-1800ms.
+  const textOpacity = fadeAt(t, 1.4, 0.4);
+  if (textOpacity <= 0) return;
+
+  const centerSize = isSquare ? 14 : 18;
+  const licSize = isSquare ? 12 : 14;
+  const baselineY = isSquare ? size.height - 22 : size.height - 35;
+  const padX = 80;
+
+  ctx.save();
+  ctx.globalAlpha *= textOpacity;
+  ctx.fillStyle = state.onPrimary;
+  ctx.font = `bold ${centerSize}px Helvetica, Arial, sans-serif`;
+  ctx.textAlign = "center";
+  ctx.textBaseline = "alphabetic";
+  if (state.footerCenter) {
+    ctx.fillText(state.footerCenter, size.width / 2, baselineY);
   }
-  if (labelP > 0 && state.address) {
-    ctx.save();
-    ctx.globalAlpha *= labelP * 0.85;
-    ctx.fillStyle = state.onPrimary;
-    ctx.font = `${addressSize}px Helvetica, Arial, sans-serif`;
-    ctx.textAlign = "center";
-    ctx.textBaseline = "alphabetic";
-    ctx.fillText(state.address, cx, addressY);
-    ctx.restore();
+  if (state.licenseNumber) {
+    ctx.font = `${licSize}px Helvetica, Arial, sans-serif`;
+    ctx.textAlign = "right";
+    ctx.globalAlpha *= 0.85;
+    ctx.fillText(
+      `License #${state.licenseNumber.replace(/^#/, "")}`,
+      size.width - padX,
+      baselineY
+    );
   }
+  ctx.restore();
 }
 
 /* ──────────────────────────────────────────────────────────────── */
 /* Helpers                                                          */
 /* ──────────────────────────────────────────────────────────────── */
 
-function drawCenteredSpaced(
-  ctx: CanvasRenderingContext2D,
-  text: string,
-  cx: number,
-  y: number,
-  size: number,
-  color: string,
-  spacing: number
-): void {
-  if (!text) return;
-  ctx.save();
-  ctx.fillStyle = color;
-  ctx.font = `bold ${size}px Helvetica, Arial, sans-serif`;
-  ctx.textAlign = "center";
-  ctx.textBaseline = "alphabetic";
-  drawSpaced(ctx, text.toUpperCase(), cx, y, spacing);
-  ctx.restore();
-}
-
-function drawCenteredText(
-  ctx: CanvasRenderingContext2D,
-  text: string,
-  cx: number,
-  y: number,
-  size: number,
-  color: string,
-  bold: boolean,
-  alphaMul: number = 1
-): void {
-  if (!text) return;
-  ctx.save();
-  ctx.globalAlpha *= alphaMul;
-  ctx.fillStyle = color;
-  ctx.font = `${bold ? "bold " : ""}${size}px Helvetica, Arial, sans-serif`;
-  ctx.textAlign = "center";
-  ctx.textBaseline = "alphabetic";
-  ctx.fillText(text, cx, y);
-  ctx.restore();
+/** Linear opacity that rises from 0 → 1 over `dur` seconds
+ *  starting at `start`. Holds at 1 after start+dur. The staggered
+ *  fade-in schedule is just a sequence of (start, dur) pairs. */
+function fadeAt(t: number, start: number, dur: number): number {
+  if (t < start) return 0;
+  if (t >= start + dur) return 1;
+  return (t - start) / dur;
 }
 
 function drawSafeAreaDebug(
   ctx: CanvasRenderingContext2D,
-  canvas: { w: number; h: number }
+  size: { width: number; height: number }
 ): void {
   ctx.save();
   ctx.strokeStyle = "rgba(255, 0, 0, 0.7)";
@@ -678,13 +715,13 @@ function drawSafeAreaDebug(
   ctx.setLineDash([10, 10]);
   ctx.beginPath();
   ctx.moveTo(SAFE_X, 0);
-  ctx.lineTo(SAFE_X, canvas.h);
-  ctx.moveTo(canvas.w - SAFE_X, 0);
-  ctx.lineTo(canvas.w - SAFE_X, canvas.h);
+  ctx.lineTo(SAFE_X, size.height);
+  ctx.moveTo(size.width - SAFE_X, 0);
+  ctx.lineTo(size.width - SAFE_X, size.height);
   ctx.moveTo(0, SAFE_Y);
-  ctx.lineTo(canvas.w, SAFE_Y);
-  ctx.moveTo(0, canvas.h - SAFE_Y);
-  ctx.lineTo(canvas.w, canvas.h - SAFE_Y);
+  ctx.lineTo(size.width, SAFE_Y);
+  ctx.moveTo(0, size.height - SAFE_Y);
+  ctx.lineTo(size.width, size.height - SAFE_Y);
   ctx.stroke();
   ctx.restore();
 }

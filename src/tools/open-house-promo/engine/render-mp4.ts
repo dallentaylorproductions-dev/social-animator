@@ -132,6 +132,12 @@ export async function renderPromoMp4(
     highlights: draft.propertyHighlights
       .map((h) => h.trim())
       .filter(Boolean),
+    // Pre-truncate to 140 chars matching PromoDocument's truncate
+    // behavior so the MP4 description block is single-line clean.
+    description:
+      draft.description.length > 140
+        ? draft.description.slice(0, 140).trimEnd() + "…"
+        : draft.description,
     agentName: brand.agentName || "Your name",
     brokerage: brand.brokerage || "",
     phone: formatPhone(brand.contactPhone) || "",
