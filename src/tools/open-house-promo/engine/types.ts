@@ -62,6 +62,30 @@ export interface PromoDraft {
   primaryColor: string;
   accentColor: string;
   backgroundColor: string;
+
+  // MP4 export length in seconds. H-7.1 added user-configurable
+  // duration (5-15s) matching the Listing Flyer's slider.
+  // Animation timing in timeline.ts adapts: entrance window stays
+  // fixed at 0-1.55s so the intro feels snappy regardless of
+  // total length; Ken Burns and QR pulse scale to fit.
+  mp4DurationSeconds: number;
+}
+
+export const MIN_MP4_DURATION = 5;
+export const MAX_MP4_DURATION = 15;
+/** 6s preserves H-7's pre-slider behavior so existing drafts
+ *  render identically without explicit migration. */
+export const DEFAULT_MP4_DURATION = 6;
+
+export function clampMp4Duration(n: unknown): number {
+  const v =
+    typeof n === "number" && Number.isFinite(n)
+      ? n
+      : DEFAULT_MP4_DURATION;
+  return Math.max(
+    MIN_MP4_DURATION,
+    Math.min(MAX_MP4_DURATION, Math.round(v))
+  );
 }
 
 export const MAX_HIGHLIGHTS = 5;
@@ -98,6 +122,7 @@ export const EMPTY_DRAFT: PromoDraft = {
   primaryColor: "",
   accentColor: "",
   backgroundColor: "",
+  mp4DurationSeconds: DEFAULT_MP4_DURATION,
 };
 
 /** Build a fresh PhotoEntry from a compressed data URL with default
@@ -183,6 +208,9 @@ export function clampDraft(input: unknown): PromoDraft {
     primaryColor: str(o.primaryColor),
     accentColor: str(o.accentColor),
     backgroundColor: str(o.backgroundColor),
+    // Old drafts (pre-H-7.1) won't have this field; default to
+    // 6s preserves their original render behavior.
+    mp4DurationSeconds: clampMp4Duration(o.mp4DurationSeconds),
   };
 }
 

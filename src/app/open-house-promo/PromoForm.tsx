@@ -9,9 +9,13 @@ import {
   MAX_PHOTOS,
   PHOTO_MAX_EDGE,
   PHOTO_QUALITY,
+  MIN_MP4_DURATION,
+  MAX_MP4_DURATION,
+  clampMp4Duration,
   normalizeUrl,
 } from "@/tools/open-house-promo/engine/types";
 import { type BrandSettings, effectiveBrandAccent } from "@/lib/brand";
+import { DurationSlider } from "@/components/ui/duration-slider";
 
 interface PromoFormProps {
   draft: PromoDraft;
@@ -502,6 +506,20 @@ export function PromoForm({
             rows={2}
           />
         </Field>
+      </FormSection>
+
+      {/* ── VIDEO LENGTH ─────────────────────────────────── */}
+      <FormSection title="Video length">
+        <DurationSlider
+          value={draft.mp4DurationSeconds}
+          onChange={(v) =>
+            update("mp4DurationSeconds", clampMp4Duration(v))
+          }
+          min={MIN_MP4_DURATION}
+          max={MAX_MP4_DURATION}
+          label="Video length"
+          helper="Choose how long the animated promo plays. Shorter videos load faster; longer videos give viewers more time to read."
+        />
       </FormSection>
     </div>
   );

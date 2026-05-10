@@ -8,14 +8,14 @@ import {
 } from "./types";
 import { type BrandSettings, formatPhone, effectiveBrandAccent } from "@/lib/brand";
 import { renderTimelineToWebm } from "@/tools/listing-flyer/engine/render-mp4";
-import { webmToMp4, WARMUP_MS } from "@/engine/export";
+import { webmToMp4, getWarmupMs } from "@/engine/export";
 import {
   pickContrastText,
   pickContrastMuted,
 } from "@/tools/listing-flyer/engine/contrast";
 import {
   buildPromoTimeline,
-  PROMO_TOTAL_SEC,
+  PROMO_DEFAULT_DURATION_SEC,
   type PromoMp4State,
   type PromoMp4Assets,
 } from "./timeline";
@@ -27,8 +27,8 @@ import {
   srcToImage,
 } from "./crop";
 
-/** Promo MP4 loop length in seconds. Re-exported for ExportButtons. */
-export const PROMO_DURATION_SEC = PROMO_TOTAL_SEC;
+/** Default loop length when caller doesn't pass an override. */
+export const PROMO_DURATION_SEC = PROMO_DEFAULT_DURATION_SEC;
 
 export type RenderSize = { width: number; height: number };
 
@@ -65,6 +65,13 @@ export async function renderPromoMp4(
   brandLogoImg: HTMLImageElement | null,
   onProgress?: (update: RenderProgressUpdate) => void
 ): Promise<Blob> {
+  // H-7.1 reads the user-picked duration from the draft. clampDraft
+  // already coerces the field to an int in [5, 15], but defensive
+  // floor here in case a stale caller hands us an unclamped value.
+  const durationSec = Math.max(
+    5,
+    Math.min(15, Math.round(draft.mp4DurationSeconds ?? PROMO_DURATION_SEC))
+  );
   const primary = brand.primaryColor || "#4ef2d9";
   const accent = effectiveBrandAccent(brand);
   const background = brand.backgroundColor || "#ffffff";
@@ -167,13 +174,13 @@ export async function renderPromoMp4(
     brandLogo: brandLogoImg,
   };
 
-  const timeline = buildPromoTimeline(state, size, assets);
+  const timeline = buildPromoTimeline(state, size, assets, durationSec);
 
   const webm = await renderTimelineToWebm(
     canvas,
     timeline,
     size,
-    PROMO_DURATION_SEC,
+    durationSec,
     background,
     (p) => onProgress?.({ phase: "rendering", progress: p })
   );
@@ -181,9 +188,9 @@ export async function renderPromoMp4(
   const mp4 = await webmToMp4(
     webm,
     size,
-    PROMO_DURATION_SEC,
+    durationSec,
     (p) => onProgress?.({ phase: "converting", progress: p }),
-    WARMUP_MS
+    getWarmupMs()
   );
 
   return mp4;

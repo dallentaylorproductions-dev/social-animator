@@ -1,5 +1,5 @@
 import { Timeline } from "@/engine/timeline";
-import { recordCanvas, WARMUP_MS } from "@/engine/export";
+import { recordCanvas, getWarmupMs } from "@/engine/export";
 
 /**
  * Render the given Timeline to a hidden canvas and capture its rAF output as
@@ -20,7 +20,7 @@ export async function renderTimelineToWebm(
   seconds: number,
   background: string,
   onProgress?: (progress: number) => void,
-  warmupMs: number = WARMUP_MS
+  warmupMs: number = getWarmupMs()
 ): Promise<Blob> {
   canvas.width = size.width;
   canvas.height = size.height;
