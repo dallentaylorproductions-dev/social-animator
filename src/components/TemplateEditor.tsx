@@ -273,7 +273,7 @@ export function TemplateEditor({ template }: TemplateEditorProps) {
                         type="text"
                         value={state[field.key] ?? ""}
                         onChange={(e) => updateField(field.key, e.target.value)}
-                        className="w-full bg-neutral-900 border border-neutral-800 rounded-md px-3 py-2 text-sm focus:outline-none focus:border-[#4ef2d9]"
+                        className="w-full bg-neutral-900 border border-neutral-800 rounded-md px-3 py-2 text-base lg:text-sm focus:outline-none focus:border-[#4ef2d9]"
                       />
                     )}
                     {field.type === "textarea" && (
@@ -281,7 +281,7 @@ export function TemplateEditor({ template }: TemplateEditorProps) {
                         value={state[field.key] ?? ""}
                         onChange={(e) => updateField(field.key, e.target.value)}
                         rows={3}
-                        className="w-full bg-neutral-900 border border-neutral-800 rounded-md px-3 py-2 text-sm focus:outline-none focus:border-[#4ef2d9] resize-none"
+                        className="w-full bg-neutral-900 border border-neutral-800 rounded-md px-3 py-2 text-base lg:text-sm focus:outline-none focus:border-[#4ef2d9] resize-none"
                       />
                     )}
                     {field.type === "color" && (
@@ -307,7 +307,7 @@ export function TemplateEditor({ template }: TemplateEditorProps) {
                           type="text"
                           value={state[field.key] ?? ""}
                           onChange={(e) => updateField(field.key, e.target.value)}
-                          className="flex-1 min-w-0 bg-neutral-900 border border-neutral-800 rounded-md px-3 py-2 text-sm font-mono focus:outline-none focus:border-[#4ef2d9]"
+                          className="flex-1 min-w-0 bg-neutral-900 border border-neutral-800 rounded-md px-3 py-2 text-base lg:text-sm font-mono focus:outline-none focus:border-[#4ef2d9]"
                         />
                       </div>
                     )}
@@ -321,7 +321,7 @@ export function TemplateEditor({ template }: TemplateEditorProps) {
                       <select
                         value={state[field.key] ?? field.default}
                         onChange={(e) => updateField(field.key, e.target.value)}
-                        className="w-full bg-neutral-900 border border-neutral-800 rounded-md px-3 py-2 text-sm focus:outline-none focus:border-[#4ef2d9]"
+                        className="w-full bg-neutral-900 border border-neutral-800 rounded-md px-3 py-2 text-base lg:text-sm focus:outline-none focus:border-[#4ef2d9]"
                       >
                         {field.options?.map((opt) => (
                           <option key={opt.value} value={opt.value}>
