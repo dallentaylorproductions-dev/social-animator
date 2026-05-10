@@ -201,7 +201,12 @@ export function ExportButtons({
     const emit = (
       stage: ExportStage,
       stagePercent: number,
-      label?: string
+      label?: string,
+      extra?: {
+        frameIndex?: number;
+        totalFrames?: number;
+        livePreviewUrl?: string;
+      }
     ) =>
       setExportProgress({
         stage,
@@ -209,6 +214,7 @@ export function ExportButtons({
         overallPercent: overallProgress(stage, stagePercent),
         elapsedMs: Date.now() - startedAt,
         label,
+        ...extra,
       });
 
     try {
@@ -239,10 +245,18 @@ export function ExportButtons({
             progress: combined,
           });
           // Map engine phases onto the 4-stage loader model:
-          //   "rendering"  → "rendering" stage  (recording floor)
+          //   "rendering"  → "rendering" stage  (frame iteration
+          //                  on desktop, MediaRecorder on iOS)
           //   "converting" → "encoding"  stage  (ffmpeg)
+          // Frame counter + live preview only flow through on the
+          // desktop frame-by-frame path; iOS leaves them undefined
+          // and the loader degrades gracefully.
           if (update.phase === "rendering") {
-            emit("rendering", update.progress * 100, sz.loaderLabel);
+            emit("rendering", update.progress * 100, sz.loaderLabel, {
+              frameIndex: update.frameIndex,
+              totalFrames: update.totalFrames,
+              livePreviewUrl: update.livePreviewUrl,
+            });
           } else {
             emit("encoding", update.progress * 100, sz.loaderLabel);
           }

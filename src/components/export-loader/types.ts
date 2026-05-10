@@ -23,4 +23,14 @@ export interface ExportProgress {
   elapsedMs: number;
   /** Optional sub-label for batch exports — e.g. "Reel (1 of 2)". */
   label?: string;
+  /** Current frame number (only meaningful during stage="rendering"). */
+  frameIndex?: number;
+  /** Total frame count (only meaningful during stage="rendering"). */
+  totalFrames?: number;
+  /**
+   * Object URL for a JPEG preview of the most recently rendered
+   * frame. Only populated by the frame-by-frame engine path; the
+   * iOS MediaRecorder fallback leaves it undefined.
+   */
+  livePreviewUrl?: string;
 }

@@ -10,7 +10,6 @@ import {
 import { clearDraft, saveDraft } from "@/tools/listing-flyer/engine/draft-storage";
 import { waitForPhoto } from "@/tools/listing-flyer/engine/photos";
 import { mapFlyerToShowcase } from "@/tools/listing-flyer/engine/template-mapping";
-import { renderTimelineToWebm } from "@/tools/listing-flyer/engine/render-mp4";
 import { exportJpegFromDraft } from "@/tools/listing-flyer/engine/jpeg-export";
 import { generatePdfBlob } from "@/tools/listing-flyer/output/pdf-export";
 import { listingShowcaseTemplate } from "@/templates/listing-showcase";
@@ -19,9 +18,8 @@ import {
   getFFmpeg,
   isMobileDevice,
   shareOrDownload,
-  webmToMp4,
-  getWarmupMs,
 } from "@/engine/export";
+import { renderTimelineToMp4 } from "@/engine/frame-render";
 import { type BrandSettings } from "@/lib/brand";
 import { ExportLoader } from "@/components/export-loader/ExportLoader";
 import type { ExportProgress, ExportStage } from "@/components/export-loader/types";
@@ -190,7 +188,12 @@ export function ExportButtons({
     const emit = (
       stage: ExportStage,
       stagePercent: number,
-      label?: string
+      label?: string,
+      extra?: {
+        frameIndex?: number;
+        totalFrames?: number;
+        livePreviewUrl?: string;
+      }
     ) =>
       setExportProgress({
         stage,
@@ -198,6 +201,7 @@ export function ExportButtons({
         overallPercent: overallProgress(stage, stagePercent),
         elapsedMs: Date.now() - startedAt,
         label,
+        ...extra,
       });
 
     try {
@@ -265,38 +269,34 @@ export function ExportButtons({
           progress: 0,
         });
         emit("rendering", 0, sz.loaderLabel);
+        await ffmpegPromise;
 
-        const webm = await renderTimelineToWebm(
+        // Unified entry point: iOS Safari → MediaRecorder + webmToMp4
+        // (existing path, preserves iOS reliability); everything else
+        // → frame-by-frame + ffmpeg PNG-sequence (new H-7.2.1a path,
+        // eliminates real-time canvas paint constraint that was
+        // capping vertical 1080×1920 quality).
+        const mp4 = await renderTimelineToMp4(
           canvas,
           timeline,
           { width: sz.width, height: sz.height },
           draft.duration,
           state.background ?? "#0a0a0a",
           (p) => {
-            setMp4State({ kind: "running", phase: sz.renderingPhase, progress: p });
-            emit("rendering", p * 100, sz.loaderLabel);
+            if (p.phase === "rendering") {
+              setMp4State({ kind: "running", phase: sz.renderingPhase, progress: p.progress });
+              emit("rendering", p.progress * 100, sz.loaderLabel, {
+                frameIndex: p.frameIndex,
+                totalFrames: p.totalFrames,
+                livePreviewUrl: p.livePreviewUrl,
+              });
+            } else if (p.phase === "encoding") {
+              setMp4State({ kind: "running", phase: sz.convertingPhase, progress: p.progress });
+              emit("encoding", p.progress * 100, sz.loaderLabel);
+            }
+            // "finalizing" sub-phase is engine-internal; the export
+            // handler emits its own finalizing stage after the loop.
           }
-        );
-
-        setMp4State({
-          kind: "running",
-          phase: sz.convertingPhase,
-          progress: 0,
-        });
-        emit("encoding", 0, sz.loaderLabel);
-        await ffmpegPromise;
-
-        const mp4 = await webmToMp4(
-          webm,
-          { width: sz.width, height: sz.height },
-          draft.duration,
-          (p) => {
-            setMp4State({ kind: "running", phase: sz.convertingPhase, progress: p });
-            emit("encoding", p * 100, sz.loaderLabel);
-          },
-          // Trim the captureStream warmup from the start of the webm so
-          // the final MP4 length matches the duration slider exactly.
-          getWarmupMs()
         );
 
         renderedMp4s.push({ label: sz.label, blob: mp4 });

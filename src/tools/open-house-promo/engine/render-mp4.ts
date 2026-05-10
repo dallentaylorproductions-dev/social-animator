@@ -7,8 +7,7 @@ import {
   formatEventDate,
 } from "./types";
 import { type BrandSettings, formatPhone, effectiveBrandAccent } from "@/lib/brand";
-import { renderTimelineToWebm } from "@/tools/listing-flyer/engine/render-mp4";
-import { webmToMp4, getWarmupMs } from "@/engine/export";
+import { renderTimelineToMp4 } from "@/engine/frame-render";
 import {
   pickContrastText,
   pickContrastMuted,
@@ -32,9 +31,19 @@ export const PROMO_DURATION_SEC = PROMO_DEFAULT_DURATION_SEC;
 
 export type RenderSize = { width: number; height: number };
 
+/**
+ * Progress update emitted during MP4 export. Mirrors the engine-side
+ * FrameRenderProgress shape but keeps the legacy phase names
+ * ("rendering"/"converting") so existing ExportButtons mapping code
+ * doesn't have to flip overnight. The frame-by-frame path adds
+ * frameIndex/totalFrames/livePreviewUrl for the upgraded loader.
+ */
 export interface RenderProgressUpdate {
   phase: "rendering" | "converting";
   progress: number;
+  frameIndex?: number;
+  totalFrames?: number;
+  livePreviewUrl?: string;
 }
 
 /**
@@ -176,24 +185,26 @@ export async function renderPromoMp4(
 
   const timeline = buildPromoTimeline(state, size, assets, durationSec);
 
-  const webm = await renderTimelineToWebm(
-    canvas,
-    timeline,
-    size,
-    durationSec,
-    background,
-    (p) => onProgress?.({ phase: "rendering", progress: p })
-  );
-
-  const mp4 = await webmToMp4(
-    webm,
-    size,
-    durationSec,
-    (p) => onProgress?.({ phase: "converting", progress: p }),
-    getWarmupMs()
-  );
-
-  return mp4;
+  // renderTimelineToMp4 routes by platform: iOS Safari uses the
+  // existing MediaRecorder + webmToMp4 path; everything else gets
+  // the frame-by-frame + ffmpeg PNG-sequence pipeline. Either way
+  // the caller receives the same FrameRenderProgress events; we
+  // map them to the legacy RenderProgressUpdate shape here.
+  return renderTimelineToMp4(canvas, timeline, size, durationSec, background, (p) => {
+    if (p.phase === "rendering") {
+      onProgress?.({
+        phase: "rendering",
+        progress: p.progress,
+        frameIndex: p.frameIndex,
+        totalFrames: p.totalFrames,
+        livePreviewUrl: p.livePreviewUrl,
+      });
+    } else if (p.phase === "encoding") {
+      onProgress?.({ phase: "converting", progress: p.progress });
+    }
+    // "finalizing" is engine-internal — the export handler picks
+    // up where this leaves off and emits its own finalizing stage.
+  });
 }
 
 async function preCropToCanvas(
