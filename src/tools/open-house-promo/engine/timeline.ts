@@ -772,8 +772,11 @@ function drawQrCard(
   // rectangle so the label stays centered to the card and doesn't
   // wobble with the pulse animation. Single source of truth: card
   // x + width/2 for horizontal center, card bottom + labelGap for
-  // baseline. Replaces the round-7 bug where labelCx was hand-typed
-  // separately from cardX and could drift out of alignment.
+  // top of glyph. textBaseline="top" makes labelY refer to the
+  // glyph TOP rather than the alphabetic baseline — without this
+  // the round-7 fix above visually appeared overlapping because
+  // the alphabetic baseline puts the glyph top ~0.75*fontSize
+  // ABOVE labelY, eating most of the spec'd labelGap.
   const labelCx = spec.cardX + spec.cardSize / 2;
   const labelY = spec.cardY + spec.cardSize + spec.labelGap;
 
@@ -781,7 +784,7 @@ function drawQrCard(
   ctx.fillStyle = state.accent;
   ctx.font = `bold ${spec.labelSize}px Helvetica, Arial, sans-serif`;
   ctx.textAlign = "center";
-  ctx.textBaseline = "alphabetic";
+  ctx.textBaseline = "top";
   drawSpaced(ctx, "SCAN FOR DETAILS", labelCx, labelY, spec.labelSpacing);
   ctx.restore();
 }
