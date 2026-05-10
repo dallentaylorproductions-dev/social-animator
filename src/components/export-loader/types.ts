@@ -33,4 +33,6 @@ export interface ExportProgress {
    * iOS MediaRecorder fallback leaves it undefined.
    */
   livePreviewUrl?: string;
+  /** Aspect of the video being exported — drives LiveThumbnail sizing. */
+  aspect?: "reel" | "square";
 }

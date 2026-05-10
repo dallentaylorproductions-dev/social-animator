@@ -193,6 +193,7 @@ export function ExportButtons({
         frameIndex?: number;
         totalFrames?: number;
         livePreviewUrl?: string;
+        aspect?: "reel" | "square";
       }
     ) =>
       setExportProgress({
@@ -231,6 +232,7 @@ export function ExportButtons({
           renderingPhase: "rendering-reel" as const,
           convertingPhase: "converting-reel" as const,
           loaderLabel: "Reel (1 of 2)",
+          aspect: "reel" as const,
         },
         {
           label: "square" as const,
@@ -239,6 +241,7 @@ export function ExportButtons({
           renderingPhase: "rendering-square" as const,
           convertingPhase: "converting-square" as const,
           loaderLabel: "Square (2 of 2)",
+          aspect: "square" as const,
         },
       ];
 
@@ -268,7 +271,7 @@ export function ExportButtons({
           phase: sz.renderingPhase,
           progress: 0,
         });
-        emit("rendering", 0, sz.loaderLabel);
+        emit("rendering", 0, sz.loaderLabel, { aspect: sz.aspect });
         await ffmpegPromise;
 
         // Unified entry point: iOS Safari → MediaRecorder + webmToMp4
@@ -289,10 +292,11 @@ export function ExportButtons({
                 frameIndex: p.frameIndex,
                 totalFrames: p.totalFrames,
                 livePreviewUrl: p.livePreviewUrl,
+                aspect: sz.aspect,
               });
             } else if (p.phase === "encoding") {
               setMp4State({ kind: "running", phase: sz.convertingPhase, progress: p.progress });
-              emit("encoding", p.progress * 100, sz.loaderLabel);
+              emit("encoding", p.progress * 100, sz.loaderLabel, { aspect: sz.aspect });
             }
             // "finalizing" sub-phase is engine-internal; the export
             // handler emits its own finalizing stage after the loop.

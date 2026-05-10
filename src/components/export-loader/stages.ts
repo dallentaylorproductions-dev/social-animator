@@ -16,13 +16,19 @@ interface StageDef {
  * platform optimization) so the wait time builds trust instead of
  * burning patience.
  *
- * Overall percentages reflect the rough wall-clock split observed
- * during a typical 10s desktop export after the H-7.1.1 encoding
- * fixes:
- *   preparing:  ~1-2s   (10%)
- *   rendering:  ~6-7s   (40%)  — recording floor + animation
- *   encoding:   ~15-20s (45%)  — ffmpeg dominates
- *   finalizing: ~0.5s   (5%)   — blob assembly + share-sheet prep
+ * H-7.2.1 retuned the overall split now that frame-by-frame is the
+ * desktop path. Wall-clock observations (desktop, 10s export):
+ *   preparing:  ~1-2s     (10%)
+ *   rendering:  ~30-45s   (55%)  — frame loop dominates
+ *   encoding:   ~15-25s   (30%)  — ffmpeg PNG-sequence encode
+ *   finalizing: ~0.5s     (5%)   — blob assembly + share-sheet prep
+ *
+ * Per-duration end-to-end estimates (desktop frame-by-frame path):
+ *   5s:  ~30-40s
+ *   10s: ~55-75s
+ *   15s: ~95-130s
+ * iOS uses the legacy MediaRecorder path with shorter wall-clock
+ * times (~10-25s) but those numbers are platform-specific.
  */
 export const STAGE_DEFS: Record<ExportStage, StageDef> = {
   preparing: {
@@ -33,14 +39,14 @@ export const STAGE_DEFS: Record<ExportStage, StageDef> = {
   },
   rendering: {
     title: "Rendering frames at 1080p",
-    copy: "Building each frame in your browser at full resolution. Generating locally — no cloud, no server.",
+    copy: "Drawing each frame in your browser — no cloud, no upload.",
     overallStart: 10,
-    overallEnd: 50,
+    overallEnd: 65,
   },
   encoding: {
     title: "Encoding for social platforms",
-    copy: "Optimizing for Instagram, TikTok, and Stories. Encoding at the bitrate that survives platform recompression.",
-    overallStart: 50,
+    copy: "Optimizing at the bitrate that survives platform recompression.",
+    overallStart: 65,
     overallEnd: 95,
   },
   finalizing: {

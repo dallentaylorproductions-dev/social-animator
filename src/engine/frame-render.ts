@@ -169,6 +169,14 @@ async function renderFrameByFrame(
   // use. Best-effort — deleteFile throws on missing files.
   await cleanupFrameFiles(totalFrames);
 
+  // Live preview thumbnail — emitted every THUMB_EVERY frames as a
+  // small JPEG object URL so the loader can show a crossfading
+  // miniature of the export coming together. Previous URLs are
+  // revoked as new ones arrive to keep the page's blob registry
+  // bounded.
+  const THUMB_EVERY = 10;
+  let lastThumbUrl: string | null = null;
+
   for (let i = 0; i < totalFrames; i++) {
     const t = i / fps;
 
@@ -182,11 +190,23 @@ async function renderFrameByFrame(
     const filename = frameFilename(i);
     await ffmpeg.writeFile(filename, buffer);
 
+    // Capture a thumbnail every THUMB_EVERY frames. JPEG q=0.7
+    // is plenty for a 90×160 / 140×140 preview and encodes much
+    // faster than another PNG.
+    let livePreviewUrl: string | undefined;
+    if (i % THUMB_EVERY === 0 || i === totalFrames - 1) {
+      const thumbBlob = await canvasToBlob(canvas, "image/jpeg", 0.7);
+      if (lastThumbUrl) URL.revokeObjectURL(lastThumbUrl);
+      lastThumbUrl = URL.createObjectURL(thumbBlob);
+      livePreviewUrl = lastThumbUrl;
+    }
+
     onProgress?.({
       phase: "rendering",
       progress: (i + 1) / totalFrames,
       frameIndex: i + 1,
       totalFrames,
+      livePreviewUrl,
     });
 
     // Yield to the event loop every 5 frames so the loader's

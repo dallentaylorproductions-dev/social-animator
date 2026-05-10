@@ -206,6 +206,7 @@ export function ExportButtons({
         frameIndex?: number;
         totalFrames?: number;
         livePreviewUrl?: string;
+        aspect?: "reel" | "square";
       }
     ) =>
       setExportProgress({
@@ -224,13 +225,13 @@ export function ExportButtons({
       // after both blobs are in hand — same pattern v1.19+ uses for
       // the flyer's reel/square pair.
       const sizes = [
-        { label: "reel" as const, width: 1080, height: 1920, phase: "rendering-reel" as const, loaderLabel: "Reel (1 of 2)" },
-        { label: "square" as const, width: 1080, height: 1080, phase: "rendering-square" as const, loaderLabel: "Square (2 of 2)" },
+        { label: "reel" as const, width: 1080, height: 1920, phase: "rendering-reel" as const, loaderLabel: "Reel (1 of 2)", aspect: "reel" as const },
+        { label: "square" as const, width: 1080, height: 1080, phase: "rendering-square" as const, loaderLabel: "Square (2 of 2)", aspect: "square" as const },
       ];
       const rendered: Array<{ label: string; blob: Blob }> = [];
       for (const sz of sizes) {
         setMp4State({ kind: "running", phase: sz.phase, progress: 0 });
-        emit("rendering", 0, sz.loaderLabel);
+        emit("rendering", 0, sz.loaderLabel, { aspect: sz.aspect });
         const onProgress = (update: RenderProgressUpdate) => {
           // Combine render+convert progress into a single 0..1
           // bar — render takes ~2/3 of wall time on a typical
@@ -256,9 +257,12 @@ export function ExportButtons({
               frameIndex: update.frameIndex,
               totalFrames: update.totalFrames,
               livePreviewUrl: update.livePreviewUrl,
+              aspect: sz.aspect,
             });
           } else {
-            emit("encoding", update.progress * 100, sz.loaderLabel);
+            emit("encoding", update.progress * 100, sz.loaderLabel, {
+              aspect: sz.aspect,
+            });
           }
         };
         const blob = await renderPromoMp4(
