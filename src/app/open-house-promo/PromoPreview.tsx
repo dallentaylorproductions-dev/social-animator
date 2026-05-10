@@ -135,35 +135,50 @@ export function PromoPreview({ draft, brand }: PromoPreviewProps) {
         </p>
       </div>
 
-      {/* Hero — H-7m switched from object-cover (over-cropping
-          tall source photos) to object-contain with brand-primary
-          fill. Box is fixed 3:2 so 3:2 source photos (the natural
-          phone-camera real-estate aspect) fit edge-to-edge; other
-          aspects get clean letterbox/pillarbox bars in the brand
-          color. focalX/focalY no longer affect framing here since
-          contain shows the full image — kept on PhotoEntry only
-          for the thumb-strip cells (which still use cover). */}
+      {/* Hero — H-7o blur-fill composition: a blurred + zoomed
+          copy of the same photo as the background layer, with the
+          original photo contain-fit on top. Solid-color bars on
+          aspect mismatches looked cheap-template; blur-fill reads
+          as intentional design. Two stacked img elements achieve
+          parity with the canvas-composed PDF / MP4 hero.
+          Box aspect is 1.93:1 to match the PDF hero box. */}
       <div
-        className="w-full overflow-hidden flex items-center justify-center"
+        className="w-full overflow-hidden relative"
         style={{
-          aspectRatio: "3 / 2",
+          aspectRatio: "1.93 / 1",
           backgroundColor: primary,
         }}
       >
         {heroPhoto ? (
-          // eslint-disable-next-line @next/next/no-img-element
-          <img
-            src={heroPhoto.src}
-            alt="Hero"
-            className="w-full h-full object-contain"
-          />
+          <>
+            {/* eslint-disable-next-line @next/next/no-img-element */}
+            <img
+              src={heroPhoto.src}
+              alt=""
+              aria-hidden
+              className="absolute inset-0 w-full h-full object-cover"
+              style={{
+                filter: "blur(28px) brightness(0.85)",
+                transform: "scale(1.1)",
+                transformOrigin: "center",
+              }}
+            />
+            {/* eslint-disable-next-line @next/next/no-img-element */}
+            <img
+              src={heroPhoto.src}
+              alt="Hero"
+              className="relative w-full h-full object-contain"
+            />
+          </>
         ) : (
-          <p
-            className="font-bold uppercase"
-            style={{ fontSize: 28, letterSpacing: 6, color: onPrimary, opacity: 0.6 }}
-          >
-            Open House
-          </p>
+          <div className="w-full h-full flex items-center justify-center">
+            <p
+              className="font-bold uppercase"
+              style={{ fontSize: 28, letterSpacing: 6, color: onPrimary, opacity: 0.6 }}
+            >
+              Open House
+            </p>
+          </div>
         )}
       </div>
 

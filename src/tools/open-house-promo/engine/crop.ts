@@ -115,6 +115,115 @@ export function containInBox(
 }
 
 /**
+ * Compose a blur-fill hero photo: a blurred + zoomed copy of the
+ * source as the background layer, with the original photo
+ * contain-fit on top. Replaces solid brand-color letterbox /
+ * pillarbox bars (which read as cheap-template when the source
+ * aspect is far from the box aspect). The blurred layer always
+ * comes from the same photo, so the box looks intentional even
+ * when the foreground is a vertical phone shot in a horizontal
+ * box: the surroundings dissolve into a soft, on-brand context
+ * for the photo itself.
+ *
+ * When the source aspect matches the box aspect closely, the
+ * foreground covers the entire blurred layer and the blur becomes
+ * invisible — desirable behavior for "natural" 3:2 real-estate
+ * photos that fit edge-to-edge.
+ *
+ * Implementation:
+ *   Pass 1: ctx.filter = blur(N) → draw image cover-fit (with
+ *           an extra +10% zoom so the blur's soft edges never
+ *           reveal canvas background). Optional darken overlay
+ *           on top of the blur to make the foreground photo
+ *           pop against a busy background.
+ *   Pass 2: ctx.filter = none → draw image contain-fit centered.
+ *
+ * Canvas's ctx.filter property is supported in all evergreen
+ * browsers (and the Node.js polyfill react-pdf uses internally
+ * via skia-canvas if applicable). If a renderer ignores the
+ * filter, the blur layer renders unblurred — visually still a
+ * cover-fit of the same photo behind a contain-fit, which reads
+ * fine.
+ */
+export function blurFillCompose(
+  image: HTMLImageElement,
+  boxW: number,
+  boxH: number,
+  options?: {
+    /** Gaussian blur radius in px. Higher = softer, busier
+     *  source photos benefit from higher values. */
+    blur?: number;
+    /** Darken overlay alpha (0-1) painted between the blurred
+     *  background and the foreground photo. 0 = no overlay. */
+    darken?: number;
+    /** Cap on the blurred-background zoom factor. Prevents
+     *  amplifying compression artifacts when the source photo
+     *  is much smaller than the target box. */
+    maxScale?: number;
+  }
+): HTMLCanvasElement {
+  const blur = options?.blur ?? 28;
+  const darken = options?.darken ?? 0.18;
+  const maxScale = options?.maxScale ?? 1.6;
+
+  const canvas = document.createElement("canvas");
+  canvas.width = Math.max(1, Math.round(boxW));
+  canvas.height = Math.max(1, Math.round(boxH));
+  const ctx = canvas.getContext("2d");
+  if (!ctx) throw new Error("Canvas 2D context unavailable");
+
+  if (image.naturalWidth <= 0 || image.naturalHeight <= 0) {
+    ctx.fillStyle = "#1f2937";
+    ctx.fillRect(0, 0, canvas.width, canvas.height);
+    return canvas;
+  }
+
+  ctx.imageSmoothingEnabled = true;
+  ctx.imageSmoothingQuality = "high";
+
+  // ── Pass 1: blurred zoomed background ──────────────────────
+  // Cover-fit fills the box, capped by maxScale to avoid extreme
+  // upscale artifacts. +10% extra zoom so the blur's softened
+  // edges don't expose the canvas's transparent default behind
+  // the box (the blur effect feathers ~blur radius outward).
+  const coverScale = Math.max(
+    canvas.width / image.naturalWidth,
+    canvas.height / image.naturalHeight
+  );
+  const bgScale = Math.min(coverScale, maxScale) * 1.1;
+  const bgW = image.naturalWidth * bgScale;
+  const bgH = image.naturalHeight * bgScale;
+  const bgX = (canvas.width - bgW) / 2;
+  const bgY = (canvas.height - bgH) / 2;
+
+  ctx.save();
+  ctx.filter = `blur(${blur}px)`;
+  ctx.drawImage(image, bgX, bgY, bgW, bgH);
+  ctx.filter = "none";
+  ctx.restore();
+
+  if (darken > 0) {
+    ctx.save();
+    ctx.fillStyle = `rgba(0, 0, 0, ${darken})`;
+    ctx.fillRect(0, 0, canvas.width, canvas.height);
+    ctx.restore();
+  }
+
+  // ── Pass 2: foreground photo (contain-fit) ─────────────────
+  const containScale = Math.min(
+    canvas.width / image.naturalWidth,
+    canvas.height / image.naturalHeight
+  );
+  const fgW = image.naturalWidth * containScale;
+  const fgH = image.naturalHeight * containScale;
+  const fgX = (canvas.width - fgW) / 2;
+  const fgY = (canvas.height - fgH) / 2;
+  ctx.drawImage(image, fgX, fgY, fgW, fgH);
+
+  return canvas;
+}
+
+/**
  * Pre-crop a source image to exact target dimensions, centered on
  * the focal point. Returns an offscreen HTMLCanvasElement suitable
  * for canvas drawImage (MP4 path) or canvas.toDataURL (PDF path).

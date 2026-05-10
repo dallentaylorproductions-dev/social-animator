@@ -6,7 +6,7 @@ import { type BrandSettings } from "@/lib/brand";
 import { PromoDocument } from "./PromoDocument";
 import { generateQrDataUrl } from "./qr";
 import { pickContrastText } from "@/tools/listing-flyer/engine/contrast";
-import { containInBox, cropToCanvas, srcToImage } from "../engine/crop";
+import { blurFillCompose, cropToCanvas, srcToImage } from "../engine/crop";
 
 /**
  * Generate the open-house-promo PDF blob from the current draft.
@@ -37,25 +37,24 @@ export async function generatePdfBlob(
   const qrBg = brand.backgroundColor || "#ffffff";
   const qrDataUrl = await generateQrDataUrl(draft.qrTargetUrl, 400, qrFg, qrBg);
 
-  // Hero box is now fixed 3:2 (540pt × 360pt) regardless of how
-  // many photos the draft has — the H-7m redesign moved the hero
-  // from COVER fit (which over-cropped roofs / foundations on tall
-  // source photos) to CONTAIN fit (full image always visible,
-  // brand-primary fill for any letterbox/pillarbox bars). 3:2 is
-  // the natural real-estate photo aspect, so most user uploads
-  // will fit edge-to-edge.
+  // Hero box is now hard-capped at 540pt × 270pt (2:1) per H-7p
+  // and uses blur-fill composition (H-7o) — a blurred + zoomed
+  // copy of the same photo behind the original photo at
+  // contain-fit. Looks intentional regardless of source aspect
+  // and gives the box a fixed height so the rest of the layout
+  // doesn't have to flex around variable-height heroes.
+  // Pre-compose at 2x the print resolution (1080×540) for retina
+  // sharpness.
   const hasThumbs = draft.photos.length >= 2;
-  const HERO_TARGET_W = 2000;
-  const HERO_TARGET_H = Math.round(HERO_TARGET_W * (2 / 3)); // 3:2
+  const HERO_TARGET_W = 1080;
+  const HERO_TARGET_H = 540;
 
   const heroPhoto = draft.photos[0] ?? null;
-  const heroFillColor = brand.primaryColor || "#4ef2d9";
   const heroSrc = heroPhoto
-    ? await preContainToDataUrl(
+    ? await preBlurFillToDataUrl(
         heroPhoto,
         HERO_TARGET_W,
         HERO_TARGET_H,
-        heroFillColor,
         0.92
       )
     : null;
@@ -115,20 +114,20 @@ async function preCropToDataUrl(
   return canvas.toDataURL("image/jpeg", quality);
 }
 
-/** Decode a PhotoEntry, CONTAIN-fit into a fixed-size box with
- *  brand-color fill for any letterbox/pillarbox bars, and re-encode
- *  as JPEG. CONTAIN mode — used for the hero photo so the entire
- *  image is always visible regardless of source aspect. Focal point
- *  isn't applicable since nothing is cropped out. */
-async function preContainToDataUrl(
+/** Decode a PhotoEntry, compose blur-fill (blurred zoomed
+ *  background + contain-fit foreground) at the target box
+ *  dimensions, and re-encode as JPEG. Replaces the H-7m
+ *  containInBox path: solid-color bars on aspect mismatches
+ *  read as cheap-template; a blurred copy of the same photo
+ *  reads as intentional design. */
+async function preBlurFillToDataUrl(
   photo: PhotoEntry,
   targetW: number,
   targetH: number,
-  fillColor: string,
   quality: number
 ): Promise<string> {
   const img = await srcToImage(photo.src);
-  const canvas = containInBox(img, targetW, targetH, fillColor);
+  const canvas = blurFillCompose(img, targetW, targetH);
   return canvas.toDataURL("image/jpeg", quality);
 }
 

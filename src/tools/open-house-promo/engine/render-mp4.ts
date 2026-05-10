@@ -20,7 +20,7 @@ import {
   type PromoMp4Assets,
 } from "./timeline";
 import { generateQrDataUrl } from "../output/qr";
-import { containInBox, cropToCanvas, srcToImage } from "./crop";
+import { blurFillCompose, cropToCanvas, srcToImage } from "./crop";
 
 /** Promo MP4 loop length in seconds. Re-exported for ExportButtons. */
 export const PROMO_DURATION_SEC = PROMO_TOTAL_SEC;
@@ -70,17 +70,17 @@ export async function renderPromoMp4(
 
   const isSquare = Math.abs(size.width - size.height) < 50;
 
-  // Hero region is now 3:2 for both aspects (matches the
-  // timeline's computeLayout) — 1080×720 on either reel or square.
-  // CONTAIN-fit means the entire user photo is visible regardless
-  // of source aspect; brand-primary fills any letterbox/pillarbox
-  // bars. Keep this in sync with computeLayout in timeline.ts.
+  // Hero region (H-7q): reel 3:2 (1080×720), square 1.8:1
+  // (1080×600). H-7o switched the fill from solid brand color
+  // (looked like cheap-template letterboxing) to blur-fill — the
+  // blurred zoomed copy of the same photo as background. Keep
+  // these in sync with computeLayout in timeline.ts.
   const HERO_REGION_W = size.width;
-  const HERO_REGION_H = 720;
+  const HERO_REGION_H = isSquare ? 600 : 720;
 
   const heroPhoto = draft.photos[0] ?? null;
   const hero = heroPhoto
-    ? await preContainToCanvas(heroPhoto, HERO_REGION_W, HERO_REGION_H, primary)
+    ? await preBlurFillToCanvas(heroPhoto, HERO_REGION_W, HERO_REGION_H)
     : null;
 
   // Thumb cells now 3:2 aspect, matching the natural real-estate
@@ -192,15 +192,16 @@ async function preCropToCanvas(
   return cropToCanvas(img, targetW, targetH, photo.focalX, photo.focalY);
 }
 
-/** CONTAIN-fit a PhotoEntry into a fixed box with brand-color fill
- *  on letterbox/pillarbox bars. Used for the hero photo so the
- *  entire image is always visible regardless of source aspect. */
-async function preContainToCanvas(
+/** Compose a blur-fill canvas for the hero photo. Blurred zoomed
+ *  copy fills the box as the background; original photo
+ *  contain-fit on top. Replaces the H-7m containInBox helper
+ *  whose solid-color bars looked unprofessional on aspect
+ *  mismatches. */
+async function preBlurFillToCanvas(
   photo: PhotoEntry,
   boxW: number,
-  boxH: number,
-  fillColor: string
+  boxH: number
 ): Promise<HTMLCanvasElement> {
   const img = await srcToImage(photo.src);
-  return containInBox(img, boxW, boxH, fillColor);
+  return blurFillCompose(img, boxW, boxH);
 }
