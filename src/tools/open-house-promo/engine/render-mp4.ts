@@ -67,46 +67,31 @@ export async function renderPromoMp4(
   const textPrimary = pickContrastText(background);
   const textMuted = pickContrastMuted(background);
   const onPrimary = pickContrastText(primary);
+  // H-7r highlight pills paint accent-bg with auto-contrast text.
+  const onAccent = pickContrastText(accent);
 
   const isSquare = Math.abs(size.width - size.height) < 50;
 
-  // Hero region (H-7q): reel 3:2 (1080×720), square 1.8:1
-  // (1080×600). H-7o switched the fill from solid brand color
-  // (looked like cheap-template letterboxing) to blur-fill — the
-  // blurred zoomed copy of the same photo as background. Keep
-  // these in sync with computeLayout in timeline.ts.
+  // Hero region (H-7r): full body region (canvas height minus
+  // the persistent header bar). Reel: 1080×1760 (1920 - 160 header).
+  // Square: 1080×960 (1080 - 120 header). The blur-fill composite
+  // fills this region so the hero scene reads as full-bleed below
+  // the header. Keep these in sync with computeLayout in
+  // timeline.ts (header heights 160 reel / 120 square).
+  const HEADER_H = isSquare ? 120 : 160;
   const HERO_REGION_W = size.width;
-  const HERO_REGION_H = isSquare ? 600 : 720;
+  const HERO_REGION_H = size.height - HEADER_H;
 
   const heroPhoto = draft.photos[0] ?? null;
   const hero = heroPhoto
     ? await preBlurFillToCanvas(heroPhoto, HERO_REGION_W, HERO_REGION_H)
     : null;
 
-  // Thumb cells now 3:2 aspect, matching the natural real-estate
-  // photo orientation. Square skips the strip entirely (per the
-  // H-7m layout — square is too tight to fit a usable strip).
-  let thumbs: HTMLCanvasElement[] = [];
-  if (!isSquare) {
-    // Margin must match computeLayout's portrait margin (SAFE_X
-    // = 80 in timeline.ts as of H-7n). Hardcoded here for the
-    // pre-crop sizing math; if you change SAFE_X over there,
-    // mirror it here.
-    const margin = 80;
-    const stripW = size.width - margin * 2;
-    const gap = 12;
-    const count = Math.min(4, Math.max(0, draft.photos.length - 1));
-    if (count > 0) {
-      const cellW = (stripW - gap * (count - 1)) / count;
-      // 3:2 aspect — height = cellW * 2/3.
-      const cellH = Math.round(cellW * (2 / 3));
-      thumbs = await Promise.all(
-        draft.photos
-          .slice(1, 1 + count)
-          .map((p) => preCropToCanvas(p, Math.round(cellW), cellH))
-      );
-    }
-  }
+  // H-7r dropped the thumb strip — the multi-scene composition
+  // doesn't render thumbs (the hero photo gets full-bleed scene
+  // 2 instead). PromoMp4Assets still has the field for shape
+  // stability with ExportButtons; pass an empty array.
+  const thumbs: HTMLCanvasElement[] = [];
 
   // QR — high res. Always black-on-white for scanner reliability;
   // the timeline draws a white card behind it for contrast against
@@ -137,6 +122,7 @@ export async function renderPromoMp4(
     textPrimary,
     textMuted,
     onPrimary,
+    onAccent,
     title: "Open House",
     dateLabel: draft.eventDate ? formatEventDate(draft.eventDate) : "",
     timeLabel: formatTimeRange(draft.eventStartTime, draft.eventEndTime),
