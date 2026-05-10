@@ -40,6 +40,103 @@ const str = (v: unknown, fallback = ""): string =>
   typeof v === "string" ? v : fallback;
 
 /**
+ * Derive a sensible default accent color from the user's primary
+ * brand color: same hue + saturation, lightness reduced by 20
+ * percentage points. Produces a darker companion shade that pairs
+ * with primary — e.g. mint #4ef2d9 → #1ec9b3 (darker mint),
+ * coral #f97056 → #f33d18 (darker coral). Used by tools that want
+ * an "accent" role distinct from primary when the user hasn't
+ * explicitly picked one (the BrandSettings legacy default of
+ * #ffffff produces poor results against most page backgrounds).
+ *
+ * Returns the primary input unchanged if the hex string is
+ * malformed (rather than throwing — auto-derivation is a quality-
+ * of-life feature, not load-bearing).
+ */
+export function deriveAccentFromPrimary(primaryHex: string): string {
+  const h = primaryHex.replace("#", "").trim();
+  const expanded =
+    h.length === 3 ? h.split("").map((c) => c + c).join("") : h;
+  if (expanded.length !== 6 || !/^[0-9a-fA-F]{6}$/.test(expanded)) {
+    return primaryHex;
+  }
+  const r = parseInt(expanded.slice(0, 2), 16) / 255;
+  const g = parseInt(expanded.slice(2, 4), 16) / 255;
+  const b = parseInt(expanded.slice(4, 6), 16) / 255;
+  const max = Math.max(r, g, b);
+  const min = Math.min(r, g, b);
+  const l = (max + min) / 2;
+  let hue = 0;
+  let sat = 0;
+  if (max !== min) {
+    const d = max - min;
+    sat = l > 0.5 ? d / (2 - max - min) : d / (max + min);
+    switch (max) {
+      case r:
+        hue = (g - b) / d + (g < b ? 6 : 0);
+        break;
+      case g:
+        hue = (b - r) / d + 2;
+        break;
+      default:
+        hue = (r - g) / d + 4;
+    }
+    hue /= 6;
+  }
+  // Reduce lightness by 20 percentage points (clamped to ≥0.05 so
+  // the result never collapses to pure black, which would be
+  // useless against any page bg).
+  const newL = Math.max(0.05, l - 0.2);
+  return hslToHex(hue, sat, newL);
+}
+
+function hslToHex(h: number, s: number, l: number): string {
+  const hueToRgb = (p: number, q: number, t: number) => {
+    let tt = t;
+    if (tt < 0) tt += 1;
+    if (tt > 1) tt -= 1;
+    if (tt < 1 / 6) return p + (q - p) * 6 * tt;
+    if (tt < 1 / 2) return q;
+    if (tt < 2 / 3) return p + (q - p) * (2 / 3 - tt) * 6;
+    return p;
+  };
+  let r: number;
+  let g: number;
+  let b: number;
+  if (s === 0) {
+    r = g = b = l;
+  } else {
+    const q = l < 0.5 ? l * (1 + s) : l + s - l * s;
+    const p = 2 * l - q;
+    r = hueToRgb(p, q, h + 1 / 3);
+    g = hueToRgb(p, q, h);
+    b = hueToRgb(p, q, h - 1 / 3);
+  }
+  const toHex = (n: number) =>
+    Math.round(n * 255)
+      .toString(16)
+      .padStart(2, "0");
+  return `#${toHex(r)}${toHex(g)}${toHex(b)}`;
+}
+
+/**
+ * Resolve the effective accent color for a tool that wants the
+ * auto-derive-when-unset behavior. Treats the empty string AND
+ * the legacy BrandSettings default of "#ffffff" as "unset" and
+ * derives a darker shade from primary instead. A user who really
+ * wants white can pick "#fefefe" or any other near-white hex to
+ * escape the auto-derivation.
+ */
+export function effectiveBrandAccent(brand: BrandSettings): string {
+  const raw = brand.accentColor.trim();
+  const lower = raw.toLowerCase();
+  if (!raw || lower === "#ffffff" || lower === "#fff") {
+    return deriveAccentFromPrimary(brand.primaryColor || "#4ef2d9");
+  }
+  return raw;
+}
+
+/**
  * Strip everything except digits, cap at 10 (US phone numbers). iOS phone
  * keypad lets `# * +` through type="tel" inputs — strip those out so they
  * never reach storage. Pasted formatted numbers ("253-202-8825") become

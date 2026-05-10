@@ -1,6 +1,7 @@
 import { socialAnimatorManifest } from "./social-animator/manifest";
 import { listingFlyerManifest } from "./listing-flyer/manifest";
 import { listingPresentationManifest } from "./listing-presentation/manifest";
+import { openHousePromoManifest } from "./open-house-promo/manifest";
 import type { ToolManifest } from "./types";
 
 /**
@@ -11,6 +12,7 @@ export const TOOLS: ToolManifest[] = [
   socialAnimatorManifest,
   listingFlyerManifest,
   listingPresentationManifest,
+  openHousePromoManifest,
 ];
 
 export type { ToolManifest };
