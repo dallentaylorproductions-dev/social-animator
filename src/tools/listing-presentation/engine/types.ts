@@ -54,7 +54,25 @@ export interface PresentationDraft {
   backgroundColor: string;
 }
 
-export const MAX_MARKETING_STRATEGIES = 5;
+/**
+ * H-7.2.5-1 reduced the strategy cap 5 → 4 and introduced
+ * per-strategy + per-pitch character caps. The PDF document was
+ * spec'd as 1-page-only in H-6b, but Marketing Strategy and Why
+ * Choose Me accepted unbounded text — fully-filled drafts were
+ * overflowing to a 2-page PDF, and the JPEG export (which only
+ * rasterizes page 1) was silently dropping content. The new caps
+ * trim ~80pt of vertical worst-case fill out of the body so any
+ * legal draft fits the single page.
+ */
+export const MAX_MARKETING_STRATEGIES = 4;
+export const MAX_STRATEGY_LENGTH = 80;
+export const MAX_WHY_CHOOSE_ME_LENGTH = 280;
+/** Defensive cap to keep the agent bio from blowing past the
+ *  reclaim from H-7.2.5-1b's section-spacing trim. The bio's
+ *  textbox grows to whatever its content needs (headshot is the
+ *  84pt floor), so an uncapped 500+ char bio could re-introduce
+ *  the page-2 overflow this whole chain is trying to fix. */
+export const MAX_AGENT_BIO_LENGTH = 280;
 export const MAX_COMPARABLE_SALES = 3;
 /** Headshot compressed to ~400px square JPEG q=0.85 — small enough to
  *  fit in localStorage alongside the rest of the draft, big enough that
@@ -103,9 +121,14 @@ export function clampDraft(input: unknown): PresentationDraft {
       ? o.agentHeadshot
       : null;
 
+  // H-7.2.5-1: cap individual strategy length too. Pre-H-7.2.5-1
+  // drafts saved with a 5th strategy or strategies > 80 chars get
+  // silently trimmed on load — preferable to errors or layout
+  // overflow.
   const strategies = Array.isArray(o.marketingStrategies)
     ? o.marketingStrategies
         .filter((s): s is string => typeof s === "string")
+        .map((s) => s.slice(0, MAX_STRATEGY_LENGTH))
         .slice(0, MAX_MARKETING_STRATEGIES)
     : [];
 
@@ -128,7 +151,7 @@ export function clampDraft(input: unknown): PresentationDraft {
     propertyAddress: str(o.propertyAddress),
     propertyCity: str(o.propertyCity),
     ownerName: str(o.ownerName),
-    agentBio: str(o.agentBio),
+    agentBio: str(o.agentBio).slice(0, MAX_AGENT_BIO_LENGTH),
     agentHeadshot: headshot,
     homesSold: str(o.homesSold),
     averageDaysOnMarket: str(o.averageDaysOnMarket),
@@ -136,7 +159,7 @@ export function clampDraft(input: unknown): PresentationDraft {
     yearsExperience: str(o.yearsExperience),
     marketingStrategies: strategies,
     comparableSales: comps,
-    whyChooseMe: str(o.whyChooseMe),
+    whyChooseMe: str(o.whyChooseMe).slice(0, MAX_WHY_CHOOSE_ME_LENGTH),
     primaryColor: str(o.primaryColor),
     accentColor: str(o.accentColor),
     backgroundColor: str(o.backgroundColor),
