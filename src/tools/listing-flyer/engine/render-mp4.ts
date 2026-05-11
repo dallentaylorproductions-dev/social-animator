@@ -20,7 +20,11 @@ export async function renderTimelineToWebm(
   seconds: number,
   background: string,
   onProgress?: (progress: number) => void,
-  warmupMs: number = getWarmupMs()
+  warmupMs: number = getWarmupMs(),
+  // H-7.2.4-3: pass-through to recordCanvas so the iOS
+  // MediaRecorder path can emit live thumbnails to the
+  // export loader.
+  onPreview?: (url: string) => void
 ): Promise<Blob> {
   canvas.width = size.width;
   canvas.height = size.height;
@@ -94,7 +98,7 @@ export async function renderTimelineToWebm(
   rafId = requestAnimationFrame(frame);
 
   try {
-    return await recordCanvas(canvas, seconds, 30, onProgress, warmupMs);
+    return await recordCanvas(canvas, seconds, 30, onProgress, warmupMs, onPreview);
   } finally {
     if (rafId) cancelAnimationFrame(rafId);
   }
