@@ -152,9 +152,32 @@ export async function recordCanvas(
   // Only runs when an onPreview callback is provided — Social
   // Animator's recordCanvas callers don't pass one, so they pay
   // no cost.
+  //
+  // H-7.2.4-3.5 added an immediate first snapshot fired via rAF
+  // (so the caller's paint loop, registered in renderTimelineToWebm
+  // before this function is called, has finished its first frame
+  // by the time we capture). Without it, plain setInterval first-
+  // fires at t=500ms; with iOS Safari's ~5.5s captureStream
+  // warmup tail, the user saw a blank LiveThumbnail for almost
+  // the entire warmup window before the first interval tick.
   const PREVIEW_INTERVAL_MS = 500;
   let lastPreviewUrl: string | null = null;
   let previewTimer: ReturnType<typeof setInterval> | null = null;
+  const captureSnapshot = () => {
+    canvas.toBlob(
+      (blob) => {
+        if (!blob) return;
+        const previousUrl = lastPreviewUrl;
+        lastPreviewUrl = URL.createObjectURL(blob);
+        onPreview?.(lastPreviewUrl);
+        if (previousUrl) {
+          setTimeout(() => URL.revokeObjectURL(previousUrl), 500);
+        }
+      },
+      "image/jpeg",
+      0.6
+    );
+  };
   const stopPreview = () => {
     if (previewTimer !== null) {
       clearInterval(previewTimer);
@@ -167,21 +190,14 @@ export async function recordCanvas(
     }
   };
   if (onPreview) {
-    previewTimer = setInterval(() => {
-      canvas.toBlob(
-        (blob) => {
-          if (!blob) return;
-          const previousUrl = lastPreviewUrl;
-          lastPreviewUrl = URL.createObjectURL(blob);
-          onPreview(lastPreviewUrl);
-          if (previousUrl) {
-            setTimeout(() => URL.revokeObjectURL(previousUrl), 500);
-          }
-        },
-        "image/jpeg",
-        0.6
-      );
-    }, PREVIEW_INTERVAL_MS);
+    // First snapshot fires after one rAF tick — the paint loop in
+    // renderTimelineToWebm was registered before recordCanvas was
+    // called, so by the time this rAF runs the canvas has already
+    // been painted with frame 0 of the timeline. User sees a
+    // thumbnail within ~16ms of clicking Export instead of having
+    // to wait out the warmup window.
+    requestAnimationFrame(captureSnapshot);
+    previewTimer = setInterval(captureSnapshot, PREVIEW_INTERVAL_MS);
   }
 
   return new Promise<Blob>((resolve, reject) => {
