@@ -212,7 +212,15 @@ export default function ListingFlyerPage() {
             </p>
           </aside>
 
-          <section className="lg:order-1">
+          {/* H-7.2.4-2.5: exports live INSIDE the form column rather
+              than as a col-span-2 grid item underneath. Spanning
+              both columns caused desktop visual overlap with the
+              right-column preview; confining to the form column
+              keeps exports stacked under the form, with the preview
+              column independent on the right. Mobile is unchanged
+              — single-column flow renders aside first (preview top),
+              then form + exports stacked. */}
+          <section className="lg:order-1 flex flex-col">
             <FlyerForm
               draft={draft}
               onChange={setDraft}
@@ -223,19 +231,18 @@ export default function ListingFlyerPage() {
               uploadError={uploadError}
               brand={brand}
             />
+            <div className="mt-8 pt-5 border-t border-neutral-800/60">
+              <ExportButtons
+                draft={draft}
+                photos={photos}
+                brand={effectiveBrand}
+                brandLogoImg={brandLogoImg}
+                onUpdateFormats={(next) =>
+                  setDraft((d) => ({ ...d, exportFormats: next }))
+                }
+              />
+            </div>
           </section>
-
-          <div className="lg:order-3 lg:col-span-2 pt-5 mt-2 border-t border-neutral-800/60">
-            <ExportButtons
-              draft={draft}
-              photos={photos}
-              brand={effectiveBrand}
-              brandLogoImg={brandLogoImg}
-              onUpdateFormats={(next) =>
-                setDraft((d) => ({ ...d, exportFormats: next }))
-              }
-            />
-          </div>
         </div>
       </div>
     </main>

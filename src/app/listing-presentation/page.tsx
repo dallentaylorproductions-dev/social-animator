@@ -112,7 +112,9 @@ export default function ListingPresentationPage() {
             </p>
           </aside>
 
-          <section className="lg:order-1">
+          {/* H-7.2.4-2.5: exports inside form column on desktop.
+              See commentary in src/app/listing-flyer/page.tsx. */}
+          <section className="lg:order-1 flex flex-col">
             <PresentationForm
               draft={draft}
               onChange={setDraft}
@@ -120,11 +122,10 @@ export default function ListingPresentationPage() {
               uploadError={uploadError}
               onUploadError={flashUploadError}
             />
+            <div className="mt-8 pt-5 border-t border-neutral-800/60">
+              <ExportButtons draft={draft} brand={effectiveBrand} />
+            </div>
           </section>
-
-          <div className="lg:order-3 lg:col-span-2 pt-5 mt-2 border-t border-neutral-800/60">
-            <ExportButtons draft={draft} brand={effectiveBrand} />
-          </div>
         </div>
       </div>
     </main>
