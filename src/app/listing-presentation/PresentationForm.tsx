@@ -5,6 +5,8 @@ import {
   type PresentationDraft,
   type ComparableSale,
   MAX_MARKETING_STRATEGIES,
+  MAX_STRATEGY_LENGTH,
+  MAX_WHY_CHOOSE_ME_LENGTH,
   MAX_COMPARABLE_SALES,
   HEADSHOT_MAX_EDGE,
   HEADSHOT_QUALITY,
@@ -305,25 +307,33 @@ export function PresentationForm({
       <FormSection title="Marketing strategy">
         <Field
           label={`Strategies (${draft.marketingStrategies.length} / ${MAX_MARKETING_STRATEGIES})`}
+          helper={`Up to ${MAX_MARKETING_STRATEGIES} strategies, ${MAX_STRATEGY_LENGTH} characters each.`}
         >
           <div className="space-y-2">
             {draft.marketingStrategies.map((s, i) => (
-              <div key={i} className="flex items-center gap-2">
-                <TextInput
-                  value={s}
-                  onChange={(v) => updateStrategy(i, v)}
-                  placeholder={
-                    STRATEGY_PLACEHOLDERS[i % STRATEGY_PLACEHOLDERS.length]
-                  }
+              <div key={i}>
+                <div className="flex items-center gap-2">
+                  <TextInput
+                    value={s}
+                    onChange={(v) => updateStrategy(i, v)}
+                    placeholder={
+                      STRATEGY_PLACEHOLDERS[i % STRATEGY_PLACEHOLDERS.length]
+                    }
+                    maxLength={MAX_STRATEGY_LENGTH}
+                  />
+                  <button
+                    type="button"
+                    onClick={() => removeStrategy(i)}
+                    className="px-2 py-1 text-xs text-neutral-500 hover:text-neutral-300"
+                    aria-label="Remove strategy"
+                  >
+                    ✕
+                  </button>
+                </div>
+                <CharCounter
+                  current={s.length}
+                  max={MAX_STRATEGY_LENGTH}
                 />
-                <button
-                  type="button"
-                  onClick={() => removeStrategy(i)}
-                  className="px-2 py-1 text-xs text-neutral-500 hover:text-neutral-300"
-                  aria-label="Remove strategy"
-                >
-                  ✕
-                </button>
               </div>
             ))}
             {draft.marketingStrategies.length < MAX_MARKETING_STRATEGIES && (
@@ -408,12 +418,20 @@ export function PresentationForm({
 
       {/* ── WHY CHOOSE ME ────────────────────────────────────────── */}
       <FormSection title="Why choose me">
-        <Field label="Closing pitch">
+        <Field
+          label="Closing pitch"
+          helper={`Up to ${MAX_WHY_CHOOSE_ME_LENGTH} characters — keep it focused.`}
+        >
           <TextArea
             value={draft.whyChooseMe}
             onChange={(v) => update("whyChooseMe", v)}
             placeholder="When you hire me, you hire a marketer who happens to be a real estate agent — not the other way around. Every listing gets the full playbook."
             rows={4}
+            maxLength={MAX_WHY_CHOOSE_ME_LENGTH}
+          />
+          <CharCounter
+            current={draft.whyChooseMe.length}
+            max={MAX_WHY_CHOOSE_ME_LENGTH}
           />
         </Field>
       </FormSection>
@@ -480,11 +498,13 @@ function TextInput({
   onChange,
   placeholder,
   type = "text",
+  maxLength,
 }: {
   value: string;
   onChange: (v: string) => void;
   placeholder?: string;
   type?: string;
+  maxLength?: number;
 }) {
   return (
     <input
@@ -492,6 +512,7 @@ function TextInput({
       value={value}
       onChange={(e) => onChange(e.target.value)}
       placeholder={placeholder}
+      maxLength={maxLength}
       className="w-full bg-neutral-900 border border-neutral-800 rounded-md px-3 py-2 text-base lg:text-sm focus:outline-none focus:border-[#4ef2d9]"
     />
   );
@@ -502,11 +523,13 @@ function TextArea({
   onChange,
   placeholder,
   rows = 3,
+  maxLength,
 }: {
   value: string;
   onChange: (v: string) => void;
   placeholder?: string;
   rows?: number;
+  maxLength?: number;
 }) {
   return (
     <textarea
@@ -514,8 +537,26 @@ function TextArea({
       onChange={(e) => onChange(e.target.value)}
       placeholder={placeholder}
       rows={rows}
+      maxLength={maxLength}
       className="w-full bg-neutral-900 border border-neutral-800 rounded-md px-3 py-2 text-base lg:text-sm focus:outline-none focus:border-[#4ef2d9] resize-y leading-relaxed"
     />
+  );
+}
+
+/**
+ * Small character counter shown under an input/textarea that has a
+ * maxLength cap. Stays muted until the user is within 10% of the
+ * cap, at which point it shifts to the warning shade so the
+ * remaining headroom is visible without being noisy at low fill.
+ */
+function CharCounter({ current, max }: { current: number; max: number }) {
+  const remaining = max - current;
+  const isNearMax = remaining <= Math.max(8, Math.round(max * 0.1));
+  const color = isNearMax ? "text-amber-400" : "text-neutral-600";
+  return (
+    <p className={`text-[10px] ${color} mt-1 text-right font-mono`}>
+      {current}/{max}
+    </p>
   );
 }
 
