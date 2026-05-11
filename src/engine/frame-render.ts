@@ -122,13 +122,35 @@ async function renderViaMediaRecorder(
   background: string,
   onProgress?: (p: FrameRenderProgress) => void
 ): Promise<Blob> {
+  // H-7.2.4-3: live preview comes in on a separate cadence
+  // (every ~500ms) from progress (per-rAF). Track both in
+  // closure-local state and re-emit FrameRenderProgress whenever
+  // either updates so the loader's LiveThumbnail receives blob
+  // URLs alongside the regular progress ticks.
+  let lastProgress = 0;
+  let lastPreviewUrl: string | undefined;
+  const emitRendering = () =>
+    onProgress?.({
+      phase: "rendering",
+      progress: lastProgress,
+      livePreviewUrl: lastPreviewUrl,
+    });
+
   const webm = await renderTimelineToWebm(
     canvas,
     timeline,
     size,
     durationSec,
     background,
-    (p) => onProgress?.({ phase: "rendering", progress: p })
+    (p) => {
+      lastProgress = p;
+      emitRendering();
+    },
+    undefined,
+    (url) => {
+      lastPreviewUrl = url;
+      emitRendering();
+    }
   );
   const mp4 = await webmToMp4(
     webm,

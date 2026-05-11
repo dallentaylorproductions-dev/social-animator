@@ -81,7 +81,16 @@ export async function recordCanvas(
   // Defaults to 0 so existing Social Animator callers (ExportButton,
   // BatchExportButton) get unchanged behavior. The listing-flyer path
   // explicitly opts in to getWarmupMs() via renderTimelineToWebm.
-  warmupMs: number = 0
+  warmupMs: number = 0,
+  // H-7.2.4-3: optional periodic canvas snapshot for the loader's
+  // LiveThumbnail. Emits a JPEG object URL every PREVIEW_INTERVAL_MS
+  // (~500ms). Mirrors the desktop frame-by-frame thumbnail cadence so
+  // iOS Safari (which uses this MediaRecorder path) now shows a
+  // live preview in the export loader instead of the empty
+  // placeholder. Caller is responsible for handling the URL (the
+  // engine revokes previous URLs on a delay so the LiveThumbnail
+  // crossfade has time to swap).
+  onPreview?: (url: string) => void
 ): Promise<Blob> {
   const stream = canvas.captureStream(fps);
 
@@ -134,8 +143,66 @@ export async function recordCanvas(
     }
   };
 
+  // H-7.2.4-3 live preview snapshot loop. Captures the current
+  // canvas as a JPEG every PREVIEW_INTERVAL_MS while recording.
+  // Each new URL is emitted to the caller; previous URLs are
+  // revoked on a delay so the LiveThumbnail crossfade has time to
+  // swap before the source blob is freed (same pattern as the
+  // frame-by-frame engine path in src/engine/frame-render.ts).
+  // Only runs when an onPreview callback is provided — Social
+  // Animator's recordCanvas callers don't pass one, so they pay
+  // no cost.
+  //
+  // H-7.2.4-3.5 added an immediate first snapshot fired via rAF
+  // (so the caller's paint loop, registered in renderTimelineToWebm
+  // before this function is called, has finished its first frame
+  // by the time we capture). Without it, plain setInterval first-
+  // fires at t=500ms; with iOS Safari's ~5.5s captureStream
+  // warmup tail, the user saw a blank LiveThumbnail for almost
+  // the entire warmup window before the first interval tick.
+  const PREVIEW_INTERVAL_MS = 500;
+  let lastPreviewUrl: string | null = null;
+  let previewTimer: ReturnType<typeof setInterval> | null = null;
+  const captureSnapshot = () => {
+    canvas.toBlob(
+      (blob) => {
+        if (!blob) return;
+        const previousUrl = lastPreviewUrl;
+        lastPreviewUrl = URL.createObjectURL(blob);
+        onPreview?.(lastPreviewUrl);
+        if (previousUrl) {
+          setTimeout(() => URL.revokeObjectURL(previousUrl), 500);
+        }
+      },
+      "image/jpeg",
+      0.6
+    );
+  };
+  const stopPreview = () => {
+    if (previewTimer !== null) {
+      clearInterval(previewTimer);
+      previewTimer = null;
+    }
+    if (lastPreviewUrl) {
+      const toRevoke = lastPreviewUrl;
+      setTimeout(() => URL.revokeObjectURL(toRevoke), 2000);
+      lastPreviewUrl = null;
+    }
+  };
+  if (onPreview) {
+    // First snapshot fires after one rAF tick — the paint loop in
+    // renderTimelineToWebm was registered before recordCanvas was
+    // called, so by the time this rAF runs the canvas has already
+    // been painted with frame 0 of the timeline. User sees a
+    // thumbnail within ~16ms of clicking Export instead of having
+    // to wait out the warmup window.
+    requestAnimationFrame(captureSnapshot);
+    previewTimer = setInterval(captureSnapshot, PREVIEW_INTERVAL_MS);
+  }
+
   return new Promise<Blob>((resolve, reject) => {
     recorder.onstop = () => {
+      stopPreview();
       const blob = new Blob(chunks, { type: mimeType });
       console.log(
         `[MP4-DEBUG] recordCanvas stop: chunks=${chunkCount} totalBytes=${totalBytes} blobSize=${blob.size}`
@@ -151,8 +218,10 @@ export async function recordCanvas(
       }
       resolve(blob);
     };
-    recorder.onerror = (e) =>
+    recorder.onerror = (e) => {
+      stopPreview();
       reject(new Error(`MediaRecorder error: ${String(e)}`));
+    };
 
     recorder.start(100);
     console.log(`[MP4-DEBUG] recordCanvas: recorder.start() ok, state=${recorder.state}`);
@@ -177,6 +246,7 @@ export async function recordCanvas(
         try {
           recorder.stop();
         } catch (err) {
+          stopPreview();
           reject(err instanceof Error ? err : new Error(String(err)));
         }
       }

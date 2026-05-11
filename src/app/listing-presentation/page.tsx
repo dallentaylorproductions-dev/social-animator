@@ -90,7 +90,11 @@ export default function ListingPresentationPage() {
             columns. Listing Presentation has no MP4 export, so the
             buttons section is just PDF/JPEG. */}
         <div className="flex flex-col gap-6 lg:grid lg:grid-cols-[1fr_420px] lg:gap-10 mt-6">
-          <aside className="lg:order-2 sticky top-0 z-20 -mx-6 lg:mx-0 px-6 lg:px-0 pt-3 lg:pt-6 pb-3 lg:pb-0 bg-neutral-950 lg:bg-transparent border-b border-neutral-800/60 lg:border-0 shadow-md shadow-black/40 lg:shadow-none lg:self-start">
+          {/* Desktop sticky preview: see commentary in
+              src/app/listing-flyer/page.tsx. lg:max-h + overflow
+              constrain the aside to viewport height so it can't
+              escape its grid column and overlap the exports row. */}
+          <aside className="lg:order-2 sticky top-0 lg:top-4 z-20 -mx-6 lg:mx-0 px-6 lg:px-0 pt-3 lg:pt-6 pb-3 lg:pb-0 bg-neutral-950 lg:bg-transparent border-b border-neutral-800/60 lg:border-0 shadow-md shadow-black/40 lg:shadow-none lg:self-start lg:max-h-[calc(100vh-2rem)] lg:overflow-y-auto">
             <p className="text-[10px] uppercase tracking-[0.15em] text-neutral-500 mb-3">
               Live preview
             </p>
@@ -108,7 +112,9 @@ export default function ListingPresentationPage() {
             </p>
           </aside>
 
-          <section className="lg:order-1">
+          {/* H-7.2.4-2.5: exports inside form column on desktop.
+              See commentary in src/app/listing-flyer/page.tsx. */}
+          <section className="lg:order-1 flex flex-col">
             <PresentationForm
               draft={draft}
               onChange={setDraft}
@@ -116,11 +122,10 @@ export default function ListingPresentationPage() {
               uploadError={uploadError}
               onUploadError={flashUploadError}
             />
+            <div className="mt-8 pt-5 border-t border-neutral-800/60">
+              <ExportButtons draft={draft} brand={effectiveBrand} />
+            </div>
           </section>
-
-          <div className="lg:order-3 lg:col-span-2 pt-5 mt-2 border-t border-neutral-800/60">
-            <ExportButtons draft={draft} brand={effectiveBrand} />
-          </div>
         </div>
       </div>
     </main>
