@@ -7,6 +7,7 @@ import {
   MAX_MARKETING_STRATEGIES,
   MAX_STRATEGY_LENGTH,
   MAX_WHY_CHOOSE_ME_LENGTH,
+  MAX_AGENT_BIO_LENGTH,
   MAX_COMPARABLE_SALES,
   HEADSHOT_MAX_EDGE,
   HEADSHOT_QUALITY,
@@ -259,12 +260,20 @@ export function PresentationForm({
           )}
         </Field>
 
-        <Field label="Bio" helper="3-4 sentences. Lead with your local expertise.">
+        <Field
+          label="Bio"
+          helper={`3-4 sentences. Lead with your local expertise. Up to ${MAX_AGENT_BIO_LENGTH} characters.`}
+        >
           <TextArea
             value={draft.agentBio}
             onChange={(v) => update("agentBio", v)}
             placeholder="Lifelong Olympia resident. Eight years selling Westside and Cooper Point. I take the photos, write the copy, and run the marketing myself — no handoffs."
             rows={4}
+            maxLength={MAX_AGENT_BIO_LENGTH}
+          />
+          <CharCounter
+            current={draft.agentBio.length}
+            max={MAX_AGENT_BIO_LENGTH}
           />
         </Field>
       </FormSection>

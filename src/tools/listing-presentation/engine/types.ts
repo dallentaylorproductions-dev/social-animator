@@ -67,6 +67,12 @@ export interface PresentationDraft {
 export const MAX_MARKETING_STRATEGIES = 4;
 export const MAX_STRATEGY_LENGTH = 80;
 export const MAX_WHY_CHOOSE_ME_LENGTH = 280;
+/** Defensive cap to keep the agent bio from blowing past the
+ *  reclaim from H-7.2.5-1b's section-spacing trim. The bio's
+ *  textbox grows to whatever its content needs (headshot is the
+ *  84pt floor), so an uncapped 500+ char bio could re-introduce
+ *  the page-2 overflow this whole chain is trying to fix. */
+export const MAX_AGENT_BIO_LENGTH = 280;
 export const MAX_COMPARABLE_SALES = 3;
 /** Headshot compressed to ~400px square JPEG q=0.85 — small enough to
  *  fit in localStorage alongside the rest of the draft, big enough that
@@ -145,7 +151,7 @@ export function clampDraft(input: unknown): PresentationDraft {
     propertyAddress: str(o.propertyAddress),
     propertyCity: str(o.propertyCity),
     ownerName: str(o.ownerName),
-    agentBio: str(o.agentBio),
+    agentBio: str(o.agentBio).slice(0, MAX_AGENT_BIO_LENGTH),
     agentHeadshot: headshot,
     homesSold: str(o.homesSold),
     averageDaysOnMarket: str(o.averageDaysOnMarket),

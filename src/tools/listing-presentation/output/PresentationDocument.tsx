@@ -128,7 +128,7 @@ const styles = StyleSheet.create({
   // Agent block
   agentRow: {
     flexDirection: "row",
-    marginTop: 18,
+    marginTop: 12,
     alignItems: "flex-start",
   },
   headshot: {
@@ -161,7 +161,7 @@ const styles = StyleSheet.create({
   // Track record (4 tiles)
   trackRecordRow: {
     flexDirection: "row",
-    marginTop: 18,
+    marginTop: 12,
     gap: 10,
   },
   statTile: {
@@ -185,7 +185,7 @@ const styles = StyleSheet.create({
 
   // Marketing strategy bullets
   strategyList: {
-    marginTop: 18,
+    marginTop: 12,
   },
   strategyRow: {
     flexDirection: "row",
@@ -208,7 +208,7 @@ const styles = StyleSheet.create({
   // Comparable sales (3-column card grid)
   compsRow: {
     flexDirection: "row",
-    marginTop: 18,
+    marginTop: 12,
     gap: 8,
   },
   compCard: {
@@ -236,7 +236,7 @@ const styles = StyleSheet.create({
 
   // Why choose me
   whySection: {
-    marginTop: 18,
+    marginTop: 12,
   },
   whyText: {
     fontSize: 11,
@@ -400,7 +400,7 @@ export function PresentationDocument({
 
           {/* Agent */}
           <Text
-            style={[styles.sectionLabel, { color: primary, marginTop: 22 }]}
+            style={[styles.sectionLabel, { color: primary, marginTop: 14 }]}
           >
             Meet your agent
           </Text>
@@ -431,7 +431,7 @@ export function PresentationDocument({
 
           {/* Track record */}
           <Text
-            style={[styles.sectionLabel, { color: primary, marginTop: 22 }]}
+            style={[styles.sectionLabel, { color: primary, marginTop: 14 }]}
           >
             Track record
           </Text>
@@ -460,7 +460,7 @@ export function PresentationDocument({
               <Text
                 style={[
                   styles.sectionLabel,
-                  { color: primary, marginTop: 22 },
+                  { color: primary, marginTop: 14 },
                 ]}
               >
                 Marketing strategy
@@ -491,7 +491,7 @@ export function PresentationDocument({
               <Text
                 style={[
                   styles.sectionLabel,
-                  { color: primary, marginTop: 22 },
+                  { color: primary, marginTop: 14 },
                 ]}
               >
                 Recent comparable sales
