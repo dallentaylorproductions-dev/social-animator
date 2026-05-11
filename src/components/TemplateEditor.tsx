@@ -359,7 +359,20 @@ export function TemplateEditor({ template }: TemplateEditorProps) {
             </div>
           </aside>
 
-          <section className="sticky top-0 z-20 -mx-6 lg:mx-0 px-6 lg:px-0 pt-3 pb-3 lg:py-0 bg-neutral-950 lg:bg-transparent border-b border-neutral-800/60 lg:border-0 lg:static flex items-start justify-center">
+          {/* H-7.2.4-4: desktop preview was `lg:static` which killed
+              the sticky behavior on long forms — once the user
+              scrolled past the preview's natural top, it scrolled
+              off the top of the viewport and stayed gone. Switched
+              to the same sticky pattern as the other three tools
+              (Listing Flyer / Listing Presentation / Open House
+              Promo): `lg:sticky lg:top-4 lg:self-start` anchors
+              the preview to the top of its grid cell with a 16px
+              chrome offset; `lg:max-h-[calc(100vh-2rem)]
+              lg:overflow-y-auto` caps height to viewport so the
+              preview can't escape its column into the exports row
+              below. Mobile sticky-top (via the unconditional
+              `sticky top-0`) is preserved. */}
+          <section className="sticky top-0 lg:top-4 z-20 -mx-6 lg:mx-0 px-6 lg:px-0 pt-3 pb-3 lg:py-0 bg-neutral-950 lg:bg-transparent border-b border-neutral-800/60 lg:border-0 lg:self-start lg:max-h-[calc(100vh-2rem)] lg:overflow-y-auto flex items-start justify-center">
             <div className="w-full max-w-[200px] lg:max-w-sm">
               <Canvas
                 ref={canvasRef}
