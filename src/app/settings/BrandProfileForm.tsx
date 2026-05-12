@@ -5,9 +5,9 @@ import {
   type BrandSettings,
   loadBrandSettings,
   saveBrandSettings,
-  formatPhone,
   extractPhoneDigits,
 } from "@/lib/brand";
+import { PhoneInput } from "@/components/inputs";
 
 /**
  * Brand profile form. All values persist to localStorage on every change —
@@ -135,12 +135,13 @@ export function BrandProfileForm() {
           />
         </Field>
         <Field label="Contact phone">
-          {/* Storage is raw 10 digits; display is "(xxx) xxx-xxxx". Strips
-           * non-digits on every change so iOS phone-keypad characters like
-           * # * + never reach storage. */}
-          <TextInput
-            type="tel"
-            value={formatPhone(s.contactPhone)}
+          {/* H-7.10: PhoneInput handles live "(xxx) xxx-xxxx" formatting
+           * + caret preservation. Storage stays raw 10 digits — the
+           * onChange wrapper strips back to digits before persisting
+           * (PhoneInput is idempotent on already-formatted input, so
+           * re-passing the raw value triggers a clean re-format). */}
+          <PhoneInput
+            value={s.contactPhone}
             onChange={(v) => update("contactPhone", extractPhoneDigits(v))}
             placeholder="(555) 123-4567"
           />

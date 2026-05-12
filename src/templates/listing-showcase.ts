@@ -70,10 +70,10 @@ export const listingShowcaseTemplate: TemplateConfig = {
     },
     { key: "address", label: "Street address", type: "text", default: "1247 Maple Heights Dr" },
     { key: "cityState", label: "City, state, zip", type: "text", default: "Beaverton, OR 97005" },
-    { key: "price", label: "Price", type: "text", default: "$685,000" },
+    { key: "price", label: "Price", type: "currency", default: "$685,000" },
     { key: "beds", label: "Beds", type: "text", default: "4" },
     { key: "baths", label: "Baths", type: "text", default: "3" },
-    { key: "sqft", label: "Sq ft", type: "text", default: "2,840" },
+    { key: "sqft", label: "Sq ft", type: "number", default: "2,840" },
     {
       key: "features",
       label: "Feature bullets",

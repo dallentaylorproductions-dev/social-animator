@@ -16,6 +16,7 @@ import {
 } from "@/tools/open-house-promo/engine/types";
 import { type BrandSettings, effectiveBrandAccent } from "@/lib/brand";
 import { DurationSlider } from "@/components/ui/duration-slider";
+import { CurrencyInput } from "@/components/inputs";
 
 interface PromoFormProps {
   draft: PromoDraft;
@@ -266,7 +267,7 @@ export function PromoForm({
           />
         </Field>
         <Field label="Listing price">
-          <TextInput
+          <CurrencyInput
             value={draft.listingPrice}
             onChange={(v) => update("listingPrice", v)}
             placeholder="$685,000"
