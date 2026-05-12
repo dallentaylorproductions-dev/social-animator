@@ -21,7 +21,14 @@ export type FieldType =
   | "color"
   | "image"
   | "select"
-  | "stringList";
+  | "stringList"
+  // H-7.10: auto-formatted numeric input types. Each routes through
+  // the reusable CurrencyInput / NumberInput / PhoneInput components
+  // (see src/components/inputs). State value holds the formatted
+  // display string, which downstream renderers consume unchanged.
+  | "currency"
+  | "number"
+  | "phone";
 
 export interface FieldDef {
   key: string;

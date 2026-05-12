@@ -17,6 +17,11 @@ import { ExportButton } from "@/components/ExportButton";
 import { ImageField } from "@/components/ImageField";
 import { formatPhone, useBrandSettings } from "@/lib/brand";
 import { getFFmpeg } from "@/engine/export";
+import {
+  CurrencyInput,
+  NumberInput,
+  PhoneInput,
+} from "@/components/inputs";
 
 interface TemplateEditorProps {
   template: TemplateConfig;
@@ -322,6 +327,24 @@ export function TemplateEditor({ template }: TemplateEditorProps) {
                         value={state[field.key] ?? ""}
                         onChange={(e) => updateField(field.key, e.target.value)}
                         className="w-full bg-neutral-900 border border-neutral-800 rounded-md px-3 py-2 text-base lg:text-sm focus:outline-none focus:border-[#4ef2d9]"
+                      />
+                    )}
+                    {field.type === "currency" && (
+                      <CurrencyInput
+                        value={state[field.key] ?? ""}
+                        onChange={(v) => updateField(field.key, v)}
+                      />
+                    )}
+                    {field.type === "number" && (
+                      <NumberInput
+                        value={state[field.key] ?? ""}
+                        onChange={(v) => updateField(field.key, v)}
+                      />
+                    )}
+                    {field.type === "phone" && (
+                      <PhoneInput
+                        value={state[field.key] ?? ""}
+                        onChange={(v) => updateField(field.key, v)}
                       />
                     )}
                     {field.type === "textarea" && (
