@@ -140,7 +140,10 @@ export const listingShowcaseTemplate: TemplateConfig = {
     // landscape phone photo (4:3) into a wider box, more of the photo's
     // useful content (the front door, key features) stays visible.
     const horizontalMargin = isShort ? 40 : 60;
-    const topMargin = isShort ? 60 : 80;
+    // H-7.9: Feed (4:5) reduces top inset 80→60 so the hero can claim
+    // more vertical real estate without pushing the bottom row off the
+    // 1080×1350 frame. Square + Reel preserved.
+    const topMargin = isShort ? 60 : isVertical ? 80 : 60;
     const bottomMargin = isShort ? 50 : 60;
 
     // Hero: fixed proportion of canvas height. Pre-H-1.5 the height was
@@ -154,7 +157,15 @@ export const listingShowcaseTemplate: TemplateConfig = {
     // the vertical slack that opened up when CHANGE 14 anchored the bottom
     // row to the frame bottom — without the bump, 9:16 had ~220pt of empty
     // canvas between the stats line and the features list.
-    const heroH = Math.floor(height * (isShort ? 0.42 : 0.52));
+    // H-7.9 / H-7.9.1: Feed hero ratio. H-7.9 grew it 0.52→0.55 which
+    // combined with the spacing bumps pushed bottom content off-frame.
+    // H-7.9.1 pulls back to 0.48 — still taller than 0.52 in absolute
+    // terms thanks to the topMargin reduction (60 vs prior 80), but
+    // reclaims ~95pt of vertical budget so phone+license land cleanly
+    // inside the 60pt bottom inset. Square + Reel preserved.
+    const heroH = Math.floor(
+      height * (isShort ? 0.42 : isVertical ? 0.52 : 0.48)
+    );
     const heroX = horizontalMargin;
     const heroY = topMargin;
     const heroW = width - horizontalMargin * 2;
@@ -179,11 +190,18 @@ export const listingShowcaseTemplate: TemplateConfig = {
     // H-7.5: +16px breathing room between hero photo bottom edge and
     // JUST LISTED badge — Dallen's feedback that the badge sat too
     // close to the photo edge. Applies to both aspects.
+    // H-7.9.1: Feed reverts to the H-7.5 baseline of 46 (was 60). The
+    // bumped value was contributing to the bottom overflow; the badge
+    // still reads as a deliberate marker at 46pt now that the hero is
+    // shorter (0.48 vs 0.55). Square + Reel preserved.
     const gapHeroToBadge = isShort ? 37 : 46;
     const gapBadgeToAddress = isShort ? 14 : 21;
     const gapAddressToCity = isShort ? 11 : 17;
     const gapCityToPrice = isShort ? 17 : 27;
-    const gapPriceToStats = isShort ? 18 : 27;
+    // H-7.9: Feed widens price→stats gap 27→42 so the price billboard
+    // reads as the dominant line, not crowding the stats row beneath
+    // it. Square + Reel preserved.
+    const gapPriceToStats = isShort ? 18 : isVertical ? 27 : 42;
 
     const contentX = horizontalMargin;
     const heroBottom = heroY + heroH;
@@ -209,7 +227,14 @@ export const listingShowcaseTemplate: TemplateConfig = {
     const usableColsW = width - bottomColPadX * 2 - columnGap;
     const featuresColRatio = isVertical ? 540 / 900 : isShort ? 0.55 : 0.35;
     const featuresColW = Math.floor(usableColsW * featuresColRatio);
-    const agentColW = usableColsW - featuresColW;
+    // H-7.9.1: Feed pulls the agent column's right edge in by 30pt for
+    // breathing room from the frame edge — long names like "Aaron
+    // Thomas Home Team" were crowding right-of-center. The divider
+    // above the agent block spans rightColX → rightColX + agentColW,
+    // so it shortens with the column automatically. Square + Reel
+    // preserved (no inset).
+    const agentRightInset = isShort || isVertical ? 0 : 30;
+    const agentColW = usableColsW - featuresColW - agentRightInset;
     const leftColX = bottomColPadX;
     const rightColX = bottomColPadX + featuresColW + columnGap;
 
@@ -223,18 +248,23 @@ export const listingShowcaseTemplate: TemplateConfig = {
     const featureLineHeight = isShort ? 44 : isVertical ? 48 : 58;
     const featureBulletRadius = isShort ? 6 : isVertical ? 6 : 8;
 
-    // Agent info (right column). Square + Feed keep existing sizes.
+    // Agent info (right column). Square + Reel keep their H-7.5 sizes.
     // Vertical (Reel) H-7.5 — moves the agent typography to readable
     // sizes inside the 360pt column: logo 48, name 24pt bold (allows
     // 2-line wrap below), brokerage 16, phone 18 (slightly more
     // prominent — user-actionable), license 14. Row gap 12pt for
     // comfortable vertical rhythm.
-    const logoSize = isShort ? 48 : isVertical ? 48 : 64;
+    // H-7.9.1: Feed proportional shrinks — logo 64→54 (~−15%), name
+    // 38→34 (~−10%), brokerage 31→29 (~−7%), phone 31→28 (~−10%),
+    // license 25→22 (~−12%). Combined with the 30pt right-inset on
+    // agentColW, the block reads as a compact secondary panel that
+    // doesn't reach for the frame's right edge.
+    const logoSize = isShort ? 48 : isVertical ? 48 : 54;
     const logoToNameGap = 12;
-    const agentNameSize = isShort ? 28 : isVertical ? 24 : 38;
-    const agentBrokerageSize = isShort ? 25 : isVertical ? 16 : 31;
-    const agentPhoneSize = isShort ? 25 : isVertical ? 18 : 31;
-    const agentLicenseSize = isShort ? 19 : isVertical ? 14 : 25;
+    const agentNameSize = isShort ? 28 : isVertical ? 24 : 34;
+    const agentBrokerageSize = isShort ? 25 : isVertical ? 16 : 29;
+    const agentPhoneSize = isShort ? 25 : isVertical ? 18 : 28;
+    const agentLicenseSize = isShort ? 19 : isVertical ? 14 : 22;
     const agentRowGap = isShort ? 4 : isVertical ? 12 : 6;
 
     // ── Parse features ──────────────────────────────────────────────────
@@ -528,6 +558,23 @@ export const listingShowcaseTemplate: TemplateConfig = {
           ctx.globalAlpha = p;
           ctx.translate(0, (1 - p) * 20);
 
+          // H-7.9: thin divider above the agent block (Feed only).
+          // Sits inside the existing stats→bottom gap so it consumes
+          // whitespace, not new vertical space. Muted color + low
+          // alpha — a hairline section marker, not a hard rule.
+          if (!isVertical) {
+            ctx.save();
+            ctx.globalAlpha = p * 0.35;
+            ctx.strokeStyle = state.agentMutedColor;
+            ctx.lineWidth = 1;
+            const dividerY = bottomSectionY - 14;
+            ctx.beginPath();
+            ctx.moveTo(rightColX, dividerY);
+            ctx.lineTo(rightColX + agentColW, dividerY);
+            ctx.stroke();
+            ctx.restore();
+          }
+
           // Top-anchored: same Y as the first feature line so both columns
           // start at the same horizontal level. No bottom-of-frame anchoring.
           let cursorY = bottomSectionY;
@@ -660,8 +707,11 @@ export const listingShowcaseTemplate: TemplateConfig = {
 
           // ── Phone (with optional inline license #) ───────────────────
           // Format license as "License #1234" so it doesn't read as a
-          // stray number. Inline with phone if it fits in the column,
-          // else fall through to its own line.
+          // stray number. Inline with phone — H-7.9 forces a single
+          // combined line for Feed (saves a row in the agent column +
+          // reads as one contact unit). Reel keeps the stack-on-overflow
+          // fallback so the narrow 360pt column can break cleanly
+          // when the combined width exceeds it (preserves H-7.5).
           const phoneText = state.agentPhone?.trim() ?? "";
           const licenseText = state.agentLicense?.trim()
             ? `License #${state.agentLicense.trim().replace(/^#/, "")}`
@@ -677,8 +727,13 @@ export const listingShowcaseTemplate: TemplateConfig = {
               ? `${phoneText}  ·  ${licenseText}`
               : phoneText;
 
-            if (licenseText && ctx.measureText(combined).width > agentColW) {
-              // Won't fit on one line — render phone now, license below.
+            const shouldStack =
+              isVertical &&
+              licenseText &&
+              ctx.measureText(combined).width > agentColW;
+
+            if (shouldStack) {
+              // Reel-only fallback — render phone now, license below.
               ctx.fillText(
                 truncateToWidth(phoneText, agentColW),
                 rightColX,
