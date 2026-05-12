@@ -28,21 +28,53 @@ export type FieldType =
   // display string, which downstream renderers consume unchanged.
   | "currency"
   | "number"
+  | "phone"
+  // H-7.12: arrays of objects. Stored as a JSON-string under one
+  // TemplateState key (mirrors stringList precedent). Nested image
+  // fields use synthesized asset keys: `${fieldKey}.${index}.${innerField}`
+  // (e.g. "images.0.imageUrl"). See ObjectListSchema below.
+  | "objectList";
+
+/** Subset of FieldType allowed inside an objectList item. No nesting
+ *  (objectList can't contain objectList); no color/select for now. */
+export type ObjectListItemType =
+  | "text"
+  | "textarea"
+  | "image"
+  | "number"
+  | "currency"
   | "phone";
+
+export interface ObjectListItemSpec {
+  type: ObjectListItemType;
+  label: string;
+  placeholder?: string;
+  /** Char cap for text/textarea fields; mirrors stringList's `max` semantics. */
+  max?: number;
+}
+
+/** Schema describes each object's inner field shape. The schema's keys
+ *  become property names on every list item. Order is preserved via
+ *  Object.keys iteration (insertion order in the schema literal). */
+export type ObjectListSchema = Record<string, ObjectListItemSpec>;
 
 export interface FieldDef {
   key: string;
   label: string;
   type: FieldType;
-  /** Default value. For type: "stringList", store as newline-joined string —
-   * this keeps TemplateState's `Record<string, string>` shape simple while
-   * the editor renders the list as separate inputs with × remove + Add. */
+  /** Default value. For type: "stringList", store as newline-joined string;
+   * for type: "objectList", store as a JSON-stringified array (default "[]").
+   * These keep TemplateState's `Record<string, string>` shape simple while
+   * the editor renders the list with structured UI. */
   default: string;
   /** For type: "select" — the available choices. */
   options?: { value: string; label: string }[];
-  /** For type: "stringList" — caps the number of entries; "+ Add" disables
-   * once length reaches max. Label gets a "(n / max)" counter. */
+  /** For type: "stringList" or "objectList" — caps the number of entries;
+   * "+ Add" disables once length reaches max. Label gets a "(n / max)" counter. */
   max?: number;
+  /** For type: "objectList" — describes each item's inner field shape.
+   *  Required when type === "objectList"; ignored otherwise. */
+  schema?: ObjectListSchema;
   /** Optional conditional render rule — field only shows when state[key] === value. */
   showWhen?: { key: string; value: string };
 }

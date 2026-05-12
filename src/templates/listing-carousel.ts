@@ -15,44 +15,78 @@ export const listingCarouselTemplate: TemplateConfig = {
   description:
     "Animated photo tour with coverflow-style transitions — next and previous photos peek in from the sides, hinting at what's coming.",
   duration: 10,
+  // H-7.12 image-asset keys use the objectList synthesized convention:
+  // `${fieldKey}.${index}.${innerFieldName}` → "images.0.imageUrl", etc.
+  // The seed file paths populate the picker-preview cards on the
+  // template list page.
   sampleAssets: {
-    photo1: "/sample-assets/exterior.webp",
-    photo2: "/sample-assets/kitchen.webp",
-    photo3: "/sample-assets/living-room.webp",
-    photo4: "/sample-assets/bedroom.webp",
-    photo5: "/sample-assets/bathroom.webp",
-    photo6: "/sample-assets/backyard.webp",
+    "images.0.imageUrl": "/sample-assets/exterior.webp",
+    "images.1.imageUrl": "/sample-assets/kitchen.webp",
+    "images.2.imageUrl": "/sample-assets/living-room.webp",
+    "images.3.imageUrl": "/sample-assets/bedroom.webp",
+    "images.4.imageUrl": "/sample-assets/bathroom.webp",
+    "images.5.imageUrl": "/sample-assets/backyard.webp",
   },
   sampleState: {
     title: "Open House Saturday",
     subtitle: "1:00–4:00pm",
+    // Picker-preview seed for the carousel needs 6 items in the JSON so
+    // build() iterates the right indices. Captions stay empty in the
+    // preview seed; H-7.12-3.5 renders captions per item when present.
+    images: JSON.stringify(
+      Array.from({ length: 6 }, () => ({ imageUrl: "", caption: "" }))
+    ),
   },
   fields: [
     { key: "title", label: "Title (optional)", type: "text", default: "123 Maple Street" },
     { key: "titleColor", label: "Title color", type: "color", default: "#ffffff" },
     { key: "subtitle", label: "Subtitle (optional)", type: "text", default: "Open House Sat 1–4pm" },
     { key: "subtitleColor", label: "Subtitle color", type: "color", default: "#9ca3af" },
-    { key: "photo1", label: "Photo 1", type: "image", default: "" },
-    { key: "photo2", label: "Photo 2", type: "image", default: "" },
-    { key: "photo3", label: "Photo 3", type: "image", default: "" },
-    { key: "photo4", label: "Photo 4", type: "image", default: "" },
-    { key: "photo5", label: "Photo 5", type: "image", default: "" },
-    { key: "photo6", label: "Photo 6", type: "image", default: "" },
+    {
+      // H-7.12: replaces the previous photo1..photo6 fixed-slot fields.
+      // Up to 8 photos with optional captions. H-7.12-3.5 renders the
+      // caption text below each photo as it foregrounds in the
+      // coverflow (B.2 visual). Empty captions render nothing.
+      key: "images",
+      label: "Photos",
+      type: "objectList",
+      max: 8,
+      default: "[]",
+      schema: {
+        imageUrl: { type: "image", label: "Photo" },
+        caption: { type: "text", label: "Caption (optional)", max: 60 },
+      },
+    },
     { key: "background", label: "Background", type: "color", default: "#000000" },
   ],
   build(state, size, assets) {
     const { width, height } = size;
 
-    // Collect uploaded + loaded photos in order, skipping empty slots
-    const photoKeys = ["photo1", "photo2", "photo3", "photo4", "photo5", "photo6"];
+    // H-7.12: read photo count from the objectList JSON in state.images,
+    // then look up each photo's HTMLImageElement at the synthesized
+    // asset key `images.${i}.imageUrl`. Skip slots that haven't been
+    // uploaded yet (img.complete + naturalWidth check matches the prior
+    // photo1..photo6 logic). Captions ride alongside photos in a parallel
+    // array so caption[i] always pairs with photos[i] even when some
+    // items have no uploaded image (H-7.12-3.5).
+    let imageItems: Array<{ imageUrl?: string; caption?: string }> = [];
+    try {
+      const parsed = JSON.parse(state.images || "[]");
+      if (Array.isArray(parsed)) imageItems = parsed;
+    } catch {
+      // malformed JSON → render no photos (placeholder branch fires)
+    }
     const photos: HTMLImageElement[] = [];
-    for (const key of photoKeys) {
-      const img = assets?.[key];
+    const captions: string[] = [];
+    imageItems.forEach((item, i) => {
+      const img = assets?.[`images.${i}.imageUrl`];
       if (img && img.complete && img.naturalWidth > 0) {
         photos.push(img);
+        captions.push((item?.caption ?? "").trim());
       }
-    }
+    });
     const photoCount = photos.length;
+    const hasAnyCaption = captions.some((c) => c.length > 0);
 
     // Layout
     const titleFontSize = 60;
@@ -63,6 +97,15 @@ export const listingCarouselTemplate: TemplateConfig = {
     const photoCornerRadius = 24;
     const sideOffset = 460; // px from canvas center for relativePosition = ±1
     const photoCenterY = height * 0.55;
+
+    // Caption layout (H-7.12-3.5). Side-photo peeks scale to ~0.7×, so
+    // their bottoms sit at photoCenterY + ~157px — a 40px gap below the
+    // foreground photo's bottom edge keeps captions clear of side peeks.
+    const captionFontSize = 28;
+    const captionGap = 40;
+    const captionTopY = photoCenterY + photoBaseHeight / 2 + captionGap;
+    const captionLineHeight = captionFontSize * 1.2;
+    const captionMaxWidth = photoBaseWidth - 40;
 
     // Animation timing
     const titleEntryStart = 0.2;
@@ -224,6 +267,75 @@ export const listingCarouselTemplate: TemplateConfig = {
         },
       });
     } else {
+      // Captions track (H-7.12-3.5). Mirrors the carousel's slot/
+      // transition state so each caption fades in/out in lockstep with
+      // its photo's foreground state. Caption alpha falls off ~3× faster
+      // than the photo's so only the centered caption reads clearly;
+      // side-photo captions fade to invisible during transitions. Skipped
+      // entirely when every caption is empty so the track adds no cost
+      // for users who don't fill captions in.
+      if (hasAnyCaption) {
+        tracks.push({
+          id: "captions",
+          start: carouselStart,
+          duration: naturalCarouselDuration,
+          onUpdate: (p, ctx) => {
+            const entrySeconds = 0.22;
+            const entryFraction = Math.min(
+              0.5,
+              entrySeconds / naturalCarouselDuration
+            );
+            const entryAlpha =
+              p < entryFraction ? easeOutCubic(p / entryFraction) : 1;
+
+            const drawCaption = (caption: string, rel: number, alpha: number) => {
+              if (!caption || alpha <= 0.01) return;
+              ctx.save();
+              ctx.globalAlpha = alpha;
+              ctx.fillStyle = state.subtitleColor || "#9ca3af";
+              ctx.font = `500 ${captionFontSize}px Inter, system-ui, sans-serif`;
+              ctx.textAlign = "center";
+              ctx.textBaseline = "top";
+              const lines = wrapText(ctx, caption, captionMaxWidth);
+              lines.forEach((line, idx) => {
+                ctx.fillText(
+                  line,
+                  width / 2 + rel * sideOffset,
+                  captionTopY + idx * captionLineHeight
+                );
+              });
+              ctx.restore();
+            };
+
+            if (photoCount === 1) {
+              drawCaption(captions[0], 0, entryAlpha);
+              return;
+            }
+
+            const totalSlots = photoCount;
+            const t = p * totalSlots;
+            const slotIndex = Math.min(photoCount - 1, Math.floor(t));
+            const localT = t - slotIndex;
+
+            const holdRatio = 0.7;
+            let transitionProgress = 0;
+            if (slotIndex < photoCount - 1 && localT >= holdRatio) {
+              transitionProgress = (localT - holdRatio) / (1 - holdRatio);
+              transitionProgress = easeOutCubic(transitionProgress);
+            }
+            const carouselPos = slotIndex + transitionProgress;
+
+            captions.forEach((caption, i) => {
+              if (!caption) return;
+              const rel = i - carouselPos;
+              const absRel = Math.abs(rel);
+              const alpha = Math.max(0, 1 - absRel * 1.5) * entryAlpha;
+              drawCaption(caption, rel, alpha);
+            });
+          },
+        });
+      }
+
       tracks.push({
         id: "carousel",
         start: carouselStart,

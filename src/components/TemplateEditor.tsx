@@ -12,16 +12,33 @@ import {
   type TemplateAssets,
   type TemplateState,
   type FieldDef,
+  type ObjectListSchema,
 } from "@/templates/types";
 import { ExportButton } from "@/components/ExportButton";
 import { ImageField } from "@/components/ImageField";
 import { formatPhone, useBrandSettings } from "@/lib/brand";
+import {
+  LISTING_PROFILE_FIELDS,
+  useListingProfile,
+  type ListingProfile,
+} from "@/lib/listing-profile";
 import { getFFmpeg } from "@/engine/export";
 import {
   CurrencyInput,
   NumberInput,
   PhoneInput,
 } from "@/components/inputs";
+
+/**
+ * Templates that consume the shared listing profile (per H-7.12 audit).
+ * On these templates, empty form fields populate from the saved profile
+ * on first render; a "Save changes to listing profile" button appears
+ * when the template state diverges from the saved profile.
+ */
+const LISTING_CONSUMER_TEMPLATE_IDS = new Set([
+  "listing-card",
+  "listing-showcase",
+]);
 
 interface TemplateEditorProps {
   template: TemplateConfig;
@@ -152,8 +169,51 @@ export function TemplateEditor({ template }: TemplateEditorProps) {
   const canvasRef = useRef<HTMLCanvasElement>(null);
 
   const { settings: brandSettings, logoImg: brandLogo } = useBrandSettings();
+  const listingProfile = useListingProfile();
 
   const size = SIZE_PRESETS.find((s) => s.key === sizeKey)!;
+
+  // H-7.12 (C.3): for listing-consumer templates, merge the saved
+  // listing profile into form state ONCE on initial hydration —
+  // "first-edit-only" defaults injection. After this, edits stay
+  // local to the template; the user explicitly commits via the
+  // "Save changes to listing profile" button (rendered below).
+  // Text fields are merged only where state is empty (don't
+  // clobber a default that was already set by the template's
+  // FieldDef). Hero photo is materialized from its data URL.
+  const mergedListingProfileRef = useRef(false);
+  useEffect(() => {
+    if (mergedListingProfileRef.current) return;
+    if (!listingProfile.hydrated) return;
+    if (!LISTING_CONSUMER_TEMPLATE_IDS.has(template.id)) {
+      mergedListingProfileRef.current = true;
+      return;
+    }
+    mergedListingProfileRef.current = true;
+
+    setState((prev) => {
+      const next = { ...prev };
+      for (const k of LISTING_PROFILE_FIELDS) {
+        if (!next[k] && listingProfile.settings[k]) {
+          next[k] = listingProfile.settings[k];
+        }
+      }
+      return next;
+    });
+
+    if (listingProfile.settings.heroPhoto) {
+      const img = new Image();
+      img.onload = () =>
+        setAssets((prev) => ({ ...prev, heroPhoto: img }));
+      // Silent on error — a stale/corrupt data URL just leaves the
+      // hero slot empty and the user re-uploads.
+      img.src = listingProfile.settings.heroPhoto;
+    }
+  }, [
+    listingProfile.hydrated,
+    listingProfile.settings,
+    template.id,
+  ]);
 
   useEffect(() => {
     saveColors(template, state);
@@ -164,6 +224,32 @@ export function TemplateEditor({ template }: TemplateEditorProps) {
       // Silent — actual export will retry if this fails
     });
   }, []);
+
+  // H-7.12 (C.3): dirty-state check for the "Save changes to listing
+  // profile" affordance. True when ANY listing-profile field on the
+  // current template state differs from the saved profile, OR the
+  // hero-photo asset differs from the saved hero photo data URL.
+  // Only meaningful for listing-consumer templates; non-consumers
+  // get `false` so the button stays hidden.
+  const isListingConsumer = LISTING_CONSUMER_TEMPLATE_IDS.has(template.id);
+  const listingProfileDirty = (() => {
+    if (!isListingConsumer || !listingProfile.hydrated) return false;
+    for (const k of LISTING_PROFILE_FIELDS) {
+      if ((state[k] ?? "") !== listingProfile.settings[k]) return true;
+    }
+    const heroSrc = assets.heroPhoto?.src ?? "";
+    if (heroSrc !== listingProfile.settings.heroPhoto) return true;
+    return false;
+  })();
+
+  const handleSaveListingProfile = () => {
+    const next: Partial<ListingProfile> = {};
+    for (const k of LISTING_PROFILE_FIELDS) {
+      next[k] = state[k] ?? "";
+    }
+    next.heroPhoto = assets.heroPhoto?.src ?? "";
+    listingProfile.update(next);
+  };
 
   const timeline = useMemo(() => {
     // H-7.8-2: listing-showcase reads agent name / brokerage / phone /
@@ -302,6 +388,23 @@ export function TemplateEditor({ template }: TemplateEditorProps) {
               ↺ Reset colors to brand defaults
             </button>
 
+            {/* H-7.12 (C.3): "Save changes to listing profile" appears
+                only for listing-consumer templates AND only when the
+                current template state diverges from the saved profile.
+                Click commits the listing-profile fields + hero photo
+                data URL to localStorage so the next listing-consumer
+                template renders pre-populated. Sits above the form so
+                it stays visible while the agent edits the listing
+                fields below. */}
+            {isListingConsumer && listingProfileDirty && (
+              <button
+                onClick={handleSaveListingProfile}
+                className="w-full bg-[#4ef2d9]/10 hover:bg-[#4ef2d9]/20 border border-[#4ef2d9]/40 hover:border-[#4ef2d9] text-[#4ef2d9] rounded-md px-3 py-2 text-[11px] font-medium transition"
+              >
+                Save changes to listing profile
+              </button>
+            )}
+
             <div className="space-y-5 pt-2 border-t border-neutral-800/60">
               {renderedFields.map((field) => {
                 if (!isFieldVisible(field)) return null;
@@ -312,9 +415,18 @@ export function TemplateEditor({ template }: TemplateEditorProps) {
                   field.type === "stringList"
                     ? parseStringList(state[field.key] ?? "")
                     : null;
+                // objectList stores values JSON-stringified (mirrors stringList's
+                // JSON-ish encoding trick) — the parsed array drives both the
+                // "(n / max)" counter and the nested-card UI.
+                const objectListItems =
+                  field.type === "objectList"
+                    ? parseObjectList(state[field.key] ?? "")
+                    : null;
                 const labelText =
                   field.type === "stringList" && field.max !== undefined
                     ? `${field.label} (${stringListItems!.length} / ${field.max})`
+                    : field.type === "objectList" && field.max !== undefined
+                    ? `${field.label} (${objectListItems!.length} / ${field.max})`
                     : field.label;
                 return (
                   <div key={field.key}>
@@ -362,6 +474,19 @@ export function TemplateEditor({ template }: TemplateEditorProps) {
                         onChange={(next) =>
                           updateField(field.key, next.join("\n"))
                         }
+                      />
+                    )}
+                    {field.type === "objectList" && field.schema && objectListItems && (
+                      <ObjectListInput
+                        fieldKey={field.key}
+                        schema={field.schema}
+                        max={field.max}
+                        items={objectListItems}
+                        onChange={(items) =>
+                          updateField(field.key, JSON.stringify(items))
+                        }
+                        assets={assets}
+                        updateAsset={updateAsset}
                       />
                     )}
                     {field.type === "color" && (
@@ -530,6 +655,202 @@ function StringListInput({
         <button
           type="button"
           onClick={() => onChange([...items, ""])}
+          className="w-full bg-neutral-900 border border-dashed border-neutral-700 hover:border-[#4ef2d9] rounded-md px-3 py-2 text-xs text-neutral-400 hover:text-neutral-200 transition"
+        >
+          + Add
+        </button>
+      )}
+    </div>
+  );
+}
+
+/**
+ * Parse an `objectList` field's stored value (JSON-stringified array) into
+ * a typed array. Invalid JSON or non-array shapes fall back to an empty
+ * list so the editor never crashes on a corrupted state. Each item is
+ * coerced to a plain Record<string, string> (image data is stored as the
+ * empty string here — the actual HTMLImageElement lives in TemplateAssets
+ * under the synthesized key `${fieldKey}.${index}.${innerField}`).
+ */
+function parseObjectList(raw: string): Array<Record<string, string>> {
+  if (!raw) return [];
+  try {
+    const parsed = JSON.parse(raw);
+    if (!Array.isArray(parsed)) return [];
+    return parsed.map((it) =>
+      it && typeof it === "object" && !Array.isArray(it)
+        ? Object.fromEntries(
+            Object.entries(it as Record<string, unknown>).map(([k, v]) => [
+              k,
+              typeof v === "string" ? v : String(v ?? ""),
+            ])
+          )
+        : {}
+    );
+  } catch {
+    return [];
+  }
+}
+
+/**
+ * Renders the stacked-card UI for an `objectList` field. Each list item
+ * is a collapsible card with the schema's inner fields rendered as nested
+ * inputs. Add/remove mirror the stringList interaction model from H-7.7.1.
+ *
+ * Image-asset key convention: `${fieldKey}.${index}.${innerFieldName}`.
+ * Remove-item shifts trailing asset entries down by 1 to keep them aligned
+ * with the post-splice items array (otherwise an image upload on item 2
+ * would visually move to item 1's slot after item 0 is removed).
+ *
+ * The parent owns state; this component is purely a controlled-input
+ * wrapper that calls onChange with the next items array on every edit.
+ */
+function ObjectListInput({
+  fieldKey,
+  schema,
+  max,
+  items,
+  onChange,
+  assets,
+  updateAsset,
+}: {
+  fieldKey: string;
+  schema: ObjectListSchema;
+  max?: number;
+  items: Array<Record<string, string>>;
+  onChange: (next: Array<Record<string, string>>) => void;
+  assets: TemplateAssets;
+  updateAsset: (key: string, img: HTMLImageElement | null) => void;
+}) {
+  const canAdd = max === undefined || items.length < max;
+  const schemaEntries = Object.entries(schema);
+  const imageFieldNames = schemaEntries
+    .filter(([, spec]) => spec.type === "image")
+    .map(([name]) => name);
+
+  const assetKey = (index: number, innerField: string) =>
+    `${fieldKey}.${index}.${innerField}`;
+
+  const updateItemField = (i: number, fieldName: string, value: string) => {
+    const next = items.map((item, idx) =>
+      idx === i ? { ...item, [fieldName]: value } : item
+    );
+    onChange(next);
+  };
+
+  const addItem = () => {
+    const empty: Record<string, string> = {};
+    for (const [name] of schemaEntries) empty[name] = "";
+    onChange([...items, empty]);
+  };
+
+  const removeItem = (i: number) => {
+    // Shift any image-asset entries past index i down by 1 so they
+    // stay aligned with the post-splice items array.
+    for (const imgField of imageFieldNames) {
+      for (let j = i; j < items.length - 1; j++) {
+        const fromKey = assetKey(j + 1, imgField);
+        const toKey = assetKey(j, imgField);
+        updateAsset(toKey, assets[fromKey] ?? null);
+      }
+      // Clear the now-orphaned tail slot.
+      updateAsset(assetKey(items.length - 1, imgField), null);
+    }
+    onChange(items.filter((_, idx) => idx !== i));
+  };
+
+  return (
+    <div className="space-y-3">
+      {items.map((item, i) => (
+        <div
+          key={i}
+          className="bg-neutral-900 border border-neutral-800 rounded-md p-3 space-y-3"
+        >
+          <div className="flex items-center justify-between">
+            <span className="text-[10px] uppercase tracking-[0.15em] text-neutral-500">
+              Item {i + 1}
+            </span>
+            <button
+              type="button"
+              onClick={() => removeItem(i)}
+              className="text-xs text-neutral-500 hover:text-red-400 transition"
+              aria-label="Remove item"
+            >
+              Remove
+            </button>
+          </div>
+          {schemaEntries.map(([fieldName, spec]) => {
+            const innerLabelText = spec.label;
+            const innerValue = item[fieldName] ?? "";
+            const inputClass =
+              "w-full bg-neutral-950 border border-neutral-800 rounded-md px-3 py-2 text-base lg:text-sm focus:outline-none focus:border-[#4ef2d9]";
+            return (
+              <div key={fieldName}>
+                <label className="block text-[10px] uppercase tracking-[0.15em] text-neutral-500 mb-1">
+                  {innerLabelText}
+                </label>
+                {spec.type === "text" && (
+                  <input
+                    type="text"
+                    value={innerValue}
+                    onChange={(e) =>
+                      updateItemField(i, fieldName, e.target.value)
+                    }
+                    placeholder={spec.placeholder}
+                    maxLength={spec.max}
+                    className={inputClass}
+                  />
+                )}
+                {spec.type === "textarea" && (
+                  <textarea
+                    value={innerValue}
+                    onChange={(e) =>
+                      updateItemField(i, fieldName, e.target.value)
+                    }
+                    rows={2}
+                    placeholder={spec.placeholder}
+                    maxLength={spec.max}
+                    className={`${inputClass} resize-none`}
+                  />
+                )}
+                {spec.type === "image" && (
+                  <ImageField
+                    value={assets[assetKey(i, fieldName)] ?? null}
+                    onChange={(img) =>
+                      updateAsset(assetKey(i, fieldName), img)
+                    }
+                  />
+                )}
+                {spec.type === "currency" && (
+                  <CurrencyInput
+                    value={innerValue}
+                    onChange={(v) => updateItemField(i, fieldName, v)}
+                    placeholder={spec.placeholder}
+                  />
+                )}
+                {spec.type === "number" && (
+                  <NumberInput
+                    value={innerValue}
+                    onChange={(v) => updateItemField(i, fieldName, v)}
+                    placeholder={spec.placeholder}
+                  />
+                )}
+                {spec.type === "phone" && (
+                  <PhoneInput
+                    value={innerValue}
+                    onChange={(v) => updateItemField(i, fieldName, v)}
+                    placeholder={spec.placeholder}
+                  />
+                )}
+              </div>
+            );
+          })}
+        </div>
+      ))}
+      {canAdd && (
+        <button
+          type="button"
+          onClick={addItem}
           className="w-full bg-neutral-900 border border-dashed border-neutral-700 hover:border-[#4ef2d9] rounded-md px-3 py-2 text-xs text-neutral-400 hover:text-neutral-200 transition"
         >
           + Add
