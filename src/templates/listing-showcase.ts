@@ -66,8 +66,11 @@ export const listingShowcaseTemplate: TemplateConfig = {
     { key: "sqft", label: "Sq ft", type: "text", default: "2,840" },
     {
       key: "features",
-      label: "Feature bullets (one per line — up to 2)",
-      type: "textarea",
+      label: "Feature bullets",
+      type: "stringList",
+      max: 2,
+      // Newline-joined under the hood so the build() parser stays unchanged
+      // (it already splits state.features on \n and slices to featuresMax).
       default:
         "Chef's kitchen with quartz counters\nPrimary suite with spa bath",
     },
