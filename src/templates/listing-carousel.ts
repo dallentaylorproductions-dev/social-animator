@@ -31,9 +31,8 @@ export const listingCarouselTemplate: TemplateConfig = {
     title: "Open House Saturday",
     subtitle: "1:00–4:00pm",
     // Picker-preview seed for the carousel needs 6 items in the JSON so
-    // build() iterates the right indices. Captions are intentionally
-    // empty — H-7.12-3 captures captions as data only; future visual
-    // phase will draw them per photo.
+    // build() iterates the right indices. Captions stay empty in the
+    // preview seed; H-7.12-3.5 renders captions per item when present.
     images: JSON.stringify(
       Array.from({ length: 6 }, () => ({ imageUrl: "", caption: "" }))
     ),
@@ -45,9 +44,9 @@ export const listingCarouselTemplate: TemplateConfig = {
     { key: "subtitleColor", label: "Subtitle color", type: "color", default: "#9ca3af" },
     {
       // H-7.12: replaces the previous photo1..photo6 fixed-slot fields.
-      // Up to 8 photos with optional captions; captions are stored but
-      // NOT rendered in this commit (B.1 data-only per audit). A
-      // follow-up visual phase will layer captions onto each photo.
+      // Up to 8 photos with optional captions. H-7.12-3.5 renders the
+      // caption text below each photo as it foregrounds in the
+      // coverflow (B.2 visual). Empty captions render nothing.
       key: "images",
       label: "Photos",
       type: "objectList",
@@ -67,8 +66,9 @@ export const listingCarouselTemplate: TemplateConfig = {
     // then look up each photo's HTMLImageElement at the synthesized
     // asset key `images.${i}.imageUrl`. Skip slots that haven't been
     // uploaded yet (img.complete + naturalWidth check matches the prior
-    // photo1..photo6 logic). Captions are present in the parsed array
-    // (item.caption) but intentionally not rendered yet — B.1 data-only.
+    // photo1..photo6 logic). Captions ride alongside photos in a parallel
+    // array so caption[i] always pairs with photos[i] even when some
+    // items have no uploaded image (H-7.12-3.5).
     let imageItems: Array<{ imageUrl?: string; caption?: string }> = [];
     try {
       const parsed = JSON.parse(state.images || "[]");
@@ -77,13 +77,16 @@ export const listingCarouselTemplate: TemplateConfig = {
       // malformed JSON → render no photos (placeholder branch fires)
     }
     const photos: HTMLImageElement[] = [];
-    imageItems.forEach((_, i) => {
+    const captions: string[] = [];
+    imageItems.forEach((item, i) => {
       const img = assets?.[`images.${i}.imageUrl`];
       if (img && img.complete && img.naturalWidth > 0) {
         photos.push(img);
+        captions.push((item?.caption ?? "").trim());
       }
     });
     const photoCount = photos.length;
+    const hasAnyCaption = captions.some((c) => c.length > 0);
 
     // Layout
     const titleFontSize = 60;
@@ -94,6 +97,15 @@ export const listingCarouselTemplate: TemplateConfig = {
     const photoCornerRadius = 24;
     const sideOffset = 460; // px from canvas center for relativePosition = ±1
     const photoCenterY = height * 0.55;
+
+    // Caption layout (H-7.12-3.5). Side-photo peeks scale to ~0.7×, so
+    // their bottoms sit at photoCenterY + ~157px — a 40px gap below the
+    // foreground photo's bottom edge keeps captions clear of side peeks.
+    const captionFontSize = 28;
+    const captionGap = 40;
+    const captionTopY = photoCenterY + photoBaseHeight / 2 + captionGap;
+    const captionLineHeight = captionFontSize * 1.2;
+    const captionMaxWidth = photoBaseWidth - 40;
 
     // Animation timing
     const titleEntryStart = 0.2;
@@ -255,6 +267,75 @@ export const listingCarouselTemplate: TemplateConfig = {
         },
       });
     } else {
+      // Captions track (H-7.12-3.5). Mirrors the carousel's slot/
+      // transition state so each caption fades in/out in lockstep with
+      // its photo's foreground state. Caption alpha falls off ~3× faster
+      // than the photo's so only the centered caption reads clearly;
+      // side-photo captions fade to invisible during transitions. Skipped
+      // entirely when every caption is empty so the track adds no cost
+      // for users who don't fill captions in.
+      if (hasAnyCaption) {
+        tracks.push({
+          id: "captions",
+          start: carouselStart,
+          duration: naturalCarouselDuration,
+          onUpdate: (p, ctx) => {
+            const entrySeconds = 0.22;
+            const entryFraction = Math.min(
+              0.5,
+              entrySeconds / naturalCarouselDuration
+            );
+            const entryAlpha =
+              p < entryFraction ? easeOutCubic(p / entryFraction) : 1;
+
+            const drawCaption = (caption: string, rel: number, alpha: number) => {
+              if (!caption || alpha <= 0.01) return;
+              ctx.save();
+              ctx.globalAlpha = alpha;
+              ctx.fillStyle = state.subtitleColor || "#9ca3af";
+              ctx.font = `500 ${captionFontSize}px Inter, system-ui, sans-serif`;
+              ctx.textAlign = "center";
+              ctx.textBaseline = "top";
+              const lines = wrapText(ctx, caption, captionMaxWidth);
+              lines.forEach((line, idx) => {
+                ctx.fillText(
+                  line,
+                  width / 2 + rel * sideOffset,
+                  captionTopY + idx * captionLineHeight
+                );
+              });
+              ctx.restore();
+            };
+
+            if (photoCount === 1) {
+              drawCaption(captions[0], 0, entryAlpha);
+              return;
+            }
+
+            const totalSlots = photoCount;
+            const t = p * totalSlots;
+            const slotIndex = Math.min(photoCount - 1, Math.floor(t));
+            const localT = t - slotIndex;
+
+            const holdRatio = 0.7;
+            let transitionProgress = 0;
+            if (slotIndex < photoCount - 1 && localT >= holdRatio) {
+              transitionProgress = (localT - holdRatio) / (1 - holdRatio);
+              transitionProgress = easeOutCubic(transitionProgress);
+            }
+            const carouselPos = slotIndex + transitionProgress;
+
+            captions.forEach((caption, i) => {
+              if (!caption) return;
+              const rel = i - carouselPos;
+              const absRel = Math.abs(rel);
+              const alpha = Math.max(0, 1 - absRel * 1.5) * entryAlpha;
+              drawCaption(caption, rel, alpha);
+            });
+          },
+        });
+      }
+
       tracks.push({
         id: "carousel",
         start: carouselStart,
