@@ -17,12 +17,28 @@ import {
 import { ExportButton } from "@/components/ExportButton";
 import { ImageField } from "@/components/ImageField";
 import { formatPhone, useBrandSettings } from "@/lib/brand";
+import {
+  LISTING_PROFILE_FIELDS,
+  useListingProfile,
+  type ListingProfile,
+} from "@/lib/listing-profile";
 import { getFFmpeg } from "@/engine/export";
 import {
   CurrencyInput,
   NumberInput,
   PhoneInput,
 } from "@/components/inputs";
+
+/**
+ * Templates that consume the shared listing profile (per H-7.12 audit).
+ * On these templates, empty form fields populate from the saved profile
+ * on first render; a "Save changes to listing profile" button appears
+ * when the template state diverges from the saved profile.
+ */
+const LISTING_CONSUMER_TEMPLATE_IDS = new Set([
+  "listing-card",
+  "listing-showcase",
+]);
 
 interface TemplateEditorProps {
   template: TemplateConfig;
@@ -153,8 +169,51 @@ export function TemplateEditor({ template }: TemplateEditorProps) {
   const canvasRef = useRef<HTMLCanvasElement>(null);
 
   const { settings: brandSettings, logoImg: brandLogo } = useBrandSettings();
+  const listingProfile = useListingProfile();
 
   const size = SIZE_PRESETS.find((s) => s.key === sizeKey)!;
+
+  // H-7.12 (C.3): for listing-consumer templates, merge the saved
+  // listing profile into form state ONCE on initial hydration —
+  // "first-edit-only" defaults injection. After this, edits stay
+  // local to the template; the user explicitly commits via the
+  // "Save changes to listing profile" button (rendered below).
+  // Text fields are merged only where state is empty (don't
+  // clobber a default that was already set by the template's
+  // FieldDef). Hero photo is materialized from its data URL.
+  const mergedListingProfileRef = useRef(false);
+  useEffect(() => {
+    if (mergedListingProfileRef.current) return;
+    if (!listingProfile.hydrated) return;
+    if (!LISTING_CONSUMER_TEMPLATE_IDS.has(template.id)) {
+      mergedListingProfileRef.current = true;
+      return;
+    }
+    mergedListingProfileRef.current = true;
+
+    setState((prev) => {
+      const next = { ...prev };
+      for (const k of LISTING_PROFILE_FIELDS) {
+        if (!next[k] && listingProfile.settings[k]) {
+          next[k] = listingProfile.settings[k];
+        }
+      }
+      return next;
+    });
+
+    if (listingProfile.settings.heroPhoto) {
+      const img = new Image();
+      img.onload = () =>
+        setAssets((prev) => ({ ...prev, heroPhoto: img }));
+      // Silent on error — a stale/corrupt data URL just leaves the
+      // hero slot empty and the user re-uploads.
+      img.src = listingProfile.settings.heroPhoto;
+    }
+  }, [
+    listingProfile.hydrated,
+    listingProfile.settings,
+    template.id,
+  ]);
 
   useEffect(() => {
     saveColors(template, state);
@@ -165,6 +224,32 @@ export function TemplateEditor({ template }: TemplateEditorProps) {
       // Silent — actual export will retry if this fails
     });
   }, []);
+
+  // H-7.12 (C.3): dirty-state check for the "Save changes to listing
+  // profile" affordance. True when ANY listing-profile field on the
+  // current template state differs from the saved profile, OR the
+  // hero-photo asset differs from the saved hero photo data URL.
+  // Only meaningful for listing-consumer templates; non-consumers
+  // get `false` so the button stays hidden.
+  const isListingConsumer = LISTING_CONSUMER_TEMPLATE_IDS.has(template.id);
+  const listingProfileDirty = (() => {
+    if (!isListingConsumer || !listingProfile.hydrated) return false;
+    for (const k of LISTING_PROFILE_FIELDS) {
+      if ((state[k] ?? "") !== listingProfile.settings[k]) return true;
+    }
+    const heroSrc = assets.heroPhoto?.src ?? "";
+    if (heroSrc !== listingProfile.settings.heroPhoto) return true;
+    return false;
+  })();
+
+  const handleSaveListingProfile = () => {
+    const next: Partial<ListingProfile> = {};
+    for (const k of LISTING_PROFILE_FIELDS) {
+      next[k] = state[k] ?? "";
+    }
+    next.heroPhoto = assets.heroPhoto?.src ?? "";
+    listingProfile.update(next);
+  };
 
   const timeline = useMemo(() => {
     // H-7.8-2: listing-showcase reads agent name / brokerage / phone /
@@ -302,6 +387,23 @@ export function TemplateEditor({ template }: TemplateEditorProps) {
             >
               ↺ Reset colors to brand defaults
             </button>
+
+            {/* H-7.12 (C.3): "Save changes to listing profile" appears
+                only for listing-consumer templates AND only when the
+                current template state diverges from the saved profile.
+                Click commits the listing-profile fields + hero photo
+                data URL to localStorage so the next listing-consumer
+                template renders pre-populated. Sits above the form so
+                it stays visible while the agent edits the listing
+                fields below. */}
+            {isListingConsumer && listingProfileDirty && (
+              <button
+                onClick={handleSaveListingProfile}
+                className="w-full bg-[#4ef2d9]/10 hover:bg-[#4ef2d9]/20 border border-[#4ef2d9]/40 hover:border-[#4ef2d9] text-[#4ef2d9] rounded-md px-3 py-2 text-[11px] font-medium transition"
+              >
+                Save changes to listing profile
+              </button>
+            )}
 
             <div className="space-y-5 pt-2 border-t border-neutral-800/60">
               {renderedFields.map((field) => {
