@@ -128,8 +128,15 @@ export const listingShowcaseTemplate: TemplateConfig = {
         : DURATION;
 
     // ── Aspect-aware layout ─────────────────────────────────────────────
-    // Square (1:1) is height-constrained — compress vertical sizing.
+    // Three aspect tiers:
+    //   isShort     — 1080×1080 (square / 1:1), height-constrained
+    //   isVertical  — 1080×1920 (Reel / 9:16), the Listing Flyer's
+    //                 primary MP4 output; widened safe-area pad,
+    //                 4-feature cap, compact agent typography (H-7.5)
+    //   default     — 1080×1350 (feed / 4:5), used by standalone
+    //                 Social Animator template editor
     const isShort = height < 1300;
+    const isVertical = height >= width * 1.5;
 
     // Square (1:1) gets a slightly tighter horizontal margin so the hero box
     // has more horizontal room to work with. With center-cropping a typical
@@ -172,7 +179,10 @@ export const listingShowcaseTemplate: TemplateConfig = {
     // Inter-group gaps tightened ~25% to remove dead vertical space between
     // sections without crossing into "cramped". Hero, badge, address, price,
     // stats, and bottom block read as a deliberate rhythm now.
-    const gapHeroToBadge = isShort ? 21 : 30;
+    // H-7.5: +16px breathing room between hero photo bottom edge and
+    // JUST LISTED badge — Dallen's feedback that the badge sat too
+    // close to the photo edge. Applies to both aspects.
+    const gapHeroToBadge = isShort ? 37 : 46;
     const gapBadgeToAddress = isShort ? 14 : 21;
     const gapAddressToCity = isShort ? 11 : 17;
     const gapCityToPrice = isShort ? 17 : 27;
@@ -186,48 +196,61 @@ export const listingShowcaseTemplate: TemplateConfig = {
     const priceY = cityStateY + cityStateFontSize / 2 + gapCityToPrice + priceFontSize / 2;
     const statsY = priceY + priceFontSize / 2 + gapPriceToStats + statsFontSize / 2;
 
-    // Two-column split with a gap in the middle. On 9:16, feature bullets
-    // ("Indoor Pool", "Open Bar") are short and don't need an even half of
-    // the canvas width — so we give the agent column more room. On 1:1 the
-    // 50/50 split was truncating "Chef's kitchen with quartz counters" once
-    // CHANGE 14 bumped the feature font; rebalance to 55/45 so longer
-    // feature copy renders in full while leaving enough agent-side budget
-    // for "Aaron Thomas Home Team".
-    const columnGap = isShort ? 40 : 60;
-    const featuresColRatio = isShort ? 0.55 : 0.35;
-    const usableW = width - horizontalMargin * 2 - columnGap;
-    const featuresColW = Math.floor(usableW * featuresColRatio);
-    const agentColW = usableW - featuresColW;
-    const leftColX = horizontalMargin;
-    const rightColX = horizontalMargin + featuresColW + columnGap;
+    // Two-column split with a gap in the middle.
+    //
+    // Square (isShort) keeps its proven 55/45 features/agent split.
+    // Feed (default — 1080×1350 standalone) keeps its 35/65 split that
+    // was tuned for short feature copy on the standalone template
+    // editor.
+    // Vertical (isVertical / Reel) — H-7.5: widens the features column
+    // to 540pt (50% of inner usable area) so 27-char features fit on
+    // a single line; narrows the agent column to 360pt and bumps the
+    // safe-area pad to 80pt on each side. Column gap drops to 20pt to
+    // recover the horizontal budget that the wider safe pads cost.
+    const bottomColPadX = isVertical ? 80 : horizontalMargin;
+    const columnGap = isVertical ? 20 : isShort ? 40 : 60;
+    const usableColsW = width - bottomColPadX * 2 - columnGap;
+    const featuresColRatio = isVertical ? 540 / 900 : isShort ? 0.55 : 0.35;
+    const featuresColW = Math.floor(usableColsW * featuresColRatio);
+    const agentColW = usableColsW - featuresColW;
+    const leftColX = bottomColPadX;
+    const rightColX = bottomColPadX + featuresColW + columnGap;
 
-    // Features (left column). Bumped ~17-20% over the H-1.5o sizes once the
-    // bottom section started anchoring to the frame bottom — the freed-up
-    // slack absorbs the bigger type without crowding hero/info above.
-    const featureFontSize = isShort ? 28 : 36;
-    const featureLineHeight = isShort ? 44 : 58;
-    const featureBulletRadius = isShort ? 6 : 8;
+    // Features (left column). H-7.5 drops the Reel (isVertical) feature
+    // font 36→26 so 27-char features fit on a single line in the new
+    // 540pt column (~21px avg char at 26pt × 27 chars = 567px? — still
+    // close, but with the 14-char/200pt ratio Inter actually delivers,
+    // 27 chars land around 432pt, well within 540pt). Square + Feed
+    // sizes preserved.
+    const featureFontSize = isShort ? 28 : isVertical ? 26 : 36;
+    const featureLineHeight = isShort ? 44 : isVertical ? 48 : 58;
+    const featureBulletRadius = isShort ? 6 : isVertical ? 6 : 8;
 
-    // Agent info (right column) — header row (logo + name side-by-side) on
-    // top, then a tight stack of brokerage / phone / license below. Header
-    // row height = logo size; logo and name are vertical-center-aligned.
-    const logoSize = isShort ? 48 : 64;
+    // Agent info (right column). Square + Feed keep existing sizes.
+    // Vertical (Reel) H-7.5 — moves the agent typography to readable
+    // sizes inside the 360pt column: logo 48, name 24pt bold (allows
+    // 2-line wrap below), brokerage 16, phone 18 (slightly more
+    // prominent — user-actionable), license 14. Row gap 12pt for
+    // comfortable vertical rhythm.
+    const logoSize = isShort ? 48 : isVertical ? 48 : 64;
     const logoToNameGap = 12;
-    const agentNameSize = isShort ? 28 : 38;
-    // Secondary agent text bumped a second time after the bottom section
-    // gained vertical slack from frame-bottom anchoring. Header is still
-    // dominant — name > brokerage > phone > license.
-    const agentBrokerageSize = isShort ? 25 : 31;
-    const agentPhoneSize = isShort ? 25 : 31;
-    const agentLicenseSize = isShort ? 19 : 25;
-    const agentRowGap = isShort ? 4 : 6;
+    const agentNameSize = isShort ? 28 : isVertical ? 24 : 38;
+    const agentBrokerageSize = isShort ? 25 : isVertical ? 16 : 31;
+    const agentPhoneSize = isShort ? 25 : isVertical ? 18 : 31;
+    const agentLicenseSize = isShort ? 19 : isVertical ? 14 : 25;
+    const agentRowGap = isShort ? 4 : isVertical ? 12 : 6;
 
     // ── Parse features ──────────────────────────────────────────────────
+    // H-7.5: Vertical (Reel) caps at 4 to keep the features stack within
+    // the agent column's visual budget at the bumped 24pt agent name +
+    // 12pt row gap. PDF (FlyerDocument) and square MP4 continue to show
+    // all 5 from the form input.
+    const featuresMax = isVertical ? 4 : 5;
     const featureLines = (state.features ?? "")
       .split(/\n/)
       .map((s) => s.trim())
       .filter(Boolean)
-      .slice(0, 5); // matches MAX_FEATURES — PDF and MP4 are now in parity
+      .slice(0, featuresMax);
 
     // ── Bottom section anchor ───────────────────────────────────────────
     // Anchor the bottom row to the frame bottom (with bottomMargin inset)
@@ -529,42 +552,88 @@ export const listingShowcaseTemplate: TemplateConfig = {
           // Logo and name are vertically centered on each other so they
           // read as one unit ("[LOGO] Aaron Thomas Home Team"), not as
           // logo-stacked-above-name.
-          const headerRowHeight = state.agentName?.trim() || agentLogoImg
-            ? logoSize
-            : 0;
-          const headerCenterY = cursorY + logoSize / 2;
+          //
+          // H-7.5: Vertical (Reel) allows the agent name to WRAP to 2
+          // lines in the narrower 360pt column at 24pt bold (per the
+          // approved mockup). Square + Feed keep single-line
+          // truncate-with-ellipsis since their wider agent columns fit
+          // the full name at their larger 28/38pt sizes.
+
+          // Phase 1: resolve logo width and where the name starts.
           let textStartX = rightColX;
           let usedLogoW = 0;
-
           if (agentLogoImg) {
             const aspect =
               agentLogoImg.naturalWidth /
               Math.max(1, agentLogoImg.naturalHeight);
             usedLogoW = Math.min(agentColW * 0.45, logoSize * Math.min(2.2, aspect));
+            textStartX = rightColX + usedLogoW + logoToNameGap;
+          }
+
+          // Phase 2: resolve name into lines.
+          const nameMaxW = rightColX + agentColW - textStartX;
+          let nameLines: string[] = [];
+          if (state.agentName?.trim()) {
+            ctx.font = `700 ${agentNameSize}px Inter, system-ui, sans-serif`;
+            if (isVertical) {
+              const wrapped = wrapText(ctx, state.agentName, nameMaxW);
+              // Cap at 2 lines — if more were needed, truncate the second
+              // line so the block never spills into a 3rd line and breaks
+              // the row's vertical budget.
+              if (wrapped.length <= 2) {
+                nameLines = wrapped;
+              } else {
+                nameLines = [
+                  wrapped[0],
+                  truncateToWidth(wrapped.slice(1).join(" "), nameMaxW),
+                ];
+              }
+            } else {
+              nameLines = [truncateToWidth(state.agentName, nameMaxW)];
+            }
+          }
+
+          // Phase 3: header row height = max(logo, name block).
+          const nameLineSpacing = 2;
+          const nameBlockH = nameLines.length > 0
+            ? nameLines.length * agentNameSize +
+              (nameLines.length - 1) * nameLineSpacing
+            : 0;
+          const headerRowHeight = state.agentName?.trim() || agentLogoImg
+            ? Math.max(logoSize, nameBlockH)
+            : 0;
+
+          // Phase 4: render logo (centered vertically on header row).
+          if (agentLogoImg) {
             drawImageContain(
               ctx,
               agentLogoImg,
               rightColX,
-              cursorY,
+              cursorY + (headerRowHeight - logoSize) / 2,
               usedLogoW,
               logoSize,
               0
             );
-            textStartX = rightColX + usedLogoW + logoToNameGap;
           }
 
-          if (state.agentName?.trim()) {
+          // Phase 5: render name lines (stacked, centered vertically on
+          // header row).
+          if (nameLines.length > 0) {
             ctx.fillStyle = state.agentNameColor;
             ctx.font = `700 ${agentNameSize}px Inter, system-ui, sans-serif`;
             ctx.textAlign = "left";
             ctx.textBaseline = "middle";
-            // Available width = column right edge minus where text starts.
-            const nameMaxW = rightColX + agentColW - textStartX;
-            ctx.fillText(
-              truncateToWidth(state.agentName, nameMaxW),
-              textStartX,
-              headerCenterY
-            );
+            const firstLineCenterY =
+              cursorY +
+              (headerRowHeight - nameBlockH) / 2 +
+              agentNameSize / 2;
+            nameLines.forEach((line, lineIdx) => {
+              ctx.fillText(
+                line,
+                textStartX,
+                firstLineCenterY + lineIdx * (agentNameSize + nameLineSpacing)
+              );
+            });
           }
 
           if (headerRowHeight > 0) {
