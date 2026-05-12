@@ -41,6 +41,14 @@ export const listingShowcaseTemplate: TemplateConfig = {
   description:
     "Luxury-paced 14-second reveal of a single listing — slow zoom, dramatic price moment, feature highlights with agent contact card. Pairs with the Listing Flyer tool.",
   duration: DURATION,
+  // H-7.7: Feed-only in the Social Animator template editor. Square
+  // (1080×1080) was rendering incorrectly here and the product has
+  // three specialized listing tools (Listing Flyer, Open House Promo,
+  // Listing Presentation) covering the 1:1 use case. The Listing Flyer
+  // tool reuses this template at 1080×1920 via its own export pipeline
+  // — that path is unaffected by this restriction (availableSizes
+  // governs only the standalone editor's size picker).
+  availableSizes: ["1080x1350"],
   fields: [
     { key: "heroPhoto", label: "Hero photo", type: "image", default: "" },
     { key: "agentLogo", label: "Agent logo (optional)", type: "image", default: "" },
@@ -58,10 +66,10 @@ export const listingShowcaseTemplate: TemplateConfig = {
     { key: "sqft", label: "Sq ft", type: "text", default: "2,840" },
     {
       key: "features",
-      label: "Feature bullets (one per line — up to 5)",
+      label: "Feature bullets (one per line — up to 2)",
       type: "textarea",
       default:
-        "Chef's kitchen with quartz counters\nPrimary suite with spa bath\nFinished basement",
+        "Chef's kitchen with quartz counters\nPrimary suite with spa bath",
     },
     {
       key: "agentName",
@@ -241,11 +249,15 @@ export const listingShowcaseTemplate: TemplateConfig = {
     const agentRowGap = isShort ? 4 : isVertical ? 12 : 6;
 
     // ── Parse features ──────────────────────────────────────────────────
-    // H-7.5: Vertical (Reel) caps at 4 to keep the features stack within
-    // the agent column's visual budget at the bumped 24pt agent name +
-    // 12pt row gap. PDF (FlyerDocument) and square MP4 continue to show
-    // all 5 from the form input.
-    const featuresMax = isVertical ? 4 : 5;
+    // H-7.5: Vertical (Reel — Listing Flyer tool, 1080×1920) caps at 4
+    // to keep the features stack within the agent column's visual
+    // budget at the bumped 24pt agent name + 12pt row gap.
+    // H-7.7: Feed (standalone Social Animator template editor at
+    // 1080×1350) caps at 2 — punchy 2-feature reveals read better than
+    // the prior 5-line list inside this template's animation rhythm.
+    // The Listing Flyer's PDF (FlyerDocument) still renders all 5
+    // from its own input, independent of this template's cap.
+    const featuresMax = isVertical ? 4 : 2;
     const featureLines = (state.features ?? "")
       .split(/\n/)
       .map((s) => s.trim())
