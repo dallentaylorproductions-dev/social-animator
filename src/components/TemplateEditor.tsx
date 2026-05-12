@@ -279,10 +279,21 @@ export function TemplateEditor({ template }: TemplateEditorProps) {
             <div className="space-y-5 pt-2 border-t border-neutral-800/60">
               {renderedFields.map((field) => {
                 if (!isFieldVisible(field)) return null;
+                // stringList stores values newline-joined inside state but
+                // renders as separate inputs; the parsed list is used for
+                // both the "(n / max)" counter and the input rows below.
+                const stringListItems =
+                  field.type === "stringList"
+                    ? parseStringList(state[field.key] ?? "")
+                    : null;
+                const labelText =
+                  field.type === "stringList" && field.max !== undefined
+                    ? `${field.label} (${stringListItems!.length} / ${field.max})`
+                    : field.label;
                 return (
                   <div key={field.key}>
                     <label className="block text-[10px] uppercase tracking-[0.15em] text-neutral-500 mb-2">
-                      {field.label}
+                      {labelText}
                     </label>
                     {field.type === "text" && (
                       <input
@@ -298,6 +309,15 @@ export function TemplateEditor({ template }: TemplateEditorProps) {
                         onChange={(e) => updateField(field.key, e.target.value)}
                         rows={3}
                         className="w-full bg-neutral-900 border border-neutral-800 rounded-md px-3 py-2 text-base lg:text-sm focus:outline-none focus:border-[#4ef2d9] resize-none"
+                      />
+                    )}
+                    {field.type === "stringList" && stringListItems && (
+                      <StringListInput
+                        items={stringListItems}
+                        max={field.max}
+                        onChange={(next) =>
+                          updateField(field.key, next.join("\n"))
+                        }
                       />
                     )}
                     {field.type === "color" && (
@@ -409,5 +429,75 @@ export function TemplateEditor({ template }: TemplateEditorProps) {
         </div>
       </div>
     </main>
+  );
+}
+
+/**
+ * Parse a `stringList` field's stored value (newline-joined) into an array
+ * of entries. An empty stored value yields a single empty slot so the user
+ * sees at least one input row to type into.
+ */
+function parseStringList(raw: string): string[] {
+  if (raw === "") return [""];
+  return raw.split("\n");
+}
+
+/**
+ * Renders the chip-add UI for a `stringList` field — one input per entry
+ * with a × remove control, plus a "+ Add" button that disables at `max`.
+ * The parent owns state; this component is purely presentational and emits
+ * the next array via `onChange`.
+ *
+ * Paste guard: input values strip embedded newlines so a multi-line paste
+ * into a single row can't break the underlying newline-joined storage.
+ */
+function StringListInput({
+  items,
+  max,
+  onChange,
+}: {
+  items: string[];
+  max?: number;
+  onChange: (next: string[]) => void;
+}) {
+  const canAdd = max === undefined || items.length < max;
+  return (
+    <div className="space-y-2">
+      {items.map((item, i) => (
+        <div key={i} className="flex items-center gap-2">
+          <input
+            type="text"
+            value={item}
+            onChange={(e) => {
+              const next = [...items];
+              next[i] = e.target.value.replace(/\n+/g, " ");
+              onChange(next);
+            }}
+            className="flex-1 min-w-0 bg-neutral-900 border border-neutral-800 rounded-md px-3 py-2 text-base lg:text-sm focus:outline-none focus:border-[#4ef2d9]"
+          />
+          {items.length > 1 && (
+            <button
+              type="button"
+              onClick={() =>
+                onChange(items.filter((_, idx) => idx !== i))
+              }
+              aria-label="Remove entry"
+              className="px-2 py-1 text-xs text-neutral-500 hover:text-neutral-300"
+            >
+              ✕
+            </button>
+          )}
+        </div>
+      ))}
+      {canAdd && (
+        <button
+          type="button"
+          onClick={() => onChange([...items, ""])}
+          className="w-full bg-neutral-900 border border-dashed border-neutral-700 hover:border-[#4ef2d9] rounded-md px-3 py-2 text-xs text-neutral-400 hover:text-neutral-200 transition"
+        >
+          + Add
+        </button>
+      )}
+    </div>
   );
 }

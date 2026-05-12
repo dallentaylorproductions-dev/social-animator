@@ -15,15 +15,27 @@ export const SIZE_PRESETS: SizePreset[] = [
   { key: "1080x1080", width: 1080, height: 1080, label: "Square (1080 × 1080)", shortLabel: "Square" },
 ];
 
-export type FieldType = "text" | "textarea" | "color" | "image" | "select";
+export type FieldType =
+  | "text"
+  | "textarea"
+  | "color"
+  | "image"
+  | "select"
+  | "stringList";
 
 export interface FieldDef {
   key: string;
   label: string;
   type: FieldType;
+  /** Default value. For type: "stringList", store as newline-joined string —
+   * this keeps TemplateState's `Record<string, string>` shape simple while
+   * the editor renders the list as separate inputs with × remove + Add. */
   default: string;
   /** For type: "select" — the available choices. */
   options?: { value: string; label: string }[];
+  /** For type: "stringList" — caps the number of entries; "+ Add" disables
+   * once length reaches max. Label gets a "(n / max)" counter. */
+  max?: number;
   /** Optional conditional render rule — field only shows when state[key] === value. */
   showWhen?: { key: string; value: string };
 }
