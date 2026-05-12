@@ -1,6 +1,7 @@
 "use client";
 
 import { useEffect, useMemo, useRef, useState } from "react";
+import Link from "next/link";
 import { Canvas } from "@/engine/canvas";
 import {
   SIZE_PRESETS,
@@ -192,12 +193,12 @@ export function TemplateEditor({ template }: TemplateEditorProps) {
     <main className="min-h-screen bg-neutral-950 text-white">
       <div className="max-w-6xl mx-auto p-6 lg:p-10">
         <header className="mb-8">
-          <a
-            href="/social-animator"
+          <Link
+            href="/dashboard"
             className="text-xs uppercase tracking-[0.2em] text-[#4ef2d9] hover:underline"
           >
-            ← Social Animator
-          </a>
+            ← Studio
+          </Link>
           <h1 className="text-2xl font-semibold mt-1">{template.name}</h1>
           <p className="text-sm text-neutral-400 mt-1 max-w-md">
             {template.description}
