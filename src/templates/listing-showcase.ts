@@ -140,7 +140,10 @@ export const listingShowcaseTemplate: TemplateConfig = {
     // landscape phone photo (4:3) into a wider box, more of the photo's
     // useful content (the front door, key features) stays visible.
     const horizontalMargin = isShort ? 40 : 60;
-    const topMargin = isShort ? 60 : 80;
+    // H-7.9: Feed (4:5) reduces top inset 80→60 so the hero can claim
+    // more vertical real estate without pushing the bottom row off the
+    // 1080×1350 frame. Square + Reel preserved.
+    const topMargin = isShort ? 60 : isVertical ? 80 : 60;
     const bottomMargin = isShort ? 50 : 60;
 
     // Hero: fixed proportion of canvas height. Pre-H-1.5 the height was
@@ -154,7 +157,13 @@ export const listingShowcaseTemplate: TemplateConfig = {
     // the vertical slack that opened up when CHANGE 14 anchored the bottom
     // row to the frame bottom — without the bump, 9:16 had ~220pt of empty
     // canvas between the stats line and the features list.
-    const heroH = Math.floor(height * (isShort ? 0.42 : 0.52));
+    // H-7.9: Feed hero grows 0.52→0.55 (~+40pt at 1350). Combined with
+    // the topMargin reduction (-20pt) the hero is ~60pt taller while
+    // its top edge moves up — a more confident header presence on 4:5.
+    // Square + Reel preserved.
+    const heroH = Math.floor(
+      height * (isShort ? 0.42 : isVertical ? 0.52 : 0.55)
+    );
     const heroX = horizontalMargin;
     const heroY = topMargin;
     const heroW = width - horizontalMargin * 2;
@@ -179,11 +188,17 @@ export const listingShowcaseTemplate: TemplateConfig = {
     // H-7.5: +16px breathing room between hero photo bottom edge and
     // JUST LISTED badge — Dallen's feedback that the badge sat too
     // close to the photo edge. Applies to both aspects.
-    const gapHeroToBadge = isShort ? 37 : 46;
+    // H-7.9: Feed bumps further (46→60) so the badge reads as a
+    // segmentation marker between hero and info block, not as a tag
+    // hugging the photo. Square + Reel preserved.
+    const gapHeroToBadge = isShort ? 37 : isVertical ? 46 : 60;
     const gapBadgeToAddress = isShort ? 14 : 21;
     const gapAddressToCity = isShort ? 11 : 17;
     const gapCityToPrice = isShort ? 17 : 27;
-    const gapPriceToStats = isShort ? 18 : 27;
+    // H-7.9: Feed widens price→stats gap 27→42 so the price billboard
+    // reads as the dominant line, not crowding the stats row beneath
+    // it. Square + Reel preserved.
+    const gapPriceToStats = isShort ? 18 : isVertical ? 27 : 42;
 
     const contentX = horizontalMargin;
     const heroBottom = heroY + heroH;
@@ -528,6 +543,23 @@ export const listingShowcaseTemplate: TemplateConfig = {
           ctx.globalAlpha = p;
           ctx.translate(0, (1 - p) * 20);
 
+          // H-7.9: thin divider above the agent block (Feed only).
+          // Sits inside the existing stats→bottom gap so it consumes
+          // whitespace, not new vertical space. Muted color + low
+          // alpha — a hairline section marker, not a hard rule.
+          if (!isVertical) {
+            ctx.save();
+            ctx.globalAlpha = p * 0.35;
+            ctx.strokeStyle = state.agentMutedColor;
+            ctx.lineWidth = 1;
+            const dividerY = bottomSectionY - 14;
+            ctx.beginPath();
+            ctx.moveTo(rightColX, dividerY);
+            ctx.lineTo(rightColX + agentColW, dividerY);
+            ctx.stroke();
+            ctx.restore();
+          }
+
           // Top-anchored: same Y as the first feature line so both columns
           // start at the same horizontal level. No bottom-of-frame anchoring.
           let cursorY = bottomSectionY;
@@ -660,8 +692,11 @@ export const listingShowcaseTemplate: TemplateConfig = {
 
           // ── Phone (with optional inline license #) ───────────────────
           // Format license as "License #1234" so it doesn't read as a
-          // stray number. Inline with phone if it fits in the column,
-          // else fall through to its own line.
+          // stray number. Inline with phone — H-7.9 forces a single
+          // combined line for Feed (saves a row in the agent column +
+          // reads as one contact unit). Reel keeps the stack-on-overflow
+          // fallback so the narrow 360pt column can break cleanly
+          // when the combined width exceeds it (preserves H-7.5).
           const phoneText = state.agentPhone?.trim() ?? "";
           const licenseText = state.agentLicense?.trim()
             ? `License #${state.agentLicense.trim().replace(/^#/, "")}`
@@ -677,8 +712,13 @@ export const listingShowcaseTemplate: TemplateConfig = {
               ? `${phoneText}  ·  ${licenseText}`
               : phoneText;
 
-            if (licenseText && ctx.measureText(combined).width > agentColW) {
-              // Won't fit on one line — render phone now, license below.
+            const shouldStack =
+              isVertical &&
+              licenseText &&
+              ctx.measureText(combined).width > agentColW;
+
+            if (shouldStack) {
+              // Reel-only fallback — render phone now, license below.
               ctx.fillText(
                 truncateToWidth(phoneText, agentColW),
                 rightColX,
