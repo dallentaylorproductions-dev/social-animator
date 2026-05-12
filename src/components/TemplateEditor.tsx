@@ -16,7 +16,6 @@ import {
 import { ExportButton } from "@/components/ExportButton";
 import { ImageField } from "@/components/ImageField";
 import { formatPhone, useBrandSettings } from "@/lib/brand";
-import { BatchExportButton } from "@/components/BatchExportButton";
 import { getFFmpeg } from "@/engine/export";
 
 interface TemplateEditorProps {
@@ -405,15 +404,6 @@ export function TemplateEditor({ template }: TemplateEditorProps) {
                 filename={`${template.id}-${size.shortLabel.toLowerCase()}`}
                 onStartRecording={() => setPlayKey((k) => k + 1)}
               />
-              <div className="pt-3">
-                <BatchExportButton
-                  templateId={template.id}
-                  duration={duration}
-                  canvasRef={canvasRef}
-                  onSizeChange={setSizeKey}
-                  onPlayKeyChange={() => setPlayKey((k) => k + 1)}
-                />
-              </div>
             </div>
           </aside>
 
