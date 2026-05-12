@@ -96,20 +96,6 @@ export function ExportButton({
     }
   };
 
-  const handleExportWebm = async () => {
-    try {
-      setState({ kind: "recording", progress: 0 });
-      const webm = await doRecord();
-      await finishWithBlob(webm, `${filename}.webm`);
-    } catch (err) {
-      console.error("WebM export failed:", err);
-      setState({
-        kind: "error",
-        message: err instanceof Error ? err.message : String(err),
-      });
-    }
-  };
-
   const handleSave = async () => {
     if (state.kind !== "ready") return;
     try {
@@ -140,29 +126,19 @@ export function ExportButton({
           Save video
         </button>
       ) : (
-        <>
-          <button
-            onClick={handleExportMp4}
-            disabled={isBusy}
-            className="w-full bg-[#4ef2d9] hover:bg-[#3ad9c0] text-black rounded-md px-4 py-3 text-sm font-semibold transition disabled:opacity-60 disabled:cursor-not-allowed"
-          >
-            {state.kind === "idle" && "Export MP4"}
-            {state.kind === "recording" &&
-              `Recording… ${Math.round(state.progress * 100)}%`}
-            {state.kind === "converting" &&
-              `Converting to MP4… ${Math.round(state.progress * 100)}%`}
-            {state.kind === "saved" && "Saved ✓"}
-            {state.kind === "error" && "Try again — Export MP4"}
-          </button>
-
-          <button
-            onClick={handleExportWebm}
-            disabled={isBusy}
-            className="w-full bg-neutral-800 hover:bg-neutral-700 text-neutral-200 rounded-md px-4 py-2 text-xs font-medium transition disabled:opacity-60 disabled:cursor-not-allowed"
-          >
-            Export WebM (fallback)
-          </button>
-        </>
+        <button
+          onClick={handleExportMp4}
+          disabled={isBusy}
+          className="w-full bg-[#4ef2d9] hover:bg-[#3ad9c0] text-black rounded-md px-4 py-3 text-sm font-semibold transition disabled:opacity-60 disabled:cursor-not-allowed"
+        >
+          {state.kind === "idle" && "Export MP4"}
+          {state.kind === "recording" &&
+            `Recording… ${Math.round(state.progress * 100)}%`}
+          {state.kind === "converting" &&
+            `Converting to MP4… ${Math.round(state.progress * 100)}%`}
+          {state.kind === "saved" && "Saved ✓"}
+          {state.kind === "error" && "Try again — Export MP4"}
+        </button>
       )}
 
       {state.kind === "ready" && (
@@ -189,12 +165,11 @@ export function ExportButton({
         <div className="text-[11px] text-red-400 leading-snug break-words space-y-1">
           <p>Export failed: {state.message}</p>
           <p className="text-neutral-500">
-            Try the WebM fallback above, or{" "}
             <button
               onClick={reset}
               className="underline hover:text-neutral-300"
             >
-              reset
+              Reset and try again
             </button>
             .
           </p>

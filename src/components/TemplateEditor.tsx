@@ -15,7 +15,7 @@ import {
 } from "@/templates/types";
 import { ExportButton } from "@/components/ExportButton";
 import { ImageField } from "@/components/ImageField";
-import { useBrandSettings } from "@/lib/brand";
+import { formatPhone, useBrandSettings } from "@/lib/brand";
 import { BatchExportButton } from "@/components/BatchExportButton";
 import { getFFmpeg } from "@/engine/export";
 
@@ -162,14 +162,36 @@ export function TemplateEditor({ template }: TemplateEditorProps) {
   }, []);
 
   const timeline = useMemo(() => {
+    // H-7.8-2: listing-showcase reads agent name / brokerage / phone /
+    // license / logo from the brand profile rather than from sidebar
+    // form fields. Inject those values into build() inputs for that
+    // template only — mirrors the four main tools' pattern (Listing
+    // Flyer's template-mapping.ts does the same merge). Other templates
+    // pass state + assets straight through unchanged.
+    const buildState =
+      template.id === "listing-showcase"
+        ? {
+            ...state,
+            agentName: brandSettings.agentName || "",
+            agentBrokerage: brandSettings.brokerage || "",
+            agentPhone: brandSettings.contactPhone
+              ? formatPhone(brandSettings.contactPhone)
+              : "",
+            agentLicense: brandSettings.licenseNumber || "",
+          }
+        : state;
+    const buildAssets =
+      template.id === "listing-showcase"
+        ? { ...assets, agentLogo: brandLogo }
+        : assets;
     const t = template.build(
-      state,
+      buildState,
       { width: size.width, height: size.height },
-      assets
+      buildAssets
     );
     t.duration = duration;
     return t;
-  }, [template, state, size, duration, assets]);
+  }, [template, state, size, duration, assets, brandSettings, brandLogo]);
 
   const paintBackground = useMemo(
     () => makePaintBackground(state, size.width, size.height),

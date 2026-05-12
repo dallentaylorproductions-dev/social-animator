@@ -51,7 +51,12 @@ export const listingShowcaseTemplate: TemplateConfig = {
   availableSizes: ["1080x1350"],
   fields: [
     { key: "heroPhoto", label: "Hero photo", type: "image", default: "" },
-    { key: "agentLogo", label: "Agent logo (optional)", type: "image", default: "" },
+    // H-7.8-2: agent fields (logo, name, brokerage, phone, license)
+    // removed from the editor sidebar. The standalone Social Animator
+    // editor now injects these from the brand profile via TemplateEditor;
+    // the Listing Flyer tool already mapped them from its own
+    // template-mapping.ts. build() still reads state.agentName etc., so
+    // both callsites continue to render the agent card.
     {
       key: "status",
       label: "Status",
@@ -73,30 +78,6 @@ export const listingShowcaseTemplate: TemplateConfig = {
       // (it already splits state.features on \n and slices to featuresMax).
       default:
         "Chef's kitchen with quartz counters\nPrimary suite with spa bath",
-    },
-    {
-      key: "agentName",
-      label: "Agent name",
-      type: "text",
-      default: "",
-    },
-    {
-      key: "agentBrokerage",
-      label: "Brokerage",
-      type: "text",
-      default: "",
-    },
-    {
-      key: "agentPhone",
-      label: "Agent phone",
-      type: "text",
-      default: "",
-    },
-    {
-      key: "agentLicense",
-      label: "License # (optional)",
-      type: "text",
-      default: "",
     },
     { key: "background", label: "Background", type: "color", default: "#0a0a0a" },
     { key: "statusColor", label: "Status badge", type: "color", default: "#4ef2d9" },
