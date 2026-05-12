@@ -44,6 +44,23 @@ export async function renderTimelineToWebm(
     `[MP4-DEBUG] renderTimelineToWebm: ${size.width}x${size.height} duration=${seconds}s warmup=${warmupSec.toFixed(1)}s bg=${background}`
   );
 
+  // H-7.11 pre-paint: synchronously render the t=0 frame to the
+  // canvas BEFORE the rAF loop is scheduled and recordCanvas calls
+  // recorder.start(). Without this, there's a ~16ms window between
+  // recorder.start (sync) and the first rAF tick (next paint cycle)
+  // where the canvas sits in its post-clear state — iOS Safari's
+  // captureStream can emit a stale-residue first frame from the
+  // prior render's GPU buffer (visible as a "full composition flash"
+  // at frame 1 of the trimmed output MP4 for the Open House Promo
+  // tool, where t=0 is otherwise mostly empty; latent but invisible
+  // on Listing Flyer because its t=0 already draws the hero photo
+  // at full opacity). Idempotent with the rAF loop below — the
+  // first rAF tick re-paints frame 0 identically.
+  ctx.setTransform(1, 0, 0, 1, 0, 0);
+  ctx.fillStyle = background;
+  ctx.fillRect(0, 0, size.width, size.height);
+  timeline.render(0, ctx);
+
   const frame = (ts: DOMHighResTimeStamp) => {
     if (startTs === null) startTs = ts;
     const wallT = (ts - startTs) / 1000;
