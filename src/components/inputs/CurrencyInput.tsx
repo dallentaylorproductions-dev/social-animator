@@ -8,9 +8,23 @@ import {
 } from "./formatHelpers";
 
 /**
- * Live-formatted currency input ("$685,000"). Stores raw digits in
- * the parent's form state; the display string is derived on every
- * render via `formatCurrency`.
+ * Live-formatted currency input ("$685,000").
+ *
+ * Storage contract — STATE = DISPLAY: this component both accepts
+ * and emits the formatted display string (e.g. "$685,000"). The
+ * parent's form state holds the formatted form directly, which
+ * means downstream renderers (PDF documents, listing-showcase
+ * canvas regex, etc.) continue to receive the canonical display
+ * exactly as a manually-typed "$685,000" did before this phase.
+ *
+ * The brief's wording ("store raw digits") would have required
+ * updating every downstream renderer to re-format raw on output,
+ * since today the PDFs render `{draft.price}` literally and the
+ * canvas count-up animation extracts the "$" prefix via regex
+ * (`priceMatch[1]`). Storing raw would lose the prefix and
+ * regress both surfaces. Both `formatCurrency` and the canvas
+ * regex are idempotent when fed an already-formatted value, so
+ * state=display is the lowest-risk path.
  *
  * Cursor preservation: when the user types or deletes mid-string,
  * commas shift around but the caret must stay logically adjacent
@@ -19,22 +33,22 @@ import {
  *   1. On change, count how many raw digits sit to the LEFT of the
  *      browser-reported caret in the freshly-edited (pre-reformat)
  *      display.
- *   2. Call onChange with the stripped raw digits — React re-renders
- *      with the canonically-formatted display.
- *   3. In a useLayoutEffect (runs before the browser paints), walk
- *      the new formatted display and land the caret AFTER the same
- *      raw-digit ordinal — so commas shifted in or out are
- *      transparent to the user.
+ *   2. Compute the reformatted display from the stripped digits.
+ *   3. Call onChange with that reformatted string — React commits.
+ *   4. In a useLayoutEffect (runs before paint), walk the new
+ *      display and land the caret AFTER the same raw-digit ordinal,
+ *      so commas shifted in or out are transparent to the user.
  *
- * Paste handling: a paste of "$1,234,567" or "1234567" or "1.234.567"
- * all normalize to the same raw "1234567" because stripToDigits is
- * unconditional. The display always re-formats from raw.
+ * Paste handling: "$1,234,567", "1234567", "1.234.567" all
+ * normalize to the same "$1,234,567" via stripToDigits + format.
  */
 export interface CurrencyInputProps {
-  /** Raw integer digits, e.g. "685000". Empty string means empty. */
+  /** Formatted display string, e.g. "$685,000". Accepts any input
+   * shape — already-formatted, raw digits, partially-formatted —
+   * because formatCurrency is idempotent on its own output. */
   value: string;
-  /** Called with the raw digit string after any edit. */
-  onChange: (raw: string) => void;
+  /** Called with the new formatted display string after every edit. */
+  onChange: (formatted: string) => void;
   placeholder?: string;
   className?: string;
   required?: boolean;
@@ -75,7 +89,7 @@ export function CurrencyInput({
     const reformatted = formatCurrency(newRaw);
     pendingCaretRef.current = caretAfterNthDigit(reformatted, rawDigitsLeft);
 
-    onChange(newRaw);
+    onChange(reformatted);
   };
 
   // Restore the planned caret position after React commits the new

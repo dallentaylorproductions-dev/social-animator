@@ -4,23 +4,29 @@ import { useState } from "react";
 import { formatNumberWithCommas, stripToDigits } from "./formatHelpers";
 
 /**
- * On-blur formatted integer input ("2,840"). Stores raw digits in
- * the parent's form state. While focused the user sees the raw
- * digits (no commas) for clean editing; on blur the display switches
- * to the comma-grouped form. On focus it reverts.
+ * On-blur formatted integer input ("2,840").
  *
- * The blur-only formatting sidesteps the cursor-management gymnastics
- * needed for live currency inputs — fine for sqft and similar fields
- * where users rarely edit mid-value after committing a number.
+ * Storage contract — STATE = DISPLAY (formatted): the component emits
+ * the comma-grouped form, so parent state holds "2,840" directly and
+ * downstream renderers receive it unchanged. See CurrencyInput's
+ * comment block for why state=display beats state=raw for this phase
+ * (zero downstream changes; idempotent on already-formatted input).
  *
- * Paste handling: pasting "2,840" or "2840" both store raw "2840".
- * Non-digit characters are stripped on every keystroke.
+ * UX: while focused, display strips the commas so the user can edit
+ * a clean digit string. On blur the display switches back to the
+ * comma-grouped form AND the parent state updates to that
+ * comma-grouped form. On every keystroke the parent state also
+ * receives a comma-grouped value so live previews stay in sync.
+ *
+ * Paste handling: "2,840", "2840", or "2.840" all normalize via
+ * stripToDigits + format.
  */
 export interface NumberInputProps {
-  /** Raw integer digits, e.g. "2840". Empty string means empty. */
+  /** Formatted display string, e.g. "2,840". Accepts any input shape;
+   * formatNumberWithCommas is idempotent on already-formatted values. */
   value: string;
-  /** Called with the raw digit string after any edit. */
-  onChange: (raw: string) => void;
+  /** Called with the new formatted display string after every edit. */
+  onChange: (formatted: string) => void;
   placeholder?: string;
   className?: string;
   required?: boolean;
@@ -42,10 +48,15 @@ export function NumberInput({
 }: NumberInputProps) {
   const [isFocused, setIsFocused] = useState(false);
 
-  const display = isFocused ? value : formatNumberWithCommas(value);
+  // While focused, show the raw digit string for clean editing.
+  // When blurred (or in initial render), show the formatted form.
+  const display = isFocused ? stripToDigits(value) : formatNumberWithCommas(value);
 
   const handleChange = (e: React.ChangeEvent<HTMLInputElement>) => {
-    onChange(stripToDigits(e.target.value));
+    // Emit the comma-grouped form so parent state stays canonical
+    // even mid-edit; the display while focused continues to show raw
+    // digits (read directly from `value` via stripToDigits above).
+    onChange(formatNumberWithCommas(e.target.value));
   };
 
   return (

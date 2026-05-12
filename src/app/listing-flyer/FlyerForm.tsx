@@ -12,6 +12,7 @@ import {
 } from "@/tools/listing-flyer/engine/types";
 import { type BrandSettings } from "@/lib/brand";
 import { DurationSlider } from "@/components/ui/duration-slider";
+import { CurrencyInput, NumberInput } from "@/components/inputs";
 
 interface FlyerFormProps {
   draft: FlyerDraft;
@@ -171,7 +172,7 @@ export function FlyerForm({
       </Field>
 
       <Field label="List price" required>
-        <TextInput
+        <CurrencyInput
           value={draft.price}
           onChange={(v) => update("price", v)}
           placeholder="$685,000"
@@ -196,7 +197,7 @@ export function FlyerForm({
           />
         </Field>
         <Field label="Sq ft">
-          <TextInput
+          <NumberInput
             value={draft.sqft}
             onChange={(v) => update("sqft", v)}
             placeholder="2,840"

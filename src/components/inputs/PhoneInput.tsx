@@ -5,9 +5,15 @@ import { extractPhoneDigits, formatPhone } from "@/lib/brand";
 import { caretAfterNthDigit } from "./formatHelpers";
 
 /**
- * Live-formatted US phone input ("(253) 555-0188"). Stores raw 10
- * digits in the parent's form state; the display string is derived
- * via the shared `formatPhone` helper.
+ * Live-formatted US phone input ("(253) 555-0188").
+ *
+ * Storage contract — STATE = DISPLAY (formatted): the component
+ * emits the formatted display string, so most callers will store
+ * "(253) 555-0188" directly. `formatPhone` is idempotent on its
+ * own output, so a caller that prefers raw digits in state (e.g.,
+ * Settings/BrandProfileForm's existing pattern) can wrap onChange:
+ *
+ *     onChange={(v) => update("contactPhone", extractPhoneDigits(v))}
  *
  * Live (not on-blur) is intentional — phones have a fixed digit
  * count, the formatting is industry-standard, and live caret
@@ -15,16 +21,18 @@ import { caretAfterNthDigit } from "./formatHelpers";
  * shape is predictable. Reuses the same caret-after-nth-digit
  * strategy as CurrencyInput.
  *
- * Paste handling: any of "+1 253 555 0188", "(253) 555-0188",
- * "253-555-0188", or "12535550188" pastes into the same raw
- * "2535550188" — `extractPhoneDigits` strips non-digits and slices
- * to the last 10 (so a leading "+1" is dropped automatically).
+ * Paste handling: "+1 253 555 0188", "(253) 555-0188",
+ * "253-555-0188", or "12535550188" all normalize to "(253) 555-0188"
+ * via `extractPhoneDigits` (strips non-digits and slices to the last
+ * 10, so a leading "+1" is dropped automatically).
  */
 export interface PhoneInputProps {
-  /** Raw digits, up to 10 (e.g., "2535550188"). Empty string = empty. */
+  /** Formatted display string ("(253) 555-0188"), or any input shape
+   * that `formatPhone` can normalize (raw "2535550188", partial,
+   * already-formatted). */
   value: string;
-  /** Called with the raw digit string after any edit. */
-  onChange: (raw: string) => void;
+  /** Called with the new formatted display string after every edit. */
+  onChange: (formatted: string) => void;
   placeholder?: string;
   className?: string;
   required?: boolean;
@@ -65,7 +73,7 @@ export function PhoneInput({
     const reformatted = formatPhone(newRaw);
     pendingCaretRef.current = caretAfterNthDigit(reformatted, rawDigitsLeft);
 
-    onChange(newRaw);
+    onChange(reformatted);
   };
 
   useLayoutEffect(() => {
