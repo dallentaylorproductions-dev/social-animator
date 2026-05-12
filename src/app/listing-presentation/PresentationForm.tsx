@@ -13,6 +13,7 @@ import {
   HEADSHOT_QUALITY,
 } from "@/tools/listing-presentation/engine/types";
 import { type BrandSettings } from "@/lib/brand";
+import { CurrencyInput, NumberInput } from "@/components/inputs";
 
 interface PresentationFormProps {
   draft: PresentationDraft;
@@ -282,7 +283,7 @@ export function PresentationForm({
       <FormSection title="Track record">
         <div className="grid grid-cols-2 gap-3">
           <Field label="Homes sold this year">
-            <TextInput
+            <NumberInput
               value={draft.homesSold}
               onChange={(v) => update("homesSold", v)}
               placeholder="47"
@@ -392,7 +393,7 @@ export function PresentationForm({
                   }
                 />
                 <div className="grid grid-cols-3 gap-2">
-                  <TextInput
+                  <CurrencyInput
                     value={c.soldPrice}
                     onChange={(v) => updateComp(i, { soldPrice: v })}
                     placeholder="$685,000"
