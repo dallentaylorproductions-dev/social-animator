@@ -66,6 +66,13 @@ export interface TemplateConfig {
    * since its layout doesn't currently work at 1:1 — three specialized
    * listing tools cover that need elsewhere). */
   availableSizes?: TemplateSize[];
+  /** Set to true when the template renders its own in-content agent
+   * block (logo + name + brokerage + phone + license). The Canvas
+   * component skips the corner brand-overlay watermark for these
+   * templates so the agent name doesn't appear twice. Templates that
+   * don't draw their own agent block (default — the other 9 today)
+   * keep the overlay as their primary brand attribution. */
+  rendersAgentInContent?: boolean;
 }
 
 export function getDefaultState(template: TemplateConfig): TemplateState {

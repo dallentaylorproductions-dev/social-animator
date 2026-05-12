@@ -440,8 +440,10 @@ export function TemplateEditor({ template }: TemplateEditorProps) {
                 background={state.background ?? "#000000"}
                 paintBackground={paintBackground}
                 playKey={`${sizeKey}-${playKey}-${duration}`}
-                brandLogo={brandLogo}
-                brandName={brandSettings.agentName}
+                brandLogo={template.rendersAgentInContent ? null : brandLogo}
+                brandName={
+                  template.rendersAgentInContent ? "" : brandSettings.agentName
+                }
               />
               <p className="text-[10px] lg:text-xs text-neutral-500 mt-2 lg:mt-3 text-center">
                 Preview · {size.label} · {duration}s

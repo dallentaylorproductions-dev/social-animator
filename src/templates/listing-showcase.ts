@@ -49,6 +49,11 @@ export const listingShowcaseTemplate: TemplateConfig = {
   // — that path is unaffected by this restriction (availableSizes
   // governs only the standalone editor's size picker).
   availableSizes: ["1080x1350"],
+  // H-7.8.1: this template draws its own in-content agent card (track
+  // id "agentCard"), so the Canvas component should skip its
+  // drawBrandOverlay watermark — otherwise the agent name renders
+  // twice (once in-content, once as the corner overlay).
+  rendersAgentInContent: true,
   fields: [
     { key: "heroPhoto", label: "Hero photo", type: "image", default: "" },
     // H-7.8-2: agent fields (logo, name, brokerage, phone, license)
