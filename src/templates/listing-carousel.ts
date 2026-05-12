@@ -15,43 +15,74 @@ export const listingCarouselTemplate: TemplateConfig = {
   description:
     "Animated photo tour with coverflow-style transitions — next and previous photos peek in from the sides, hinting at what's coming.",
   duration: 10,
+  // H-7.12 image-asset keys use the objectList synthesized convention:
+  // `${fieldKey}.${index}.${innerFieldName}` → "images.0.imageUrl", etc.
+  // The seed file paths populate the picker-preview cards on the
+  // template list page.
   sampleAssets: {
-    photo1: "/sample-assets/exterior.webp",
-    photo2: "/sample-assets/kitchen.webp",
-    photo3: "/sample-assets/living-room.webp",
-    photo4: "/sample-assets/bedroom.webp",
-    photo5: "/sample-assets/bathroom.webp",
-    photo6: "/sample-assets/backyard.webp",
+    "images.0.imageUrl": "/sample-assets/exterior.webp",
+    "images.1.imageUrl": "/sample-assets/kitchen.webp",
+    "images.2.imageUrl": "/sample-assets/living-room.webp",
+    "images.3.imageUrl": "/sample-assets/bedroom.webp",
+    "images.4.imageUrl": "/sample-assets/bathroom.webp",
+    "images.5.imageUrl": "/sample-assets/backyard.webp",
   },
   sampleState: {
     title: "Open House Saturday",
     subtitle: "1:00–4:00pm",
+    // Picker-preview seed for the carousel needs 6 items in the JSON so
+    // build() iterates the right indices. Captions are intentionally
+    // empty — H-7.12-3 captures captions as data only; future visual
+    // phase will draw them per photo.
+    images: JSON.stringify(
+      Array.from({ length: 6 }, () => ({ imageUrl: "", caption: "" }))
+    ),
   },
   fields: [
     { key: "title", label: "Title (optional)", type: "text", default: "123 Maple Street" },
     { key: "titleColor", label: "Title color", type: "color", default: "#ffffff" },
     { key: "subtitle", label: "Subtitle (optional)", type: "text", default: "Open House Sat 1–4pm" },
     { key: "subtitleColor", label: "Subtitle color", type: "color", default: "#9ca3af" },
-    { key: "photo1", label: "Photo 1", type: "image", default: "" },
-    { key: "photo2", label: "Photo 2", type: "image", default: "" },
-    { key: "photo3", label: "Photo 3", type: "image", default: "" },
-    { key: "photo4", label: "Photo 4", type: "image", default: "" },
-    { key: "photo5", label: "Photo 5", type: "image", default: "" },
-    { key: "photo6", label: "Photo 6", type: "image", default: "" },
+    {
+      // H-7.12: replaces the previous photo1..photo6 fixed-slot fields.
+      // Up to 8 photos with optional captions; captions are stored but
+      // NOT rendered in this commit (B.1 data-only per audit). A
+      // follow-up visual phase will layer captions onto each photo.
+      key: "images",
+      label: "Photos",
+      type: "objectList",
+      max: 8,
+      default: "[]",
+      schema: {
+        imageUrl: { type: "image", label: "Photo" },
+        caption: { type: "text", label: "Caption (optional)", max: 60 },
+      },
+    },
     { key: "background", label: "Background", type: "color", default: "#000000" },
   ],
   build(state, size, assets) {
     const { width, height } = size;
 
-    // Collect uploaded + loaded photos in order, skipping empty slots
-    const photoKeys = ["photo1", "photo2", "photo3", "photo4", "photo5", "photo6"];
+    // H-7.12: read photo count from the objectList JSON in state.images,
+    // then look up each photo's HTMLImageElement at the synthesized
+    // asset key `images.${i}.imageUrl`. Skip slots that haven't been
+    // uploaded yet (img.complete + naturalWidth check matches the prior
+    // photo1..photo6 logic). Captions are present in the parsed array
+    // (item.caption) but intentionally not rendered yet — B.1 data-only.
+    let imageItems: Array<{ imageUrl?: string; caption?: string }> = [];
+    try {
+      const parsed = JSON.parse(state.images || "[]");
+      if (Array.isArray(parsed)) imageItems = parsed;
+    } catch {
+      // malformed JSON → render no photos (placeholder branch fires)
+    }
     const photos: HTMLImageElement[] = [];
-    for (const key of photoKeys) {
-      const img = assets?.[key];
+    imageItems.forEach((_, i) => {
+      const img = assets?.[`images.${i}.imageUrl`];
       if (img && img.complete && img.naturalWidth > 0) {
         photos.push(img);
       }
-    }
+    });
     const photoCount = photos.length;
 
     // Layout
