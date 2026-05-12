@@ -127,7 +127,22 @@ export function TemplateEditor({ template }: TemplateEditorProps) {
     return { ...defaults, ...saved };
   });
   const [assets, setAssets] = useState<TemplateAssets>({});
-  const [sizeKey, setSizeKey] = useState<TemplateSize>("1080x1350");
+  // H-7.7: templates can restrict the editor's size picker via
+  // `availableSizes`. Filter SIZE_PRESETS once; the initial sizeKey
+  // falls back to whichever size the template actually supports if
+  // the conventional Feed default isn't in the allowed list.
+  const availableSizes = useMemo(
+    () =>
+      template.availableSizes
+        ? SIZE_PRESETS.filter((s) => template.availableSizes!.includes(s.key))
+        : SIZE_PRESETS,
+    [template]
+  );
+  const [sizeKey, setSizeKey] = useState<TemplateSize>(() =>
+    availableSizes.some((s) => s.key === "1080x1350")
+      ? "1080x1350"
+      : availableSizes[0].key
+  );
   const [playKey, setPlayKey] = useState(0);
   const [duration, setDuration] = useState<number>(template.duration);
   const canvasRef = useRef<HTMLCanvasElement>(null);
@@ -212,7 +227,7 @@ export function TemplateEditor({ template }: TemplateEditorProps) {
                 Size
               </label>
               <div className="grid grid-cols-3 gap-2">
-                {SIZE_PRESETS.map((s) => (
+                {availableSizes.map((s) => (
                   <button
                     key={s.key}
                     onClick={() => setSizeKey(s.key)}

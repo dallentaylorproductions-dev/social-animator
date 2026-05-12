@@ -48,6 +48,12 @@ export interface TemplateConfig {
   /** Preview-only: image-field key → public path. Loaded by TemplatePreview
    * and passed as the `assets` arg to build() for the picker preview only. */
   sampleAssets?: Record<string, string>;
+  /** Restrict which SIZE_PRESETS the editor exposes for this template.
+   * Omit to allow all sizes. Used by templates whose layout only renders
+   * correctly at specific aspects (H-7.7: Listing Showcase is Feed-only
+   * since its layout doesn't currently work at 1:1 — three specialized
+   * listing tools cover that need elsewhere). */
+  availableSizes?: TemplateSize[];
 }
 
 export function getDefaultState(template: TemplateConfig): TemplateState {
