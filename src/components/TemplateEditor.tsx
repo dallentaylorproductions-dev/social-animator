@@ -16,7 +16,6 @@ import {
 import { ExportButton } from "@/components/ExportButton";
 import { ImageField } from "@/components/ImageField";
 import { formatPhone, useBrandSettings } from "@/lib/brand";
-import { BatchExportButton } from "@/components/BatchExportButton";
 import { getFFmpeg } from "@/engine/export";
 
 interface TemplateEditorProps {
@@ -405,15 +404,6 @@ export function TemplateEditor({ template }: TemplateEditorProps) {
                 filename={`${template.id}-${size.shortLabel.toLowerCase()}`}
                 onStartRecording={() => setPlayKey((k) => k + 1)}
               />
-              <div className="pt-3">
-                <BatchExportButton
-                  templateId={template.id}
-                  duration={duration}
-                  canvasRef={canvasRef}
-                  onSizeChange={setSizeKey}
-                  onPlayKeyChange={() => setPlayKey((k) => k + 1)}
-                />
-              </div>
             </div>
           </aside>
 
@@ -440,8 +430,10 @@ export function TemplateEditor({ template }: TemplateEditorProps) {
                 background={state.background ?? "#000000"}
                 paintBackground={paintBackground}
                 playKey={`${sizeKey}-${playKey}-${duration}`}
-                brandLogo={brandLogo}
-                brandName={brandSettings.agentName}
+                brandLogo={template.rendersAgentInContent ? null : brandLogo}
+                brandName={
+                  template.rendersAgentInContent ? "" : brandSettings.agentName
+                }
               />
               <p className="text-[10px] lg:text-xs text-neutral-500 mt-2 lg:mt-3 text-center">
                 Preview · {size.label} · {duration}s
