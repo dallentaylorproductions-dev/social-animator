@@ -157,12 +157,14 @@ export const listingShowcaseTemplate: TemplateConfig = {
     // the vertical slack that opened up when CHANGE 14 anchored the bottom
     // row to the frame bottom — without the bump, 9:16 had ~220pt of empty
     // canvas between the stats line and the features list.
-    // H-7.9: Feed hero grows 0.52→0.55 (~+40pt at 1350). Combined with
-    // the topMargin reduction (-20pt) the hero is ~60pt taller while
-    // its top edge moves up — a more confident header presence on 4:5.
-    // Square + Reel preserved.
+    // H-7.9 / H-7.9.1: Feed hero ratio. H-7.9 grew it 0.52→0.55 which
+    // combined with the spacing bumps pushed bottom content off-frame.
+    // H-7.9.1 pulls back to 0.48 — still taller than 0.52 in absolute
+    // terms thanks to the topMargin reduction (60 vs prior 80), but
+    // reclaims ~95pt of vertical budget so phone+license land cleanly
+    // inside the 60pt bottom inset. Square + Reel preserved.
     const heroH = Math.floor(
-      height * (isShort ? 0.42 : isVertical ? 0.52 : 0.55)
+      height * (isShort ? 0.42 : isVertical ? 0.52 : 0.48)
     );
     const heroX = horizontalMargin;
     const heroY = topMargin;
@@ -188,10 +190,11 @@ export const listingShowcaseTemplate: TemplateConfig = {
     // H-7.5: +16px breathing room between hero photo bottom edge and
     // JUST LISTED badge — Dallen's feedback that the badge sat too
     // close to the photo edge. Applies to both aspects.
-    // H-7.9: Feed bumps further (46→60) so the badge reads as a
-    // segmentation marker between hero and info block, not as a tag
-    // hugging the photo. Square + Reel preserved.
-    const gapHeroToBadge = isShort ? 37 : isVertical ? 46 : 60;
+    // H-7.9.1: Feed reverts to the H-7.5 baseline of 46 (was 60). The
+    // bumped value was contributing to the bottom overflow; the badge
+    // still reads as a deliberate marker at 46pt now that the hero is
+    // shorter (0.48 vs 0.55). Square + Reel preserved.
+    const gapHeroToBadge = isShort ? 37 : 46;
     const gapBadgeToAddress = isShort ? 14 : 21;
     const gapAddressToCity = isShort ? 11 : 17;
     const gapCityToPrice = isShort ? 17 : 27;
@@ -224,7 +227,14 @@ export const listingShowcaseTemplate: TemplateConfig = {
     const usableColsW = width - bottomColPadX * 2 - columnGap;
     const featuresColRatio = isVertical ? 540 / 900 : isShort ? 0.55 : 0.35;
     const featuresColW = Math.floor(usableColsW * featuresColRatio);
-    const agentColW = usableColsW - featuresColW;
+    // H-7.9.1: Feed pulls the agent column's right edge in by 30pt for
+    // breathing room from the frame edge — long names like "Aaron
+    // Thomas Home Team" were crowding right-of-center. The divider
+    // above the agent block spans rightColX → rightColX + agentColW,
+    // so it shortens with the column automatically. Square + Reel
+    // preserved (no inset).
+    const agentRightInset = isShort || isVertical ? 0 : 30;
+    const agentColW = usableColsW - featuresColW - agentRightInset;
     const leftColX = bottomColPadX;
     const rightColX = bottomColPadX + featuresColW + columnGap;
 
@@ -238,18 +248,23 @@ export const listingShowcaseTemplate: TemplateConfig = {
     const featureLineHeight = isShort ? 44 : isVertical ? 48 : 58;
     const featureBulletRadius = isShort ? 6 : isVertical ? 6 : 8;
 
-    // Agent info (right column). Square + Feed keep existing sizes.
+    // Agent info (right column). Square + Reel keep their H-7.5 sizes.
     // Vertical (Reel) H-7.5 — moves the agent typography to readable
     // sizes inside the 360pt column: logo 48, name 24pt bold (allows
     // 2-line wrap below), brokerage 16, phone 18 (slightly more
     // prominent — user-actionable), license 14. Row gap 12pt for
     // comfortable vertical rhythm.
-    const logoSize = isShort ? 48 : isVertical ? 48 : 64;
+    // H-7.9.1: Feed proportional shrinks — logo 64→54 (~−15%), name
+    // 38→34 (~−10%), brokerage 31→29 (~−7%), phone 31→28 (~−10%),
+    // license 25→22 (~−12%). Combined with the 30pt right-inset on
+    // agentColW, the block reads as a compact secondary panel that
+    // doesn't reach for the frame's right edge.
+    const logoSize = isShort ? 48 : isVertical ? 48 : 54;
     const logoToNameGap = 12;
-    const agentNameSize = isShort ? 28 : isVertical ? 24 : 38;
-    const agentBrokerageSize = isShort ? 25 : isVertical ? 16 : 31;
-    const agentPhoneSize = isShort ? 25 : isVertical ? 18 : 31;
-    const agentLicenseSize = isShort ? 19 : isVertical ? 14 : 25;
+    const agentNameSize = isShort ? 28 : isVertical ? 24 : 34;
+    const agentBrokerageSize = isShort ? 25 : isVertical ? 16 : 29;
+    const agentPhoneSize = isShort ? 25 : isVertical ? 18 : 28;
+    const agentLicenseSize = isShort ? 19 : isVertical ? 14 : 22;
     const agentRowGap = isShort ? 4 : isVertical ? 12 : 6;
 
     // ── Parse features ──────────────────────────────────────────────────
