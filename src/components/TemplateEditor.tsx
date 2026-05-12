@@ -12,6 +12,7 @@ import {
   type TemplateAssets,
   type TemplateState,
   type FieldDef,
+  type ObjectListSchema,
 } from "@/templates/types";
 import { ExportButton } from "@/components/ExportButton";
 import { ImageField } from "@/components/ImageField";
@@ -312,9 +313,18 @@ export function TemplateEditor({ template }: TemplateEditorProps) {
                   field.type === "stringList"
                     ? parseStringList(state[field.key] ?? "")
                     : null;
+                // objectList stores values JSON-stringified (mirrors stringList's
+                // JSON-ish encoding trick) — the parsed array drives both the
+                // "(n / max)" counter and the nested-card UI.
+                const objectListItems =
+                  field.type === "objectList"
+                    ? parseObjectList(state[field.key] ?? "")
+                    : null;
                 const labelText =
                   field.type === "stringList" && field.max !== undefined
                     ? `${field.label} (${stringListItems!.length} / ${field.max})`
+                    : field.type === "objectList" && field.max !== undefined
+                    ? `${field.label} (${objectListItems!.length} / ${field.max})`
                     : field.label;
                 return (
                   <div key={field.key}>
@@ -362,6 +372,19 @@ export function TemplateEditor({ template }: TemplateEditorProps) {
                         onChange={(next) =>
                           updateField(field.key, next.join("\n"))
                         }
+                      />
+                    )}
+                    {field.type === "objectList" && field.schema && objectListItems && (
+                      <ObjectListInput
+                        fieldKey={field.key}
+                        schema={field.schema}
+                        max={field.max}
+                        items={objectListItems}
+                        onChange={(items) =>
+                          updateField(field.key, JSON.stringify(items))
+                        }
+                        assets={assets}
+                        updateAsset={updateAsset}
                       />
                     )}
                     {field.type === "color" && (
@@ -530,6 +553,202 @@ function StringListInput({
         <button
           type="button"
           onClick={() => onChange([...items, ""])}
+          className="w-full bg-neutral-900 border border-dashed border-neutral-700 hover:border-[#4ef2d9] rounded-md px-3 py-2 text-xs text-neutral-400 hover:text-neutral-200 transition"
+        >
+          + Add
+        </button>
+      )}
+    </div>
+  );
+}
+
+/**
+ * Parse an `objectList` field's stored value (JSON-stringified array) into
+ * a typed array. Invalid JSON or non-array shapes fall back to an empty
+ * list so the editor never crashes on a corrupted state. Each item is
+ * coerced to a plain Record<string, string> (image data is stored as the
+ * empty string here — the actual HTMLImageElement lives in TemplateAssets
+ * under the synthesized key `${fieldKey}.${index}.${innerField}`).
+ */
+function parseObjectList(raw: string): Array<Record<string, string>> {
+  if (!raw) return [];
+  try {
+    const parsed = JSON.parse(raw);
+    if (!Array.isArray(parsed)) return [];
+    return parsed.map((it) =>
+      it && typeof it === "object" && !Array.isArray(it)
+        ? Object.fromEntries(
+            Object.entries(it as Record<string, unknown>).map(([k, v]) => [
+              k,
+              typeof v === "string" ? v : String(v ?? ""),
+            ])
+          )
+        : {}
+    );
+  } catch {
+    return [];
+  }
+}
+
+/**
+ * Renders the stacked-card UI for an `objectList` field. Each list item
+ * is a collapsible card with the schema's inner fields rendered as nested
+ * inputs. Add/remove mirror the stringList interaction model from H-7.7.1.
+ *
+ * Image-asset key convention: `${fieldKey}.${index}.${innerFieldName}`.
+ * Remove-item shifts trailing asset entries down by 1 to keep them aligned
+ * with the post-splice items array (otherwise an image upload on item 2
+ * would visually move to item 1's slot after item 0 is removed).
+ *
+ * The parent owns state; this component is purely a controlled-input
+ * wrapper that calls onChange with the next items array on every edit.
+ */
+function ObjectListInput({
+  fieldKey,
+  schema,
+  max,
+  items,
+  onChange,
+  assets,
+  updateAsset,
+}: {
+  fieldKey: string;
+  schema: ObjectListSchema;
+  max?: number;
+  items: Array<Record<string, string>>;
+  onChange: (next: Array<Record<string, string>>) => void;
+  assets: TemplateAssets;
+  updateAsset: (key: string, img: HTMLImageElement | null) => void;
+}) {
+  const canAdd = max === undefined || items.length < max;
+  const schemaEntries = Object.entries(schema);
+  const imageFieldNames = schemaEntries
+    .filter(([, spec]) => spec.type === "image")
+    .map(([name]) => name);
+
+  const assetKey = (index: number, innerField: string) =>
+    `${fieldKey}.${index}.${innerField}`;
+
+  const updateItemField = (i: number, fieldName: string, value: string) => {
+    const next = items.map((item, idx) =>
+      idx === i ? { ...item, [fieldName]: value } : item
+    );
+    onChange(next);
+  };
+
+  const addItem = () => {
+    const empty: Record<string, string> = {};
+    for (const [name] of schemaEntries) empty[name] = "";
+    onChange([...items, empty]);
+  };
+
+  const removeItem = (i: number) => {
+    // Shift any image-asset entries past index i down by 1 so they
+    // stay aligned with the post-splice items array.
+    for (const imgField of imageFieldNames) {
+      for (let j = i; j < items.length - 1; j++) {
+        const fromKey = assetKey(j + 1, imgField);
+        const toKey = assetKey(j, imgField);
+        updateAsset(toKey, assets[fromKey] ?? null);
+      }
+      // Clear the now-orphaned tail slot.
+      updateAsset(assetKey(items.length - 1, imgField), null);
+    }
+    onChange(items.filter((_, idx) => idx !== i));
+  };
+
+  return (
+    <div className="space-y-3">
+      {items.map((item, i) => (
+        <div
+          key={i}
+          className="bg-neutral-900 border border-neutral-800 rounded-md p-3 space-y-3"
+        >
+          <div className="flex items-center justify-between">
+            <span className="text-[10px] uppercase tracking-[0.15em] text-neutral-500">
+              Item {i + 1}
+            </span>
+            <button
+              type="button"
+              onClick={() => removeItem(i)}
+              className="text-xs text-neutral-500 hover:text-red-400 transition"
+              aria-label="Remove item"
+            >
+              Remove
+            </button>
+          </div>
+          {schemaEntries.map(([fieldName, spec]) => {
+            const innerLabelText = spec.label;
+            const innerValue = item[fieldName] ?? "";
+            const inputClass =
+              "w-full bg-neutral-950 border border-neutral-800 rounded-md px-3 py-2 text-base lg:text-sm focus:outline-none focus:border-[#4ef2d9]";
+            return (
+              <div key={fieldName}>
+                <label className="block text-[10px] uppercase tracking-[0.15em] text-neutral-500 mb-1">
+                  {innerLabelText}
+                </label>
+                {spec.type === "text" && (
+                  <input
+                    type="text"
+                    value={innerValue}
+                    onChange={(e) =>
+                      updateItemField(i, fieldName, e.target.value)
+                    }
+                    placeholder={spec.placeholder}
+                    maxLength={spec.max}
+                    className={inputClass}
+                  />
+                )}
+                {spec.type === "textarea" && (
+                  <textarea
+                    value={innerValue}
+                    onChange={(e) =>
+                      updateItemField(i, fieldName, e.target.value)
+                    }
+                    rows={2}
+                    placeholder={spec.placeholder}
+                    maxLength={spec.max}
+                    className={`${inputClass} resize-none`}
+                  />
+                )}
+                {spec.type === "image" && (
+                  <ImageField
+                    value={assets[assetKey(i, fieldName)] ?? null}
+                    onChange={(img) =>
+                      updateAsset(assetKey(i, fieldName), img)
+                    }
+                  />
+                )}
+                {spec.type === "currency" && (
+                  <CurrencyInput
+                    value={innerValue}
+                    onChange={(v) => updateItemField(i, fieldName, v)}
+                    placeholder={spec.placeholder}
+                  />
+                )}
+                {spec.type === "number" && (
+                  <NumberInput
+                    value={innerValue}
+                    onChange={(v) => updateItemField(i, fieldName, v)}
+                    placeholder={spec.placeholder}
+                  />
+                )}
+                {spec.type === "phone" && (
+                  <PhoneInput
+                    value={innerValue}
+                    onChange={(v) => updateItemField(i, fieldName, v)}
+                    placeholder={spec.placeholder}
+                  />
+                )}
+              </div>
+            );
+          })}
+        </div>
+      ))}
+      {canAdd && (
+        <button
+          type="button"
+          onClick={addItem}
           className="w-full bg-neutral-900 border border-dashed border-neutral-700 hover:border-[#4ef2d9] rounded-md px-3 py-2 text-xs text-neutral-400 hover:text-neutral-200 transition"
         >
           + Add
