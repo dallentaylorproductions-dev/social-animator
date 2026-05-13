@@ -39,9 +39,12 @@ export const listingCarouselTemplate: TemplateConfig = {
   },
   fields: [
     { key: "title", label: "Title (optional)", type: "text", default: "123 Maple Street" },
-    { key: "titleColor", label: "Title color", type: "color", default: "#ffffff" },
     { key: "subtitle", label: "Subtitle (optional)", type: "text", default: "Open House Sat 1–4pm" },
-    { key: "subtitleColor", label: "Subtitle color", type: "color", default: "#9ca3af" },
+    // H-7.13: brand-slot color fields. Primary = title text, Accent =
+    // subtitle + caption text. Empty defaults flow through the brand
+    // profile at render time (resolveBrandColors in TemplateEditor).
+    { key: "primary", label: "Primary", type: "color", default: "" },
+    { key: "accent", label: "Accent", type: "color", default: "" },
     {
       // H-7.12: replaces the previous photo1..photo6 fixed-slot fields.
       // Up to 8 photos with optional captions. H-7.12-3.5 renders the
@@ -126,7 +129,7 @@ export const listingCarouselTemplate: TemplateConfig = {
         onUpdate: (p, ctx) => {
           ctx.globalAlpha = p;
           ctx.translate(0, (1 - p) * 16);
-          ctx.fillStyle = state.titleColor;
+          ctx.fillStyle = state.primary;
           ctx.font = `bold ${titleFontSize}px Inter, system-ui, sans-serif`;
           ctx.textAlign = "center";
           ctx.textBaseline = "middle";
@@ -167,7 +170,7 @@ export const listingCarouselTemplate: TemplateConfig = {
           const subtitleAnchorY =
             titleY + 90 + (titleLines.length - 1) * titleLineHeight;
 
-          ctx.fillStyle = state.subtitleColor || "#9ca3af";
+          ctx.fillStyle = state.accent;
           ctx.font = `600 32px Inter, system-ui, sans-serif`;
           ctx.textAlign = "center";
           ctx.textBaseline = "middle";
@@ -292,7 +295,7 @@ export const listingCarouselTemplate: TemplateConfig = {
               if (!caption || alpha <= 0.01) return;
               ctx.save();
               ctx.globalAlpha = alpha;
-              ctx.fillStyle = state.subtitleColor || "#9ca3af";
+              ctx.fillStyle = state.accent;
               ctx.font = `500 ${captionFontSize}px Inter, system-ui, sans-serif`;
               ctx.textAlign = "center";
               ctx.textBaseline = "top";

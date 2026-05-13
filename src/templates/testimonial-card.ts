@@ -23,25 +23,12 @@ export const testimonialCardTemplate: TemplateConfig = {
       type: "text",
       default: "— Mark & Lisa T., Beaverton",
     },
+    // H-7.13: brand-slot color fields. Primary = the oversized opening
+    // quote glyph, Accent = the body of the quote text. Attribution
+    // line is hardcoded muted (consistently muted per audit §4.4).
+    { key: "primary", label: "Primary", type: "color", default: "" },
+    { key: "accent", label: "Accent", type: "color", default: "" },
     { key: "background", label: "Background", type: "color", default: "#000000" },
-    {
-      key: "quoteMarkColor",
-      label: "Quote mark color",
-      type: "color",
-      default: "#4ef2d9",
-    },
-    {
-      key: "quoteTextColor",
-      label: "Quote text color",
-      type: "color",
-      default: "#ffffff",
-    },
-    {
-      key: "attributionColor",
-      label: "Attribution color",
-      type: "color",
-      default: "#9ca3af",
-    },
   ],
   build(state, size) {
     const { width, height } = size;
@@ -71,7 +58,7 @@ export const testimonialCardTemplate: TemplateConfig = {
         ctx.globalAlpha = alpha;
         ctx.translate(width / 2, quoteMarkY);
         ctx.scale(scale, scale);
-        ctx.fillStyle = state.quoteMarkColor;
+        ctx.fillStyle = state.primary;
         // Georgia gives a more pronounced quote-mark glyph than Inter
         ctx.font = `900 ${quoteMarkSize}px Georgia, "Times New Roman", serif`;
         ctx.textAlign = "center";
@@ -89,7 +76,7 @@ export const testimonialCardTemplate: TemplateConfig = {
       onUpdate: (p, ctx) => {
         ctx.globalAlpha = p;
         ctx.translate(0, (1 - p) * 30);
-        ctx.fillStyle = state.quoteTextColor;
+        ctx.fillStyle = state.accent;
         ctx.font = `500 ${quoteFontSize}px Inter, system-ui, sans-serif`;
         ctx.textAlign = "center";
         ctx.textBaseline = "middle";
@@ -111,7 +98,8 @@ export const testimonialCardTemplate: TemplateConfig = {
       onUpdate: (p, ctx) => {
         ctx.globalAlpha = p;
         ctx.translate(0, (1 - p) * 20);
-        ctx.fillStyle = state.attributionColor;
+        // Hardcoded muted (audit §4.4 — attribution uniformly muted).
+        ctx.fillStyle = "#9ca3af";
         ctx.font = `400 ${attributionFontSize}px Inter, system-ui, sans-serif`;
         ctx.textAlign = "center";
         ctx.textBaseline = "middle";

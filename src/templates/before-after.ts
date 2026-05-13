@@ -19,10 +19,12 @@ export const beforeAfterTemplate: TemplateConfig = {
     { key: "beforeLabel", label: "Before label", type: "text", default: "BEFORE" },
     { key: "afterPhoto", label: "After photo", type: "image", default: "" },
     { key: "afterLabel", label: "After label", type: "text", default: "AFTER" },
+    // H-7.13: brand-slot color fields. Primary = title text, Accent =
+    // BEFORE/AFTER pill background. Label text is hardcoded (contrast-
+    // driven, not a customization point per audit §4.2).
+    { key: "primary", label: "Primary", type: "color", default: "" },
+    { key: "accent", label: "Accent", type: "color", default: "" },
     { key: "background", label: "Background", type: "color", default: "#000000" },
-    { key: "titleColor", label: "Title color", type: "color", default: "#ffffff" },
-    { key: "labelBg", label: "Label background", type: "color", default: "#4ef2d9" },
-    { key: "labelText", label: "Label text", type: "color", default: "#0a0a0a" },
   ],
   build(state, size, assets) {
     const { width, height } = size;
@@ -95,12 +97,14 @@ export const beforeAfterTemplate: TemplateConfig = {
       const textW = ctx.measureText(text).width;
       const labelW = textW + labelPaddingH * 2;
 
-      ctx.fillStyle = state.labelBg;
+      ctx.fillStyle = state.accent;
       ctx.beginPath();
       ctx.roundRect(-labelW / 2, -labelHeight / 2, labelW, labelHeight, labelHeight / 2);
       ctx.fill();
 
-      ctx.fillStyle = state.labelText;
+      // Hardcoded near-black for label text — contrast-driven against the
+      // pill fill, not a customization point (audit §4.2).
+      ctx.fillStyle = "#0a0a0a";
       ctx.textAlign = "center";
       ctx.textBaseline = "middle";
       ctx.fillText(text, 0, 0);
@@ -119,7 +123,7 @@ export const beforeAfterTemplate: TemplateConfig = {
       onUpdate: (p, ctx) => {
         ctx.globalAlpha = p;
         ctx.translate(0, (1 - p) * 20);
-        ctx.fillStyle = state.titleColor;
+        ctx.fillStyle = state.primary;
         ctx.font = `bold ${titleFontSize}px Inter, system-ui, sans-serif`;
         ctx.textAlign = "center";
         ctx.textBaseline = "middle";
