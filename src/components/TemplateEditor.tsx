@@ -14,6 +14,13 @@ import {
   type FieldDef,
   type ObjectListSchema,
 } from "@/templates/types";
+import {
+  BRAND_SLOT_KEYS,
+  brandColorFor,
+  brandColorSlotsFor,
+  isMigratedTemplate,
+  resolveBrandColors,
+} from "@/templates/brand-slots";
 import { ExportButton } from "@/components/ExportButton";
 import { ImageField } from "@/components/ImageField";
 import {
@@ -91,74 +98,6 @@ function saveColors(template: TemplateConfig, state: TemplateState): void {
   } catch {
     // ignore
   }
-}
-
-/**
- * H-7.13 simplified color picker. Brand-slot field keys move from the inline
- * sidebar into a dedicated "Brand colors" section at the top of the form,
- * mirroring the pattern shared by Listing Flyer / OH Promo / Listing
- * Presentation. The slot set is closed (matches the audit's documented
- * exception for qa-card) so unrelated color fields stay inline.
- */
-const BRAND_SLOT_KEYS = new Set([
-  "primary",
-  "accent",
-  "background",
-  // qa-card exception (audit §4.6): question/answer panel pairing is a
-  // signature design element that doesn't map cleanly to brand primary/
-  // accent, so question panel surfaces as a 4th slot on qa-card.
-  "questionPanel",
-]);
-
-function brandColorSlotsFor(template: TemplateConfig): FieldDef[] {
-  return template.fields.filter(
-    (f) => f.type === "color" && BRAND_SLOT_KEYS.has(f.key)
-  );
-}
-
-/**
- * A template is considered migrated to the H-7.13 brand-slot pattern once it
- * declares `primary` or `accent` color fields. Pre-migration templates keep
- * their legacy inline-color FieldDefs and bypass the brand inheritance layer;
- * the form layout for those templates is identical to v1.38.
- */
-function isMigratedTemplate(template: TemplateConfig): boolean {
-  return template.fields.some(
-    (f) => f.key === "primary" || f.key === "accent"
-  );
-}
-
-/**
- * Resolve the effective fallback color for a brand slot. Primary + accent
- * pull from the brand profile; background and exception slots use the
- * template's own FieldDef.default (per audit §3.1 — backgroundColor is
- * intentionally NOT exposed in BrandProfileForm, so the per-template
- * default is the only fallback for the Background slot).
- */
-function brandColorFor(slot: FieldDef, brand: BrandSettings): string {
-  if (slot.key === "primary") return brand.primaryColor || slot.default;
-  if (slot.key === "accent") return brand.accentColor || slot.default;
-  return slot.default;
-}
-
-/**
- * Build the resolved state passed to template.build(). For migrated
- * templates, empty brand-slot values fall through to the brand profile
- * (primary/accent) or to the FieldDef default (background, exceptions).
- * Non-empty values are user overrides and pass through unchanged.
- */
-function resolveBrandColors(
-  state: TemplateState,
-  template: TemplateConfig,
-  brand: BrandSettings
-): TemplateState {
-  const slots = brandColorSlotsFor(template);
-  if (slots.length === 0) return state;
-  const out: TemplateState = { ...state };
-  for (const slot of slots) {
-    if (!out[slot.key]) out[slot.key] = brandColorFor(slot, brand);
-  }
-  return out;
 }
 
 /** Build the form's fields list with EXTRA_BACKGROUND_FIELDS injected right
