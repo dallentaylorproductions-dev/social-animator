@@ -161,8 +161,14 @@ export function PresentationPreview({
               <span className="text-[26px] font-bold">{headshotInitial}</span>
             </div>
           )}
+          {/* v1.39.1: `min-w-0` lets the flex child shrink below its
+           *  content's intrinsic width; `[overflow-wrap:anywhere]` breaks
+           *  long unbroken strings (emails, license #s, URLs, hashtags)
+           *  at the column edge instead of overflowing the preview right
+           *  edge. Normal text with spaces still wraps at word boundaries
+           *  first — `anywhere` only character-breaks as a fallback. */}
           <p
-            className="text-[11px] leading-relaxed flex-1"
+            className="text-[11px] leading-relaxed flex-1 min-w-0 [overflow-wrap:anywhere]"
             style={{ color: textPrimary }}
           >
             {draft.agentBio ||
