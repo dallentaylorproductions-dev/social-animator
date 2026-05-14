@@ -46,17 +46,14 @@ export const numberedProcessTemplate: TemplateConfig = {
       type: "textarea",
       default: "Inspection, appraisal, signing day. We've got you.",
     },
+    // H-7.13: brand-slot color fields. Primary = step badges + connecting
+    // path, Accent = title text. The white-card-with-dark-text trio
+    // (cardColor / cardTitleColor / cardBodyColor) is hardcoded —
+    // load-bearing for legibility on the step cards, not a customization
+    // point per audit §4.7.
+    { key: "primary", label: "Primary", type: "color", default: "" },
+    { key: "accent", label: "Accent", type: "color", default: "" },
     { key: "background", label: "Background", type: "color", default: "#000000" },
-    { key: "titleColor", label: "Title color", type: "color", default: "#ffffff" },
-    {
-      key: "accentColor",
-      label: "Accent (badges + path)",
-      type: "color",
-      default: "#4ef2d9",
-    },
-    { key: "cardColor", label: "Card", type: "color", default: "#ffffff" },
-    { key: "cardTitleColor", label: "Card title", type: "color", default: "#0a0a0a" },
-    { key: "cardBodyColor", label: "Card body", type: "color", default: "#3a3a3a" },
   ],
   build(state, size) {
     const { width, height } = size;
@@ -98,7 +95,7 @@ export const numberedProcessTemplate: TemplateConfig = {
       easing: easeOutCubic,
       onUpdate: (p, ctx) => {
         ctx.globalAlpha = p;
-        ctx.fillStyle = state.titleColor;
+        ctx.fillStyle = state.accent;
         ctx.font = `bold ${titleFontSize}px Inter, system-ui, sans-serif`;
         ctx.textAlign = "center";
         ctx.textBaseline = "middle";
@@ -120,18 +117,20 @@ export const numberedProcessTemplate: TemplateConfig = {
           ctx.globalAlpha = p;
           ctx.translate(0, slideOffset);
 
-          ctx.fillStyle = state.cardColor;
+          // Hardcoded card-surface trio — load-bearing for legibility on
+          // the step cards (audit §4.7).
+          ctx.fillStyle = "#ffffff";
           ctx.beginPath();
           ctx.roundRect(cardX, stepY - cardHeight / 2, cardWidth, cardHeight, 24);
           ctx.fill();
 
-          ctx.fillStyle = state.cardTitleColor;
+          ctx.fillStyle = "#0a0a0a";
           ctx.font = `700 ${cardTitleSize}px Inter, system-ui, sans-serif`;
           ctx.textAlign = "left";
           ctx.textBaseline = "top";
           ctx.fillText(step.title, cardX + cardPadding, stepY - cardHeight / 2 + cardPadding);
 
-          ctx.fillStyle = state.cardBodyColor;
+          ctx.fillStyle = "#3a3a3a";
           ctx.font = `400 ${cardBodySize}px Inter, system-ui, sans-serif`;
           drawWrappedText(
             ctx,
@@ -142,7 +141,7 @@ export const numberedProcessTemplate: TemplateConfig = {
             cardBodyLineHeight
           );
 
-          ctx.fillStyle = state.accentColor;
+          ctx.fillStyle = state.primary;
           ctx.beginPath();
           ctx.arc(badgeX, stepY, badgeRadius, 0, Math.PI * 2);
           ctx.fill();
@@ -175,7 +174,7 @@ export const numberedProcessTemplate: TemplateConfig = {
           }
           const drawnLength = p * totalLength;
 
-          ctx.strokeStyle = state.accentColor;
+          ctx.strokeStyle = state.primary;
           ctx.lineWidth = 4;
           ctx.setLineDash([10, 10]);
           ctx.lineCap = "round";
@@ -217,7 +216,7 @@ export const numberedProcessTemplate: TemplateConfig = {
             yPos = stepStartY + (i + 1) * stepSpacing + badgeRadius;
           }
 
-          ctx.fillStyle = state.accentColor;
+          ctx.fillStyle = state.primary;
           ctx.globalAlpha = 0.35;
           ctx.beginPath();
           ctx.arc(badgeX, yPos, 22, 0, Math.PI * 2);

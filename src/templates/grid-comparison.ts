@@ -43,12 +43,14 @@ export const gridComparisonTemplate: TemplateConfig = {
       type: "textarea",
       default: "Curb appeal closes deals.",
     },
+    // H-7.13: brand-slot color fields. Primary = center cross connector
+    // + glow rings, Accent = title text. The white-card-with-dark-text
+    // trio (cardColor / cardTitleColor / cardBodyColor) is hardcoded —
+    // load-bearing for legibility on the four cards, not a customization
+    // point per audit §4.8.
+    { key: "primary", label: "Primary", type: "color", default: "" },
+    { key: "accent", label: "Accent", type: "color", default: "" },
     { key: "background", label: "Background", type: "color", default: "#000000" },
-    { key: "titleColor", label: "Title", type: "color", default: "#ffffff" },
-    { key: "accentColor", label: "Accent", type: "color", default: "#4ef2d9" },
-    { key: "cardColor", label: "Card", type: "color", default: "#ffffff" },
-    { key: "cardTitleColor", label: "Card title", type: "color", default: "#0a0a0a" },
-    { key: "cardBodyColor", label: "Card body", type: "color", default: "#3a3a3a" },
   ],
   build(state, size) {
     const { width, height } = size;
@@ -88,7 +90,7 @@ export const gridComparisonTemplate: TemplateConfig = {
       easing: easeOutCubic,
       onUpdate: (p, ctx) => {
         ctx.globalAlpha = p;
-        ctx.fillStyle = state.titleColor;
+        ctx.fillStyle = state.accent;
         ctx.font = `bold ${titleFontSize}px Inter, system-ui, sans-serif`;
         ctx.textAlign = "center";
         ctx.textBaseline = "middle";
@@ -108,7 +110,7 @@ export const gridComparisonTemplate: TemplateConfig = {
         const horizontalReach = (cardWidth + gridGap) / 2 - 30;
         const verticalReach = (cardHeight + gridGap) / 2 - 30;
 
-        ctx.strokeStyle = state.accentColor;
+        ctx.strokeStyle = state.primary;
         ctx.lineWidth = 3;
         ctx.lineCap = "round";
 
@@ -124,7 +126,7 @@ export const gridComparisonTemplate: TemplateConfig = {
         ctx.stroke();
 
         ctx.globalAlpha = p;
-        ctx.fillStyle = state.accentColor;
+        ctx.fillStyle = state.primary;
         ctx.beginPath();
         ctx.arc(centerX, centerY, 10, 0, Math.PI * 2);
         ctx.fill();
@@ -152,7 +154,9 @@ export const gridComparisonTemplate: TemplateConfig = {
           ctx.scale(popScale, popScale);
           ctx.translate(-cx, -cy);
 
-          ctx.fillStyle = state.cardColor;
+          // Hardcoded card-surface trio — load-bearing for legibility on
+          // the four grid cards (audit §4.8).
+          ctx.fillStyle = "#ffffff";
           ctx.beginPath();
           ctx.roundRect(pos.x, pos.y, cardWidth, cardHeight, 28);
           ctx.fill();
@@ -162,11 +166,11 @@ export const gridComparisonTemplate: TemplateConfig = {
           ctx.textBaseline = "middle";
           ctx.fillText(card.icon, pos.x + cardWidth / 2, pos.y + 130);
 
-          ctx.fillStyle = state.cardTitleColor;
+          ctx.fillStyle = "#0a0a0a";
           ctx.font = `700 42px Inter, system-ui, sans-serif`;
           ctx.fillText(card.title, pos.x + cardWidth / 2, pos.y + 270);
 
-          ctx.fillStyle = state.cardBodyColor;
+          ctx.fillStyle = "#3a3a3a";
           ctx.font = `400 26px Inter, system-ui, sans-serif`;
           ctx.textAlign = "center";
           ctx.textBaseline = "top";
@@ -193,7 +197,7 @@ export const gridComparisonTemplate: TemplateConfig = {
           if (alpha <= 0.01) return;
 
           ctx.globalAlpha = alpha;
-          ctx.strokeStyle = state.accentColor;
+          ctx.strokeStyle = state.primary;
           ctx.lineWidth = 4;
           ctx.beginPath();
           ctx.arc(pos.x + cardWidth / 2, pos.y + 130, radius, 0, Math.PI * 2);

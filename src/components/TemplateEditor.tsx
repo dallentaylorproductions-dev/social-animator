@@ -14,9 +14,20 @@ import {
   type FieldDef,
   type ObjectListSchema,
 } from "@/templates/types";
+import {
+  BRAND_SLOT_KEYS,
+  brandColorFor,
+  brandColorSlotsFor,
+  isMigratedTemplate,
+  resolveBrandColors,
+} from "@/templates/brand-slots";
 import { ExportButton } from "@/components/ExportButton";
 import { ImageField } from "@/components/ImageField";
-import { formatPhone, useBrandSettings } from "@/lib/brand";
+import {
+  formatPhone,
+  useBrandSettings,
+  type BrandSettings,
+} from "@/lib/brand";
 import {
   LISTING_PROFILE_FIELDS,
   useListingProfile,
@@ -89,19 +100,24 @@ function saveColors(template: TemplateConfig, state: TemplateState): void {
   }
 }
 
-function clearSavedColors(template: TemplateConfig): void {
-  if (typeof window === "undefined") return;
-  try {
-    window.localStorage.removeItem(SAVED_COLORS_KEY_PREFIX + template.id);
-  } catch {
-    // ignore
-  }
-}
-
 /** Build the form's fields list with EXTRA_BACKGROUND_FIELDS injected right
  *  after the template's existing "background" color field, so background
- *  controls are grouped. If no "background" field exists, extras append. */
-function buildRenderedFields(template: TemplateConfig): FieldDef[] {
+ *  controls are grouped. If no "background" field exists, extras append.
+ *
+ *  H-7.13: for migrated templates (those declaring `primary` or `accent`),
+ *  brand-slot color fields move into the top-of-form BrandColorsSection
+ *  and are excluded from the inline list. EXTRA_BACKGROUND_FIELDS append
+ *  at the end since the inline background anchor is now absent.
+ */
+function buildRenderedFields(
+  template: TemplateConfig,
+  isMigrated: boolean
+): FieldDef[] {
+  if (isMigrated) {
+    const out = template.fields.filter((f) => !BRAND_SLOT_KEYS.has(f.key));
+    out.push(...EXTRA_BACKGROUND_FIELDS);
+    return out;
+  }
   const out: FieldDef[] = [];
   let injected = false;
   for (const f of template.fields) {
@@ -251,7 +267,18 @@ export function TemplateEditor({ template }: TemplateEditorProps) {
     listingProfile.update(next);
   };
 
+  // H-7.13: surface BrandColorsSection only after a template adopts the
+  // brand-slot FieldDef shape. Pre-migration templates render colors
+  // inline as before — `renderedFields` and `resolveBrandColors` both
+  // short-circuit when `isMigrated` is false.
+  const isMigrated = isMigratedTemplate(template);
+
   const timeline = useMemo(() => {
+    // H-7.13: resolve brand-slot color fields first — empty state values
+    // fall through to brand.primaryColor / brand.accentColor / FieldDef
+    // default per audit §3.1. No-op for pre-migration templates.
+    const resolvedState = resolveBrandColors(state, template, brandSettings);
+
     // H-7.8-2: listing-showcase reads agent name / brokerage / phone /
     // license / logo from the brand profile rather than from sidebar
     // form fields. Inject those values into build() inputs for that
@@ -261,7 +288,7 @@ export function TemplateEditor({ template }: TemplateEditorProps) {
     const buildState =
       template.id === "listing-showcase"
         ? {
-            ...state,
+            ...resolvedState,
             agentName: brandSettings.agentName || "",
             agentBrokerage: brandSettings.brokerage || "",
             agentPhone: brandSettings.contactPhone
@@ -269,7 +296,7 @@ export function TemplateEditor({ template }: TemplateEditorProps) {
               : "",
             agentLicense: brandSettings.licenseNumber || "",
           }
-        : state;
+        : resolvedState;
     const buildAssets =
       template.id === "listing-showcase"
         ? { ...assets, agentLogo: brandLogo }
@@ -288,7 +315,10 @@ export function TemplateEditor({ template }: TemplateEditorProps) {
     [state, size.width, size.height]
   );
 
-  const renderedFields = useMemo(() => buildRenderedFields(template), [template]);
+  const renderedFields = useMemo(
+    () => buildRenderedFields(template, isMigrated),
+    [template, isMigrated]
+  );
 
   const updateField = (key: string, value: string) => {
     setState((prev) => ({ ...prev, [key]: value }));
@@ -298,18 +328,10 @@ export function TemplateEditor({ template }: TemplateEditorProps) {
     setAssets((prev) => ({ ...prev, [key]: img }));
   };
 
-  const resetColors = () => {
-    clearSavedColors(template);
-    setState((prev) => {
-      const next = { ...prev };
-      for (const f of colorFieldsFor(template)) {
-        next[f.key] = f.default;
-      }
-      // Also reset backgroundStyle to default (solid)
-      next.backgroundStyle = "solid";
-      return next;
-    });
-  };
+  // H-7.13: per-field reset for brand slots lives inside BrandColorsSection.
+  // The old global "Reset colors to brand defaults" toolbar button was
+  // misleadingly named (it reset to template hardcoded defaults, not brand
+  // colors) and has been removed; section-local Reset is the replacement.
 
   const isFieldVisible = (field: FieldDef): boolean => {
     if (!field.showWhen) return true;
@@ -381,12 +403,20 @@ export function TemplateEditor({ template }: TemplateEditorProps) {
               Replay animation
             </button>
 
-            <button
-              onClick={resetColors}
-              className="w-full text-[11px] text-neutral-500 hover:text-neutral-300 transition py-1"
-            >
-              ↺ Reset colors to brand defaults
-            </button>
+            {/* H-7.13: migrated templates surface "Brand colors" at the top
+                of the form (matches the pattern shared by Listing Flyer /
+                OH Promo / Listing Presentation). The reset affordance lives
+                inside that section. Pre-migration templates render colors
+                inline below and have no bulk-reset control until they
+                migrate. */}
+            {isMigrated && (
+              <BrandColorsSection
+                slots={brandColorSlotsFor(template)}
+                state={state}
+                brand={brandSettings}
+                updateField={updateField}
+              />
+            )}
 
             {/* H-7.12 (C.3): "Save changes to listing profile" appears
                 only for listing-consumer templates AND only when the
@@ -856,6 +886,97 @@ function ObjectListInput({
           + Add
         </button>
       )}
+    </div>
+  );
+}
+
+/**
+ * Top-of-form brand-color section for migrated templates. Mirrors the
+ * pattern shared by Listing Flyer / OH Promo / Listing Presentation
+ * forms: a small grid of color pickers (Primary / Accent / Background,
+ * plus the qa-card exception slot if present) with a "Reset to brand
+ * defaults" affordance that only appears when any slot has been
+ * overridden away from its FieldDef default.
+ *
+ * Empty slot values resolve through the brand profile (primary/accent)
+ * or the FieldDef default (background, exceptions); the visible value
+ * in the picker is always the resolved effective color so the swatch
+ * never reads as missing. Editing the input writes the user's value as
+ * an explicit override; clearing it (or clicking Reset) restores the
+ * inherited default at the next render.
+ */
+function BrandColorsSection({
+  slots,
+  state,
+  brand,
+  updateField,
+}: {
+  slots: FieldDef[];
+  state: TemplateState;
+  brand: BrandSettings;
+  updateField: (key: string, value: string) => void;
+}) {
+  const hasOverride = slots.some(
+    (s) => state[s.key] !== undefined && state[s.key] !== s.default
+  );
+  const resetBrandColors = () => {
+    for (const s of slots) updateField(s.key, s.default);
+  };
+
+  return (
+    <div>
+      <div className="flex items-baseline justify-between mb-2">
+        <label className="block text-[10px] uppercase tracking-[0.15em] text-neutral-500">
+          Brand colors
+        </label>
+        {hasOverride && (
+          <button
+            type="button"
+            onClick={resetBrandColors}
+            className="text-[10px] text-neutral-500 hover:text-[#4ef2d9] transition"
+          >
+            ↺ Reset to brand defaults
+          </button>
+        )}
+      </div>
+      {/* Mobile portrait can't fit 3 pickers in one row at 44pt swatch +
+       * usable hex input each; wrap to 2 cols on <sm and a single row at
+       * sm+. Mirrors FlyerForm / PromoForm / PresentationForm layout. */}
+      <div className="grid grid-cols-2 gap-3 sm:grid-cols-3">
+        {slots.map((slot) => {
+          const effective = state[slot.key] || brandColorFor(slot, brand);
+          return (
+            <div key={slot.key}>
+              <span className="block text-[9px] uppercase tracking-[0.12em] text-neutral-600 mb-1.5">
+                {slot.label}
+              </span>
+              <div className="flex items-center gap-2">
+                <label
+                  className="relative block w-11 h-11 rounded border border-neutral-800 cursor-pointer overflow-hidden flex-shrink-0"
+                  style={{ backgroundColor: effective || "#000000" }}
+                >
+                  <input
+                    type="color"
+                    value={effective || "#000000"}
+                    onChange={(e) => updateField(slot.key, e.target.value)}
+                    className="absolute inset-0 w-full h-full opacity-0 cursor-pointer"
+                  />
+                </label>
+                <input
+                  type="text"
+                  value={effective}
+                  onChange={(e) => updateField(slot.key, e.target.value)}
+                  className="flex-1 min-w-0 bg-neutral-900 border border-neutral-800 rounded-md px-2 py-1.5 text-base lg:text-xs font-mono focus:outline-none focus:border-[#4ef2d9]"
+                />
+              </div>
+            </div>
+          );
+        })}
+      </div>
+      <p className="text-[10px] text-neutral-600 mt-2 leading-relaxed">
+        Override colors for this template only — your brand profile in
+        Settings is unchanged.
+      </p>
     </div>
   );
 }

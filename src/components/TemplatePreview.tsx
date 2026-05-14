@@ -7,6 +7,8 @@ import {
   type TemplateAssets,
   type TemplateState,
 } from "@/templates/types";
+import { resolveBrandColors } from "@/templates/brand-slots";
+import { useBrandSettings } from "@/lib/brand";
 
 interface TemplatePreviewProps {
   templateId: string;
@@ -68,6 +70,14 @@ export function TemplatePreview({
 }: TemplatePreviewProps) {
   const canvasRef = useRef<HTMLCanvasElement>(null);
   const wrapperRef = useRef<HTMLDivElement>(null);
+
+  // H-7.13-6: pull brand settings so resolveBrandColors below can fall
+  // empty primary/accent slots through to the brand profile, identical
+  // to how the editor renders. Without this thread, primary/accent state
+  // values (which default to "") leave ctx.fillStyle invalid and the
+  // canvas keeps its previous fillStyle (gray skeleton) — exactly the
+  // regression smoke-tested on the picker page.
+  const { settings: brandSettings } = useBrandSettings();
 
   useEffect(() => {
     const canvas = canvasRef.current;
@@ -191,8 +201,13 @@ export function TemplatePreview({
       for (const [key, img] of results) {
         assets[key] = img;
       }
+      // H-7.13-6: resolve brand-slot colors before build() — empty
+      // primary/accent fall through to brandSettings; resolveBrandColors
+      // is a no-op for pre-migration templates so unmigrated paths are
+      // unaffected.
+      const resolvedState = resolveBrandColors(state, template, brandSettings);
       timeline = template.build(
-        state,
+        resolvedState,
         { width: FULL_W, height: FULL_H },
         assets
       );
@@ -228,7 +243,11 @@ export function TemplatePreview({
       observer.disconnect();
       document.removeEventListener("visibilitychange", handleVisibility);
     };
-  }, [templateId, startOffsetMs]);
+    // H-7.13-6: brandSettings in deps so the timeline rebuilds when the
+    // user updates brand colors in Settings and navigates back (or, more
+    // commonly, on the first client render when useBrandSettings'
+    // localStorage initializer replaces the SSR DEFAULT_BRAND snapshot).
+  }, [templateId, startOffsetMs, brandSettings]);
 
   return (
     <div ref={wrapperRef} className="block w-full">

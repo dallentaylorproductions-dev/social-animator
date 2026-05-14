@@ -22,12 +22,16 @@ export const qaCardTemplate: TemplateConfig = {
       type: "textarea",
       default: "Spring. Buyers move fast, inventory stays tight — our strongest market window.",
     },
+    // H-7.13: brand-slot color fields. Primary = answer panel, Accent =
+    // title text. Question panel keeps its own slot (audit §4.6 exception)
+    // — the question/answer panel color pairing is a signature design
+    // element of this template that doesn't map cleanly to brand primary
+    // or accent. Question + answer panel text colors are hardcoded
+    // (contrast-driven against the panel fill, not customization points).
+    { key: "primary", label: "Primary", type: "color", default: "" },
+    { key: "accent", label: "Accent", type: "color", default: "" },
     { key: "background", label: "Background", type: "color", default: "#000000" },
-    { key: "titleColor", label: "Title color", type: "color", default: "#ffffff" },
-    { key: "questionPanelColor", label: "Question panel", type: "color", default: "#4bc9f0" },
-    { key: "questionTextColor", label: "Question text", type: "color", default: "#ffffff" },
-    { key: "answerPanelColor", label: "Answer panel", type: "color", default: "#4ef2d9" },
-    { key: "answerTextColor", label: "Answer text", type: "color", default: "#0a1a1a" },
+    { key: "questionPanel", label: "Question panel", type: "color", default: "#4bc9f0" },
   ],
   build(state, size) {
     const { width, height } = size;
@@ -66,7 +70,7 @@ export const qaCardTemplate: TemplateConfig = {
           ctx.globalAlpha = Math.min(1, p * 1.3);
           ctx.translate(width / 2, titleCenterY);
           ctx.scale(scale, scale);
-          ctx.fillStyle = state.titleColor;
+          ctx.fillStyle = state.accent;
           ctx.font = `900 ${titleFontSize}px Inter, system-ui, sans-serif`;
           ctx.textAlign = "center";
           ctx.textBaseline = "middle";
@@ -83,11 +87,13 @@ export const qaCardTemplate: TemplateConfig = {
         onUpdate: (p, ctx) => {
           const offsetX = (1 - p) * -(cardX + cardWidth + 100);
           ctx.translate(offsetX, 0);
-          ctx.fillStyle = state.questionPanelColor;
+          ctx.fillStyle = state.questionPanel;
           ctx.beginPath();
           ctx.roundRect(cardX, questionCardY, cardWidth, cardHeight, cornerRadius);
           ctx.fill();
-          ctx.fillStyle = state.questionTextColor;
+          // Hardcoded white text on the sky-blue panel — contrast-driven
+          // against the question panel fill (audit §4.6).
+          ctx.fillStyle = "#ffffff";
           ctx.font = `bold ${cardTextSize}px Inter, system-ui, sans-serif`;
           ctx.textAlign = "left";
           ctx.textBaseline = "top";
@@ -111,11 +117,12 @@ export const qaCardTemplate: TemplateConfig = {
         onUpdate: (p, ctx) => {
           const offsetX = (1 - p) * (width + 100);
           ctx.translate(offsetX, 0);
-          ctx.fillStyle = state.answerPanelColor;
+          ctx.fillStyle = state.primary;
           ctx.beginPath();
           ctx.roundRect(answerCardX, answerCardY, cardWidth, cardHeight, cornerRadius);
           ctx.fill();
-          ctx.fillStyle = state.answerTextColor;
+          // Hardcoded near-black text on the primary panel (audit §4.6).
+          ctx.fillStyle = "#0a1a1a";
           ctx.font = `500 ${cardTextSize}px Inter, system-ui, sans-serif`;
           ctx.textAlign = "left";
           ctx.textBaseline = "top";

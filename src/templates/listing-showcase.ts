@@ -84,17 +84,16 @@ export const listingShowcaseTemplate: TemplateConfig = {
       default:
         "Chef's kitchen with quartz counters\nPrimary suite with spa bath",
     },
+    // H-7.13: brand-slot color fields. Primary = status badge fill +
+    // feature-bullet glyphs, Accent = the price. Status text,
+    // address/city/stats text, feature text, and the agent name/muted
+    // text trio are hardcoded to their v1.38 FieldDef defaults — all
+    // load-bearing for legibility on the template's dark background
+    // (#0a0a0a) and not customization points per audit §4.10.
+    // Background keeps the template's signature #0a0a0a default.
+    { key: "primary", label: "Primary", type: "color", default: "" },
+    { key: "accent", label: "Accent", type: "color", default: "" },
     { key: "background", label: "Background", type: "color", default: "#0a0a0a" },
-    { key: "statusColor", label: "Status badge", type: "color", default: "#4ef2d9" },
-    { key: "statusTextColor", label: "Status text", type: "color", default: "#0a0a0a" },
-    { key: "addressColor", label: "Address", type: "color", default: "#ffffff" },
-    { key: "cityStateColor", label: "City/state", type: "color", default: "#9ca3af" },
-    { key: "priceColor", label: "Price", type: "color", default: "#4ef2d9" },
-    { key: "statsColor", label: "Stats", type: "color", default: "#ffffff" },
-    { key: "featureColor", label: "Feature bullets", type: "color", default: "#4ef2d9" },
-    { key: "featureTextColor", label: "Feature text", type: "color", default: "#ffffff" },
-    { key: "agentNameColor", label: "Agent name", type: "color", default: "#ffffff" },
-    { key: "agentMutedColor", label: "Agent body text", type: "color", default: "#9ca3af" },
   ],
   sampleAssets: { heroPhoto: "/sample-assets/exterior.webp" },
   sampleState: {
@@ -398,12 +397,13 @@ export const listingShowcaseTemplate: TemplateConfig = {
         const textW = ctx.measureText(badgeText).width;
         const badgeW = textW + badgePaddingH * 2;
 
-        ctx.fillStyle = state.statusColor;
+        ctx.fillStyle = state.primary;
         ctx.beginPath();
         ctx.roundRect(contentX, badgeY, badgeW, badgeHeight, badgeHeight / 2);
         ctx.fill();
 
-        ctx.fillStyle = state.statusTextColor;
+        // Hardcoded near-black on the primary pill (audit §4.10 — contrast).
+        ctx.fillStyle = "#0a0a0a";
         ctx.textAlign = "center";
         ctx.textBaseline = "middle";
         ctx.fillText(badgeText, contentX + badgeW / 2, badgeY + badgeHeight / 2);
@@ -419,7 +419,7 @@ export const listingShowcaseTemplate: TemplateConfig = {
       onUpdate: (p, ctx) => {
         ctx.globalAlpha = p;
         ctx.translate(0, (1 - p) * 24);
-        ctx.fillStyle = state.addressColor;
+        ctx.fillStyle = "#ffffff";
         ctx.font = `700 ${addressFontSize}px Inter, system-ui, sans-serif`;
         ctx.textAlign = "left";
         ctx.textBaseline = "middle";
@@ -436,7 +436,7 @@ export const listingShowcaseTemplate: TemplateConfig = {
       onUpdate: (p, ctx) => {
         ctx.globalAlpha = p;
         ctx.translate(0, (1 - p) * 18);
-        ctx.fillStyle = state.cityStateColor;
+        ctx.fillStyle = "#9ca3af";
         ctx.font = `400 ${cityStateFontSize}px Inter, system-ui, sans-serif`;
         ctx.textAlign = "left";
         ctx.textBaseline = "middle";
@@ -463,7 +463,7 @@ export const listingShowcaseTemplate: TemplateConfig = {
         ctx.globalAlpha = Math.min(1, p * 1.3);
         ctx.translate(contentX, priceY);
         ctx.scale(scale, scale);
-        ctx.fillStyle = state.priceColor;
+        ctx.fillStyle = state.accent;
         ctx.font = `900 ${priceFontSize}px Inter, system-ui, sans-serif`;
         ctx.textAlign = "left";
         ctx.textBaseline = "middle";
@@ -487,7 +487,7 @@ export const listingShowcaseTemplate: TemplateConfig = {
         onUpdate: (p, ctx) => {
           ctx.globalAlpha = p;
           ctx.translate(0, (1 - p) * 14);
-          ctx.fillStyle = state.statsColor;
+          ctx.fillStyle = "#ffffff";
           ctx.font = `500 ${statsFontSize}px Inter, system-ui, sans-serif`;
           ctx.textAlign = "left";
           ctx.textBaseline = "middle";
@@ -526,12 +526,12 @@ export const listingShowcaseTemplate: TemplateConfig = {
 
           const y = firstFeatureCenterY + i * featureLineHeight;
           // Bullet
-          ctx.fillStyle = state.featureColor;
+          ctx.fillStyle = state.primary;
           ctx.beginPath();
           ctx.arc(leftColX + featureBulletRadius + 2, y, featureBulletRadius, 0, Math.PI * 2);
           ctx.fill();
           // Text
-          ctx.fillStyle = state.featureTextColor;
+          ctx.fillStyle = "#ffffff";
           ctx.font = `500 ${featureFontSize}px Inter, system-ui, sans-serif`;
           ctx.textAlign = "left";
           ctx.textBaseline = "middle";
@@ -565,7 +565,7 @@ export const listingShowcaseTemplate: TemplateConfig = {
           if (!isVertical) {
             ctx.save();
             ctx.globalAlpha = p * 0.35;
-            ctx.strokeStyle = state.agentMutedColor;
+            ctx.strokeStyle = "#9ca3af";
             ctx.lineWidth = 1;
             const dividerY = bottomSectionY - 14;
             ctx.beginPath();
@@ -667,7 +667,7 @@ export const listingShowcaseTemplate: TemplateConfig = {
           // Phase 5: render name lines (stacked, centered vertically on
           // header row).
           if (nameLines.length > 0) {
-            ctx.fillStyle = state.agentNameColor;
+            ctx.fillStyle = "#ffffff";
             ctx.font = `700 ${agentNameSize}px Inter, system-ui, sans-serif`;
             ctx.textAlign = "left";
             ctx.textBaseline = "middle";
@@ -693,7 +693,7 @@ export const listingShowcaseTemplate: TemplateConfig = {
 
           // ── Brokerage ────────────────────────────────────────────────
           if (state.agentBrokerage?.trim()) {
-            ctx.fillStyle = state.agentMutedColor;
+            ctx.fillStyle = "#9ca3af";
             ctx.font = `500 ${agentBrokerageSize}px Inter, system-ui, sans-serif`;
             ctx.textAlign = "left";
             ctx.textBaseline = "top";
@@ -718,7 +718,7 @@ export const listingShowcaseTemplate: TemplateConfig = {
             : "";
 
           if (phoneText) {
-            ctx.fillStyle = state.agentNameColor;
+            ctx.fillStyle = "#ffffff";
             ctx.font = `500 ${agentPhoneSize}px Inter, system-ui, sans-serif`;
             ctx.textAlign = "left";
             ctx.textBaseline = "top";
@@ -740,7 +740,7 @@ export const listingShowcaseTemplate: TemplateConfig = {
                 cursorY
               );
               cursorY += agentPhoneSize + agentRowGap;
-              ctx.fillStyle = state.agentMutedColor;
+              ctx.fillStyle = "#9ca3af";
               ctx.font = `400 ${agentLicenseSize}px Inter, system-ui, sans-serif`;
               ctx.fillText(
                 truncateToWidth(licenseText, agentColW),
@@ -756,7 +756,7 @@ export const listingShowcaseTemplate: TemplateConfig = {
             }
           } else if (licenseText) {
             // No phone, license alone
-            ctx.fillStyle = state.agentMutedColor;
+            ctx.fillStyle = "#9ca3af";
             ctx.font = `400 ${agentLicenseSize}px Inter, system-ui, sans-serif`;
             ctx.textAlign = "left";
             ctx.textBaseline = "top";

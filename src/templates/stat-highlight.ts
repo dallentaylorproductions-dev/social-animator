@@ -17,10 +17,12 @@ export const statHighlightTemplate: TemplateConfig = {
       type: "textarea",
       default: "In our market, last quarter.",
     },
+    // H-7.13: brand-slot color fields. Primary = the hero stat number,
+    // Accent = the context label above. Supporting line is hardcoded
+    // muted (consistently muted in the design per audit §4.3).
+    { key: "primary", label: "Primary", type: "color", default: "" },
+    { key: "accent", label: "Accent", type: "color", default: "" },
     { key: "background", label: "Background", type: "color", default: "#000000" },
-    { key: "statColor", label: "Stat color", type: "color", default: "#4ef2d9" },
-    { key: "contextColor", label: "Context color", type: "color", default: "#ffffff" },
-    { key: "supportingColor", label: "Supporting color", type: "color", default: "#9ca3af" },
   ],
   build(state, size) {
     const { width, height } = size;
@@ -60,7 +62,7 @@ export const statHighlightTemplate: TemplateConfig = {
       onUpdate: (p, ctx) => {
         ctx.globalAlpha = p;
         ctx.translate(0, (1 - p) * 30);
-        ctx.fillStyle = state.contextColor;
+        ctx.fillStyle = state.accent;
         ctx.font = `600 ${contextFontSize}px Inter, system-ui, sans-serif`;
         ctx.textAlign = "center";
         ctx.textBaseline = "middle";
@@ -85,7 +87,7 @@ export const statHighlightTemplate: TemplateConfig = {
             ? currentValue.toFixed(decimals)
             : Math.round(currentValue).toLocaleString();
 
-        ctx.fillStyle = state.statColor;
+        ctx.fillStyle = state.primary;
         ctx.font = `900 ${statFontSize}px Inter, system-ui, sans-serif`;
         ctx.textAlign = "center";
         ctx.textBaseline = "middle";
@@ -102,7 +104,8 @@ export const statHighlightTemplate: TemplateConfig = {
       onUpdate: (p, ctx) => {
         ctx.globalAlpha = p;
         ctx.translate(0, (1 - p) * 30);
-        ctx.fillStyle = state.supportingColor;
+        // Hardcoded muted (audit §4.3 — supporting line uniformly muted).
+        ctx.fillStyle = "#9ca3af";
         ctx.font = `400 ${supportingFontSize}px Inter, system-ui, sans-serif`;
         ctx.textAlign = "center";
         ctx.textBaseline = "middle";

@@ -49,11 +49,12 @@ export const marketUpdateTemplate: TemplateConfig = {
     { key: "stat3Value", label: "Stat 3 value", type: "text", default: "$489K" },
     { key: "stat4Label", label: "Stat 4 label", type: "text", default: "Inventory" },
     { key: "stat4Value", label: "Stat 4 value", type: "text", default: "47" },
+    // H-7.13: brand-slot color fields. Primary = the four big stat
+    // values, Accent = the header title above. Subtitle + stat labels
+    // are hardcoded muted (consistently muted per audit §4.5).
+    { key: "primary", label: "Primary", type: "color", default: "" },
+    { key: "accent", label: "Accent", type: "color", default: "" },
     { key: "background", label: "Background", type: "color", default: "#000000" },
-    { key: "titleColor", label: "Title color", type: "color", default: "#ffffff" },
-    { key: "subtitleColor", label: "Subtitle color", type: "color", default: "#9ca3af" },
-    { key: "labelColor", label: "Stat labels", type: "color", default: "#9ca3af" },
-    { key: "valueColor", label: "Stat values", type: "color", default: "#4ef2d9" },
   ],
   build(state, size) {
     const { width, height } = size;
@@ -99,7 +100,7 @@ export const marketUpdateTemplate: TemplateConfig = {
       onUpdate: (p, ctx) => {
         ctx.globalAlpha = p;
         ctx.translate(0, (1 - p) * 20);
-        ctx.fillStyle = state.titleColor;
+        ctx.fillStyle = state.accent;
         ctx.font = `bold ${titleFontSize}px Inter, system-ui, sans-serif`;
         ctx.textAlign = "center";
         ctx.textBaseline = "middle";
@@ -116,7 +117,8 @@ export const marketUpdateTemplate: TemplateConfig = {
       onUpdate: (p, ctx) => {
         ctx.globalAlpha = p;
         ctx.translate(0, (1 - p) * 16);
-        ctx.fillStyle = state.subtitleColor;
+        // Hardcoded muted (audit §4.5 — subtitle uniformly muted).
+        ctx.fillStyle = "#9ca3af";
         ctx.font = `500 ${subtitleFontSize}px Inter, system-ui, sans-serif`;
         ctx.textAlign = "center";
         ctx.textBaseline = "middle";
@@ -145,7 +147,8 @@ export const marketUpdateTemplate: TemplateConfig = {
           ctx.translate(0, (1 - fadeAlpha) * 16);
 
           // Label
-          ctx.fillStyle = state.labelColor;
+          // Hardcoded muted (audit §4.5 — stat labels uniformly muted).
+          ctx.fillStyle = "#9ca3af";
           ctx.font = `600 ${labelFontSize}px Inter, system-ui, sans-serif`;
           ctx.textAlign = "center";
           ctx.textBaseline = "middle";
@@ -161,7 +164,7 @@ export const marketUpdateTemplate: TemplateConfig = {
           const currentValue = stat.parsed.target * easedCount;
           const formatted = formatStat(currentValue, stat.parsed.decimals);
 
-          ctx.fillStyle = state.valueColor;
+          ctx.fillStyle = state.primary;
           ctx.font = `900 ${valueFontSize}px Inter, system-ui, sans-serif`;
           ctx.fillText(
             `${stat.parsed.prefix}${formatted}${stat.parsed.suffix}`,

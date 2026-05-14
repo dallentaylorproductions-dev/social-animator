@@ -33,13 +33,16 @@ export const listingCardTemplate: TemplateConfig = {
     { key: "beds", label: "Beds", type: "text", default: "3" },
     { key: "baths", label: "Baths", type: "text", default: "2" },
     { key: "sqft", label: "Sq ft", type: "number", default: "1,840" },
+    // H-7.13: brand-slot color fields. Primary = status badge fill,
+    // Accent = the price. Address/city/stats text colors are hardcoded
+    // to the v1.38 FieldDef defaults (#ffffff white address, #9ca3af
+    // muted city, #ffffff white stats — load-bearing for legibility on
+    // the dark background, not customization points per audit §4.9).
+    // Status text color is hardcoded #0a0a0a (contrast on the primary
+    // pill).
+    { key: "primary", label: "Primary", type: "color", default: "" },
+    { key: "accent", label: "Accent", type: "color", default: "" },
     { key: "background", label: "Background", type: "color", default: "#000000" },
-    { key: "statusColor", label: "Status badge", type: "color", default: "#4ef2d9" },
-    { key: "statusTextColor", label: "Status text", type: "color", default: "#0a0a0a" },
-    { key: "addressColor", label: "Address", type: "color", default: "#ffffff" },
-    { key: "cityStateColor", label: "City/state", type: "color", default: "#9ca3af" },
-    { key: "priceColor", label: "Price", type: "color", default: "#4ef2d9" },
-    { key: "statsColor", label: "Stats", type: "color", default: "#ffffff" },
   ],
   build(state, size, assets) {
     const { width, height } = size;
@@ -164,12 +167,13 @@ export const listingCardTemplate: TemplateConfig = {
         const badgeW = textW + badgePaddingH * 2;
         const badgeXPos = contentX;
 
-        ctx.fillStyle = state.statusColor;
+        ctx.fillStyle = state.primary;
         ctx.beginPath();
         ctx.roundRect(badgeXPos, badgeY, badgeW, badgeHeight, badgeHeight / 2);
         ctx.fill();
 
-        ctx.fillStyle = state.statusTextColor;
+        // Hardcoded near-black on the primary pill (audit §4.9 — contrast).
+        ctx.fillStyle = "#0a0a0a";
         ctx.textAlign = "center";
         ctx.textBaseline = "middle";
         ctx.fillText(
@@ -189,7 +193,7 @@ export const listingCardTemplate: TemplateConfig = {
       onUpdate: (p, ctx) => {
         ctx.globalAlpha = p;
         ctx.translate(0, (1 - p) * 24);
-        ctx.fillStyle = state.addressColor;
+        ctx.fillStyle = "#ffffff";
         ctx.font = `700 ${addressFontSize}px Inter, system-ui, sans-serif`;
         ctx.textAlign = "left";
         ctx.textBaseline = "middle";
@@ -206,7 +210,7 @@ export const listingCardTemplate: TemplateConfig = {
       onUpdate: (p, ctx) => {
         ctx.globalAlpha = p;
         ctx.translate(0, (1 - p) * 18);
-        ctx.fillStyle = state.cityStateColor;
+        ctx.fillStyle = "#9ca3af";
         ctx.font = `400 ${cityStateFontSize}px Inter, system-ui, sans-serif`;
         ctx.textAlign = "left";
         ctx.textBaseline = "middle";
@@ -227,7 +231,7 @@ export const listingCardTemplate: TemplateConfig = {
             ? currentValue.toFixed(priceDecimals)
             : Math.round(currentValue).toLocaleString();
 
-        ctx.fillStyle = state.priceColor;
+        ctx.fillStyle = state.accent;
         ctx.font = `900 ${priceFontSize}px Inter, system-ui, sans-serif`;
         ctx.textAlign = "left";
         ctx.textBaseline = "middle";
@@ -248,7 +252,7 @@ export const listingCardTemplate: TemplateConfig = {
       onUpdate: (p, ctx) => {
         ctx.globalAlpha = p;
         ctx.translate(0, (1 - p) * 18);
-        ctx.fillStyle = state.statsColor;
+        ctx.fillStyle = "#ffffff";
         ctx.font = `500 ${statsFontSize}px Inter, system-ui, sans-serif`;
         ctx.textAlign = "left";
         ctx.textBaseline = "middle";
