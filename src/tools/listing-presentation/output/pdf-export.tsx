@@ -4,6 +4,11 @@ import { pdf } from "@react-pdf/renderer";
 import { type PresentationDraft } from "../engine/types";
 import { type BrandSettings } from "@/lib/brand";
 import { PresentationDocument } from "./PresentationDocument";
+import {
+  PHASE_NAMES,
+  measurePhase,
+  measurePhaseSync,
+} from "@/lib/perf";
 
 /**
  * Generate the listing-presentation PDF blob from the current draft.
@@ -31,9 +36,12 @@ export async function generatePdfBlob(
   draft: PresentationDraft,
   brand: BrandSettings
 ): Promise<Blob> {
-  const blob = await pdf(
+  const doc = measurePhaseSync(PHASE_NAMES.PDF_DOC_BUILD, () => (
     <PresentationDocument draft={draft} brand={brand} />
-  ).toBlob();
+  ));
+  const blob = await measurePhase(PHASE_NAMES.PDF_RENDER_TO_BLOB, () =>
+    pdf(doc).toBlob()
+  );
 
   void assertSinglePage(blob, draft);
 

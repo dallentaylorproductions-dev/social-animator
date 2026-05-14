@@ -1,6 +1,7 @@
 import type { Metadata, Viewport } from "next";
 import { Geist, Geist_Mono, Inter } from "next/font/google";
 import "./globals.css";
+import { PerfToast } from "@/components/PerfToast";
 
 const geistSans = Geist({
   variable: "--font-geist-sans",
@@ -47,6 +48,10 @@ export default function RootLayout({
         className={`${geistSans.variable} ${geistMono.variable} ${inter.variable} antialiased overflow-x-hidden`}
       >
         {children}
+        {/* H-7.14: gated behind ?perf=1 — renders null otherwise so the
+         *  overhead in the common path is one URLSearchParams check at
+         *  mount + nothing else. */}
+        <PerfToast />
       </body>
     </html>
   );

@@ -3,6 +3,7 @@
 import { type PromoDraft } from "./types";
 import { type BrandSettings } from "@/lib/brand";
 import { generatePdfBlob } from "../output/pdf-export";
+import { PHASE_NAMES, measurePhase } from "@/lib/perf";
 
 /**
  * Rasterize the open-house-promo PDF to a JPEG Blob suitable for
@@ -28,7 +29,7 @@ async function pdfBlobToJpeg(
   scale = 3.0,
   quality = 0.92
 ): Promise<Blob> {
-  const pdfjsLib = await loadPdfjs();
+  const pdfjsLib = await measurePhase(PHASE_NAMES.PDFJS_LOAD, () => loadPdfjs());
   const data = await pdfBlob.arrayBuffer();
   const pdfDoc = await pdfjsLib.getDocument({ data }).promise;
   try {
@@ -39,15 +40,21 @@ async function pdfBlobToJpeg(
     canvas.height = Math.ceil(viewport.height);
     const ctx = canvas.getContext("2d");
     if (!ctx) throw new Error("Canvas 2D context unavailable");
-    await page.render({ canvasContext: ctx, viewport }).promise;
-    return await new Promise<Blob>((resolve, reject) => {
-      canvas.toBlob(
-        (b) =>
-          b ? resolve(b) : reject(new Error("Canvas toBlob returned null")),
-        "image/jpeg",
-        quality
-      );
-    });
+    await measurePhase(PHASE_NAMES.PDFJS_RASTERIZE, () =>
+      page.render({ canvasContext: ctx, viewport }).promise
+    );
+    return await measurePhase(PHASE_NAMES.CANVAS_TO_JPEG_BLOB, () =>
+      new Promise<Blob>((resolve, reject) => {
+        canvas.toBlob(
+          (b) =>
+            b
+              ? resolve(b)
+              : reject(new Error("Canvas toBlob returned null")),
+          "image/jpeg",
+          quality
+        );
+      })
+    );
   } finally {
     await pdfDoc.destroy();
   }

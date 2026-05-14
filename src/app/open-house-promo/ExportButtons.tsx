@@ -27,6 +27,12 @@ import { type BrandSettings } from "@/lib/brand";
 import { ExportLoader } from "@/components/export-loader/ExportLoader";
 import type { ExportProgress, ExportStage } from "@/components/export-loader/types";
 import { overallProgress } from "@/components/export-loader/stages";
+import {
+  PHASE_NAMES,
+  endRun,
+  measurePhase,
+  startRun,
+} from "@/lib/perf";
 
 interface ExportButtonsProps {
   draft: PromoDraft;
@@ -120,10 +126,17 @@ export function ExportButtons({
     if (!canExport) return;
     saveDraft(draft);
     setPdfState({ kind: "generating" });
+    const perfRun = startRun({
+      toolId: "open-house-promo",
+      output: "pdf",
+      photoCount: draft.photos.length,
+    });
     try {
       const blob = await generatePdfBlob(draft, brand);
       const filename = `${filenamePrefix}-open-house.pdf`;
-      const result = await shareOrDownload(blob, filename);
+      const result = await measurePhase(PHASE_NAMES.FINAL_BLOB_DELIVER, () =>
+        shareOrDownload(blob, filename)
+      );
       if (result === "shared" || result === "downloaded") clearDraft();
       setPdfState({ kind: "done" });
       setTimeout(() => setPdfState({ kind: "idle" }), 3000);
@@ -133,6 +146,8 @@ export function ExportButtons({
         kind: "error",
         message: err instanceof Error ? err.message : String(err),
       });
+    } finally {
+      endRun(perfRun);
     }
   };
 
@@ -141,10 +156,17 @@ export function ExportButtons({
     if (!canExport) return;
     saveDraft(draft);
     setJpegState({ kind: "generating" });
+    const perfRun = startRun({
+      toolId: "open-house-promo",
+      output: "jpeg",
+      photoCount: draft.photos.length,
+    });
     try {
       const blob = await exportJpegFromDraft(draft, brand);
       const filename = `${filenamePrefix}-open-house.jpg`;
-      const result = await shareOrDownload(blob, filename);
+      const result = await measurePhase(PHASE_NAMES.FINAL_BLOB_DELIVER, () =>
+        shareOrDownload(blob, filename)
+      );
       if (result === "shared" || result === "downloaded") clearDraft();
       setJpegState({ kind: "done" });
       setTimeout(() => setJpegState({ kind: "idle" }), 3000);
@@ -154,6 +176,8 @@ export function ExportButtons({
         kind: "error",
         message: err instanceof Error ? err.message : String(err),
       });
+    } finally {
+      endRun(perfRun);
     }
   };
 
@@ -162,6 +186,11 @@ export function ExportButtons({
     if (!canExportQr) return;
     saveDraft(draft);
     setQrState({ kind: "generating" });
+    const perfRun = startRun({
+      toolId: "open-house-promo",
+      output: "qr-png",
+      photoCount: 0,
+    });
     try {
       // Standalone QR is rendered at 800px on a white background
       // with high-contrast dark foreground — independent of the
@@ -169,17 +198,16 @@ export function ExportButtons({
       // surface, regardless of where the realtor pastes it.
       const qrFg = "#000000";
       const qrBg = "#ffffff";
-      const dataUrl = await generateQrDataUrl(
-        draft.qrTargetUrl,
-        800,
-        qrFg,
-        qrBg
+      const dataUrl = await measurePhase(PHASE_NAMES.QR_GENERATE, () =>
+        generateQrDataUrl(draft.qrTargetUrl, 800, qrFg, qrBg)
       );
       if (!dataUrl) throw new Error("Could not generate QR code");
       const blob = await dataUrlToBlob(dataUrl);
       const slug = filenamePrefix.split("-").slice(3).join("-") || "open-house";
       const filename = `${slug}-qr-code.png`;
-      const result = await shareOrDownload(blob, filename);
+      const result = await measurePhase(PHASE_NAMES.FINAL_BLOB_DELIVER, () =>
+        shareOrDownload(blob, filename)
+      );
       if (result === "shared" || result === "downloaded") clearDraft();
       setQrState({ kind: "done" });
       setTimeout(() => setQrState({ kind: "idle" }), 3000);
@@ -189,6 +217,8 @@ export function ExportButtons({
         kind: "error",
         message: err instanceof Error ? err.message : String(err),
       });
+    } finally {
+      endRun(perfRun);
     }
   };
 
@@ -204,6 +234,13 @@ export function ExportButtons({
       });
       return;
     }
+    // H-7.14: single run per export click, same as Listing Flyer. Output
+    // tag picks the leading selected format for the enum.
+    const perfRun = startRun({
+      toolId: "open-house-promo",
+      output: draft.exportFormats.reel ? "mp4-reel" : "mp4-sq",
+      photoCount: draft.photos.length,
+    });
     setMp4State({ kind: "running", phase: "preparing", progress: 0 });
 
     // Single wall-clock origin for the loader's elapsed counter,
@@ -365,6 +402,7 @@ export function ExportButtons({
       // On mobile success, the share-sheet handoff happens via the
       // separate Save Reel / Save Square buttons after this returns.
       setExportProgress(null);
+      endRun(perfRun);
     }
   };
 

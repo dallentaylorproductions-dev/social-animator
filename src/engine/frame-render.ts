@@ -3,6 +3,13 @@
 import { Timeline } from "./timeline";
 import { getFFmpeg, recordCanvas, webmToMp4, getWarmupMs } from "./export";
 import { renderTimelineToWebm } from "@/tools/listing-flyer/engine/render-mp4";
+import {
+  PHASE_NAMES,
+  getActiveRun,
+  measurePhase,
+  measurePhaseSync,
+  recordFrameTime,
+} from "@/lib/perf";
 
 /**
  * Frame-by-frame MP4 render pipeline.
@@ -136,28 +143,38 @@ async function renderViaMediaRecorder(
       livePreviewUrl: lastPreviewUrl,
     });
 
-  const webm = await renderTimelineToWebm(
-    canvas,
-    timeline,
-    size,
-    durationSec,
-    background,
-    (p) => {
-      lastProgress = p;
-      emitRendering();
-    },
-    undefined,
-    (url) => {
-      lastPreviewUrl = url;
-      emitRendering();
-    }
+  // H-7.14: iOS MediaRecorder path. recorder-active covers the entire
+  // recordCanvas-driven capture (the warmup pre-roll is internal to that
+  // function and reported as part of this same phase — split into a
+  // separate recorder-warmup phase in a later refinement if the audit
+  // shows the warmup dominating). recorder-finalize covers the webm →
+  // mp4 transcode (the wasm container swap, no re-encoding).
+  const webm = await measurePhase(PHASE_NAMES.RECORDER_ACTIVE, () =>
+    renderTimelineToWebm(
+      canvas,
+      timeline,
+      size,
+      durationSec,
+      background,
+      (p) => {
+        lastProgress = p;
+        emitRendering();
+      },
+      undefined,
+      (url) => {
+        lastPreviewUrl = url;
+        emitRendering();
+      }
+    )
   );
-  const mp4 = await webmToMp4(
-    webm,
-    size,
-    durationSec,
-    (p) => onProgress?.({ phase: "encoding", progress: p }),
-    getWarmupMs()
+  const mp4 = await measurePhase(PHASE_NAMES.RECORDER_FINALIZE, () =>
+    webmToMp4(
+      webm,
+      size,
+      durationSec,
+      (p) => onProgress?.({ phase: "encoding", progress: p }),
+      getWarmupMs()
+    )
   );
   onProgress?.({ phase: "finalizing", progress: 1 });
   return mp4;
@@ -184,7 +201,12 @@ async function renderFrameByFrame(
   ctx.imageSmoothingEnabled = true;
   ctx.imageSmoothingQuality = "high";
 
-  const ffmpeg = await getFFmpeg();
+  // ffmpeg-load times only the first call's wasm init; subsequent calls
+  // resolve the cached promise in ~0ms and the phase just records a near-
+  // zero delta. Cold/warm differentiation lives on the RunRecord flag.
+  const ffmpeg = await measurePhase(PHASE_NAMES.FFMPEG_LOAD, () => getFFmpeg());
+
+  const perfRun = getActiveRun();
 
   // Defensive cleanup before render. Two leak sources to scrub:
   //   1. A previous render that crashed mid-loop and left frames
@@ -216,32 +238,42 @@ async function renderFrameByFrame(
 
   for (let i = 0; i < totalFrames; i++) {
     const t = i / fps;
+    // H-7.14: per-frame wall-clock starts here so recordFrameTime captures
+    // render + capture + thumbnail in aggregate (matches what a user
+    // experiences as "this frame took X ms").
+    const frameStart = performance.now();
 
-    ctx.setTransform(1, 0, 0, 1, 0, 0);
-    ctx.fillStyle = background;
-    ctx.fillRect(0, 0, size.width, size.height);
-    timeline.render(t, ctx);
+    measurePhaseSync(PHASE_NAMES.FRAME_RENDER_LOOP, () => {
+      ctx.setTransform(1, 0, 0, 1, 0, 0);
+      ctx.fillStyle = background;
+      ctx.fillRect(0, 0, size.width, size.height);
+      timeline.render(t, ctx);
+    });
 
-    const blob = await canvasToBlob(canvas, "image/png");
-    const buffer = new Uint8Array(await blob.arrayBuffer());
-    const filename = frameFilename(i);
-    await ffmpeg.writeFile(filename, buffer);
-
-    // Capture a thumbnail every THUMB_EVERY frames. JPEG q=0.6
-    // is plenty for a 90×160 / 140×140 preview and encodes much
-    // faster than another PNG. The previous URL is revoked on a
-    // 500ms timer (see THUMB_EVERY block above) so the LiveThumbnail
-    // crossfade has time to swap before the source blob is freed.
     let livePreviewUrl: string | undefined;
-    if (i % THUMB_EVERY === 0 || i === totalFrames - 1) {
-      const thumbBlob = await canvasToBlob(canvas, "image/jpeg", 0.6);
-      const previousUrl = lastThumbUrl;
-      lastThumbUrl = URL.createObjectURL(thumbBlob);
-      livePreviewUrl = lastThumbUrl;
-      if (previousUrl) {
-        setTimeout(() => URL.revokeObjectURL(previousUrl), 500);
+    await measurePhase(PHASE_NAMES.FRAME_CAPTURE_LOOP, async () => {
+      const blob = await canvasToBlob(canvas, "image/png");
+      const buffer = new Uint8Array(await blob.arrayBuffer());
+      const filename = frameFilename(i);
+      await ffmpeg.writeFile(filename, buffer);
+
+      // Capture a thumbnail every THUMB_EVERY frames. JPEG q=0.6
+      // is plenty for a 90×160 / 140×140 preview and encodes much
+      // faster than another PNG. The previous URL is revoked on a
+      // 500ms timer (see THUMB_EVERY block above) so the LiveThumbnail
+      // crossfade has time to swap before the source blob is freed.
+      if (i % THUMB_EVERY === 0 || i === totalFrames - 1) {
+        const thumbBlob = await canvasToBlob(canvas, "image/jpeg", 0.6);
+        const previousUrl = lastThumbUrl;
+        lastThumbUrl = URL.createObjectURL(thumbBlob);
+        livePreviewUrl = lastThumbUrl;
+        if (previousUrl) {
+          setTimeout(() => URL.revokeObjectURL(previousUrl), 500);
+        }
       }
-    }
+    });
+
+    if (perfRun) recordFrameTime(perfRun, performance.now() - frameStart);
 
     onProgress?.({
       phase: "rendering",
@@ -269,25 +301,27 @@ async function renderFrameByFrame(
   ffmpeg.on("progress", progressHandler);
 
   try {
-    await ffmpeg.exec([
-      "-framerate",
-      String(fps),
-      "-i",
-      "frame_%05d.png",
-      "-c:v",
-      "libx264",
-      "-profile:v",
-      "high",
-      "-preset",
-      "medium",
-      "-crf",
-      "18",
-      "-pix_fmt",
-      "yuv420p",
-      "-movflags",
-      "+faststart",
-      "output.mp4",
-    ]);
+    await measurePhase(PHASE_NAMES.FFMPEG_ENCODE, () =>
+      ffmpeg.exec([
+        "-framerate",
+        String(fps),
+        "-i",
+        "frame_%05d.png",
+        "-c:v",
+        "libx264",
+        "-profile:v",
+        "high",
+        "-preset",
+        "medium",
+        "-crf",
+        "18",
+        "-pix_fmt",
+        "yuv420p",
+        "-movflags",
+        "+faststart",
+        "output.mp4",
+      ])
+    );
 
     onProgress?.({ phase: "finalizing", progress: 0.5 });
 
