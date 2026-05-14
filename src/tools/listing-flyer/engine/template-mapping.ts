@@ -68,6 +68,8 @@ export function mapFlyerToShowcase(
     agentLicense: brand.licenseNumber || "",
 
     background,
+    primary,
+    accent: primary,
     statusColor: primary,
     statusTextColor: badgeTextColor,
     addressColor: textPrimary,
