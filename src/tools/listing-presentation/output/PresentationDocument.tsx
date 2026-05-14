@@ -38,6 +38,21 @@ import {
 const PT_PER_INCH = 72;
 const MARGIN = PT_PER_INCH * 0.5;
 
+/**
+ * v1.39.1: insert zero-width spaces (U+200B) into long non-whitespace runs
+ * so react-pdf can break them. react-pdf's default text engine wraps at
+ * word boundaries only and overflows on emails / license #s / URLs /
+ * hashtags pasted into a bio. ZWSPs give the engine valid break points
+ * every ~25 chars while staying invisible in the rendered PDF. Normal
+ * word-bounded text is untouched (the regex only matches runs of 26+
+ * non-whitespace characters).
+ */
+function softBreakLongRuns(text: string, chunk = 25): string {
+  return text.replace(/\S{26,}/g, (run) =>
+    run.replace(new RegExp(`(.{${chunk}})`, "g"), "$1\u200B")
+  );
+}
+
 const styles = StyleSheet.create({
   page: {
     fontFamily: "Helvetica",
@@ -423,8 +438,10 @@ export function PresentationDocument({
             )}
             <View style={styles.agentBioWrap}>
               <Text style={[styles.agentBio, { color: textPrimary }]}>
-                {draft.agentBio ||
-                  "Add a 3-4 sentence bio in the form. Lead with your local expertise."}
+                {softBreakLongRuns(
+                  draft.agentBio ||
+                    "Add a 3-4 sentence bio in the form. Lead with your local expertise."
+                )}
               </Text>
             </View>
           </View>
