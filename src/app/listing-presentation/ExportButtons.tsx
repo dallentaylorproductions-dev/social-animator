@@ -14,6 +14,12 @@ import { generatePdfBlob } from "@/tools/listing-presentation/output/pdf-export"
 import { exportJpegFromDraft } from "@/tools/listing-presentation/engine/jpeg-export";
 import { shareOrDownload } from "@/engine/export";
 import { type BrandSettings } from "@/lib/brand";
+import {
+  PHASE_NAMES,
+  endRun,
+  measurePhase,
+  startRun,
+} from "@/lib/perf";
 
 interface ExportButtonsProps {
   draft: PresentationDraft;
@@ -44,10 +50,20 @@ export function ExportButtons({ draft, brand }: ExportButtonsProps) {
     // leaves the editor session recoverable on reload.
     saveDraft(draft);
     setPdfState({ kind: "generating" });
+    // Listing Presentation has no photo field — photoCount = 1 if a
+    // headshot is uploaded, else 0. Keeps the perf record honest about
+    // image-decode work for the audit doc.
+    const perfRun = startRun({
+      toolId: "listing-presentation",
+      output: "pdf",
+      photoCount: draft.agentHeadshot ? 1 : 0,
+    });
     try {
       const blob = await generatePdfBlob(draft, brand);
       const filename = `${addressSlug(draft.propertyAddress)}-presentation.pdf`;
-      const result = await shareOrDownload(blob, filename);
+      const result = await measurePhase(PHASE_NAMES.FINAL_BLOB_DELIVER, () =>
+        shareOrDownload(blob, filename)
+      );
       // Only clear the draft when the file actually shipped. If the
       // user dismissed the share sheet (cancelled), keep the draft so
       // they can retry without re-typing the form.
@@ -62,6 +78,8 @@ export function ExportButtons({ draft, brand }: ExportButtonsProps) {
         kind: "error",
         message: err instanceof Error ? err.message : String(err),
       });
+    } finally {
+      endRun(perfRun);
     }
   };
 
@@ -69,10 +87,17 @@ export function ExportButtons({ draft, brand }: ExportButtonsProps) {
     if (!canExport) return;
     saveDraft(draft);
     setJpegState({ kind: "generating" });
+    const perfRun = startRun({
+      toolId: "listing-presentation",
+      output: "jpeg",
+      photoCount: draft.agentHeadshot ? 1 : 0,
+    });
     try {
       const blob = await exportJpegFromDraft(draft, brand);
       const filename = `${addressSlug(draft.propertyAddress)}-presentation.jpg`;
-      const result = await shareOrDownload(blob, filename);
+      const result = await measurePhase(PHASE_NAMES.FINAL_BLOB_DELIVER, () =>
+        shareOrDownload(blob, filename)
+      );
       if (result === "shared" || result === "downloaded") {
         clearDraft();
       }
@@ -84,6 +109,8 @@ export function ExportButtons({ draft, brand }: ExportButtonsProps) {
         kind: "error",
         message: err instanceof Error ? err.message : String(err),
       });
+    } finally {
+      endRun(perfRun);
     }
   };
 

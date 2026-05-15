@@ -25,6 +25,12 @@ import { type BrandSettings } from "@/lib/brand";
 import { ExportLoader } from "@/components/export-loader/ExportLoader";
 import type { ExportProgress, ExportStage } from "@/components/export-loader/types";
 import { overallProgress } from "@/components/export-loader/stages";
+import {
+  PHASE_NAMES,
+  endRun,
+  measurePhase,
+  startRun,
+} from "@/lib/perf";
 
 interface ExportButtonsProps {
   draft: FlyerDraft;
@@ -131,10 +137,17 @@ export function ExportButtons({
     // the editor session recoverable on reload.
     saveDraft(draft);
     setPdfState({ kind: "generating" });
+    const perfRun = startRun({
+      toolId: "listing-flyer",
+      output: "pdf",
+      photoCount: photos.length,
+    });
     try {
       const blob = await generatePdfBlob(draft, photos, brand);
       const filename = `${addressSlug(draft.addressLine1)}-flyer.pdf`;
-      const result = await shareOrDownload(blob, filename);
+      const result = await measurePhase(PHASE_NAMES.FINAL_BLOB_DELIVER, () =>
+        shareOrDownload(blob, filename)
+      );
       // Only clear the draft when the file actually shipped. If the user
       // dismissed the share sheet (cancelled), keep the draft so they can
       // retry without re-typing the form.
@@ -149,6 +162,8 @@ export function ExportButtons({
         kind: "error",
         message: err instanceof Error ? err.message : String(err),
       });
+    } finally {
+      endRun(perfRun);
     }
   };
 
@@ -159,10 +174,17 @@ export function ExportButtons({
     // window applies.
     saveDraft(draft);
     setJpegState({ kind: "generating" });
+    const perfRun = startRun({
+      toolId: "listing-flyer",
+      output: "jpeg",
+      photoCount: photos.length,
+    });
     try {
       const blob = await exportJpegFromDraft(draft, photos, brand);
       const filename = `${addressSlug(draft.addressLine1)}-flyer.jpg`;
-      const result = await shareOrDownload(blob, filename);
+      const result = await measurePhase(PHASE_NAMES.FINAL_BLOB_DELIVER, () =>
+        shareOrDownload(blob, filename)
+      );
       if (result === "shared" || result === "downloaded") {
         clearDraft();
       }
@@ -174,6 +196,8 @@ export function ExportButtons({
         kind: "error",
         message: err instanceof Error ? err.message : String(err),
       });
+    } finally {
+      endRun(perfRun);
     }
   };
 
@@ -190,6 +214,17 @@ export function ExportButtons({
       });
       return;
     }
+
+    // H-7.14: single run per export click. When both formats are selected
+    // the phases (ffmpeg-load, frame-render-loop, etc.) accumulate across
+    // both renders — the per-format split is recoverable from frameStats
+    // (counts double) if needed. Output picks the leading-selected format
+    // for the enum.
+    const perfRun = startRun({
+      toolId: "listing-flyer",
+      output: draft.exportFormats.reel ? "mp4-reel" : "mp4-sq",
+      photoCount: photos.length,
+    });
 
     setMp4State({ kind: "running", phase: "preparing", progress: 0 });
 
@@ -225,7 +260,9 @@ export function ExportButtons({
       const ffmpegPromise = getFFmpeg();
 
       // Wait for all photos to have materialized HTMLImageElements
-      await Promise.all(photos.map((p) => waitForPhoto(p)));
+      await measurePhase(PHASE_NAMES.PHOTO_DECODE_ALL, () =>
+        Promise.all(photos.map((p) => waitForPhoto(p)))
+      );
 
       const { state, assets } = mapFlyerToShowcase(
         draft,
@@ -386,6 +423,7 @@ export function ExportButtons({
       // share-sheet handoff happens via separate Save Reel / Save
       // Square buttons after this returns.
       setExportProgress(null);
+      endRun(perfRun);
     }
   };
 

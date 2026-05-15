@@ -581,6 +581,10 @@ export function TemplateEditor({ template }: TemplateEditorProps) {
                 size={{ width: size.width, height: size.height }}
                 filename={`${template.id}-${size.shortLabel.toLowerCase()}`}
                 onStartRecording={() => setPlayKey((k) => k + 1)}
+                templateId={template.id}
+                photoCount={
+                  Object.values(assets).filter((img) => img !== null).length
+                }
               />
             </div>
           </aside>

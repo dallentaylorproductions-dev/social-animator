@@ -8,6 +8,12 @@ import {
   isMobileDevice,
   getFFmpeg,
 } from "@/engine/export";
+import {
+  PHASE_NAMES,
+  endRun,
+  measurePhase,
+  startRun,
+} from "@/lib/perf";
 
 interface ExportButtonProps {
   canvasRef: RefObject<HTMLCanvasElement | null>;
@@ -15,6 +21,13 @@ interface ExportButtonProps {
   size: { width: number; height: number };
   filename: string;
   onStartRecording?: () => void;
+  /** H-7.14: template identity for the perf record. Optional so existing
+   *  callers that don't supply it still compile; perf record is created
+   *  regardless but the templateId field is left undefined. */
+  templateId?: string;
+  /** H-7.14: counted from the editor's loaded image assets. Drives the
+   *  audit's "scaling with photoCount" cuts. */
+  photoCount?: number;
 }
 
 type ExportState =
@@ -31,6 +44,8 @@ export function ExportButton({
   size,
   filename,
   onStartRecording,
+  templateId,
+  photoCount = 0,
 }: ExportButtonProps) {
   const [state, setState] = useState<ExportState>({ kind: "idle" });
 
@@ -74,16 +89,31 @@ export function ExportButton({
   };
 
   const handleExportMp4 = async () => {
+    // H-7.14: portrait-ish (height > width) → mp4-reel; otherwise mp4-sq.
+    // Covers the 3 Social Animator sizes (Feed 1080×1350, Square 1080×1080,
+    // Story 1080×1920) since the perf enum is intentionally coarse.
+    const perfRun = startRun({
+      toolId: "social-animator",
+      output: size.height > size.width ? "mp4-reel" : "mp4-sq",
+      templateId,
+      photoCount,
+    });
     try {
-      const ffmpegPromise = getFFmpeg();
+      const ffmpegPromise = measurePhase(PHASE_NAMES.FFMPEG_LOAD, () =>
+        getFFmpeg()
+      );
 
       setState({ kind: "recording", progress: 0 });
-      const webm = await doRecord();
+      const webm = await measurePhase(PHASE_NAMES.RECORDER_ACTIVE, () =>
+        doRecord()
+      );
 
       setState({ kind: "converting", progress: 0 });
       await ffmpegPromise;
-      const mp4 = await webmToMp4(webm, size, duration, (progress) =>
-        setState({ kind: "converting", progress })
+      const mp4 = await measurePhase(PHASE_NAMES.RECORDER_FINALIZE, () =>
+        webmToMp4(webm, size, duration, (progress) =>
+          setState({ kind: "converting", progress })
+        )
       );
 
       await finishWithBlob(mp4, `${filename}.mp4`);
@@ -93,6 +123,8 @@ export function ExportButton({
         kind: "error",
         message: err instanceof Error ? err.message : String(err),
       });
+    } finally {
+      endRun(perfRun);
     }
   };
 

@@ -25,6 +25,7 @@ import {
   cropToCanvas,
   srcToImage,
 } from "./crop";
+import { PHASE_NAMES, measurePhase } from "@/lib/perf";
 
 /** Default loop length when caller doesn't pass an override. */
 export const PROMO_DURATION_SEC = PROMO_DEFAULT_DURATION_SEC;
@@ -107,29 +108,30 @@ export async function renderPromoMp4(
   const HERO_REGION_H = isSquare ? 540 : 720;
 
   const heroPhoto = draft.photos[0] ?? null;
-  const heroLayered = heroPhoto
-    ? await preBlurFillLayered(heroPhoto, HERO_REGION_W, HERO_REGION_H)
-    : null;
-
-  // Thumb strip cells (reel only) — H-7x bumped 240×90 (8:3) →
-  // 240×160 (3:2 native real-estate photo aspect, no top/bottom
-  // truncation on typical phone sources). Keep dims in sync with
-  // the timeline's thumb strip layout.
-  let thumbs: HTMLCanvasElement[] = [];
-  if (!isSquare && draft.photos.length > 1) {
-    thumbs = await Promise.all(
-      draft.photos.slice(1, 5).map((p) => preCropToCanvas(p, 240, 160))
-    );
-  }
+  // photo-decode-all covers hero + thumb materialization. Both go through
+  // srcToImage which is the dominant cost (data URL → HTMLImageElement
+  // round-trip + canvas compose for the hero blur-fill).
+  const { heroLayered, thumbs } = await measurePhase(
+    PHASE_NAMES.PHOTO_DECODE_ALL,
+    async () => {
+      const hero = heroPhoto
+        ? await preBlurFillLayered(heroPhoto, HERO_REGION_W, HERO_REGION_H)
+        : null;
+      let thumbsLocal: HTMLCanvasElement[] = [];
+      if (!isSquare && draft.photos.length > 1) {
+        thumbsLocal = await Promise.all(
+          draft.photos.slice(1, 5).map((p) => preCropToCanvas(p, 240, 160))
+        );
+      }
+      return { heroLayered: hero, thumbs: thumbsLocal };
+    }
+  );
 
   // QR — high res. Always black-on-white for scanner reliability;
   // the timeline draws a white card behind it for contrast against
   // any primary bg.
-  const qrDataUrl = await generateQrDataUrl(
-    draft.qrTargetUrl,
-    600,
-    "#000000",
-    "#ffffff"
+  const qrDataUrl = await measurePhase(PHASE_NAMES.QR_GENERATE, () =>
+    generateQrDataUrl(draft.qrTargetUrl, 600, "#000000", "#ffffff")
   );
   const qrImage = qrDataUrl ? await srcToImage(qrDataUrl) : null;
 

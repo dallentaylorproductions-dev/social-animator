@@ -7,6 +7,11 @@ import { PromoDocument } from "./PromoDocument";
 import { generateQrDataUrl } from "./qr";
 import { pickContrastText } from "@/tools/listing-flyer/engine/contrast";
 import { blurFillCompose, cropToCanvas, srcToImage } from "../engine/crop";
+import {
+  PHASE_NAMES,
+  measurePhase,
+  measurePhaseSync,
+} from "@/lib/perf";
 
 /**
  * Generate the open-house-promo PDF blob from the current draft.
@@ -35,7 +40,9 @@ export async function generatePdfBlob(
 ): Promise<Blob> {
   const qrFg = pickContrastText(brand.backgroundColor || "#ffffff");
   const qrBg = brand.backgroundColor || "#ffffff";
-  const qrDataUrl = await generateQrDataUrl(draft.qrTargetUrl, 400, qrFg, qrBg);
+  const qrDataUrl = await measurePhase(PHASE_NAMES.QR_GENERATE, () =>
+    generateQrDataUrl(draft.qrTargetUrl, 400, qrFg, qrBg)
+  );
 
   // Hero box is now hard-capped at 540pt × 270pt (2:1) per H-7p
   // and uses blur-fill composition (H-7o) — a blurred + zoomed
@@ -50,30 +57,35 @@ export async function generatePdfBlob(
   const HERO_TARGET_H = 540;
 
   const heroPhoto = draft.photos[0] ?? null;
-  const heroSrc = heroPhoto
-    ? await preBlurFillToDataUrl(
-        heroPhoto,
-        HERO_TARGET_W,
-        HERO_TARGET_H,
-        0.92
-      )
-    : null;
-
-  // Thumb strip cells are now 3:2 too — the natural real-estate
-  // photo aspect. Each cell ~132pt × 88pt at print, pre-cropped at
-  // 600px wide / 400px tall so the focal point is preserved at
-  // high resolution.
   const THUMB_TARGET_W = 600;
   const THUMB_TARGET_H = Math.round(THUMB_TARGET_W * (2 / 3)); // 3:2
-
   const thumbPhotos = draft.photos.slice(1, 5);
-  const thumbSrcs = await Promise.all(
-    thumbPhotos.map((p) =>
-      preCropToDataUrl(p, THUMB_TARGET_W, THUMB_TARGET_H, 0.92)
-    )
+
+  // photo-decode-all covers all photo materialization for this export
+  // (hero blur-fill compose + thumb crop) since both come from the same
+  // PhotoEntry.src data URLs and the cost is dominated by the srcToImage
+  // decode round-trip.
+  const { heroSrc, thumbSrcs } = await measurePhase(
+    PHASE_NAMES.PHOTO_DECODE_ALL,
+    async () => {
+      const hero = heroPhoto
+        ? await preBlurFillToDataUrl(
+            heroPhoto,
+            HERO_TARGET_W,
+            HERO_TARGET_H,
+            0.92
+          )
+        : null;
+      const thumbs = await Promise.all(
+        thumbPhotos.map((p) =>
+          preCropToDataUrl(p, THUMB_TARGET_W, THUMB_TARGET_H, 0.92)
+        )
+      );
+      return { heroSrc: hero, thumbSrcs: thumbs };
+    }
   );
 
-  const blob = await pdf(
+  const doc = measurePhaseSync(PHASE_NAMES.PDF_DOC_BUILD, () => (
     <PromoDocument
       draft={draft}
       brand={brand}
@@ -82,7 +94,10 @@ export async function generatePdfBlob(
       thumbSrcs={thumbSrcs}
       hasThumbs={hasThumbs}
     />
-  ).toBlob();
+  ));
+  const blob = await measurePhase(PHASE_NAMES.PDF_RENDER_TO_BLOB, () =>
+    pdf(doc).toBlob()
+  );
 
   // Non-blocking page-count check. The user gets their PDF either
   // way; this just logs a warning to console if the document

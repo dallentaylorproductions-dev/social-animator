@@ -5,6 +5,11 @@ import { type FlyerDraft } from "../engine/types";
 import { type FlyerPhoto } from "../engine/types";
 import { type BrandSettings } from "@/lib/brand";
 import { FlyerDocument } from "./FlyerDocument";
+import {
+  PHASE_NAMES,
+  measurePhase,
+  measurePhaseSync,
+} from "@/lib/perf";
 
 /**
  * Generate the listing-flyer PDF blob from the current form state.
@@ -24,12 +29,13 @@ export async function generatePdfBlob(
   photos: FlyerPhoto[],
   brand: BrandSettings
 ): Promise<Blob> {
-  const photoDataUrls = await Promise.all(
-    photos.map((p) => fileToCompressedDataUrl(p.file))
+  const photoDataUrls = await measurePhase(PHASE_NAMES.PHOTO_DECODE_ALL, () =>
+    Promise.all(photos.map((p) => fileToCompressedDataUrl(p.file)))
   );
-  return pdf(
+  const doc = measurePhaseSync(PHASE_NAMES.PDF_DOC_BUILD, () => (
     <FlyerDocument draft={draft} photoUrls={photoDataUrls} brand={brand} />
-  ).toBlob();
+  ));
+  return measurePhase(PHASE_NAMES.PDF_RENDER_TO_BLOB, () => pdf(doc).toBlob());
 }
 
 /**
