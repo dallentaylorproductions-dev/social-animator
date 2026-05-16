@@ -3,6 +3,8 @@ import { promises as fs } from 'node:fs';
 import { pdfToPng } from 'pdf-to-png-converter';
 import {
   bufferToScreenshotPng,
+  mp4Duration,
+  mp4FirstFramePng,
   seedBrandProfile,
   seedOpenHousePromoDraft,
   uploadTestPhoto,
@@ -200,6 +202,25 @@ test.describe('Open House Promo — exports', () => {
     expect(stats.size).toBeGreaterThan(50_000);
     expect(stats.size).toBeLessThan(50_000_000);
     expect(download.suggestedFilename()).toMatch(/\.mp4$/i);
+
+    // W-3.2: duration assertion. seedOpenHousePromoDraft sets
+    // mp4DurationSeconds=6 (PROMO_DEFAULT_DURATION_SEC;
+    // src/tools/open-house-promo/engine/types.ts). webmToMp4 trims to
+    // exactly `-t durationSec`. ±0.5s tolerance is generous.
+    const mp4Buffer = await fs.readFile(filePath!);
+    const duration = await mp4Duration(page, mp4Buffer);
+    expect(duration).toBeGreaterThanOrEqual(5.5);
+    expect(duration).toBeLessThanOrEqual(6.5);
+
+    // W-3.2: first-frame visual snapshot.
+    const firstFramePng = await mp4FirstFramePng(page, mp4Buffer);
+    expect(firstFramePng).toMatchSnapshot(
+      'oh-promo-mp4-reel-first-frame.png',
+      {
+        threshold: 0.2,
+        maxDiffPixelRatio: 0.05,
+      }
+    );
   });
 
   test('exports a valid MP4 square (1:1) @slow', async ({ page }) => {
@@ -235,5 +256,21 @@ test.describe('Open House Promo — exports', () => {
     expect(stats.size).toBeGreaterThan(50_000);
     expect(stats.size).toBeLessThan(50_000_000);
     expect(download.suggestedFilename()).toMatch(/\.mp4$/i);
+
+    // W-3.2: duration assertion (same 6s expected as the reel test).
+    const mp4Buffer = await fs.readFile(filePath!);
+    const duration = await mp4Duration(page, mp4Buffer);
+    expect(duration).toBeGreaterThanOrEqual(5.5);
+    expect(duration).toBeLessThanOrEqual(6.5);
+
+    // W-3.2: first-frame visual snapshot.
+    const firstFramePng = await mp4FirstFramePng(page, mp4Buffer);
+    expect(firstFramePng).toMatchSnapshot(
+      'oh-promo-mp4-square-first-frame.png',
+      {
+        threshold: 0.2,
+        maxDiffPixelRatio: 0.05,
+      }
+    );
   });
 });
