@@ -1,5 +1,5 @@
 import { expect, type Page } from '@playwright/test';
-import { promises as fs } from 'node:fs';
+import { promises as fs, readFileSync } from 'node:fs';
 import path from 'node:path';
 
 /**
@@ -225,6 +225,67 @@ export async function uploadTestPhoto(
   await expect(
     page.getByText(/Photos\s*\(1\s*\/\s*\d+\)/i).first()
   ).toBeVisible({ timeout: 15_000 });
+}
+
+/**
+ * Read a test photo from public/perf-test/ and return it as a JPEG data URL
+ * string. Synchronous read — intended for use inside test setup code where
+ * the data URL needs to be embedded into a JSON payload (e.g.,
+ * seedListingProfile's heroPhoto field).
+ *
+ * 3000×2000 photos at ~400 KB encode to ~530 KB base64 + the prefix — well
+ * within localStorage's per-key limit on Chromium (~5 MB).
+ */
+export function testPhotoDataUri(photoFileName: string = 'perf-01.jpg'): string {
+  const photoPath = path.resolve(
+    __dirname,
+    '../../public/perf-test',
+    photoFileName
+  );
+  const buffer = readFileSync(photoPath);
+  return `data:image/jpeg;base64,${buffer.toString('base64')}`;
+}
+
+/**
+ * Seed the cross-template listing profile in localStorage. Auto-merged into
+ * listing-card + listing-showcase on first hydration via useListingProfile
+ * (src/lib/listing-profile.ts:STORAGE_KEY=socanim_listing_profile).
+ *
+ * heroPhoto is a data URL (or empty string); the editor materializes it
+ * into an HTMLImageElement asset on mount. Pass testPhotoDataUri() for a
+ * real photo or leave the field empty to test the placeholder path.
+ *
+ * Other text fields follow the H-7.10 state-equals-display contract
+ * (price = "$685,000", sqft = "2,840", etc.).
+ */
+export async function seedListingProfile(
+  page: Page,
+  profile: {
+    heroPhoto?: string;
+    status?: string;
+    address?: string;
+    cityState?: string;
+    price?: string;
+    beds?: string;
+    baths?: string;
+    sqft?: string;
+  } = {}
+): Promise<void> {
+  await page.addInitScript((seed) => {
+    window.localStorage.setItem(
+      'socanim_listing_profile',
+      JSON.stringify({
+        heroPhoto: seed.heroPhoto ?? '',
+        status: seed.status ?? 'Just Listed',
+        address: seed.address ?? '',
+        cityState: seed.cityState ?? '',
+        price: seed.price ?? '',
+        beds: seed.beds ?? '',
+        baths: seed.baths ?? '',
+        sqft: seed.sqft ?? '',
+      })
+    );
+  }, profile);
 }
 
 /**
