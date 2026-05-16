@@ -26,5 +26,12 @@ export default defineConfig({
     // of 60-120s. Warm restarts are <2s, so this cap is only consumed
     // on the first run after a clean `.next/`.
     timeout: 300_000,
+    env: {
+      // Activates the middleware's E2E bypass (src/middleware.ts) so tests
+      // can reach gated routes (/listing-flyer, /social-animator, /settings,
+      // /dashboard) without a real auth session. The bypass also requires
+      // NODE_ENV !== 'production' — production builds are never affected.
+      E2E_TESTING: '1',
+    },
   },
 });
