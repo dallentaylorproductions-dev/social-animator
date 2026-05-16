@@ -4,28 +4,31 @@ import { pdfToPng } from 'pdf-to-png-converter';
 import {
   bufferToScreenshotPng,
   seedBrandProfile,
-  seedListingFlyerDraft,
+  seedOpenHousePromoDraft,
   uploadTestPhoto,
 } from './fixtures/seed-helpers';
 
 /**
- * Listing Flyer — full export coverage.
+ * Open House Promo — full export coverage.
  *
- * PDF + JPEG carry visual snapshot assertions (catches the bullet-class
- * regression mechanically). MP4 reel + MP4 square are file-level only —
- * size + extension; visual diff on 5-second videos is overkill and frame-
- * timing variance would make snapshots flaky.
+ * PDF + JPEG + QR PNG carry visual snapshots. MP4 reel/square are
+ * file-level only (same rationale as Listing Flyer: video diff is overkill
+ * for 5-10s outputs).
  *
- * The MP4 tests are tagged @slow so the iterative loop can skip them
- * (`npx playwright test --grep-invert "@slow"`). Per H-7.14 measurements
- * (docs/H-7.14-render-perf-audit.md §4), Listing Flyer MP4 Reel cold is
- * ~90s on Mac Chrome; 180s budget gives generous headroom for cold runs.
+ * validateForExport (src/tools/open-house-promo/engine/types.ts:320)
+ * requires eventDate, eventStartTime, propertyAddress — all seeded by
+ * seedOpenHousePromoDraft. QR PNG additionally requires qrTargetUrl
+ * (also seeded).
+ *
+ * Note: /open-house-promo is NOT in src/middleware.ts's matcher, so the
+ * E2E_TESTING bypass isn't load-bearing here. The seedBrandProfile call
+ * still seeds the agent block fields used in the rendered output.
  */
 
-test.describe('Listing Flyer — exports', () => {
+test.describe('Open House Promo — exports', () => {
   test.beforeEach(async ({ page }) => {
     await seedBrandProfile(page);
-    await seedListingFlyerDraft(page);
+    await seedOpenHousePromoDraft(page);
   });
 
   test('exports a valid PDF with matching visual snapshot', async ({
@@ -33,7 +36,7 @@ test.describe('Listing Flyer — exports', () => {
   }) => {
     test.setTimeout(90_000);
 
-    await page.goto('/listing-flyer');
+    await page.goto('/open-house-promo');
     await expect(page).not.toHaveURL(/\/login/i);
 
     await uploadTestPhoto(page);
@@ -53,7 +56,6 @@ test.describe('Listing Flyer — exports', () => {
     expect(stats.size).toBeGreaterThan(10_000);
     expect(stats.size).toBeLessThan(5_000_000);
 
-    // Magic-bytes sniff
     const fd = await fs.open(filePath!, 'r');
     try {
       const header = Buffer.alloc(5);
@@ -63,14 +65,13 @@ test.describe('Listing Flyer — exports', () => {
       await fd.close();
     }
 
-    // Visual diff against the stored snapshot
     const pngPages = await pdfToPng(filePath!, {
       viewportScale: 2.0,
       pagesToProcess: [1],
     });
     expect(pngPages.length).toBe(1);
     expect(pngPages[0].content).toMatchSnapshot(
-      'listing-flyer-pdf-page-1.png',
+      'oh-promo-pdf-page-1.png',
       {
         threshold: 0.2,
         maxDiffPixelRatio: 0.05,
@@ -83,25 +84,18 @@ test.describe('Listing Flyer — exports', () => {
   }) => {
     test.setTimeout(90_000);
 
-    await page.goto('/listing-flyer');
+    await page.goto('/open-house-promo');
     await expect(page).not.toHaveURL(/\/login/i);
 
     await uploadTestPhoto(page);
 
-    // Button text from ExportButtons.tsx: "Export JPEG (Camera Roll)".
-    // Anchor on "Export JPEG" so the regex isn't tied to the parenthetical.
-    const exportButton = page.getByRole('button', {
-      name: /export jpeg/i,
-    });
+    const exportButton = page.getByRole('button', { name: /export jpeg/i });
     await expect(exportButton).toBeEnabled();
 
     const downloadPromise = page.waitForEvent('download', { timeout: 60_000 });
     await exportButton.click();
     const download = await downloadPromise;
 
-    // jpeg-export.ts builds the JPEG via pdfjs rasterization at 3x scale +
-    // q=0.92 — typical output is ~1-2 MB. 10 MB ceiling catches runaway
-    // size, 10 KB floor catches empty/error blobs.
     const filePath = await download.path();
     expect(filePath).toBeTruthy();
     const stats = await fs.stat(filePath!);
@@ -109,7 +103,6 @@ test.describe('Listing Flyer — exports', () => {
     expect(stats.size).toBeLessThan(10_000_000);
     expect(download.suggestedFilename()).toMatch(/\.jpe?g$/i);
 
-    // Magic-bytes sniff — JPEG SOI is FF D8 FF
     const fd = await fs.open(filePath!, 'r');
     try {
       const header = Buffer.alloc(3);
@@ -121,36 +114,80 @@ test.describe('Listing Flyer — exports', () => {
       await fd.close();
     }
 
-    // Visual snapshot on the JPEG. bufferToScreenshotPng renders the JPEG
-    // through Chromium and returns a PNG buffer; raw JPEG bytes can't be
-    // passed to toMatchSnapshot directly (the image diff decodes both
-    // sides as PNG and JPEG bytes fail the decode on the second run).
     const jpegBuffer = await fs.readFile(filePath!);
     const png = await bufferToScreenshotPng(page, jpegBuffer, 'image/jpeg');
-    expect(png).toMatchSnapshot('listing-flyer-jpeg.png', {
+    expect(png).toMatchSnapshot('oh-promo-jpeg.png', {
       threshold: 0.2,
       maxDiffPixelRatio: 0.05,
     });
   });
 
-  test('exports a valid MP4 reel (9:16 vertical) @slow', async ({ page }) => {
-    test.setTimeout(270_000); // 4.5 min — H-7.14 measured ~90s warm,
-    // but cold Playwright-spawned dev-server runs add ffmpeg-load +
-    // first-compile overhead. Saw 179s mid-export in the W-2.4 run.
+  test('exports a valid QR PNG with matching visual snapshot', async ({
+    page,
+  }) => {
+    test.setTimeout(60_000);
 
-    await page.goto('/listing-flyer');
+    await page.goto('/open-house-promo');
+    await expect(page).not.toHaveURL(/\/login/i);
+
+    // QR export doesn't require a photo — qrTargetUrl is seeded by
+    // seedOpenHousePromoDraft. Button text: "Export QR Code (PNG)"
+    // per ExportButtons.tsx.
+    const exportButton = page.getByRole('button', { name: /export qr/i });
+    await expect(exportButton).toBeEnabled();
+
+    const downloadPromise = page.waitForEvent('download', { timeout: 30_000 });
+    await exportButton.click();
+    const download = await downloadPromise;
+
+    const filePath = await download.path();
+    expect(filePath).toBeTruthy();
+    const stats = await fs.stat(filePath!);
+    // QR PNGs are small but not tiny — 800px image with ~1KB data URL.
+    expect(stats.size).toBeGreaterThan(500);
+    expect(stats.size).toBeLessThan(500_000);
+    expect(download.suggestedFilename()).toMatch(/\.png$/i);
+
+    // PNG magic bytes: 89 50 4E 47
+    const fd = await fs.open(filePath!, 'r');
+    try {
+      const header = Buffer.alloc(4);
+      await fd.read(header, 0, 4, 0);
+      expect(header[0]).toBe(0x89);
+      expect(header[1]).toBe(0x50);
+      expect(header[2]).toBe(0x4e);
+      expect(header[3]).toBe(0x47);
+    } finally {
+      await fd.close();
+    }
+
+    // QR codes are high-contrast (pure black/white modules) so we can
+    // tighten the tolerances vs the photo-bearing snapshots — anti-
+    // aliasing matters less and any real change shows up immediately.
+    const pngBuffer = await fs.readFile(filePath!);
+    const screenshotPng = await bufferToScreenshotPng(
+      page,
+      pngBuffer,
+      'image/png'
+    );
+    expect(screenshotPng).toMatchSnapshot('oh-promo-qr.png', {
+      threshold: 0.1,
+      maxDiffPixelRatio: 0.02,
+    });
+  });
+
+  test('exports a valid MP4 reel (9:16 vertical) @slow', async ({ page }) => {
+    test.setTimeout(270_000);
+
+    await page.goto('/open-house-promo');
     await expect(page).not.toHaveURL(/\/login/i);
 
     await uploadTestPhoto(page);
 
-    // The seeded draft has exportFormats: { reel: true, square: false }, so
-    // the Reel checkbox should already be checked and the export button
-    // should read "Export Reel (MP4)" per renderButtonLabel in
-    // ExportButtons.tsx.
     const reelCheckbox = page.getByRole('checkbox', { name: /reel \(9:16\)/i });
     await expect(reelCheckbox).toBeChecked();
 
-    const exportButton = page.getByRole('button', { name: /export reel/i });
+    const exportButton = page.getByRole('button', { name: /render reel|export reel/i });
     await expect(exportButton).toBeEnabled();
 
     const downloadPromise = page.waitForEvent('download', { timeout: 240_000 });
@@ -160,24 +197,22 @@ test.describe('Listing Flyer — exports', () => {
     const filePath = await download.path();
     expect(filePath).toBeTruthy();
     const stats = await fs.stat(filePath!);
-    // MP4 size sanity: 50 KB floor catches empty/error blobs; 50 MB ceiling
-    // catches runaway encodes. Typical 8s Listing Flyer MP4 Reel is 2-6 MB.
     expect(stats.size).toBeGreaterThan(50_000);
     expect(stats.size).toBeLessThan(50_000_000);
     expect(download.suggestedFilename()).toMatch(/\.mp4$/i);
   });
 
   test('exports a valid MP4 square (1:1) @slow', async ({ page }) => {
-    test.setTimeout(270_000); // Same headroom as the reel test.
+    test.setTimeout(270_000);
 
-    await page.goto('/listing-flyer');
+    await page.goto('/open-house-promo');
     await expect(page).not.toHaveURL(/\/login/i);
 
     await uploadTestPhoto(page);
 
-    // Toggle: check square first (so we never sit in a both-false state
-    // that would briefly disable the export button via hasAnyFormat), then
-    // uncheck reel. After this the button label is "Export Square (MP4)".
+    // Square-first toggle to avoid both-false transient that disables the
+    // export button via hasAnyFormat (same pattern as Listing Flyer MP4
+    // square test).
     const reelCheckbox = page.getByRole('checkbox', { name: /reel \(9:16\)/i });
     const squareCheckbox = page.getByRole('checkbox', {
       name: /square \(1:1\)/i,
@@ -185,7 +220,9 @@ test.describe('Listing Flyer — exports', () => {
     await squareCheckbox.check();
     if (await reelCheckbox.isChecked()) await reelCheckbox.uncheck();
 
-    const exportButton = page.getByRole('button', { name: /export square/i });
+    const exportButton = page.getByRole('button', {
+      name: /render square|export square/i,
+    });
     await expect(exportButton).toBeEnabled();
 
     const downloadPromise = page.waitForEvent('download', { timeout: 240_000 });
