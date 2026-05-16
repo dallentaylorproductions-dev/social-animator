@@ -28,6 +28,7 @@
     "stripe": "^22.1.0"
   },
   "devDependencies": {
+    "@playwright/test": "^1.60.0",
     "@tailwindcss/postcss": "^4",
     "@types/node": "^20",
     "@types/qrcode": "^1.5.6",
@@ -35,6 +36,7 @@
     "@types/react-dom": "^19",
     "eslint": "^9",
     "eslint-config-next": "16.2.4",
+    "pdf-to-png-converter": "^4.0.0",
     "tailwindcss": "^4",
     "typescript": "^5"
   }

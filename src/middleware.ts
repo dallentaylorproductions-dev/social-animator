@@ -15,6 +15,24 @@ import { NextResponse } from "next/server";
  *     needs to reach these to GET an active sub
  */
 export default auth(async (req) => {
+  // Test-only bypass: skip auth/subscription checks when running E2E
+  // tests against a non-production build. The bypass requires BOTH
+  // conditions simultaneously to prevent any chance of leaking into
+  // production:
+  //   - NODE_ENV !== 'production' (Next.js sets this automatically in
+  //     production builds; Vercel respects it)
+  //   - E2E_TESTING === '1' (only set by playwright.config.ts when
+  //     Playwright spawns the dev server for tests; never set in any
+  //     other environment)
+  // Even if E2E_TESTING somehow leaked into Vercel prod env vars by
+  // misconfiguration, the NODE_ENV check still blocks the bypass.
+  if (
+    process.env.NODE_ENV !== "production" &&
+    process.env.E2E_TESTING === "1"
+  ) {
+    return NextResponse.next();
+  }
+
   const isLoggedIn = !!req.auth;
   const { pathname, search } = req.nextUrl;
 
