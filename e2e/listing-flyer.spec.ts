@@ -1,6 +1,7 @@
 import { test, expect } from '@playwright/test';
 import { promises as fs } from 'node:fs';
 import path from 'node:path';
+import { pdfToPng } from 'pdf-to-png-converter';
 
 /**
  * W-2.2 — Listing Flyer PDF export end-to-end test.
@@ -148,5 +149,29 @@ test.describe('Listing Flyer — PDF export', () => {
     } finally {
       await fd.close();
     }
+
+    // Visual diff: rasterize page 1 of the exported PDF to PNG and compare
+    // against the stored snapshot. Catches output drift like the v1.39.2
+    // bullet regression — if any visual element silently disappears or
+    // changes color, this assertion fails the test and blocks the merge.
+    const pngPages = await pdfToPng(filePath!, {
+      viewportScale: 2.0, // 2x for higher resolution, more sensitive comparison
+      pagesToProcess: [1], // page 1 only
+    });
+    expect(pngPages.length).toBe(1);
+    const pngBuffer = pngPages[0].content;
+
+    expect(pngBuffer).toMatchSnapshot('listing-flyer-pdf-page-1.png', {
+      // Reasonable defaults for visual diff:
+      // - threshold: per-pixel sensitivity (0 = strict, 1 = ignore all)
+      //   0.2 tolerates anti-aliasing variance while still catching real
+      //   visual changes
+      // - maxDiffPixelRatio: ratio of pixels that can differ before fail
+      //   0.05 means up to 5% of pixels can differ — generous enough
+      //   to handle font rendering nuance, strict enough to catch real
+      //   regressions like a missing bullet color or a wrong background.
+      threshold: 0.2,
+      maxDiffPixelRatio: 0.05,
+    });
   });
 });
