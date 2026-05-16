@@ -1,0 +1,96 @@
+name: Playwright Tests
+
+on:
+  pull_request:
+    branches:
+      - main
+  push:
+    branches:
+      - main
+
+# Cancel in-progress runs when a new commit is pushed to the same PR /
+# branch — saves CI minutes when iterating on a stack.
+concurrency:
+  group: playwright-${{ github.workflow }}-${{ github.event.pull_request.number || github.ref }}
+  cancel-in-progress: true
+
+jobs:
+  test:
+    name: Run Playwright e2e tests
+    runs-on: ubuntu-latest
+    timeout-minutes: 30
+
+    env:
+      # ----- App env vars -----
+      # All values are dummies — the middleware bypass (E2E_TESTING=1) skips
+      # any code path that actually uses these values. They exist only to
+      # let the Next.js build succeed without complaining about missing
+      # config. Real production secrets live in Vercel's env settings, NOT
+      # here.
+      AUTH_SECRET: ci-dummy-secret-do-not-use-in-production-this-is-only-for-build
+      AUTH_URL: http://localhost:3000
+      AUTH_RESEND_KEY: dummy-resend-key
+      AUTH_EMAIL_FROM: noreply@example.com
+      KV_REST_API_URL: https://dummy.upstash.io
+      KV_REST_API_TOKEN: dummy-kv-token
+      STRIPE_SECRET_KEY: sk_test_dummy
+      STRIPE_PRICE_ID: price_dummy
+      STRIPE_WEBHOOK_SECRET: whsec_dummy
+
+      # ----- Test bypass -----
+      # Activates the middleware bypass introduced in W-2.2. This var is set
+      # ONLY in this workflow's env, NOT in Vercel production env vars. The
+      # bypass ALSO checks NODE_ENV !== 'production' — even if E2E_TESTING
+      # somehow leaked into Vercel by misconfiguration, the NODE_ENV check
+      # still blocks it.
+      E2E_TESTING: '1'
+
+      # ----- CI marker -----
+      # Playwright reads this to switch on/off CI-specific config:
+      # forbidOnly, retries, GitHub-annotation reporter.
+      CI: 'true'
+
+    steps:
+      - name: Checkout
+        uses: actions/checkout@v4
+
+      - name: Setup Node.js
+        uses: actions/setup-node@v4
+        with:
+          node-version: 22
+          cache: npm
+
+      - name: Install dependencies
+        run: npm ci
+
+      - name: Install Playwright browsers
+        # --with-deps installs the system libraries Chromium needs on Ubuntu
+        # (libnss3, libatk-bridge2.0-0, etc.). Mac-local installs don't need
+        # this; CI Linux does.
+        run: npx playwright install --with-deps chromium
+
+      - name: Run Playwright tests
+        run: npx playwright test
+
+      # Upload the HTML report on failure so any drift can be diagnosed from
+      # the GitHub UI without re-running locally. Snapshot diff images live
+      # inside this report when a visual test fails.
+      - name: Upload Playwright report on failure
+        if: failure()
+        uses: actions/upload-artifact@v4
+        with:
+          name: playwright-report
+          path: playwright-report/
+          retention-days: 14
+
+      # test-results/ holds traces + screenshots + the actual + expected
+      # snapshot pairs when a snapshot diff fires. Keeps the same retention
+      # so the artifacts are available for the bootstrap workflow (option B
+      # in docs/regression-testing.md).
+      - name: Upload test results on failure
+        if: failure()
+        uses: actions/upload-artifact@v4
+        with:
+          name: test-results
+          path: test-results/
+          retention-days: 14

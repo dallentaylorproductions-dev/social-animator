@@ -1,15 +1,23 @@
 import { defineConfig, devices } from '@playwright/test';
 
+// CI is set by the GitHub Actions workflow (.github/workflows/playwright.yml)
+// and any other CI runner. When true, switch on stricter defaults: GitHub-
+// annotation reporter, one retry to absorb MP4 timing flake, fail on stray
+// test.only(). Locally, stay terse + zero-retry so flakes surface
+// immediately.
+const isCI = !!process.env.CI;
+
 export default defineConfig({
   testDir: './e2e',
   fullyParallel: false,
-  forbidOnly: !!process.env.CI,
-  retries: 0,
+  forbidOnly: isCI,
+  retries: isCI ? 1 : 0,
   workers: 1,
-  reporter: 'list',
+  reporter: isCI ? [['github'], ['html']] : 'list',
   use: {
     baseURL: 'http://localhost:3000',
     trace: 'on-first-retry',
+    screenshot: 'only-on-failure',
   },
   projects: [
     {
