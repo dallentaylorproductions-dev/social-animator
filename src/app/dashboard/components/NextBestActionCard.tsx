@@ -41,9 +41,18 @@ export function NextBestActionCard({
           {primarySkill.name} →
         </Link>
         {nextSkills.length > 0 && (
-          <p className="text-[11px] text-neutral-500 leading-relaxed">
-            After this: {nextSkills.map((s) => s.name).join(' · ')}
-          </p>
+          <div className="flex flex-wrap items-center gap-2">
+            <span className="text-[11px] text-neutral-500 leading-relaxed">After this:</span>
+            {nextSkills.map((s) => (
+              <Link
+                key={s.id}
+                href={skillRoute(s.id)}
+                className="inline-flex items-center rounded-full border border-neutral-700 px-3 py-1 text-[11px] text-neutral-300 hover:border-[#4ef2d9]/60 hover:text-[#4ef2d9] transition"
+              >
+                {s.name}
+              </Link>
+            ))}
+          </div>
         )}
       </div>
     </div>

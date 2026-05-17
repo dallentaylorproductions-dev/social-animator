@@ -8,11 +8,12 @@ import type { WorkflowState } from '@/skills/types';
  * Call from a useEffect — `window` access guarded for SSR safety.
  *
  * Storage keys (verified against current code):
- *   socanim_brand_settings        — src/lib/brand.ts
- *   socanim_listing_profile       — src/lib/listing-profile.ts
- *   listingFlyer:draft            — src/tools/listing-flyer/engine/draft-storage.ts
- *   openHousePromo:draft          — src/tools/open-house-promo/engine/draft-storage.ts
- *   listingPresentation:draft     — src/tools/listing-presentation/engine/draft-storage.ts
+ *   socanim_brand_settings           — src/lib/brand.ts
+ *   socanim_listing_profile          — src/lib/listing-profile.ts
+ *   listingFlyer:draft               — src/tools/listing-flyer/engine/draft-storage.ts
+ *   openHousePromo:draft             — src/tools/open-house-promo/engine/draft-storage.ts
+ *   listingPresentation:draft        — src/tools/listing-presentation/engine/draft-storage.ts
+ *   sellerIntelligenceReport:draft   — src/tools/seller-intelligence-report/engine/draft-storage.ts
  */
 
 function readJson<T>(key: string): T | null {
@@ -57,6 +58,30 @@ export function detectActiveStates(): WorkflowState[] {
   );
   if (presentationDraft?.propertyAddress) {
     active.push('seller_appointment_state');
+  }
+
+  // SIR draft — seller appointment prep. Tracks the agent-facing companion
+  // to Listing Presentation (audit-spec'd Workflow 5 surface).
+  const sirDraft = readJson<{
+    propertyAddress?: string;
+    recommendedListPrice?: string;
+    comps?: Array<{ address?: string; soldPrice?: string }>;
+  }>('sellerIntelligenceReport:draft');
+  if (sirDraft?.propertyAddress) {
+    if (!active.includes('seller_appointment_state')) {
+      active.push('seller_appointment_state');
+    }
+    // Mirror validateForExport: address + price + at least one comp with
+    // address + soldPrice means the SIR is "done enough" and the agent
+    // can transition to the conversion / next-step phase.
+    const firstComp = sirDraft.comps?.[0];
+    if (
+      sirDraft.recommendedListPrice?.trim() &&
+      firstComp?.address?.trim() &&
+      firstComp?.soldPrice?.trim()
+    ) {
+      active.push('seller_conversion_state');
+    }
   }
 
   // Cadence-based states surface as always-on in Phase 1. Phase 2 will gate
