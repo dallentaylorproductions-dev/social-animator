@@ -122,7 +122,9 @@ function AllSkillsSection() {
   const marketingAssets = ALL_SKILLS.filter(
     (s) => s.id === 'listing-flyer' || s.id === 'open-house-promo'
   );
-  const sellerPitch = ALL_SKILLS.filter((s) => s.id === 'listing-presentation');
+  const sellerPitch = ALL_SKILLS.filter(
+    (s) => s.id === 'listing-presentation' || s.id === 'seller-intelligence-report',
+  );
   const socialContent = ALL_SKILLS.filter((s) =>
     s.id.startsWith('social-animator-')
   );
