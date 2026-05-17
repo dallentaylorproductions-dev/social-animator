@@ -187,11 +187,11 @@ export async function renderPromoMp4(
 
   const timeline = buildPromoTimeline(state, size, assets, durationSec);
 
-  // renderTimelineToMp4 routes by platform: iOS Safari uses the
-  // existing MediaRecorder + webmToMp4 path; everything else gets
-  // the frame-by-frame + ffmpeg PNG-sequence pipeline. Either way
-  // the caller receives the same FrameRenderProgress events; we
-  // map them to the legacy RenderProgressUpdate shape here.
+  // renderTimelineToMp4 uses the MediaRecorder + webmToMp4 pipeline
+  // on all platforms (W-3.2 consolidation — the prior frame-by-frame
+  // PNG-sequence path was deleted). The caller receives
+  // FrameRenderProgress events that we map to the legacy
+  // RenderProgressUpdate shape here.
   return renderTimelineToMp4(canvas, timeline, size, durationSec, background, (p) => {
     if (p.phase === "rendering") {
       onProgress?.({

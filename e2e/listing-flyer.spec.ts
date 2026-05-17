@@ -3,6 +3,8 @@ import { promises as fs } from 'node:fs';
 import { pdfToPng } from 'pdf-to-png-converter';
 import {
   bufferToScreenshotPng,
+  mp4Duration,
+  mp4FirstFramePng,
   seedBrandProfile,
   seedListingFlyerDraft,
   uploadTestPhoto,
@@ -165,6 +167,27 @@ test.describe('Listing Flyer — exports', () => {
     expect(stats.size).toBeGreaterThan(50_000);
     expect(stats.size).toBeLessThan(50_000_000);
     expect(download.suggestedFilename()).toMatch(/\.mp4$/i);
+
+    // W-3.2: duration assertion. seedListingFlyerDraft sets duration=8 (the
+    // DEFAULT_DURATION; src/tools/listing-flyer/engine/types.ts). webmToMp4
+    // trims to exactly `-t durationSec` after skipping the warmup, so the
+    // output is 8s ±container header rounding. ±0.5s tolerance is generous.
+    const mp4Buffer = await fs.readFile(filePath!);
+    const duration = await mp4Duration(page, mp4Buffer);
+    expect(duration).toBeGreaterThanOrEqual(7.5);
+    expect(duration).toBeLessThanOrEqual(8.5);
+
+    // W-3.2: first-frame visual snapshot. Catches MP4-specific visual
+    // regressions (bullet color drift, layout shift) that the PDF/JPEG
+    // snapshots don't see.
+    const firstFramePng = await mp4FirstFramePng(page, mp4Buffer);
+    expect(firstFramePng).toMatchSnapshot(
+      'listing-flyer-mp4-reel-first-frame.png',
+      {
+        threshold: 0.2,
+        maxDiffPixelRatio: 0.05,
+      }
+    );
   });
 
   test('exports a valid MP4 square (1:1) @slow', async ({ page }) => {
@@ -198,5 +221,21 @@ test.describe('Listing Flyer — exports', () => {
     expect(stats.size).toBeGreaterThan(50_000);
     expect(stats.size).toBeLessThan(50_000_000);
     expect(download.suggestedFilename()).toMatch(/\.mp4$/i);
+
+    // W-3.2: duration assertion (same 8s expected as the reel test).
+    const mp4Buffer = await fs.readFile(filePath!);
+    const duration = await mp4Duration(page, mp4Buffer);
+    expect(duration).toBeGreaterThanOrEqual(7.5);
+    expect(duration).toBeLessThanOrEqual(8.5);
+
+    // W-3.2: first-frame visual snapshot.
+    const firstFramePng = await mp4FirstFramePng(page, mp4Buffer);
+    expect(firstFramePng).toMatchSnapshot(
+      'listing-flyer-mp4-square-first-frame.png',
+      {
+        threshold: 0.2,
+        maxDiffPixelRatio: 0.05,
+      }
+    );
   });
 });

@@ -289,6 +289,94 @@ export async function seedListingProfile(
 }
 
 /**
+ * Read the duration (in seconds) of an MP4 buffer. Loads the file into a
+ * <video> element and reads video.duration once metadata is parsed. Used
+ * to assert that exported MP4s match expected timeline length — catches
+ * frame-timing drift in backgrounded tabs and trim/pad regressions in
+ * webmToMp4.
+ *
+ * Side effect: navigates the page away from whatever it was on. Call
+ * AFTER the export-related assertions are done.
+ */
+export async function mp4Duration(
+  page: Page,
+  mp4Buffer: Buffer
+): Promise<number> {
+  const dataUrl = `data:video/mp4;base64,${mp4Buffer.toString('base64')}`;
+  await page.setContent(
+    `<!DOCTYPE html><html><body style="margin:0">` +
+      `<video id="v" src="${dataUrl}" preload="metadata" muted></video>` +
+      `</body></html>`
+  );
+  return await page.evaluate(() => {
+    return new Promise<number>((resolve, reject) => {
+      const v = document.getElementById('v') as HTMLVideoElement | null;
+      if (!v) {
+        reject(new Error('video element not found'));
+        return;
+      }
+      if (v.readyState >= 1 && Number.isFinite(v.duration)) {
+        resolve(v.duration);
+        return;
+      }
+      v.addEventListener('error', () => reject(new Error('video failed to load')), { once: true });
+      v.addEventListener('loadedmetadata', () => resolve(v.duration), { once: true });
+    });
+  });
+}
+
+/**
+ * Extract a first-second representative frame of an MP4 buffer as a PNG
+ * buffer suitable for Playwright's toMatchSnapshot. Loads the MP4 into a
+ * <video> on a fresh page context, seeks to t=1.0s, then screenshots the
+ * <video> element.
+ *
+ * Why t=1.0s and not t=0: MediaRecorder's first captured frame timing
+ * varies by 1-2 rAF ticks (~16-32ms) across runs, so frames sampled at
+ * t=0.05s land mid-fade on entry tracks and aren't deterministic between
+ * runs. By t=1.0s, all templates' entry tracks have settled into stable
+ * frames (Listing Flyer + OH Promo entries land within 3.3s but most
+ * land in the first ~0.5s; Social Animator templates are similar). The
+ * captured frame still represents the "early in the timeline" state the
+ * snapshot is meant to lock down — just past the noisy first 50ms.
+ *
+ * Side effect: navigates the page away. Call AFTER all other
+ * export-related assertions.
+ */
+export async function mp4FirstFramePng(
+  page: Page,
+  mp4Buffer: Buffer
+): Promise<Buffer> {
+  const dataUrl = `data:video/mp4;base64,${mp4Buffer.toString('base64')}`;
+  await page.setContent(
+    `<!DOCTYPE html><html><body style="margin:0;padding:0;background:#000">` +
+      `<video id="v" src="${dataUrl}" preload="auto" playsinline muted ` +
+      `style="display:block;width:auto"></video>` +
+      `</body></html>`
+  );
+  await page.evaluate(() => {
+    return new Promise<void>((resolve, reject) => {
+      const v = document.getElementById('v') as HTMLVideoElement | null;
+      if (!v) {
+        reject(new Error('video element not found'));
+        return;
+      }
+      v.addEventListener('error', () => reject(new Error('video failed to load')), { once: true });
+      const seekAndResolve = () => {
+        v.addEventListener('seeked', () => resolve(), { once: true });
+        v.currentTime = 1.0;
+      };
+      if (v.readyState >= 2) {
+        seekAndResolve();
+      } else {
+        v.addEventListener('loadeddata', seekAndResolve, { once: true });
+      }
+    });
+  });
+  return await page.locator('video').screenshot({ type: 'png' });
+}
+
+/**
  * Convert an image buffer (JPEG / PNG / etc.) into a PNG screenshot buffer
  * that Playwright's toMatchSnapshot can pixel-diff.
  *

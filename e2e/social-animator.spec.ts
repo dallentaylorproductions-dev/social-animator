@@ -1,6 +1,8 @@
 import { test, expect } from '@playwright/test';
 import { promises as fs } from 'node:fs';
 import {
+  mp4Duration,
+  mp4FirstFramePng,
   seedBrandProfile,
   seedListingProfile,
   testPhotoDataUri,
@@ -69,6 +71,25 @@ test.describe('Social Animator — exports', () => {
     expect(stats.size).toBeGreaterThan(20_000);
     expect(stats.size).toBeLessThan(50_000_000);
     expect(download.suggestedFilename()).toMatch(/\.mp4$/i);
+
+    // W-3.2: duration assertion. listing-carousel's template.duration = 10
+    // (src/templates/listing-carousel.ts). TemplateEditor initializes the
+    // ExportButton's duration from template.duration; webmToMp4 trims to
+    // exactly `-t durationSec`.
+    const mp4Buffer = await fs.readFile(filePath!);
+    const duration = await mp4Duration(page, mp4Buffer);
+    expect(duration).toBeGreaterThanOrEqual(9.5);
+    expect(duration).toBeLessThanOrEqual(10.5);
+
+    // W-3.2: first-frame visual snapshot.
+    const firstFramePng = await mp4FirstFramePng(page, mp4Buffer);
+    expect(firstFramePng).toMatchSnapshot(
+      'social-animator-listing-carousel-first-frame.png',
+      {
+        threshold: 0.2,
+        maxDiffPixelRatio: 0.05,
+      }
+    );
   });
 
   test('listing-showcase — exports a valid MP4 @slow', async ({ page }) => {
@@ -113,5 +134,23 @@ test.describe('Social Animator — exports', () => {
     expect(stats.size).toBeGreaterThan(50_000);
     expect(stats.size).toBeLessThan(50_000_000);
     expect(download.suggestedFilename()).toMatch(/\.mp4$/i);
+
+    // W-3.2: duration assertion. listing-showcase's DURATION = 8
+    // (src/templates/listing-showcase.ts). webmToMp4 trims to exactly
+    // `-t durationSec`.
+    const mp4Buffer = await fs.readFile(filePath!);
+    const duration = await mp4Duration(page, mp4Buffer);
+    expect(duration).toBeGreaterThanOrEqual(7.5);
+    expect(duration).toBeLessThanOrEqual(8.5);
+
+    // W-3.2: first-frame visual snapshot.
+    const firstFramePng = await mp4FirstFramePng(page, mp4Buffer);
+    expect(firstFramePng).toMatchSnapshot(
+      'social-animator-listing-showcase-first-frame.png',
+      {
+        threshold: 0.2,
+        maxDiffPixelRatio: 0.05,
+      }
+    );
   });
 });
