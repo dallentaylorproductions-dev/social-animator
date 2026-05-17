@@ -203,8 +203,6 @@ interface CallableSkill {
   supportedStates: WorkflowState[];    // which OS states can invoke this skill
 
   recommendedNextSkills?: SkillId[];   // for "do this next" chaining suggestions
-
-  tierGate?: 'starter' | 'pro' | 'ai-os'; // optional minimum tier required to invoke
 }
 
 interface SkillInputSpec {
@@ -280,7 +278,6 @@ outputs:
 costProfile: free
 supportedStates: [listing_launch_state, just_sold_state, price_reduction_state, listing_live_state]
 recommendedNextSkills: [social-animator-listing-carousel, social-animator-listing-card, listing-landing-page (future)]
-tierGate: starter
 ```
 
 **Dual-output gap:** No agent-facing companion exists. Per the dual-output pattern surfaced 2026-05-14, this skill could also produce an agent-facing **"launch coordination checklist"** — a private one-pager the agent uses to track what's been done for this listing (flyer? ✓; social posts? ✓/✗; open house scheduled? ✓/✗; price reduction trigger date? etc.). Defer to Phase 1.5 — the checklist content is the work, not the engine.
@@ -316,7 +313,6 @@ outputs:
 costProfile: free
 supportedStates: [open_house_state, pre_event_state]
 recommendedNextSkills: [showing-tour-page (future), open-house-walking-guide (future, agent-facing)]
-tierGate: starter
 ```
 
 **Dual-output gap:** No agent-facing companion. The natural one is the **"open-house walking guide"** — agent-side talking points for greeting visitors, the listing's selling-point cheat sheet, the day-of sign-in QR for lead capture. This is the canonical example from the 2026-05-14 dual-output surface. **Defer to Phase 1.5** — content design required.
@@ -350,7 +346,6 @@ outputs:
 costProfile: free
 supportedStates: [seller_appointment_state, seller_conversion_state, pre_listing_state]
 recommendedNextSkills: [seller-intelligence-report (future, agent-facing), listing-flyer (after listing won)]
-tierGate: pro
 ```
 
 **Dual-output gap:** This is the **highest-value dual-output gap in the codebase.** The agent-facing **"Seller Intelligence Report"** — comps with valuation logic, talking points addressed to the seller's likely objections, team stats, suggested pricing strategy — is exactly what an agent needs at the appointment alongside the client-facing one-pager. The Presentation tool today is half the workflow; the missing half is structurally the same engine (react-pdf, BrandSettings + ListingProfile inputs) with different content. **Defer to Phase 2** — content design + content cap.
@@ -382,7 +377,6 @@ outputs:
 costProfile: free
 supportedStates: [listing_launch_state, just_sold_state]
 recommendedNextSkills: [social-animator-listing-carousel, listing-flyer]
-tierGate: starter
 ```
 
 | Template | Suggested skill purpose | Primary states |
@@ -709,7 +703,7 @@ Listed in order. Each step is independently shippable; no step blocks the next a
 
 - **Skill IDs are forever.** Once shipped, renaming a skill ID breaks dashboard recommendations cached client-side and any future analytics joins. Decide naming conventions carefully before Step 2. Recommend kebab-case, scoped by domain: `listing-flyer`, `open-house-promo`, `social-animator-listing-showcase` (the SA scope prefix makes the 10 templates distinguishable).
 - **State enum churn.** The `WorkflowState` union in Section 3 is best-guess. Real usage will surface missing states ("pending offer," "in escrow," etc.). Plan for non-breaking additions (union extension is safe; renames are not).
-- **`tierGate` lock-in.** Marking a skill as `pro`-only is a pricing commitment. Defer the tier-gating to a separate concern from skill metadata if possible — let the dashboard query the agent's subscription and render accordingly. Don't bake `tierGate` into the CallableSkill record yet.
+- **`tierGate` lock-in.** Marking a skill as `pro`-only is a pricing commitment. Defer the tier-gating to a separate concern from skill metadata if possible — let the dashboard query the agent's subscription and render accordingly. Don't bake `tierGate` into the CallableSkill record yet. **Update (2026-05-16):** `tierGate` was cut from the v1 `CallableSkill` interface per this reasoning. Tier-gating is now a dashboard concern: the dashboard queries the agent's subscription and renders accordingly.
 - **Dual-output ambiguity for SA templates.** The framing says "most agent workflows produce two deliverables." SA templates produce only client-facing MP4s. Forcing an agent-facing companion (e.g. "scheduled post tracker") might be over-engineering. Defer; let the meta-skill (Content Calendar) cover this rather than per-template.
 
 ### Unknowns the audit cannot answer
