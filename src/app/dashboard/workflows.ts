@@ -7,14 +7,15 @@ import { getSkillById } from '@/skills/registry';
  * surfaces workflows as primary "next best action" cards; each card resolves
  * to the workflow's first skill and chains via recommendedNextSkills.
  *
- * Phase 1 wires 4 of the 7 named workflows per W-1 Half B audit section 5:
+ * Phase 1 wires 5 of the 7 named workflows per W-1 Half B audit section 5:
  *   1. Listing Launch OS
  *   2. Open House OS
  *   4. Momentum Engine (partial — full needs Phase 2 behavior tracking)
+ *   5. Seller Win System (agent half — wired when SIR shipped)
  *   6. Content Engine
  *
- * Workflows 3 (Buyer Tour), 5 (Seller Conversion's agent half), 7 (Authority
- * foundation) require new skills that don't exist yet per the gap analysis.
+ * Workflows 3 (Buyer Tour) and 7 (Authority foundation) require new skills
+ * that don't exist yet per the gap analysis.
  */
 
 export interface Workflow {
@@ -57,9 +58,23 @@ export const WORKFLOWS: Workflow[] = [
     triggerStates: ['visibility_gap_state'],
     primarySkillId: 'social-animator-market-update',
   },
+  {
+    id: 'seller-win',
+    name: 'Seller Win System',
+    emotionalDriver: 'Prep for and convert your next listing appointment.',
+    triggerStates: [
+      'pre_listing_state',
+      'seller_appointment_state',
+      'seller_conversion_state',
+    ],
+    primarySkillId: 'seller-intelligence-report',
+  },
 ];
 
-const PRIORITY_ORDER = ['listing-launch', 'momentum', 'content', 'open-house'];
+// 'seller-win' slots between listing-launch and momentum: winning the listing
+// is a launch-precursor, so when it surfaces it ranks above general momentum
+// and content cadences but below an active launch in progress.
+const PRIORITY_ORDER = ['listing-launch', 'seller-win', 'momentum', 'content', 'open-house'];
 
 /**
  * Find workflows whose trigger states overlap with the agent's active states.

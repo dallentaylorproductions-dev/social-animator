@@ -2,6 +2,7 @@ import type { CallableSkill, SkillId, WorkflowState } from './types';
 import { LISTING_FLYER_SKILL } from '@/tools/listing-flyer/skill';
 import { OPEN_HOUSE_PROMO_SKILL } from '@/tools/open-house-promo/skill';
 import { LISTING_PRESENTATION_SKILL } from '@/tools/listing-presentation/skill';
+import { SELLER_INTELLIGENCE_REPORT_SKILL } from '@/tools/seller-intelligence-report/skill';
 import { SOCIAL_ANIMATOR_SKILLS } from '@/templates/skills';
 
 /**
@@ -16,6 +17,7 @@ export const ALL_SKILLS: CallableSkill[] = [
   LISTING_FLYER_SKILL,
   OPEN_HOUSE_PROMO_SKILL,
   LISTING_PRESENTATION_SKILL,
+  SELLER_INTELLIGENCE_REPORT_SKILL,
   ...SOCIAL_ANIMATOR_SKILLS,
 ];
 
