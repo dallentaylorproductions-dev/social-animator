@@ -1,5 +1,6 @@
 import { ImageResponse } from 'next/og';
 import { fetchHandout } from '@/lib/share-urls';
+import { renderOpenHouseOg } from '@/tools/open-house-prep/output/og-image';
 
 /**
  * Dynamic Open Graph image generation (OH Prep Commit 2 / Audit 1B §7).
@@ -71,6 +72,19 @@ export async function GET(_req: Request, { params }: RouteContext) {
     );
   }
 
+  // Commit 5 type dispatch — render the OH-specific OG card. Future
+  // handout types add a new arm here; the generic fallback above keeps
+  // serving null/unknown records.
+  if (record.type === 'open-house-handout') {
+    return new ImageResponse(renderOpenHouseOg(record), {
+      width: 1200,
+      height: 630,
+      headers: CACHE_HEADERS,
+    });
+  }
+
+  // Generic in-product card for any other published-but-not-yet-typed
+  // handout. Falls through with the property address if any.
   const data = record.data as {
     propertyAddress?: string;
     propertyCity?: string;
@@ -102,11 +116,11 @@ export async function GET(_req: Request, { params }: RouteContext) {
             fontWeight: 500,
           }}
         >
-          Open house
+          Handout
         </div>
         <div style={{ display: 'flex', flexDirection: 'column', gap: 12 }}>
           <div style={{ fontSize: 64, fontWeight: 700, lineHeight: 1.1 }}>
-            {data.propertyAddress ?? 'Open House'}
+            {data.propertyAddress ?? 'Handout'}
           </div>
           {data.propertyCity && (
             <div style={{ fontSize: 28, color: COLORS.textSecondary }}>

@@ -9,21 +9,19 @@ import {
 import { DEFAULT_SELECTED_TALKING_POINT_IDS } from '@/tools/open-house-prep/content/talking-points';
 import { DEFAULT_SELECTED_QUESTION_IDS } from '@/tools/open-house-prep/content/common-questions';
 import { DEFAULT_SELECTED_PROMPT_IDS } from '@/tools/open-house-prep/content/conversion-prompts';
+import { StepEventProperty } from '@/tools/open-house-prep/components/StepEventProperty';
+import { StepComps } from '@/tools/open-house-prep/components/StepComps';
+import { StepTalkingPoints } from '@/tools/open-house-prep/components/StepTalkingPoints';
+import { StepNotesAsks } from '@/tools/open-house-prep/components/StepNotesAsks';
+import { StepReview } from '@/tools/open-house-prep/components/StepReview';
 
 /**
- * Open House Prep — 5-step wizard skeleton (OH Prep Commit 4).
+ * Open House Prep — 5-step wizard (OH Prep Commit 5).
  *
- * Mirrors SIR Commit 1's skeleton pattern: real per-step UX lands in
- * Commit 5 (PDF + visitor handout + full field UX). This commit lays
- * the wizard structure + autosave + universal-default pre-selection
- * for the three content libraries.
- *
- * Steps (per Audit 1C):
- *   1. event-property — Event date + property identity
- *   2. comps — Recent area sales (up to 4 comps)
- *   3. talking-points — Talking points + common questions + conversion prompts
- *   4. notes-asks — Pre-event notes + follow-up commitments
- *   5. review — Validation + dual-export (PDF + URL)
+ * Commit 4 shipped the skeleton; this commit wires real per-step UX.
+ * StepReview wires the publish flow (POST /api/oh-prep/publish) and
+ * agent-prep PDF download. All other steps are field-input UX backed
+ * by the OpenHousePrepDraft type from Commit 4.
  */
 
 const STEPS = [
@@ -80,39 +78,19 @@ export default function OpenHousePrepPage() {
 
       <section className="mt-8 min-h-[400px]">
         {currentStep === 'event-property' && (
-          <PlaceholderStep
-            heading="Event + property"
-            blurb="Property address, list price, event date and times, hero photo, and the 'why this home' positioning paragraph."
-            commitNote="Full field UX coming in next commit. Wizard structure is in place."
-          />
+          <StepEventProperty draft={draft} setDraft={setDraft} />
         )}
         {currentStep === 'comps' && (
-          <PlaceholderStep
-            heading="Recent area sales"
-            blurb="Up to 4 comparable recent sales. Same shape as the Seller Intelligence Report comps — address, sold price, DOM, ratio, sqft, distance, sold date, agent notes."
-            commitNote="Comp card UI coming in next commit."
-          />
+          <StepComps draft={draft} setDraft={setDraft} />
         )}
         {currentStep === 'talking-points' && (
-          <PlaceholderStep
-            heading="Talking points"
-            blurb={`Pre-event prep: talking points, common visitor questions, conversion prompts. Universal defaults pre-checked (${DEFAULT_SELECTED_TALKING_POINT_IDS.length} talking points, ${DEFAULT_SELECTED_QUESTION_IDS.length} common questions, ${DEFAULT_SELECTED_PROMPT_IDS.length} conversion prompts).`}
-            commitNote="Multi-select UX coming in next commit."
-          />
+          <StepTalkingPoints draft={draft} setDraft={setDraft} />
         )}
         {currentStep === 'notes-asks' && (
-          <PlaceholderStep
-            heading="Notes + asks"
-            blurb="Private pre-event notes (agent-facing only) and post-event follow-up commitments."
-            commitNote="Note + commitment field UX coming in next commit."
-          />
+          <StepNotesAsks draft={draft} setDraft={setDraft} />
         )}
         {currentStep === 'review' && (
-          <PlaceholderStep
-            heading="Review"
-            blurb="Validation summary and dual export — your private prep PDF (download) + visitor handout URL (text-friendly share link)."
-            commitNote="PDF rendering + share-URL publish coming in next commit."
-          />
+          <StepReview draft={draft} goToStep={setCurrentStep} />
         )}
       </section>
 
@@ -150,32 +128,12 @@ function StepIndicator({ currentStep }: { currentStep: StepId }) {
         <li
           key={step.id}
           className={`flex-1 border-b-2 pb-2 ${
-            idx <= currentIdx
-              ? 'border-mint text-white'
-              : 'border-gray-700 text-gray-500'
+            idx <= currentIdx ? 'border-mint text-white' : 'border-gray-700 text-gray-500'
           }`}
         >
           {idx + 1}. {step.label}
         </li>
       ))}
     </ol>
-  );
-}
-
-function PlaceholderStep({
-  heading,
-  blurb,
-  commitNote,
-}: {
-  heading: string;
-  blurb: string;
-  commitNote: string;
-}) {
-  return (
-    <div className="space-y-4">
-      <h2 className="text-lg font-medium">{heading}</h2>
-      <p className="text-sm text-gray-400">{blurb}</p>
-      <p className="text-xs text-gray-500 italic">{commitNote}</p>
-    </div>
   );
 }

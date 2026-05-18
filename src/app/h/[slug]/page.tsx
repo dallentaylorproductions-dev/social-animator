@@ -2,6 +2,7 @@ import type { Metadata } from 'next';
 import { notFound } from 'next/navigation';
 import { fetchHandout } from '@/lib/share-urls';
 import { Card, StatLabel } from '@/components/ui';
+import { OpenHouseHandoutPage } from '@/tools/open-house-prep/output/handout-page';
 
 /**
  * Public visitor-facing handout route (OH Prep Commit 2 / Audit 1B).
@@ -63,13 +64,18 @@ export default async function HandoutPage({ params }: PageProps) {
   const record = await fetchHandout(slug);
   if (!record) notFound();
 
-  // Commit 2: placeholder until Commit 5 wires the OH Prep visitor surface.
-  // Type-dispatch lands then; for now any published handout renders this
-  // shared "being prepared" message.
+  // Commit 5 type dispatch — render the OH Prep visitor surface when the
+  // record's type matches. New handout types add a new arm here.
+  if (record.type === 'open-house-handout') {
+    return <OpenHouseHandoutPage handout={record} />;
+  }
+
+  // Fallback for unknown / not-yet-wired types (e.g., future
+  // 'listing-landing' before its renderer ships).
   return (
     <main className="min-h-screen flex items-center justify-center px-4 py-12 bg-canvas">
       <Card className="max-w-md text-center">
-        <StatLabel accent="mint">Open house</StatLabel>
+        <StatLabel accent="mint">Handout</StatLabel>
         <h1 className="text-xl font-semibold mt-3 text-text-primary">
           This handout is being prepared
         </h1>
