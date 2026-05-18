@@ -33,7 +33,8 @@ export type SkillId = string; // kebab-case, e.g. 'listing-flyer', 'social-anima
 export type SkillCategory =
   | 'Marketing assets'
   | 'Seller pitch'
-  | 'Social content';
+  | 'Social content'
+  | 'Open house';
 
 export type SkillInputType =
   | 'string'
@@ -102,6 +103,9 @@ export type WorkflowState =
   | 'pre_event_state'
   | 'event_today_state'
   | 'post_event_state'
+  // Open house prep (Commit 4 — wired by state-detection in Commit 6)
+  | 'open_house_prep_state'
+  | 'open_house_active_state'
   // Conversion / pitching
   | 'seller_appointment_state'
   | 'seller_conversion_state'
