@@ -47,10 +47,12 @@ function isCurrentStepValid(
 ): boolean {
   if (!draft) return false;
   if (stepId === 'event-property') {
+    // v1.45.2 hardening: coerce-safe trim via String(value ?? '') so a
+    // legacy draft with a non-string field doesn't throw.
     return (
-      draft.propertyAddress.trim().length > 0 &&
-      draft.listPrice.trim().length > 0 &&
-      draft.eventDate.trim().length > 0
+      String(draft.propertyAddress ?? '').trim().length > 0 &&
+      String(draft.listPrice ?? '').trim().length > 0 &&
+      String(draft.eventDate ?? '').trim().length > 0
     );
   }
   return true;
@@ -126,6 +128,7 @@ export default function OpenHousePrepPage() {
 
       <nav className="mt-8 flex justify-between">
         <button
+          type="button"
           onClick={() => {
             const idx = STEPS.findIndex((s) => s.id === currentStep);
             if (idx > 0) setCurrentStep(STEPS[idx - 1].id);
@@ -136,7 +139,12 @@ export default function OpenHousePrepPage() {
           ← Previous
         </button>
         <button
+          type="button"
           onClick={() => {
+            // v1.45.2 P1-R01 hardening: re-check validity in the click
+            // handler. Belt-and-suspenders against any disabled-prop
+            // binding regression.
+            if (!isCurrentStepValid(currentStep, draft)) return;
             const idx = STEPS.findIndex((s) => s.id === currentStep);
             if (idx < STEPS.length - 1) setCurrentStep(STEPS[idx + 1].id);
           }}

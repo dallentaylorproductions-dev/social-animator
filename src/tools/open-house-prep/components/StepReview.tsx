@@ -176,6 +176,20 @@ export function StepReview({ draft, goToStep }: StepReviewProps) {
       </section>
 
       <div className="pt-4 border-t border-neutral-800 space-y-4">
+        {!brand.agentName?.trim() && (
+          <div className="p-3 border border-gold/40 bg-gold/10 rounded-md">
+            <p className="text-sm text-gold">
+              <strong>Brand profile incomplete.</strong> Your visitor handout will
+              publish, but the &ldquo;Your agent&rdquo; section will be hidden
+              because no agent name is set.{' '}
+              <a href="/settings" className="underline hover:no-underline">
+                Set up your brand profile
+              </a>{' '}
+              first if you want visitors to see your contact info.
+            </p>
+          </div>
+        )}
+
         <PublishSection
           state={publishState}
           onPublish={handlePublish}

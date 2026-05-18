@@ -16,8 +16,12 @@ import { HandoutDownloadButton } from './HandoutDownloadButton';
  * separate client component (HandoutDownloadButton) that dynamic-imports
  * the PDF renderer browser-side.
  *
- * 7 sections per D11, ordered "valuable things in the front" per
- * Aaron's 2026-05-14 framing.
+ * 6 sections per D11, ordered "valuable things in the front" per
+ * Aaron's 2026-05-14 framing. v1.45.2 removed the standalone
+ * "What to do next" section and merged its text/call/email CTAs into
+ * the "Your agent" section. The whole "Your agent" section is hidden
+ * when the publishing agent's brand profile has no agentName (no
+ * "Your agent" placeholder text on public URLs).
  */
 
 export interface HandoutAgentContact {
@@ -35,6 +39,12 @@ export function OpenHouseHandoutPage({ handout }: { handout: HandoutRecord }) {
   const draft = clampDraft(raw);
   const agentContact: HandoutAgentContact =
     raw.agentContact ?? { email: handout.ownerEmail };
+  // v1.45.2 P3-NEW03: only render the "Your agent" section when the
+  // publishing agent has populated their brand profile. Otherwise the
+  // visitor sees literal placeholder text ("Your agent") which reads
+  // generic / unbranded. StepReview shows a warning banner pre-publish
+  // when brand profile is incomplete.
+  const hasAgentInfo = Boolean(agentContact.name?.trim());
 
   return (
     <main className="min-h-screen bg-canvas text-text-primary">
@@ -44,8 +54,7 @@ export function OpenHouseHandoutPage({ handout }: { handout: HandoutRecord }) {
         <Section3RecentSales comps={draft.comps} />
         <Section4Neighborhood facts={draft.neighborhoodFacts} />
         <Section5MarketContext text={draft.marketContext} />
-        <Section6YourAgent agentContact={agentContact} />
-        <Section7WhatToDoNext agentContact={agentContact} />
+        {hasAgentInfo && <Section6YourAgent agentContact={agentContact} />}
         <HandoutDownloadButton draft={draft} agentContact={agentContact} />
         <FooterTimestamp createdAt={handout.createdAt} updatedAt={handout.updatedAt} />
       </div>
@@ -209,67 +218,67 @@ function Section5MarketContext({ text }: { text: string | undefined }) {
   );
 }
 
-// ---------- Section 6: Your agent ----------
+// ---------- Section 6: Your agent (with contact CTAs) ----------
 
+/**
+ * "Your agent" + contact CTAs combined. v1.45.2 merged the standalone
+ * Section 7 ("What to do next") CTAs into this section — the section
+ * heading "What to do next" rendered as an empty heading on prior
+ * deploys when phone/email were absent, and the visitor's "what to do
+ * next" is conceptually how-to-reach-the-agent. One section.
+ *
+ * Only rendered by the parent when agentContact.name is non-empty
+ * (P3-NEW03 — no "Your agent" placeholder text on public URLs).
+ */
 function Section6YourAgent({ agentContact }: { agentContact: HandoutAgentContact }) {
+  const phone = agentContact.phone?.replace(/[^0-9+]/g, '');
+  const email = agentContact.email;
+  const hasCtas = Boolean(phone) || Boolean(email);
+
   return (
     <section className="flex flex-col gap-3">
       <p className="text-xs uppercase tracking-[0.18em] text-mint font-medium">
         Your agent
       </p>
-      <div className="rounded-2xl border border-border-emphasis bg-surface-elevated p-6 flex flex-col gap-2">
-        <h2 className="text-xl font-bold text-text-primary">
-          {agentContact.name || 'Your agent'}
-        </h2>
-        {agentContact.brokerage && (
-          <p className="text-sm text-text-secondary">{agentContact.brokerage}</p>
-        )}
-        {agentContact.licenseNumber && (
-          <p className="text-xs text-text-muted">License {agentContact.licenseNumber}</p>
-        )}
-      </div>
-    </section>
-  );
-}
-
-// ---------- Section 7: What to do next ----------
-
-function Section7WhatToDoNext({
-  agentContact,
-}: {
-  agentContact: HandoutAgentContact;
-}) {
-  const phone = agentContact.phone?.replace(/[^0-9+]/g, '');
-  const email = agentContact.email;
-  return (
-    <section className="flex flex-col gap-3">
-      <p className="text-xs uppercase tracking-[0.18em] text-mint font-medium">
-        What to do next
-      </p>
-      <div className="flex flex-col gap-2 sm:flex-row sm:flex-wrap">
-        {phone && (
-          <a
-            href={`sms:${phone}`}
-            className="inline-flex items-center justify-center rounded-full bg-mint text-black text-base font-semibold px-6 py-4 transition hover:bg-mint-hover"
-          >
-            Text the agent
-          </a>
-        )}
-        {phone && (
-          <a
-            href={`tel:${phone}`}
-            className="inline-flex items-center justify-center rounded-full border border-border-emphasis text-text-primary text-base font-medium px-6 py-4 transition hover:bg-surface-elevated"
-          >
-            Call
-          </a>
-        )}
-        {email && (
-          <a
-            href={`mailto:${email}?subject=${encodeURIComponent('Open house inquiry')}`}
-            className="inline-flex items-center justify-center rounded-full border border-border-emphasis text-text-primary text-base font-medium px-6 py-4 transition hover:bg-surface-elevated"
-          >
-            Email
-          </a>
+      <div className="rounded-2xl border border-border-emphasis bg-surface-elevated p-6 flex flex-col gap-4">
+        <div className="flex flex-col gap-2">
+          <h2 className="text-xl font-bold text-text-primary">
+            {agentContact.name}
+          </h2>
+          {agentContact.brokerage && (
+            <p className="text-sm text-text-secondary">{agentContact.brokerage}</p>
+          )}
+          {agentContact.licenseNumber && (
+            <p className="text-xs text-text-muted">License {agentContact.licenseNumber}</p>
+          )}
+        </div>
+        {hasCtas && (
+          <div className="flex flex-col gap-2 sm:flex-row sm:flex-wrap">
+            {phone && (
+              <a
+                href={`sms:${phone}`}
+                className="inline-flex items-center justify-center rounded-full bg-mint text-black text-base font-semibold px-6 py-4 transition hover:bg-mint-hover"
+              >
+                Text the agent
+              </a>
+            )}
+            {phone && (
+              <a
+                href={`tel:${phone}`}
+                className="inline-flex items-center justify-center rounded-full border border-border-emphasis text-text-primary text-base font-medium px-6 py-4 transition hover:bg-surface-elevated"
+              >
+                Call
+              </a>
+            )}
+            {email && (
+              <a
+                href={`mailto:${email}?subject=${encodeURIComponent('Open house inquiry')}`}
+                className="inline-flex items-center justify-center rounded-full border border-border-emphasis text-text-primary text-base font-medium px-6 py-4 transition hover:bg-surface-elevated"
+              >
+                Email
+              </a>
+            )}
+          </div>
         )}
       </div>
     </section>
