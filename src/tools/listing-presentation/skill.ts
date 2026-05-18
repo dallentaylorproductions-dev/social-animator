@@ -4,6 +4,7 @@ export const LISTING_PRESENTATION_SKILL: CallableSkill = {
   id: 'listing-presentation',
   name: 'Listing Presentation One-Pager',
   purpose: 'Generate the document an agent brings to a seller appointment to win the listing',
+  category: 'Seller pitch',
   inputs: {
     required: [
       { key: 'propertyAddress', type: 'string', description: 'Property address', source: 'listing-profile' },

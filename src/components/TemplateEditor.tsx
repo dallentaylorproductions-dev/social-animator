@@ -344,7 +344,7 @@ export function TemplateEditor({ template }: TemplateEditorProps) {
         <header className="mb-8">
           <Link
             href="/social-animator"
-            className="text-xs uppercase tracking-[0.2em] text-[#4ef2d9] hover:underline"
+            className="text-xs uppercase tracking-[0.2em] text-mint hover:underline"
           >
             ← Social Animator
           </Link>
@@ -367,7 +367,7 @@ export function TemplateEditor({ template }: TemplateEditorProps) {
                     onClick={() => setSizeKey(s.key)}
                     className={`rounded-md px-2 py-2.5 text-xs font-medium transition ${
                       sizeKey === s.key
-                        ? "bg-[#4ef2d9] text-black"
+                        ? "bg-mint text-black"
                         : "bg-neutral-900 text-neutral-300 hover:bg-neutral-800"
                     }`}
                   >
@@ -388,7 +388,7 @@ export function TemplateEditor({ template }: TemplateEditorProps) {
                 step={1}
                 value={duration}
                 onChange={(e) => setDuration(parseInt(e.target.value, 10))}
-                className="w-full accent-[#4ef2d9]"
+                className="w-full accent-mint"
               />
               <div className="flex justify-between text-[10px] text-neutral-600 mt-1">
                 <span>4s</span>
@@ -429,7 +429,7 @@ export function TemplateEditor({ template }: TemplateEditorProps) {
             {isListingConsumer && listingProfileDirty && (
               <button
                 onClick={handleSaveListingProfile}
-                className="w-full bg-[#4ef2d9]/10 hover:bg-[#4ef2d9]/20 border border-[#4ef2d9]/40 hover:border-[#4ef2d9] text-[#4ef2d9] rounded-md px-3 py-2 text-[11px] font-medium transition"
+                className="w-full bg-mint/10 hover:bg-mint/20 border border-mint/40 hover:border-mint text-mint rounded-md px-3 py-2 text-[11px] font-medium transition"
               >
                 Save changes to listing profile
               </button>
@@ -468,7 +468,7 @@ export function TemplateEditor({ template }: TemplateEditorProps) {
                         type="text"
                         value={state[field.key] ?? ""}
                         onChange={(e) => updateField(field.key, e.target.value)}
-                        className="w-full bg-neutral-900 border border-neutral-800 rounded-md px-3 py-2 text-base lg:text-sm focus:outline-none focus:border-[#4ef2d9]"
+                        className="w-full bg-neutral-900 border border-neutral-800 rounded-md px-3 py-2 text-base lg:text-sm focus:outline-none focus:border-mint"
                       />
                     )}
                     {field.type === "currency" && (
@@ -494,7 +494,7 @@ export function TemplateEditor({ template }: TemplateEditorProps) {
                         value={state[field.key] ?? ""}
                         onChange={(e) => updateField(field.key, e.target.value)}
                         rows={3}
-                        className="w-full bg-neutral-900 border border-neutral-800 rounded-md px-3 py-2 text-base lg:text-sm focus:outline-none focus:border-[#4ef2d9] resize-none"
+                        className="w-full bg-neutral-900 border border-neutral-800 rounded-md px-3 py-2 text-base lg:text-sm focus:outline-none focus:border-mint resize-none"
                       />
                     )}
                     {field.type === "stringList" && stringListItems && (
@@ -542,7 +542,7 @@ export function TemplateEditor({ template }: TemplateEditorProps) {
                           type="text"
                           value={state[field.key] ?? ""}
                           onChange={(e) => updateField(field.key, e.target.value)}
-                          className="flex-1 min-w-0 bg-neutral-900 border border-neutral-800 rounded-md px-3 py-2 text-base lg:text-sm font-mono focus:outline-none focus:border-[#4ef2d9]"
+                          className="flex-1 min-w-0 bg-neutral-900 border border-neutral-800 rounded-md px-3 py-2 text-base lg:text-sm font-mono focus:outline-none focus:border-mint"
                         />
                       </div>
                     )}
@@ -556,7 +556,7 @@ export function TemplateEditor({ template }: TemplateEditorProps) {
                       <select
                         value={state[field.key] ?? field.default}
                         onChange={(e) => updateField(field.key, e.target.value)}
-                        className="w-full bg-neutral-900 border border-neutral-800 rounded-md px-3 py-2 text-base lg:text-sm focus:outline-none focus:border-[#4ef2d9]"
+                        className="w-full bg-neutral-900 border border-neutral-800 rounded-md px-3 py-2 text-base lg:text-sm focus:outline-none focus:border-mint"
                       >
                         {field.options?.map((opt) => (
                           <option key={opt.value} value={opt.value}>
@@ -669,7 +669,7 @@ function StringListInput({
               next[i] = e.target.value.replace(/\n+/g, " ");
               onChange(next);
             }}
-            className="flex-1 min-w-0 bg-neutral-900 border border-neutral-800 rounded-md px-3 py-2 text-base lg:text-sm focus:outline-none focus:border-[#4ef2d9]"
+            className="flex-1 min-w-0 bg-neutral-900 border border-neutral-800 rounded-md px-3 py-2 text-base lg:text-sm focus:outline-none focus:border-mint"
           />
           {items.length > 1 && (
             <button
@@ -689,7 +689,7 @@ function StringListInput({
         <button
           type="button"
           onClick={() => onChange([...items, ""])}
-          className="w-full bg-neutral-900 border border-dashed border-neutral-700 hover:border-[#4ef2d9] rounded-md px-3 py-2 text-xs text-neutral-400 hover:text-neutral-200 transition"
+          className="w-full bg-neutral-900 border border-dashed border-neutral-700 hover:border-mint rounded-md px-3 py-2 text-xs text-neutral-400 hover:text-neutral-200 transition"
         >
           + Add
         </button>
@@ -817,7 +817,7 @@ function ObjectListInput({
             const innerLabelText = spec.label;
             const innerValue = item[fieldName] ?? "";
             const inputClass =
-              "w-full bg-neutral-950 border border-neutral-800 rounded-md px-3 py-2 text-base lg:text-sm focus:outline-none focus:border-[#4ef2d9]";
+              "w-full bg-neutral-950 border border-neutral-800 rounded-md px-3 py-2 text-base lg:text-sm focus:outline-none focus:border-mint";
             return (
               <div key={fieldName}>
                 <label className="block text-[10px] uppercase tracking-[0.15em] text-neutral-500 mb-1">
@@ -885,7 +885,7 @@ function ObjectListInput({
         <button
           type="button"
           onClick={addItem}
-          className="w-full bg-neutral-900 border border-dashed border-neutral-700 hover:border-[#4ef2d9] rounded-md px-3 py-2 text-xs text-neutral-400 hover:text-neutral-200 transition"
+          className="w-full bg-neutral-900 border border-dashed border-neutral-700 hover:border-mint rounded-md px-3 py-2 text-xs text-neutral-400 hover:text-neutral-200 transition"
         >
           + Add
         </button>
@@ -937,7 +937,7 @@ function BrandColorsSection({
           <button
             type="button"
             onClick={resetBrandColors}
-            className="text-[10px] text-neutral-500 hover:text-[#4ef2d9] transition"
+            className="text-[10px] text-neutral-500 hover:text-mint transition"
           >
             ↺ Reset to brand defaults
           </button>
@@ -970,7 +970,7 @@ function BrandColorsSection({
                   type="text"
                   value={effective}
                   onChange={(e) => updateField(slot.key, e.target.value)}
-                  className="flex-1 min-w-0 bg-neutral-900 border border-neutral-800 rounded-md px-2 py-1.5 text-base lg:text-xs font-mono focus:outline-none focus:border-[#4ef2d9]"
+                  className="flex-1 min-w-0 bg-neutral-900 border border-neutral-800 rounded-md px-2 py-1.5 text-base lg:text-xs font-mono focus:outline-none focus:border-mint"
                 />
               </div>
             </div>

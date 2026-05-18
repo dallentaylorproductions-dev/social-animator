@@ -4,6 +4,7 @@ export const OPEN_HOUSE_PROMO_SKILL: CallableSkill = {
   id: 'open-house-promo',
   name: 'Open House Promo Generator',
   purpose: 'Generate event-day marketing assets (PDF + JPEG + MP4 + QR) for an open house',
+  category: 'Marketing assets',
   inputs: {
     required: [
       { key: 'eventDate', type: 'date', description: 'Open house date (YYYY-MM-DD)', source: 'user-input' },

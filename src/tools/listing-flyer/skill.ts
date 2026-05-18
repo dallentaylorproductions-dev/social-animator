@@ -4,6 +4,7 @@ export const LISTING_FLYER_SKILL: CallableSkill = {
   id: 'listing-flyer',
   name: 'Listing Flyer Generator',
   purpose: 'Generate branded marketing assets (PDF + JPEG + MP4) for a single listing',
+  category: 'Marketing assets',
   inputs: {
     required: [
       { key: 'propertyAddress', type: 'string', description: 'Property address', source: 'listing-profile' },

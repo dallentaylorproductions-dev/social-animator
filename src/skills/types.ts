@@ -15,6 +15,27 @@
 
 export type SkillId = string; // kebab-case, e.g. 'listing-flyer', 'social-animator-listing-showcase'
 
+/**
+ * Display-string union for dashboard "All skills" bucketing.
+ *
+ * The string IS the display label rendered on /dashboard's SkillGroup
+ * headings — keep capitalization matching the current UI (Sentence case
+ * — first word capitalized, second word lowercase). Adding a new
+ * category here is the one place new skill surfaces declare their home.
+ *
+ * Order is fixed by `SKILL_CATEGORY_ORDER` in src/skills/registry.ts.
+ *
+ * Future categories (added as their tools land):
+ *   - 'Open house' for the OH Prep tool (Commit 4)
+ *   - 'Showing flow' for Buyer Tour Page + Buyer Consultation Guide
+ *   - 'Authority' for the Authority Page surface
+ */
+export type SkillCategory =
+  | 'Marketing assets'
+  | 'Seller pitch'
+  | 'Social content'
+  | 'Open house';
+
 export type SkillInputType =
   | 'string'
   | 'number'
@@ -82,6 +103,9 @@ export type WorkflowState =
   | 'pre_event_state'
   | 'event_today_state'
   | 'post_event_state'
+  // Open house prep (Commit 4 — wired by state-detection in Commit 6)
+  | 'open_house_prep_state'
+  | 'open_house_active_state'
   // Conversion / pitching
   | 'seller_appointment_state'
   | 'seller_conversion_state'
@@ -96,6 +120,12 @@ export interface CallableSkill {
   id: SkillId;
   name: string;
   purpose: string;
+  /**
+   * Dashboard bucket assignment for /dashboard's "All skills" section.
+   * Required so TypeScript flags any new skill that forgets to declare
+   * its bucket — this is the root-cause fix for the v1.44.1 hot patch.
+   */
+  category: SkillCategory;
   inputs: {
     required: SkillInputSpec[];
     optional: SkillInputSpec[];

@@ -153,7 +153,7 @@ export function ExportButton({
       {state.kind === "ready" ? (
         <button
           onClick={handleSave}
-          className="w-full bg-[#4ef2d9] hover:bg-[#3ad9c0] text-black rounded-md px-4 py-3 text-sm font-semibold transition"
+          className="w-full bg-mint hover:bg-[#3ad9c0] text-black rounded-md px-4 py-3 text-sm font-semibold transition"
         >
           Save video
         </button>
@@ -161,7 +161,7 @@ export function ExportButton({
         <button
           onClick={handleExportMp4}
           disabled={isBusy}
-          className="w-full bg-[#4ef2d9] hover:bg-[#3ad9c0] text-black rounded-md px-4 py-3 text-sm font-semibold transition disabled:opacity-60 disabled:cursor-not-allowed"
+          className="w-full bg-mint hover:bg-[#3ad9c0] text-black rounded-md px-4 py-3 text-sm font-semibold transition disabled:opacity-60 disabled:cursor-not-allowed"
         >
           {state.kind === "idle" && "Export MP4"}
           {state.kind === "recording" &&

@@ -31,7 +31,7 @@ export default async function SettingsPage() {
         <header className="mb-10">
           <Link
             href="/dashboard"
-            className="text-xs uppercase tracking-[0.2em] text-[#4ef2d9] hover:underline"
+            className="text-xs uppercase tracking-[0.2em] text-mint hover:underline"
           >
             ← Studio
           </Link>

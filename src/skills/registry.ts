@@ -1,8 +1,14 @@
-import type { CallableSkill, SkillId, WorkflowState } from './types';
+import type {
+  CallableSkill,
+  SkillCategory,
+  SkillId,
+  WorkflowState,
+} from './types';
 import { LISTING_FLYER_SKILL } from '@/tools/listing-flyer/skill';
 import { OPEN_HOUSE_PROMO_SKILL } from '@/tools/open-house-promo/skill';
 import { LISTING_PRESENTATION_SKILL } from '@/tools/listing-presentation/skill';
 import { SELLER_INTELLIGENCE_REPORT_SKILL } from '@/tools/seller-intelligence-report/skill';
+import { OPEN_HOUSE_PREP_SKILL } from '@/tools/open-house-prep/skill';
 import { SOCIAL_ANIMATOR_SKILLS } from '@/templates/skills';
 
 /**
@@ -18,8 +24,46 @@ export const ALL_SKILLS: CallableSkill[] = [
   OPEN_HOUSE_PROMO_SKILL,
   LISTING_PRESENTATION_SKILL,
   SELLER_INTELLIGENCE_REPORT_SKILL,
+  OPEN_HOUSE_PREP_SKILL,
   ...SOCIAL_ANIMATOR_SKILLS,
 ];
+
+/**
+ * Render order for /dashboard's "All skills" section. Preserves the
+ * Marketing → Seller → Social sequence from before Commit 3's refactor.
+ * Future categories append here as their skills land (e.g. 'Open house'
+ * for the OH Prep tool in Commit 4).
+ */
+export const SKILL_CATEGORY_ORDER: readonly SkillCategory[] = [
+  'Marketing assets',
+  'Seller pitch',
+  'Social content',
+  'Open house',
+] as const;
+
+/**
+ * Return every skill assigned to a given category. The skill's `category`
+ * field is required (TypeScript-enforced), so uncategorized skills are
+ * impossible — the v1.44 dashboard-dropout bug class can no longer occur.
+ */
+export function getSkillsByCategory(category: SkillCategory): CallableSkill[] {
+  return ALL_SKILLS.filter((skill) => skill.category === category);
+}
+
+/**
+ * Bucket the registry by category in canonical render order, dropping
+ * empty categories. The dashboard's `AllSkillsSection` consumes this
+ * directly — no hardcoded ID-match filters remain after Commit 3.
+ */
+export function getCategorizedSkills(): Array<{
+  category: SkillCategory;
+  skills: CallableSkill[];
+}> {
+  return SKILL_CATEGORY_ORDER.map((category) => ({
+    category,
+    skills: getSkillsByCategory(category),
+  })).filter((bucket) => bucket.skills.length > 0);
+}
 
 /**
  * Look up a skill by its ID. Returns null if not found (e.g. stale link).

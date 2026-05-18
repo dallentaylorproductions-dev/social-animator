@@ -182,7 +182,7 @@ export default function RotatingProductGallery({
             type="button"
             onClick={goPrev}
             aria-label="Previous tool"
-            className="w-10 h-10 rounded-full bg-neutral-900 border border-neutral-800 hover:border-[#4ef2d9] hover:text-[#4ef2d9] transition flex items-center justify-center text-neutral-400"
+            className="w-10 h-10 rounded-full bg-neutral-900 border border-neutral-800 hover:border-mint hover:text-mint transition flex items-center justify-center text-neutral-400"
           >
             <ChevronLeft size={18} />
           </button>
@@ -190,7 +190,7 @@ export default function RotatingProductGallery({
             type="button"
             onClick={goNext}
             aria-label="Next tool"
-            className="w-10 h-10 rounded-full bg-neutral-900 border border-neutral-800 hover:border-[#4ef2d9] hover:text-[#4ef2d9] transition flex items-center justify-center text-neutral-400"
+            className="w-10 h-10 rounded-full bg-neutral-900 border border-neutral-800 hover:border-mint hover:text-mint transition flex items-center justify-center text-neutral-400"
           >
             <ChevronRight size={18} />
           </button>

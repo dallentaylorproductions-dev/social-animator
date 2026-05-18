@@ -45,7 +45,7 @@ export default function ImageTestPage() {
       <div className="max-w-5xl mx-auto">
         <a
           href="/social-animator"
-          className="text-xs uppercase tracking-[0.2em] text-[#4ef2d9] hover:underline"
+          className="text-xs uppercase tracking-[0.2em] text-mint hover:underline"
         >
           ← Social Animator
         </a>

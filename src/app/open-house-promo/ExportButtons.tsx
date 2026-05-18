@@ -446,7 +446,7 @@ export function ExportButtons({
           onClick={handlePdfExport}
           disabled={!canExport}
           title={validationError ?? undefined}
-          className="w-full bg-[#4ef2d9] hover:bg-[#3ad9c0] text-black rounded-md px-4 py-3 text-sm font-semibold transition disabled:opacity-60 disabled:cursor-not-allowed"
+          className="w-full bg-mint hover:bg-[#3ad9c0] text-black rounded-md px-4 py-3 text-sm font-semibold transition disabled:opacity-60 disabled:cursor-not-allowed"
         >
           {pdfState.kind === "idle" && "Export PDF"}
           {pdfState.kind === "generating" && "Generating PDF…"}
@@ -458,7 +458,7 @@ export function ExportButtons({
           onClick={handleJpegExport}
           disabled={!canExport}
           title={validationError ?? undefined}
-          className="w-full bg-[#4ef2d9] hover:bg-[#3ad9c0] text-black rounded-md px-4 py-3 text-sm font-semibold transition disabled:opacity-60 disabled:cursor-not-allowed"
+          className="w-full bg-mint hover:bg-[#3ad9c0] text-black rounded-md px-4 py-3 text-sm font-semibold transition disabled:opacity-60 disabled:cursor-not-allowed"
         >
           {jpegState.kind === "idle" && "Export JPEG (Camera Roll)"}
           {jpegState.kind === "generating" && "Generating JPEG…"}
@@ -506,7 +506,7 @@ export function ExportButtons({
                 type="button"
                 onClick={handleSaveReel}
                 disabled={mp4State.reelSaved}
-                className="w-full bg-[#4ef2d9] hover:bg-[#3ad9c0] text-black rounded-md px-4 py-3 text-sm font-semibold transition disabled:bg-neutral-800 disabled:text-neutral-400 disabled:cursor-default"
+                className="w-full bg-mint hover:bg-[#3ad9c0] text-black rounded-md px-4 py-3 text-sm font-semibold transition disabled:bg-neutral-800 disabled:text-neutral-400 disabled:cursor-default"
               >
                 {mp4State.reelSaved ? "Reel saved ✓" : "Save Reel (9:16)"}
               </button>
@@ -516,7 +516,7 @@ export function ExportButtons({
                 type="button"
                 onClick={handleSaveSquare}
                 disabled={mp4State.squareSaved}
-                className="w-full bg-[#4ef2d9] hover:bg-[#3ad9c0] text-black rounded-md px-4 py-3 text-sm font-semibold transition disabled:bg-neutral-800 disabled:text-neutral-400 disabled:cursor-default"
+                className="w-full bg-mint hover:bg-[#3ad9c0] text-black rounded-md px-4 py-3 text-sm font-semibold transition disabled:bg-neutral-800 disabled:text-neutral-400 disabled:cursor-default"
               >
                 {mp4State.squareSaved ? "Square saved ✓" : "Save Square (1:1)"}
               </button>
@@ -648,10 +648,10 @@ function FormatCheckboxes({
           checked={formats.reel}
           onChange={(e) => toggle("reel", e.target.checked)}
           disabled={disabled}
-          className="accent-[#4ef2d9] h-4 w-4"
+          className="accent-mint h-4 w-4"
         />
         <span className="flex-1 text-neutral-200">Reel (9:16)</span>
-        <span className="text-[10px] uppercase tracking-[0.12em] text-[#4ef2d9]">
+        <span className="text-[10px] uppercase tracking-[0.12em] text-mint">
           Recommended
         </span>
       </label>
@@ -661,7 +661,7 @@ function FormatCheckboxes({
           checked={formats.square}
           onChange={(e) => toggle("square", e.target.checked)}
           disabled={disabled}
-          className="accent-[#4ef2d9] h-4 w-4"
+          className="accent-mint h-4 w-4"
         />
         <span className="flex-1 text-neutral-200">Square (1:1)</span>
       </label>

@@ -17,6 +17,7 @@ export const SOCIAL_ANIMATOR_LISTING_CARD_SKILL: CallableSkill = {
   id: 'social-animator-listing-card',
   name: 'Listing Card',
   purpose: 'Compact single-listing card — quick social post for a new or sold listing',
+  category: 'Social content',
   inputs: {
     required: [
       { key: 'heroPhoto', type: 'photo', description: 'Listing photo', source: 'listing-profile' },
@@ -45,6 +46,7 @@ export const SOCIAL_ANIMATOR_LISTING_SHOWCASE_SKILL: CallableSkill = {
   id: 'social-animator-listing-showcase',
   name: 'Listing Showcase Reel',
   purpose: '8-second animated reveal of a single listing — hero zoom + price + features + agent card',
+  category: 'Social content',
   inputs: {
     required: [
       { key: 'heroPhoto', type: 'photo', description: 'Hero photo', source: 'listing-profile' },
@@ -74,6 +76,7 @@ export const SOCIAL_ANIMATOR_LISTING_CAROUSEL_SKILL: CallableSkill = {
   id: 'social-animator-listing-carousel',
   name: 'Listing Carousel',
   purpose: 'Multi-photo carousel showcasing a listing’s hero + interior shots',
+  category: 'Social content',
   inputs: {
     required: [
       { key: 'images', type: 'objectArray', description: 'Carousel photos with optional captions', source: 'user-input' },
@@ -99,6 +102,7 @@ export const SOCIAL_ANIMATOR_BEFORE_AFTER_SKILL: CallableSkill = {
   id: 'social-animator-before-after',
   name: 'Before / After',
   purpose: 'Before/after reveal for staging, renovation, or seasonal transformations',
+  category: 'Social content',
   inputs: {
     required: [
       { key: 'beforePhoto', type: 'photo', description: 'Before photo', source: 'user-input' },
@@ -126,6 +130,7 @@ export const SOCIAL_ANIMATOR_QA_CARD_SKILL: CallableSkill = {
   id: 'social-animator-qa-card',
   name: 'Q&A Card',
   purpose: 'Pose a question, reveal the answer — great for market tips and buyer FAQs',
+  category: 'Social content',
   inputs: {
     required: [
       { key: 'questionText', type: 'string', description: 'The question', source: 'user-input' },
@@ -149,6 +154,7 @@ export const SOCIAL_ANIMATOR_TESTIMONIAL_CARD_SKILL: CallableSkill = {
   id: 'social-animator-testimonial-card',
   name: 'Testimonial Card',
   purpose: 'Animated client testimonial card — social proof for the authority feed',
+  category: 'Social content',
   inputs: {
     required: [
       { key: 'quoteText', type: 'string', description: 'The testimonial quote', source: 'user-input' },
@@ -171,6 +177,7 @@ export const SOCIAL_ANIMATOR_NUMBERED_PROCESS_SKILL: CallableSkill = {
   id: 'social-animator-numbered-process',
   name: 'Numbered Process',
   purpose: '"5 steps to X" animated explainer — agent expertise content',
+  category: 'Social content',
   inputs: {
     required: [
       { key: 'title', type: 'string', description: 'Process title (e.g. "Buying Your First Home")', source: 'user-input' },
@@ -202,6 +209,7 @@ export const SOCIAL_ANIMATOR_GRID_COMPARISON_SKILL: CallableSkill = {
   id: 'social-animator-grid-comparison',
   name: 'Grid Comparison',
   purpose: '4-cell comparison grid (e.g. neighborhoods, pricing tiers, agent vs FSBO)',
+  category: 'Social content',
   inputs: {
     required: [
       { key: 'title', type: 'string', description: 'Grid title', source: 'user-input' },
@@ -235,6 +243,7 @@ export const SOCIAL_ANIMATOR_STAT_HIGHLIGHT_SKILL: CallableSkill = {
   id: 'social-animator-stat-highlight',
   name: 'Stat Highlight',
   purpose: 'Big-number stat card with context + supporting line — authority cadence content',
+  category: 'Social content',
   inputs: {
     required: [
       { key: 'stat', type: 'string', description: 'The headline stat (e.g. "$2.4M", "47%", "3 Homes")', source: 'user-input' },
@@ -258,6 +267,7 @@ export const SOCIAL_ANIMATOR_MARKET_UPDATE_SKILL: CallableSkill = {
   id: 'social-animator-market-update',
   name: 'Market Update',
   purpose: 'Periodic market update with 4 stats + brief — the visibility-cadence workhorse',
+  category: 'Social content',
   inputs: {
     required: [
       { key: 'title', type: 'string', description: 'Update title', source: 'user-input' },

@@ -74,12 +74,12 @@ export default function StudioLandingPage() {
     <main className="min-h-screen bg-neutral-950 text-white">
       <header className="absolute top-0 inset-x-0 z-10">
         <div className="max-w-5xl mx-auto px-6 py-6 flex items-center justify-between">
-          <p className="text-xs uppercase tracking-[0.2em] text-[#4ef2d9]">
+          <p className="text-xs uppercase tracking-[0.2em] text-mint">
             Simply Edit Pro Studio
           </p>
           <Link
             href="/login"
-            className="text-xs uppercase tracking-[0.15em] text-neutral-400 hover:text-[#4ef2d9] transition"
+            className="text-xs uppercase tracking-[0.15em] text-neutral-400 hover:text-mint transition"
           >
             Sign in →
           </Link>
@@ -117,7 +117,7 @@ export default function StudioLandingPage() {
         <div className="max-w-3xl mx-auto text-center">
           <Link
             href="/login"
-            className="inline-flex items-center bg-[#4ef2d9] hover:bg-[#3ad9c0] text-black rounded-md px-7 py-3.5 text-sm font-semibold transition"
+            className="inline-flex items-center bg-mint hover:bg-[#3ad9c0] text-black rounded-md px-7 py-3.5 text-sm font-semibold transition"
           >
             Get started
           </Link>
@@ -147,7 +147,7 @@ export default function StudioLandingPage() {
         />
         <div className="relative max-w-5xl mx-auto">
           <div className="text-center max-w-3xl mx-auto">
-            <p className="text-xs uppercase tracking-[0.2em] text-[#4ef2d9]">
+            <p className="text-xs uppercase tracking-[0.2em] text-mint">
               Why Simply Edit Pro
             </p>
             <h2 className="text-3xl md:text-5xl font-bold mt-3 tracking-tight">
@@ -157,17 +157,17 @@ export default function StudioLandingPage() {
 
           <div className="grid md:grid-cols-3 gap-6 mt-12">
             <PillarCard
-              icon={<Smartphone size={32} className="text-[#4ef2d9]" />}
+              icon={<Smartphone size={32} className="text-mint" />}
               headline="Mobile-first."
               body="Built for realtors who work between showings, not at a desk. Every tool runs on the phone in your pocket."
             />
             <PillarCard
-              icon={<Briefcase size={32} className="text-[#4ef2d9]" />}
+              icon={<Briefcase size={32} className="text-mint" />}
               headline="Real estate templates."
               body="Property flyers, listing carousels, market updates, just-sold posts. Every template is purpose-built for property marketing — not Instagram dance videos."
             />
             <PillarCard
-              icon={<Palette size={32} className="text-[#4ef2d9]" />}
+              icon={<Palette size={32} className="text-mint" />}
               headline="Branded automatically."
               body="Your logo, your colors, your contact info, your license number — applied to every flyer, post, and presentation. Set it once."
             />
@@ -189,7 +189,7 @@ export default function StudioLandingPage() {
       >
         <div className="max-w-5xl mx-auto">
           <div className="text-center max-w-3xl mx-auto mb-12">
-            <p className="text-xs uppercase tracking-[0.2em] text-[#4ef2d9]">
+            <p className="text-xs uppercase tracking-[0.2em] text-mint">
               How it works
             </p>
             <h2 className="text-3xl md:text-5xl font-bold mt-3 tracking-tight">
@@ -200,19 +200,19 @@ export default function StudioLandingPage() {
           <div className="max-w-4xl mx-auto">
             <StepRow
               number="01"
-              icon={<PencilLine size={24} className="text-[#4ef2d9]" />}
+              icon={<PencilLine size={24} className="text-mint" />}
               headline="Fill in your listing."
               body="Address, price, beds/baths, photos, features. The form fields are short and the live preview updates as you type."
             />
             <StepRow
               number="02"
-              icon={<Palette size={24} className="text-[#4ef2d9]" />}
+              icon={<Palette size={24} className="text-mint" />}
               headline="Brand it your way."
               body="Your logo, colors, contact info, license number — applied automatically. Override the colors per-flyer if a listing calls for something different."
             />
             <StepRow
               number="03"
-              icon={<Share2 size={24} className="text-[#4ef2d9]" />}
+              icon={<Share2 size={24} className="text-mint" />}
               headline="Export everywhere."
               body="Print-ready PDF for handouts. JPEG for Instagram. Animated MP4 for Reels and Stories. All from the same fields, in seconds."
               isLast
@@ -227,7 +227,7 @@ export default function StudioLandingPage() {
         className="px-6 py-20 border-t border-neutral-900 scroll-mt-16"
       >
         <div className="max-w-6xl mx-auto">
-          <p className="text-xs uppercase tracking-[0.2em] text-[#4ef2d9] text-center">
+          <p className="text-xs uppercase tracking-[0.2em] text-mint text-center">
             What&apos;s inside
           </p>
           <h2 className="text-2xl md:text-3xl font-bold mt-2 text-center">
@@ -247,7 +247,7 @@ export default function StudioLandingPage() {
       <section className="px-6 py-20 border-t border-neutral-900">
         <div className="max-w-3xl mx-auto">
           <div className="text-center">
-            <p className="text-xs uppercase tracking-[0.2em] text-[#4ef2d9]">
+            <p className="text-xs uppercase tracking-[0.2em] text-mint">
               What&apos;s included
             </p>
             <h2 className="text-3xl md:text-5xl font-bold mt-3 tracking-tight">
@@ -276,7 +276,7 @@ export default function StudioLandingPage() {
         className="px-6 py-20 border-t border-neutral-900 scroll-mt-16"
       >
         <div className="max-w-md mx-auto text-center">
-          <p className="text-xs uppercase tracking-[0.2em] text-[#4ef2d9]">
+          <p className="text-xs uppercase tracking-[0.2em] text-mint">
             Pricing
           </p>
           <h2 className="text-2xl md:text-3xl font-bold mt-2">
@@ -293,7 +293,7 @@ export default function StudioLandingPage() {
           </p>
           <Link
             href="/login"
-            className="inline-flex items-center mt-8 bg-[#4ef2d9] hover:bg-[#3ad9c0] text-black rounded-md px-7 py-3.5 text-sm font-semibold transition"
+            className="inline-flex items-center mt-8 bg-mint hover:bg-[#3ad9c0] text-black rounded-md px-7 py-3.5 text-sm font-semibold transition"
           >
             Get started
           </Link>
@@ -313,7 +313,7 @@ export default function StudioLandingPage() {
       >
         <div className="max-w-3xl mx-auto">
           <div className="text-center">
-            <p className="text-xs uppercase tracking-[0.2em] text-[#4ef2d9]">
+            <p className="text-xs uppercase tracking-[0.2em] text-mint">
               Questions
             </p>
             <h2 className="text-3xl md:text-5xl font-bold mt-3 tracking-tight">
@@ -354,7 +354,7 @@ export default function StudioLandingPage() {
           Single column, three sentences, signed first-name. */}
       <section className="px-6 py-16 border-t border-neutral-900">
         <div className="max-w-2xl mx-auto text-center">
-          <p className="text-xs uppercase tracking-[0.2em] text-[#4ef2d9]">
+          <p className="text-xs uppercase tracking-[0.2em] text-mint">
             Why this exists
           </p>
           <p className="mt-6 text-neutral-300 leading-relaxed">
@@ -377,7 +377,7 @@ export default function StudioLandingPage() {
         <div className="max-w-5xl mx-auto">
           <div className="grid md:grid-cols-3 gap-10 md:gap-12">
             <div>
-              <p className="text-xs uppercase tracking-[0.2em] text-[#4ef2d9]">
+              <p className="text-xs uppercase tracking-[0.2em] text-mint">
                 Simply Edit Pro Studio
               </p>
               <p className="text-sm text-neutral-400 mt-4 leading-relaxed max-w-xs">
@@ -397,7 +397,7 @@ export default function StudioLandingPage() {
                 <li>
                   <a
                     href="#pricing"
-                    className="text-neutral-400 hover:text-[#4ef2d9] transition"
+                    className="text-neutral-400 hover:text-mint transition"
                   >
                     Pricing
                   </a>
@@ -405,7 +405,7 @@ export default function StudioLandingPage() {
                 <li>
                   <a
                     href="#how-it-works"
-                    className="text-neutral-400 hover:text-[#4ef2d9] transition"
+                    className="text-neutral-400 hover:text-mint transition"
                   >
                     How it works
                   </a>
@@ -413,7 +413,7 @@ export default function StudioLandingPage() {
                 <li>
                   <a
                     href="#tools"
-                    className="text-neutral-400 hover:text-[#4ef2d9] transition"
+                    className="text-neutral-400 hover:text-mint transition"
                   >
                     Tools
                   </a>
@@ -421,7 +421,7 @@ export default function StudioLandingPage() {
                 <li>
                   <a
                     href="#faq"
-                    className="text-neutral-400 hover:text-[#4ef2d9] transition"
+                    className="text-neutral-400 hover:text-mint transition"
                   >
                     FAQ
                   </a>
@@ -429,7 +429,7 @@ export default function StudioLandingPage() {
                 <li>
                   <Link
                     href="/login"
-                    className="text-neutral-400 hover:text-[#4ef2d9] transition"
+                    className="text-neutral-400 hover:text-mint transition"
                   >
                     Sign in
                   </Link>
@@ -445,7 +445,7 @@ export default function StudioLandingPage() {
                 <li>
                   <a
                     href="mailto:hello@simplyeditpro.com"
-                    className="text-neutral-400 hover:text-[#4ef2d9] transition"
+                    className="text-neutral-400 hover:text-mint transition"
                   >
                     Contact
                   </a>
@@ -453,7 +453,7 @@ export default function StudioLandingPage() {
                 <li>
                   <Link
                     href="/privacy"
-                    className="text-neutral-400 hover:text-[#4ef2d9] transition"
+                    className="text-neutral-400 hover:text-mint transition"
                   >
                     Privacy Policy
                   </Link>
@@ -461,7 +461,7 @@ export default function StudioLandingPage() {
                 <li>
                   <Link
                     href="/terms"
-                    className="text-neutral-400 hover:text-[#4ef2d9] transition"
+                    className="text-neutral-400 hover:text-mint transition"
                   >
                     Terms of Service
                   </Link>
@@ -474,7 +474,7 @@ export default function StudioLandingPage() {
             <p>© 2026 Simply Edit Pro Studio. All rights reserved.</p>
             <a
               href="https://simplyeditpro.com"
-              className="hover:text-[#4ef2d9] transition"
+              className="hover:text-mint transition"
             >
               simplyeditpro.com →
             </a>
@@ -494,7 +494,7 @@ function CredibilityChip({
 }) {
   return (
     <span className="inline-flex items-center gap-1.5 px-3 py-1.5 text-xs rounded-full border border-neutral-800 bg-neutral-900/50 backdrop-blur-sm text-neutral-300">
-      <span className="text-[#4ef2d9]">{icon}</span>
+      <span className="text-mint">{icon}</span>
       {label}
     </span>
   );
@@ -510,7 +510,7 @@ function PillarCard({
   body: string;
 }) {
   return (
-    <div className="group p-8 rounded-xl bg-neutral-900/50 border border-neutral-800 hover:border-[#4ef2d9]/40 hover:bg-neutral-900/80 hover:scale-[1.02] transition-all duration-300">
+    <div className="group p-8 rounded-xl bg-neutral-900/50 border border-neutral-800 hover:border-mint/40 hover:bg-neutral-900/80 hover:scale-[1.02] transition-all duration-300">
       <div className="mb-5">{icon}</div>
       <h3 className="text-xl font-bold text-white">{headline}</h3>
       <p className="text-sm text-neutral-400 mt-3 leading-relaxed">{body}</p>
@@ -520,12 +520,12 @@ function PillarCard({
 
 function FaqItem({ q, a }: { q: string; a: string }) {
   return (
-    <details className="group rounded-xl bg-neutral-900/50 border border-neutral-800 hover:border-[#4ef2d9]/40 transition-colors open:bg-neutral-900/80 [&_summary::-webkit-details-marker]:hidden">
+    <details className="group rounded-xl bg-neutral-900/50 border border-neutral-800 hover:border-mint/40 transition-colors open:bg-neutral-900/80 [&_summary::-webkit-details-marker]:hidden">
       <summary className="cursor-pointer list-none flex items-center justify-between gap-4 px-5 py-4 text-white text-base font-medium">
         <span>{q}</span>
         <ChevronDown
           size={18}
-          className="text-neutral-500 shrink-0 transition-transform duration-200 group-open:rotate-180 group-open:text-[#4ef2d9]"
+          className="text-neutral-500 shrink-0 transition-transform duration-200 group-open:rotate-180 group-open:text-mint"
         />
       </summary>
       <div className="px-5 pb-5 text-sm text-neutral-400 leading-relaxed">
@@ -546,7 +546,7 @@ function IncludedItem({
     <div className="flex items-start gap-3">
       <Check
         size={18}
-        className="text-[#4ef2d9] mt-0.5 shrink-0"
+        className="text-mint mt-0.5 shrink-0"
         strokeWidth={2.5}
       />
       <div>
@@ -579,7 +579,7 @@ function StepRow({
       }`}
     >
       <div className="md:col-span-3">
-        <p className="font-mono text-6xl md:text-7xl leading-none tracking-tight text-[#4ef2d9] opacity-80">
+        <p className="font-mono text-6xl md:text-7xl leading-none tracking-tight text-mint opacity-80">
           {number}
         </p>
       </div>

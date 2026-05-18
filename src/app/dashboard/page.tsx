@@ -20,7 +20,7 @@ export default async function DashboardPage() {
       <div className="max-w-5xl mx-auto px-6 py-12 lg:py-20">
         <header className="mb-12 flex flex-col gap-4 md:flex-row md:items-start md:justify-between md:gap-6">
           <div>
-            <p className="text-xs uppercase tracking-[0.2em] text-[#4ef2d9]">
+            <p className="text-xs uppercase tracking-[0.2em] text-mint">
               Simply Edit Pro Studio
             </p>
             <h1 className="text-3xl font-bold mt-1">
@@ -33,7 +33,7 @@ export default async function DashboardPage() {
           <nav className="flex items-center gap-5 text-xs uppercase tracking-[0.15em]">
             <Link
               href="/settings"
-              className="text-neutral-400 hover:text-[#4ef2d9] transition"
+              className="text-neutral-400 hover:text-mint transition"
             >
               Settings →
             </Link>
@@ -45,7 +45,7 @@ export default async function DashboardPage() {
             >
               <button
                 type="submit"
-                className="text-neutral-400 hover:text-[#4ef2d9] transition"
+                className="text-neutral-400 hover:text-mint transition"
               >
                 Sign out
               </button>

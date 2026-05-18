@@ -55,7 +55,7 @@ export function StepObjections({ draft, setDraft }: StepProps) {
           We&apos;ve pre-checked {DEFAULT_SELECTED_OBJECTION_IDS.length} universal talking points
           you&apos;ll almost always need. Add or remove based on this specific seller.
         </p>
-        <p className="mt-2 text-xs text-[#4ef2d9]">
+        <p className="mt-2 text-xs text-mint">
           {selected.size} of {OBJECTION_LIBRARY.length} selected
         </p>
       </header>
@@ -102,7 +102,7 @@ function ObjectionRow({
   return (
     <div
       className={`p-3 rounded border ${
-        selected ? 'border-[#4ef2d9]/40 bg-[#4ef2d9]/5' : 'border-neutral-800'
+        selected ? 'border-mint/40 bg-mint/5' : 'border-neutral-800'
       }`}
     >
       <div className="flex items-start gap-3">
@@ -119,7 +119,7 @@ function ObjectionRow({
             <button
               type="button"
               onClick={() => setShowResponse((s) => !s)}
-              className="text-[#4ef2d9] hover:underline"
+              className="text-mint hover:underline"
             >
               {showResponse ? 'Hide response' : 'Preview response'}
             </button>
@@ -136,7 +136,7 @@ function ObjectionRow({
           )}
           {showOverride && (
             <textarea
-              className="mt-2 w-full px-3 py-2 bg-neutral-900 border border-neutral-700 rounded text-xs focus:outline-none focus:border-[#4ef2d9] resize-y min-h-[60px]"
+              className="mt-2 w-full px-3 py-2 bg-neutral-900 border border-neutral-700 rounded text-xs focus:outline-none focus:border-mint resize-y min-h-[60px]"
               value={override}
               onChange={(e) => onOverrideChange(e.target.value)}
               placeholder="Type your version of the response — it will replace the library text in the printed PDF."

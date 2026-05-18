@@ -7,7 +7,7 @@ import {
   hasBrandProfileConfigured,
 } from './state-detection';
 import { getActiveWorkflows, getWorkflowPrimarySkill } from './workflows';
-import { ALL_SKILLS } from '@/skills/registry';
+import { getCategorizedSkills } from '@/skills/registry';
 import { NextBestActionCard } from './components/NextBestActionCard';
 import { SkillTile } from './components/SkillTile';
 import type { CallableSkill, WorkflowState } from '@/skills/types';
@@ -57,8 +57,8 @@ export function DashboardClient() {
 
 function EmptyState() {
   return (
-    <div className="rounded-2xl bg-neutral-900 border border-[#4ef2d9]/30 p-8 md:p-10">
-      <p className="text-[11px] uppercase tracking-[0.18em] text-[#4ef2d9]">
+    <div className="rounded-2xl bg-neutral-900 border border-mint/30 p-8 md:p-10">
+      <p className="text-[11px] uppercase tracking-[0.18em] text-mint">
         Welcome to Studio
       </p>
       <h2 className="text-2xl font-semibold mt-2 leading-tight">
@@ -70,7 +70,7 @@ function EmptyState() {
       </p>
       <Link
         href="/settings"
-        className="inline-flex items-center justify-center rounded-lg bg-[#4ef2d9] text-black text-sm font-semibold px-5 py-2.5 mt-6 transition hover:bg-[#3fd9c1]"
+        className="inline-flex items-center justify-center rounded-lg bg-mint text-black text-sm font-semibold px-5 py-2.5 mt-6 transition hover:bg-mint-hover"
       >
         Set up brand profile →
       </Link>
@@ -119,15 +119,12 @@ function NoActiveWorkflowsState() {
 }
 
 function AllSkillsSection() {
-  const marketingAssets = ALL_SKILLS.filter(
-    (s) => s.id === 'listing-flyer' || s.id === 'open-house-promo'
-  );
-  const sellerPitch = ALL_SKILLS.filter(
-    (s) => s.id === 'listing-presentation' || s.id === 'seller-intelligence-report',
-  );
-  const socialContent = ALL_SKILLS.filter((s) =>
-    s.id.startsWith('social-animator-')
-  );
+  // Commit 3 refactor: buckets derived from each skill's required `category`
+  // field (declared at the skill record's spec site) instead of hardcoded
+  // ID-match filters here. Adding a new skill no longer requires editing
+  // this file — declaring `category` on its CallableSkill is sufficient.
+  // Root-cause fix for the v1.44.1 SIR-dropout bug class.
+  const buckets = getCategorizedSkills();
 
   return (
     <section className="flex flex-col gap-6">
@@ -135,9 +132,9 @@ function AllSkillsSection() {
         All skills
       </h2>
 
-      <SkillGroup title="Marketing assets" skills={marketingAssets} />
-      <SkillGroup title="Seller pitch" skills={sellerPitch} />
-      <SkillGroup title="Social content" skills={socialContent} />
+      {buckets.map(({ category, skills }) => (
+        <SkillGroup key={category} title={category} skills={skills} />
+      ))}
     </section>
   );
 }

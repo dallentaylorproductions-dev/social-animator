@@ -602,9 +602,9 @@ function FormField({
   // the typing cursor; once the field is no longer being typed, accent
   // (price field) reverts to its mint-tinted "filled" border.
   const borderClass = active
-    ? "border-[#4ef2d9]"
+    ? "border-mint"
     : accent && text
-      ? "border-[#4ef2d9]/40"
+      ? "border-mint/40"
       : "border-neutral-800";
   const bgStyle = active
     ? { backgroundColor: "rgba(78, 242, 217, 0.05)" }
@@ -683,7 +683,7 @@ function FormChip({
     return (
       <div
         className={`bg-neutral-900 border border-dashed rounded px-2 py-1 text-[9px] text-neutral-600 min-h-[20px] flex items-center transition-colors ${
-          active ? "border-[#4ef2d9]" : "border-neutral-800"
+          active ? "border-mint" : "border-neutral-800"
         }`}
       >
         +
@@ -693,7 +693,7 @@ function FormChip({
   return (
     <div
       className={`bg-neutral-900 border rounded px-2 py-1 text-[9px] text-white min-h-[20px] flex items-center gap-1.5 transition-colors ${
-        active ? "border-[#4ef2d9]" : "border-neutral-800"
+        active ? "border-mint" : "border-neutral-800"
       }`}
       style={{
         opacity,

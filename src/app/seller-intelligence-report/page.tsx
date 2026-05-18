@@ -45,6 +45,12 @@ export default function SellerIntelligenceReportPage() {
   return (
     <div className="mx-auto max-w-3xl px-4 py-8">
       <header className="mb-8">
+        <a
+          href="/dashboard"
+          className="inline-flex items-center text-xs uppercase tracking-[0.18em] text-neutral-500 hover:text-mint mb-4 transition-colors"
+        >
+          ← Dashboard
+        </a>
         <h1 className="text-2xl font-semibold">Seller Intelligence Report</h1>
         <p className="mt-1 text-sm text-gray-400">
           Your private prep document for a listing appointment. Step{' '}
@@ -79,11 +85,22 @@ export default function SellerIntelligenceReportPage() {
             if (idx < STEPS.length - 1) setCurrentStep(STEPS[idx + 1].id);
           }}
           disabled={currentStep === STEPS[STEPS.length - 1].id}
-          className="px-4 py-2 text-sm bg-[#4ef2d9] text-black font-medium rounded disabled:opacity-50"
+          className="px-4 py-2 text-sm bg-mint text-black font-medium rounded disabled:opacity-50"
         >
           Next →
         </button>
       </nav>
+
+      {currentStep === 'review' && (
+        <div className="mt-8 pt-6 border-t border-neutral-800">
+          <a
+            href="/dashboard"
+            className="inline-flex items-center text-sm text-neutral-400 hover:text-mint transition-colors"
+          >
+            Done — back to dashboard →
+          </a>
+        </div>
+      )}
     </div>
   );
 }
@@ -96,7 +113,7 @@ function StepIndicator({ currentStep }: { currentStep: StepId }) {
         <li
           key={step.id}
           className={`flex-1 border-b-2 pb-2 ${
-            idx <= currentIdx ? 'border-[#4ef2d9] text-white' : 'border-gray-700 text-gray-500'
+            idx <= currentIdx ? 'border-mint text-white' : 'border-gray-700 text-gray-500'
           }`}
         >
           {idx + 1}. {step.label}

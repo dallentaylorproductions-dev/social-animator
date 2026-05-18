@@ -33,7 +33,7 @@ function PaywallBody() {
 
   return (
     <div className="max-w-md w-full text-center">
-      <p className="text-xs uppercase tracking-[0.2em] text-[#4ef2d9]">
+      <p className="text-xs uppercase tracking-[0.2em] text-mint">
         Simply Edit Pro Studio
       </p>
       <h1 className="text-3xl font-bold mt-2">Subscribe to access the Studio</h1>
@@ -51,7 +51,7 @@ function PaywallBody() {
       <button
         onClick={handleSubscribe}
         disabled={submitting}
-        className="mt-8 w-full bg-[#4ef2d9] hover:bg-[#3ad9c0] text-black rounded-md px-6 py-3 text-sm font-semibold transition disabled:opacity-60 disabled:cursor-not-allowed"
+        className="mt-8 w-full bg-mint hover:bg-[#3ad9c0] text-black rounded-md px-6 py-3 text-sm font-semibold transition disabled:opacity-60 disabled:cursor-not-allowed"
       >
         {submitting ? "Starting checkout…" : "Start subscription"}
       </button>

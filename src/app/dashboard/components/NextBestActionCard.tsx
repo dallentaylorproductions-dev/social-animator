@@ -18,8 +18,8 @@ export function NextBestActionCard({
   const nextSkills = getRecommendedNextSkills(primarySkill.id);
 
   return (
-    <div className="rounded-2xl bg-neutral-900 border border-[#4ef2d9]/30 p-6 md:p-7 transition hover:border-[#4ef2d9]/60">
-      <p className="text-[11px] uppercase tracking-[0.18em] text-[#4ef2d9]">
+    <div className="rounded-2xl bg-neutral-900 border border-mint/30 p-6 md:p-7 transition hover:border-mint/60">
+      <p className="text-[11px] uppercase tracking-[0.18em] text-mint">
         Next best action
       </p>
       <h2 className="text-2xl font-semibold mt-2 leading-tight">
@@ -36,7 +36,7 @@ export function NextBestActionCard({
       <div className="mt-6 flex flex-col sm:flex-row sm:items-center gap-3">
         <Link
           href={skillRoute(primarySkill.id)}
-          className="inline-flex items-center justify-center rounded-lg bg-[#4ef2d9] text-black text-sm font-semibold px-5 py-2.5 transition hover:bg-[#3fd9c1]"
+          className="inline-flex items-center justify-center rounded-lg bg-mint text-black text-sm font-semibold px-5 py-2.5 transition hover:bg-mint-hover"
         >
           {primarySkill.name} →
         </Link>
@@ -47,7 +47,7 @@ export function NextBestActionCard({
               <Link
                 key={s.id}
                 href={skillRoute(s.id)}
-                className="inline-flex items-center rounded-full border border-neutral-700 px-3 py-1 text-[11px] text-neutral-300 hover:border-[#4ef2d9]/60 hover:text-[#4ef2d9] transition"
+                className="inline-flex items-center rounded-full border border-neutral-700 px-3 py-1 text-[11px] text-neutral-300 hover:border-mint/60 hover:text-mint transition"
               >
                 {s.name}
               </Link>
