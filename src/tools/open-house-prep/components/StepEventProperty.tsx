@@ -4,6 +4,7 @@ import { useState } from 'react';
 import type { OpenHousePrepDraft } from '../engine/types';
 import { FieldHelp } from '@/tools/seller-intelligence-report/components/FieldHelp';
 import { resizeImageToDataURL } from '@/lib/image-utils';
+import { CurrencyInput } from '@/components/inputs/CurrencyInput';
 
 interface StepProps {
   draft: OpenHousePrepDraft;
@@ -49,12 +50,11 @@ export function StepEventProperty({ draft, setDraft }: StepProps) {
         />
       </FieldHelp>
 
-      <FieldHelp label="List price" required helpText="Format however you want — we'll show it as you type it.">
-        <input
-          type="text"
+      <FieldHelp label="List price" required helpText="Auto-formats with commas + currency on blur.">
+        <CurrencyInput
           className={inputCls}
           value={draft.listPrice}
-          onChange={(e) => update('listPrice', e.target.value)}
+          onChange={(v) => update('listPrice', v)}
           placeholder="$685,000"
         />
       </FieldHelp>
@@ -184,7 +184,6 @@ function HeroPhotoField({
               <input
                 type="file"
                 accept="image/*"
-                capture="environment"
                 className="hidden"
                 onChange={(e) => {
                   const f = e.target.files?.[0];

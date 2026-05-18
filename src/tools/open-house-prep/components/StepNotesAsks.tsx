@@ -86,7 +86,7 @@ export function StepNotesAsks({ draft, setDraft }: StepProps) {
           onChange={(e) =>
             setDraft({ ...draft, preEventNotes: e.target.value || undefined })
           }
-          placeholder="Two buyers have walked through twice. Husband is the decision-maker."
+          placeholder="They've had two prior agents fall through. Decision-makers aren't both in the room yet — don't push on price the first 5 minutes."
         />
       </FieldHelp>
 

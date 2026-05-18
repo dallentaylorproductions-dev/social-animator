@@ -4,6 +4,7 @@ import { useState } from 'react';
 import type { ConfidenceLevel, SellerIntelligenceReportDraft } from '../engine/types';
 import { PRICING_STRATEGIES, type PricingStrategy } from '../content/pricing-strategies';
 import { FieldHelp } from './FieldHelp';
+import { CurrencyInput } from '@/components/inputs/CurrencyInput';
 
 interface StepProps {
   draft: SellerIntelligenceReportDraft;
@@ -66,13 +67,12 @@ export function StepProperty({ draft, setDraft }: StepProps) {
       <FieldHelp
         label="Recommended list price"
         required
-        helpText="Format however you want — we'll show it as you type it."
+        helpText="Auto-formats with commas + currency on blur."
       >
-        <input
-          type="text"
+        <CurrencyInput
           className={inputCls}
           value={draft.recommendedListPrice}
-          onChange={(e) => update('recommendedListPrice', e.target.value)}
+          onChange={(v) => update('recommendedListPrice', v)}
           placeholder="$685,000"
         />
       </FieldHelp>

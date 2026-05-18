@@ -1,32 +1,28 @@
 "use client";
 
-import { useState } from "react";
 import { formatNumberWithCommas, stripToDigits } from "./formatHelpers";
 
 /**
- * On-blur formatted integer input ("2,840").
+ * Integer input ("2,840") with on-blur formatting.
  *
- * Storage contract — STATE = DISPLAY (formatted): the component emits
- * the comma-grouped form, so parent state holds "2,840" directly and
- * downstream renderers receive it unchanged. See CurrencyInput's
- * comment block for why state=display beats state=raw for this phase
- * (zero downstream changes; idempotent on already-formatted input).
+ * Storage contract — STATE = DISPLAY post-blur: the component emits
+ * the comma-grouped form on blur. Parent state holds the formatted
+ * value at rest; mid-edit it holds whatever the user has typed.
  *
- * UX: while focused, display strips the commas so the user can edit
- * a clean digit string. On blur the display switches back to the
- * comma-grouped form AND the parent state updates to that
- * comma-grouped form. On every keystroke the parent state also
- * receives a comma-grouped value so live previews stay in sync.
+ * Why on-blur instead of live formatting (changed Commit 8): same
+ * rationale as CurrencyInput — voice / dictation compatibility, paste
+ * of word-form text, and simpler code without the focus-state
+ * commas-toggle that the prior implementation needed.
  *
- * Paste handling: "2,840", "2840", or "2.840" all normalize via
- * stripToDigits + format.
+ * Publish / Export buttons trigger blur on the focused input
+ * automatically when the user clicks them, so the formatted commit
+ * fires before the action runs.
  */
 export interface NumberInputProps {
-  /** Formatted display string, e.g. "2,840". Accepts any input shape;
-   * formatNumberWithCommas is idempotent on already-formatted values. */
+  /** Comma-grouped display value post-blur (e.g. "2,840"). */
   value: string;
-  /** Called with the new formatted display string after every edit. */
-  onChange: (formatted: string) => void;
+  /** Emits raw typed text on every keystroke, formatted text on blur. */
+  onChange: (next: string) => void;
   placeholder?: string;
   className?: string;
   required?: boolean;
@@ -46,28 +42,17 @@ export function NumberInput({
   disabled,
   "aria-label": ariaLabel,
 }: NumberInputProps) {
-  const [isFocused, setIsFocused] = useState(false);
-
-  // While focused, show the raw digit string for clean editing.
-  // When blurred (or in initial render), show the formatted form.
-  const display = isFocused ? stripToDigits(value) : formatNumberWithCommas(value);
-
-  const handleChange = (e: React.ChangeEvent<HTMLInputElement>) => {
-    // Emit the comma-grouped form so parent state stays canonical
-    // even mid-edit; the display while focused continues to show raw
-    // digits (read directly from `value` via stripToDigits above).
-    onChange(formatNumberWithCommas(e.target.value));
-  };
-
   return (
     <input
       type="text"
       inputMode="numeric"
       autoComplete="off"
-      value={display}
-      onChange={handleChange}
-      onFocus={() => setIsFocused(true)}
-      onBlur={() => setIsFocused(false)}
+      value={value}
+      onChange={(e) => onChange(e.target.value)}
+      onBlur={(e) => {
+        const formatted = formatNumberWithCommas(stripToDigits(e.target.value));
+        if (formatted !== e.target.value) onChange(formatted);
+      }}
       placeholder={placeholder}
       required={required}
       disabled={disabled}

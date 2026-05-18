@@ -67,3 +67,22 @@ body {
   color: var(--foreground);
   font-family: Arial, Helvetica, sans-serif;
 }
+
+/*
+ * iOS Safari auto-zooms the viewport when a focused input has a font-size
+ * smaller than 16px. Many of our inputs use Tailwind's text-sm (14px) for
+ * desktop density; on mobile the auto-zoom is jarring and impossible to
+ * reverse without a manual pinch-out.
+ *
+ * Bumping all inputs/textareas/selects to 16px on mobile (<=640px) prevents
+ * the zoom while leaving desktop typography untouched. Accessibility
+ * preserved — pinch-zoom remains available; no user-scalable=no on the
+ * viewport meta (see src/app/layout.tsx).
+ */
+@media (max-width: 640px) {
+  input,
+  textarea,
+  select {
+    font-size: 16px;
+  }
+}

@@ -3,6 +3,8 @@
 import type { Comp, OpenHousePrepDraft } from '../engine/types';
 import { FieldHelp } from '@/tools/seller-intelligence-report/components/FieldHelp';
 import { COMP_HINTS, getHintByIndex } from '@/lib/wizard-hints';
+import { CurrencyInput } from '@/components/inputs/CurrencyInput';
+import { NumberInput } from '@/components/inputs/NumberInput';
 
 interface StepProps {
   draft: OpenHousePrepDraft;
@@ -78,12 +80,11 @@ export function StepComps({ draft, setDraft }: StepProps) {
             </FieldHelp>
 
             <div className="grid grid-cols-1 sm:grid-cols-2 gap-4">
-              <FieldHelp label="Sold price" helpText="Format as you want it printed.">
-                <input
-                  type="text"
+              <FieldHelp label="Sold price" helpText="Auto-formats with commas + currency on blur.">
+                <CurrencyInput
                   className={inputCls}
                   value={comp.soldPrice}
-                  onChange={(e) => updateComp(idx, { soldPrice: e.target.value })}
+                  onChange={(v) => updateComp(idx, { soldPrice: v })}
                   placeholder={hint.soldPrice}
                 />
               </FieldHelp>
@@ -109,13 +110,12 @@ export function StepComps({ draft, setDraft }: StepProps) {
                   placeholder={hint.saleToList}
                 />
               </FieldHelp>
-              <FieldHelp label="Square feet" helpText="Skip if not comparable.">
-                <input
-                  type="text"
+              <FieldHelp label="Square feet" helpText="Auto-formats with commas on blur. Skip if not comparable.">
+                <NumberInput
                   className={inputCls}
                   value={comp.squareFeet ?? ''}
-                  onChange={(e) =>
-                    updateComp(idx, { squareFeet: e.target.value || undefined })
+                  onChange={(v) =>
+                    updateComp(idx, { squareFeet: v || undefined })
                   }
                   placeholder={hint.squareFeet}
                 />

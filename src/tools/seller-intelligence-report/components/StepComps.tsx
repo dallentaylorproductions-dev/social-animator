@@ -3,6 +3,8 @@
 import type { Comp, SellerIntelligenceReportDraft } from '../engine/types';
 import { FieldHelp } from './FieldHelp';
 import { COMP_HINTS, getHintByIndex } from '@/lib/wizard-hints';
+import { CurrencyInput } from '@/components/inputs/CurrencyInput';
+import { NumberInput } from '@/components/inputs/NumberInput';
 
 interface StepProps {
   draft: SellerIntelligenceReportDraft;
@@ -117,13 +119,12 @@ export function StepComps({ draft, setDraft }: StepProps) {
           <FieldHelp
             label="Sold price"
             required
-            helpText="Format as you want it printed (e.g. $685,000)."
+            helpText="Auto-formats with commas + currency on blur."
           >
-            <input
-              type="text"
+            <CurrencyInput
               className={inputCls}
               value={comp.soldPrice}
-              onChange={(e) => onUpdate({ soldPrice: e.target.value })}
+              onChange={(v) => onUpdate({ soldPrice: v })}
               placeholder={hint.soldPrice}
             />
           </FieldHelp>
@@ -153,12 +154,11 @@ export function StepComps({ draft, setDraft }: StepProps) {
             />
           </FieldHelp>
 
-          <FieldHelp label="Square feet" helpText="Skip if not comparable.">
-            <input
-              type="text"
+          <FieldHelp label="Square feet" helpText="Auto-formats with commas on blur. Skip if not comparable.">
+            <NumberInput
               className={inputCls}
               value={comp.squareFeet ?? ''}
-              onChange={(e) => onUpdate({ squareFeet: e.target.value || undefined })}
+              onChange={(v) => onUpdate({ squareFeet: v || undefined })}
               placeholder={hint.squareFeet}
             />
           </FieldHelp>

@@ -1,54 +1,43 @@
 "use client";
 
-import { useLayoutEffect, useRef } from "react";
-import {
-  caretAfterNthDigit,
-  formatCurrency,
-  stripToDigits,
-} from "./formatHelpers";
+import { formatCurrency } from "./formatHelpers";
 
 /**
- * Live-formatted currency input ("$685,000").
+ * Currency input ("$685,000") with on-blur formatting.
  *
- * Storage contract — STATE = DISPLAY: this component both accepts
- * and emits the formatted display string (e.g. "$685,000"). The
- * parent's form state holds the formatted form directly, which
- * means downstream renderers (PDF documents, listing-showcase
+ * Storage contract — STATE = DISPLAY post-blur: the component emits
+ * the formatted display string (e.g. "$685,000") to the parent on
+ * blur, so downstream renderers (PDF documents, listing-showcase
  * canvas regex, etc.) continue to receive the canonical display
- * exactly as a manually-typed "$685,000" did before this phase.
+ * exactly as before. Mid-edit, the parent state holds whatever the
+ * user has typed verbatim — formatting fires on blur, not on every
+ * keystroke.
  *
- * The brief's wording ("store raw digits") would have required
- * updating every downstream renderer to re-format raw on output,
- * since today the PDFs render `{draft.price}` literally and the
- * canvas count-up animation extracts the "$" prefix via regex
- * (`priceMatch[1]`). Storing raw would lose the prefix and
- * regress both surfaces. Both `formatCurrency` and the canvas
- * regex are idempotent when fed an already-formatted value, so
- * state=display is the lowest-risk path.
+ * Why on-blur instead of live formatting (changed Commit 8):
  *
- * Cursor preservation: when the user types or deletes mid-string,
- * commas shift around but the caret must stay logically adjacent
- * to the digit the user just touched. The implementation:
+ *   1. Voice / dictation compatibility — iOS and Android speech-to-text
+ *      writes typed characters into the field with a delay-and-replace
+ *      pattern. Live formatting fights the dictation engine
+ *      mid-stream, producing malformed input. Format-on-blur lets the
+ *      voice engine commit, then the user reviews + tabs out for the
+ *      canonical formatted value.
+ *   2. Paste of word-form text ("six hundred eighty five thousand
+ *      dollars") shows the typed words until blur, letting the user
+ *      see what came in before stripToDigits collapses it to "".
+ *   3. Simpler code — drops the cursor-preservation gymnastics that
+ *      live formatting required. The browser handles caret naturally
+ *      because the display string doesn't shift mid-keystroke.
  *
- *   1. On change, count how many raw digits sit to the LEFT of the
- *      browser-reported caret in the freshly-edited (pre-reformat)
- *      display.
- *   2. Compute the reformatted display from the stripped digits.
- *   3. Call onChange with that reformatted string — React commits.
- *   4. In a useLayoutEffect (runs before paint), walk the new
- *      display and land the caret AFTER the same raw-digit ordinal,
- *      so commas shifted in or out are transparent to the user.
- *
- * Paste handling: "$1,234,567", "1234567", "1.234.567" all
- * normalize to the same "$1,234,567" via stripToDigits + format.
+ * Publish / Export buttons trigger blur on the focused input
+ * automatically when the user clicks them (focus moves to the
+ * button), so the formatted commit fires before the action runs.
  */
 export interface CurrencyInputProps {
-  /** Formatted display string, e.g. "$685,000". Accepts any input
-   * shape — already-formatted, raw digits, partially-formatted —
-   * because formatCurrency is idempotent on its own output. */
+  /** Formatted display value post-blur (e.g. "$685,000"). Accepts any
+   * input shape on initial mount — formatCurrency is idempotent. */
   value: string;
-  /** Called with the new formatted display string after every edit. */
-  onChange: (formatted: string) => void;
+  /** Emits raw typed text on every keystroke, formatted text on blur. */
+  onChange: (next: string) => void;
   placeholder?: string;
   className?: string;
   required?: boolean;
@@ -68,49 +57,17 @@ export function CurrencyInput({
   disabled,
   "aria-label": ariaLabel,
 }: CurrencyInputProps) {
-  const inputRef = useRef<HTMLInputElement>(null);
-  const pendingCaretRef = useRef<number | null>(null);
-
-  const display = formatCurrency(value);
-
-  const handleChange = (e: React.ChangeEvent<HTMLInputElement>) => {
-    const editedDisplay = e.target.value;
-    const caretInEdited = e.target.selectionStart ?? editedDisplay.length;
-
-    // Count raw digits to the left of the caret in the post-edit string.
-    const rawDigitsLeft = stripToDigits(
-      editedDisplay.slice(0, caretInEdited)
-    ).length;
-
-    const newRaw = stripToDigits(editedDisplay);
-
-    // Plan the post-re-render caret. The reformatted display may add
-    // or drop commas, so the position can differ from caretInEdited.
-    const reformatted = formatCurrency(newRaw);
-    pendingCaretRef.current = caretAfterNthDigit(reformatted, rawDigitsLeft);
-
-    onChange(reformatted);
-  };
-
-  // Restore the planned caret position after React commits the new
-  // display. useLayoutEffect runs synchronously before paint, so the
-  // user never sees the caret in the wrong spot.
-  useLayoutEffect(() => {
-    if (pendingCaretRef.current !== null && inputRef.current) {
-      const c = pendingCaretRef.current;
-      inputRef.current.setSelectionRange(c, c);
-      pendingCaretRef.current = null;
-    }
-  });
-
   return (
     <input
-      ref={inputRef}
       type="text"
       inputMode="numeric"
       autoComplete="off"
-      value={display}
-      onChange={handleChange}
+      value={value}
+      onChange={(e) => onChange(e.target.value)}
+      onBlur={(e) => {
+        const formatted = formatCurrency(e.target.value);
+        if (formatted !== e.target.value) onChange(formatted);
+      }}
       placeholder={placeholder}
       required={required}
       disabled={disabled}
