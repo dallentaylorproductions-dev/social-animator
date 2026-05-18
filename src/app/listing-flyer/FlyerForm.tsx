@@ -112,7 +112,7 @@ export function FlyerForm({
             <button
               type="button"
               onClick={resetColors}
-              className="text-[10px] text-neutral-500 hover:text-[#4ef2d9] transition"
+              className="text-[10px] text-neutral-500 hover:text-mint transition"
             >
               ↺ Reset to brand defaults
             </button>
@@ -230,7 +230,7 @@ export function FlyerForm({
             <button
               type="button"
               onClick={addFeature}
-              className="w-full bg-neutral-900 border border-dashed border-neutral-700 hover:border-[#4ef2d9] rounded-md px-3 py-2 text-xs text-neutral-400 hover:text-neutral-200 transition"
+              className="w-full bg-neutral-900 border border-dashed border-neutral-700 hover:border-mint rounded-md px-3 py-2 text-xs text-neutral-400 hover:text-neutral-200 transition"
             >
               + Add feature bullet
             </button>
@@ -272,7 +272,7 @@ export function FlyerForm({
                 />
                 <span className="flex-1 text-xs text-neutral-400 truncate">
                   {i === 0 && (
-                    <span className="text-[#4ef2d9] mr-2">HERO</span>
+                    <span className="text-mint mr-2">HERO</span>
                   )}
                   {photo.file.name}
                 </span>
@@ -313,7 +313,7 @@ export function FlyerForm({
           <button
             type="button"
             onClick={() => photoInputRef.current?.click()}
-            className="block w-full bg-neutral-900 border border-dashed border-neutral-700 hover:border-[#4ef2d9] rounded-md px-3 py-6 text-xs text-neutral-400 hover:text-neutral-200 transition text-center"
+            className="block w-full bg-neutral-900 border border-dashed border-neutral-700 hover:border-mint rounded-md px-3 py-6 text-xs text-neutral-400 hover:text-neutral-200 transition text-center"
           >
             {photos.length === 0
               ? "Click to upload photos (up to 5)"
@@ -349,7 +349,7 @@ function Field({
     <div>
       <label className="block text-[10px] uppercase tracking-[0.15em] text-neutral-500 mb-2">
         {label}
-        {required && <span className="text-[#4ef2d9] ml-1">*</span>}
+        {required && <span className="text-mint ml-1">*</span>}
       </label>
       {children}
       {helper && (
@@ -378,7 +378,7 @@ function TextInput({
       value={value}
       onChange={(e) => onChange(e.target.value)}
       placeholder={placeholder}
-      className="w-full bg-neutral-900 border border-neutral-800 rounded-md px-3 py-2 text-base lg:text-sm focus:outline-none focus:border-[#4ef2d9]"
+      className="w-full bg-neutral-900 border border-neutral-800 rounded-md px-3 py-2 text-base lg:text-sm focus:outline-none focus:border-mint"
     />
   );
 }
@@ -422,7 +422,7 @@ function ColorInput({
           // Without it, the inner flex row exceeds its grid cell and
           // overflows into the neighboring picker (the symptom Dallen saw
           // before the grid-cols-2 wrap landed).
-          className="flex-1 min-w-0 bg-neutral-900 border border-neutral-800 rounded-md px-2 py-1.5 text-base lg:text-xs font-mono focus:outline-none focus:border-[#4ef2d9]"
+          className="flex-1 min-w-0 bg-neutral-900 border border-neutral-800 rounded-md px-2 py-1.5 text-base lg:text-xs font-mono focus:outline-none focus:border-mint"
         />
       </div>
     </div>

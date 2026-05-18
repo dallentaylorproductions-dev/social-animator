@@ -69,8 +69,8 @@ export function StepReview({ draft, goToStep }: StepReviewProps) {
       {missing ? (
         <ValidationBlock missing={missing} goToStep={goToStep} />
       ) : (
-        <div className="p-4 rounded border border-[#4ef2d9]/40 bg-[#4ef2d9]/5">
-          <p className="text-sm text-[#4ef2d9] font-medium">Ready to export</p>
+        <div className="p-4 rounded border border-mint/40 bg-mint/5">
+          <p className="text-sm text-mint font-medium">Ready to export</p>
         </div>
       )}
 
@@ -116,7 +116,7 @@ export function StepReview({ draft, goToStep }: StepReviewProps) {
           type="button"
           onClick={onExport}
           disabled={Boolean(missing) || state.kind === 'downloading'}
-          className="px-5 py-2.5 text-sm font-medium rounded bg-[#4ef2d9] text-black hover:bg-[#3fd9c1] disabled:opacity-40 disabled:cursor-not-allowed"
+          className="px-5 py-2.5 text-sm font-medium rounded bg-mint text-black hover:bg-mint-hover disabled:opacity-40 disabled:cursor-not-allowed"
         >
           {state.kind === 'downloading'
             ? 'Generating PDF…'
@@ -146,7 +146,7 @@ function ValidationBlock({
       <button
         type="button"
         onClick={() => goToStep(stepId)}
-        className="text-xs text-[#4ef2d9] hover:underline"
+        className="text-xs text-mint hover:underline"
       >
         Go back to fix →
       </button>

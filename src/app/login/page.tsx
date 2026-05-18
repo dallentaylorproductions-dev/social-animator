@@ -54,7 +54,7 @@ function LoginForm() {
 
   return (
     <form onSubmit={handleSubmit} className="w-full max-w-sm">
-      <p className="text-xs uppercase tracking-[0.2em] text-[#4ef2d9]">
+      <p className="text-xs uppercase tracking-[0.2em] text-mint">
         Simply Edit Pro Studio
       </p>
       <h1 className="text-2xl font-semibold mt-1 mb-2">Sign in</h1>
@@ -73,13 +73,13 @@ function LoginForm() {
         value={email}
         onChange={(e) => setEmail(e.target.value)}
         placeholder="you@example.com"
-        className="w-full bg-neutral-900 border border-neutral-800 rounded-md px-3 py-2.5 text-base lg:text-sm focus:outline-none focus:border-[#4ef2d9]"
+        className="w-full bg-neutral-900 border border-neutral-800 rounded-md px-3 py-2.5 text-base lg:text-sm focus:outline-none focus:border-mint"
       />
 
       <button
         type="submit"
         disabled={submitting || !email}
-        className="w-full mt-4 bg-[#4ef2d9] hover:bg-[#3ad9c0] text-black rounded-md px-4 py-3 text-sm font-semibold transition disabled:opacity-60 disabled:cursor-not-allowed"
+        className="w-full mt-4 bg-mint hover:bg-[#3ad9c0] text-black rounded-md px-4 py-3 text-sm font-semibold transition disabled:opacity-60 disabled:cursor-not-allowed"
       >
         {submitting ? "Sending…" : "Send sign-in link"}
       </button>

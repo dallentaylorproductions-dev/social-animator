@@ -150,7 +150,7 @@ export function PresentationForm({
             <button
               type="button"
               onClick={resetColors}
-              className="text-[10px] text-neutral-500 hover:text-[#4ef2d9] transition"
+              className="text-[10px] text-neutral-500 hover:text-mint transition"
             >
               ↺ Reset to brand defaults
             </button>
@@ -231,7 +231,7 @@ export function PresentationForm({
                   <button
                     type="button"
                     onClick={() => headshotInputRef.current?.click()}
-                    className="text-xs text-[#4ef2d9] hover:underline self-start"
+                    className="text-xs text-mint hover:underline self-start"
                   >
                     Replace
                   </button>
@@ -248,7 +248,7 @@ export function PresentationForm({
               <button
                 type="button"
                 onClick={() => headshotInputRef.current?.click()}
-                className="w-full bg-neutral-900 border border-dashed border-neutral-700 hover:border-[#4ef2d9] rounded-md px-3 py-6 text-xs text-neutral-400 hover:text-neutral-200 transition text-center"
+                className="w-full bg-neutral-900 border border-dashed border-neutral-700 hover:border-mint rounded-md px-3 py-6 text-xs text-neutral-400 hover:text-neutral-200 transition text-center"
               >
                 Click to upload headshot · 1:1 crop, ~400×400 minimum
               </button>
@@ -350,7 +350,7 @@ export function PresentationForm({
               <button
                 type="button"
                 onClick={addStrategy}
-                className="w-full bg-neutral-900 border border-dashed border-neutral-700 hover:border-[#4ef2d9] rounded-md px-3 py-2 text-xs text-neutral-400 hover:text-neutral-200 transition"
+                className="w-full bg-neutral-900 border border-dashed border-neutral-700 hover:border-mint rounded-md px-3 py-2 text-xs text-neutral-400 hover:text-neutral-200 transition"
               >
                 + Add strategy
               </button>
@@ -417,7 +417,7 @@ export function PresentationForm({
               <button
                 type="button"
                 onClick={addComp}
-                className="w-full bg-neutral-900 border border-dashed border-neutral-700 hover:border-[#4ef2d9] rounded-md px-3 py-2 text-xs text-neutral-400 hover:text-neutral-200 transition"
+                className="w-full bg-neutral-900 border border-dashed border-neutral-700 hover:border-mint rounded-md px-3 py-2 text-xs text-neutral-400 hover:text-neutral-200 transition"
               >
                 + Add comp
               </button>
@@ -460,7 +460,7 @@ function FormSection({
 }) {
   return (
     <section className="space-y-4 pt-2 border-t border-neutral-900">
-      <h2 className="text-[11px] uppercase tracking-[0.2em] text-[#4ef2d9] font-semibold">
+      <h2 className="text-[11px] uppercase tracking-[0.2em] text-mint font-semibold">
         {title}
       </h2>
       <div className="space-y-4">{children}</div>
@@ -491,7 +491,7 @@ function Field({
     <div>
       <label className="block text-[10px] uppercase tracking-[0.15em] text-neutral-500 mb-2">
         {label}
-        {required && <span className="text-[#4ef2d9] ml-1">*</span>}
+        {required && <span className="text-mint ml-1">*</span>}
       </label>
       {children}
       {helper && (
@@ -523,7 +523,7 @@ function TextInput({
       onChange={(e) => onChange(e.target.value)}
       placeholder={placeholder}
       maxLength={maxLength}
-      className="w-full bg-neutral-900 border border-neutral-800 rounded-md px-3 py-2 text-base lg:text-sm focus:outline-none focus:border-[#4ef2d9]"
+      className="w-full bg-neutral-900 border border-neutral-800 rounded-md px-3 py-2 text-base lg:text-sm focus:outline-none focus:border-mint"
     />
   );
 }
@@ -548,7 +548,7 @@ function TextArea({
       placeholder={placeholder}
       rows={rows}
       maxLength={maxLength}
-      className="w-full bg-neutral-900 border border-neutral-800 rounded-md px-3 py-2 text-base lg:text-sm focus:outline-none focus:border-[#4ef2d9] resize-y leading-relaxed"
+      className="w-full bg-neutral-900 border border-neutral-800 rounded-md px-3 py-2 text-base lg:text-sm focus:outline-none focus:border-mint resize-y leading-relaxed"
     />
   );
 }
@@ -600,7 +600,7 @@ function ColorInput({
           type="text"
           value={value}
           onChange={(e) => onChange(e.target.value)}
-          className="flex-1 min-w-0 bg-neutral-900 border border-neutral-800 rounded-md px-2 py-1.5 text-base lg:text-xs font-mono focus:outline-none focus:border-[#4ef2d9]"
+          className="flex-1 min-w-0 bg-neutral-900 border border-neutral-800 rounded-md px-2 py-1.5 text-base lg:text-xs font-mono focus:outline-none focus:border-mint"
         />
       </div>
     </div>

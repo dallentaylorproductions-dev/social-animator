@@ -79,7 +79,7 @@ export default function SellerIntelligenceReportPage() {
             if (idx < STEPS.length - 1) setCurrentStep(STEPS[idx + 1].id);
           }}
           disabled={currentStep === STEPS[STEPS.length - 1].id}
-          className="px-4 py-2 text-sm bg-[#4ef2d9] text-black font-medium rounded disabled:opacity-50"
+          className="px-4 py-2 text-sm bg-mint text-black font-medium rounded disabled:opacity-50"
         >
           Next →
         </button>
@@ -96,7 +96,7 @@ function StepIndicator({ currentStep }: { currentStep: StepId }) {
         <li
           key={step.id}
           className={`flex-1 border-b-2 pb-2 ${
-            idx <= currentIdx ? 'border-[#4ef2d9] text-white' : 'border-gray-700 text-gray-500'
+            idx <= currentIdx ? 'border-mint text-white' : 'border-gray-700 text-gray-500'
           }`}
         >
           {idx + 1}. {step.label}

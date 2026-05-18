@@ -57,8 +57,8 @@ export function DashboardClient() {
 
 function EmptyState() {
   return (
-    <div className="rounded-2xl bg-neutral-900 border border-[#4ef2d9]/30 p-8 md:p-10">
-      <p className="text-[11px] uppercase tracking-[0.18em] text-[#4ef2d9]">
+    <div className="rounded-2xl bg-neutral-900 border border-mint/30 p-8 md:p-10">
+      <p className="text-[11px] uppercase tracking-[0.18em] text-mint">
         Welcome to Studio
       </p>
       <h2 className="text-2xl font-semibold mt-2 leading-tight">
@@ -70,7 +70,7 @@ function EmptyState() {
       </p>
       <Link
         href="/settings"
-        className="inline-flex items-center justify-center rounded-lg bg-[#4ef2d9] text-black text-sm font-semibold px-5 py-2.5 mt-6 transition hover:bg-[#3fd9c1]"
+        className="inline-flex items-center justify-center rounded-lg bg-mint text-black text-sm font-semibold px-5 py-2.5 mt-6 transition hover:bg-mint-hover"
       >
         Set up brand profile →
       </Link>

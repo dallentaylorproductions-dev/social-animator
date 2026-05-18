@@ -57,7 +57,7 @@ export interface CurrencyInputProps {
 }
 
 const DEFAULT_CLASS =
-  "w-full bg-neutral-900 border border-neutral-800 rounded-md px-3 py-2 text-base lg:text-sm focus:outline-none focus:border-[#4ef2d9]";
+  "w-full bg-neutral-900 border border-neutral-800 rounded-md px-3 py-2 text-base lg:text-sm focus:outline-none focus:border-mint";
 
 export function CurrencyInput({
   value,

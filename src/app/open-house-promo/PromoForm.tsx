@@ -189,7 +189,7 @@ export function PromoForm({
             <button
               type="button"
               onClick={resetColors}
-              className="text-[10px] text-neutral-500 hover:text-[#4ef2d9] transition"
+              className="text-[10px] text-neutral-500 hover:text-mint transition"
             >
               ↺ Reset to brand defaults
             </button>
@@ -312,7 +312,7 @@ export function PromoForm({
               <button
                 type="button"
                 onClick={addHighlight}
-                className="w-full bg-neutral-900 border border-dashed border-neutral-700 hover:border-[#4ef2d9] rounded-md px-3 py-2 text-xs text-neutral-400 hover:text-neutral-200 transition"
+                className="w-full bg-neutral-900 border border-dashed border-neutral-700 hover:border-mint rounded-md px-3 py-2 text-xs text-neutral-400 hover:text-neutral-200 transition"
               >
                 + Add highlight
               </button>
@@ -380,7 +380,7 @@ export function PromoForm({
                         );
                         update("photos", next);
                       }}
-                      className="relative w-20 h-14 rounded overflow-hidden flex-shrink-0 cursor-crosshair focus:outline-none focus:ring-2 focus:ring-[#4ef2d9]"
+                      className="relative w-20 h-14 rounded overflow-hidden flex-shrink-0 cursor-crosshair focus:outline-none focus:ring-2 focus:ring-mint"
                       aria-label={`Set focal point on photo ${i + 1}`}
                     >
                       {/* eslint-disable-next-line @next/next/no-img-element */}
@@ -418,7 +418,7 @@ export function PromoForm({
                     </div>
                     <span className="flex-1 text-xs text-neutral-400 truncate">
                       {i === 0 && (
-                        <span className="text-[#4ef2d9] mr-2">HERO</span>
+                        <span className="text-mint mr-2">HERO</span>
                       )}
                       Photo {i + 1}
                     </span>
@@ -463,7 +463,7 @@ export function PromoForm({
             <button
               type="button"
               onClick={() => photoInputRef.current?.click()}
-              className="block w-full bg-neutral-900 border border-dashed border-neutral-700 hover:border-[#4ef2d9] rounded-md px-3 py-6 text-xs text-neutral-400 hover:text-neutral-200 transition text-center"
+              className="block w-full bg-neutral-900 border border-dashed border-neutral-700 hover:border-mint rounded-md px-3 py-6 text-xs text-neutral-400 hover:text-neutral-200 transition text-center"
             >
               {draft.photos.length === 0
                 ? `Click to upload photos (up to ${MAX_PHOTOS})`
@@ -537,7 +537,7 @@ function FormSection({
 }) {
   return (
     <section className="space-y-4 pt-2 border-t border-neutral-900">
-      <h2 className="text-[11px] uppercase tracking-[0.2em] text-[#4ef2d9] font-semibold">
+      <h2 className="text-[11px] uppercase tracking-[0.2em] text-mint font-semibold">
         {title}
       </h2>
       <div className="space-y-4">{children}</div>
@@ -568,7 +568,7 @@ function Field({
     <div>
       <label className="block text-[10px] uppercase tracking-[0.15em] text-neutral-500 mb-2">
         {label}
-        {required && <span className="text-[#4ef2d9] ml-1">*</span>}
+        {required && <span className="text-mint ml-1">*</span>}
       </label>
       {children}
       {helper && (
@@ -600,7 +600,7 @@ function TextInput({
       onChange={(e) => onChange(e.target.value)}
       onBlur={onBlur}
       placeholder={placeholder}
-      className="w-full bg-neutral-900 border border-neutral-800 rounded-md px-3 py-2 text-base lg:text-sm focus:outline-none focus:border-[#4ef2d9]"
+      className="w-full bg-neutral-900 border border-neutral-800 rounded-md px-3 py-2 text-base lg:text-sm focus:outline-none focus:border-mint"
     />
   );
 }
@@ -622,7 +622,7 @@ function TextArea({
       onChange={(e) => onChange(e.target.value)}
       placeholder={placeholder}
       rows={rows}
-      className="w-full bg-neutral-900 border border-neutral-800 rounded-md px-3 py-2 text-base lg:text-sm focus:outline-none focus:border-[#4ef2d9] resize-y leading-relaxed"
+      className="w-full bg-neutral-900 border border-neutral-800 rounded-md px-3 py-2 text-base lg:text-sm focus:outline-none focus:border-mint resize-y leading-relaxed"
     />
   );
 }
@@ -639,7 +639,7 @@ function DateInput({
       type="date"
       value={value}
       onChange={(e) => onChange(e.target.value)}
-      className="w-full bg-neutral-900 border border-neutral-800 rounded-md px-3 py-2 text-base lg:text-sm focus:outline-none focus:border-[#4ef2d9]"
+      className="w-full bg-neutral-900 border border-neutral-800 rounded-md px-3 py-2 text-base lg:text-sm focus:outline-none focus:border-mint"
     />
   );
 }
@@ -656,7 +656,7 @@ function TimeInput({
       type="time"
       value={value}
       onChange={(e) => onChange(e.target.value)}
-      className="w-full bg-neutral-900 border border-neutral-800 rounded-md px-3 py-2 text-base lg:text-sm focus:outline-none focus:border-[#4ef2d9]"
+      className="w-full bg-neutral-900 border border-neutral-800 rounded-md px-3 py-2 text-base lg:text-sm focus:outline-none focus:border-mint"
     />
   );
 }
@@ -691,7 +691,7 @@ function ColorInput({
           type="text"
           value={value}
           onChange={(e) => onChange(e.target.value)}
-          className="flex-1 min-w-0 bg-neutral-900 border border-neutral-800 rounded-md px-2 py-1.5 text-base lg:text-xs font-mono focus:outline-none focus:border-[#4ef2d9]"
+          className="flex-1 min-w-0 bg-neutral-900 border border-neutral-800 rounded-md px-2 py-1.5 text-base lg:text-xs font-mono focus:outline-none focus:border-mint"
         />
       </div>
     </div>

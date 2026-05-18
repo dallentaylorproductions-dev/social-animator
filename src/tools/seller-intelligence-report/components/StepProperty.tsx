@@ -11,7 +11,7 @@ interface StepProps {
 }
 
 const inputCls =
-  'w-full px-3 py-2 bg-neutral-900 border border-neutral-700 rounded text-sm focus:outline-none focus:border-[#4ef2d9]';
+  'w-full px-3 py-2 bg-neutral-900 border border-neutral-700 rounded text-sm focus:outline-none focus:border-mint';
 
 export function StepProperty({ draft, setDraft }: StepProps) {
   const update = <K extends keyof SellerIntelligenceReportDraft>(
@@ -105,7 +105,7 @@ export function StepProperty({ draft, setDraft }: StepProps) {
               onClick={() => update('confidence', level)}
               className={`px-4 py-2 text-sm rounded border transition ${
                 draft.confidence === level
-                  ? 'bg-[#4ef2d9] text-black border-[#4ef2d9]'
+                  ? 'bg-mint text-black border-mint'
                   : 'border-neutral-700 text-gray-300 hover:border-neutral-500'
               }`}
             >
@@ -131,7 +131,7 @@ function StrategyOption({
   return (
     <div
       className={`p-3 rounded border ${
-        selected ? 'border-[#4ef2d9] bg-[#4ef2d9]/5' : 'border-neutral-700'
+        selected ? 'border-mint bg-mint/5' : 'border-neutral-700'
       }`}
     >
       <div className="flex items-start gap-3">
@@ -154,7 +154,7 @@ function StrategyOption({
           <button
             type="button"
             onClick={() => setExpanded((e) => !e)}
-            className="text-[11px] text-[#4ef2d9] mt-2 hover:underline"
+            className="text-[11px] text-mint mt-2 hover:underline"
           >
             {expanded ? 'Hide details' : 'Show details'}
           </button>

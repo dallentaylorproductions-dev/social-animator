@@ -121,7 +121,7 @@ export function ExportButtons({ draft, brand }: ExportButtonsProps) {
         onClick={handlePdfExport}
         disabled={!canExport}
         title={validationError ?? undefined}
-        className="w-full bg-[#4ef2d9] hover:bg-[#3ad9c0] text-black rounded-md px-4 py-3 text-sm font-semibold transition disabled:opacity-60 disabled:cursor-not-allowed"
+        className="w-full bg-mint hover:bg-[#3ad9c0] text-black rounded-md px-4 py-3 text-sm font-semibold transition disabled:opacity-60 disabled:cursor-not-allowed"
       >
         {pdfState.kind === "idle" && "Export PDF"}
         {pdfState.kind === "generating" && "Generating PDF…"}
@@ -134,7 +134,7 @@ export function ExportButtons({ draft, brand }: ExportButtonsProps) {
         onClick={handleJpegExport}
         disabled={!canExport}
         title={validationError ?? undefined}
-        className="w-full bg-[#4ef2d9] hover:bg-[#3ad9c0] text-black rounded-md px-4 py-3 text-sm font-semibold transition disabled:opacity-60 disabled:cursor-not-allowed"
+        className="w-full bg-mint hover:bg-[#3ad9c0] text-black rounded-md px-4 py-3 text-sm font-semibold transition disabled:opacity-60 disabled:cursor-not-allowed"
       >
         {jpegState.kind === "idle" && "Export JPEG (Camera Roll)"}
         {jpegState.kind === "generating" && "Generating JPEG…"}

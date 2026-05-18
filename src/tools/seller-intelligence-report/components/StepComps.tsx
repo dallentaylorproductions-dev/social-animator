@@ -11,7 +11,7 @@ interface StepProps {
 const MAX_COMPS = 4;
 
 const inputCls =
-  'w-full px-3 py-2 bg-neutral-900 border border-neutral-700 rounded text-sm focus:outline-none focus:border-[#4ef2d9]';
+  'w-full px-3 py-2 bg-neutral-900 border border-neutral-700 rounded text-sm focus:outline-none focus:border-mint';
 
 const textareaCls = `${inputCls} resize-y min-h-[60px]`;
 
@@ -70,7 +70,7 @@ export function StepComps({ draft, setDraft }: StepProps) {
         type="button"
         onClick={addComp}
         disabled={draft.comps.length >= MAX_COMPS}
-        className="px-4 py-2 text-sm border border-[#4ef2d9] text-[#4ef2d9] rounded hover:bg-[#4ef2d9]/10 disabled:opacity-40 disabled:cursor-not-allowed"
+        className="px-4 py-2 text-sm border border-mint text-mint rounded hover:bg-mint/10 disabled:opacity-40 disabled:cursor-not-allowed"
       >
         + Add comp {draft.comps.length >= MAX_COMPS && `(max ${MAX_COMPS})`}
       </button>

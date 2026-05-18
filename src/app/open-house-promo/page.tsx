@@ -77,7 +77,7 @@ export default function OpenHousePromoPage() {
         <header className="mb-8">
           <Link
             href="/dashboard"
-            className="text-xs uppercase tracking-[0.2em] text-[#4ef2d9] hover:underline"
+            className="text-xs uppercase tracking-[0.2em] text-mint hover:underline"
           >
             ← Studio
           </Link>
@@ -151,14 +151,14 @@ function BrandBanner({ configured }: { configured: boolean }) {
     return (
       <p className="text-[11px] text-neutral-500 leading-relaxed">
         Header and footer use your brand profile.{" "}
-        <Link href="/settings" className="text-[#4ef2d9] hover:underline">
+        <Link href="/settings" className="text-mint hover:underline">
           Edit
         </Link>
       </p>
     );
   }
   return (
-    <div className="bg-neutral-900 border border-[#4ef2d9]/30 rounded-md px-4 py-3 text-[12px] leading-relaxed">
+    <div className="bg-neutral-900 border border-mint/30 rounded-md px-4 py-3 text-[12px] leading-relaxed">
       <span className="text-white font-medium">Set up your brand profile</span>
       <span className="text-neutral-400">
         {" "}
@@ -166,7 +166,7 @@ function BrandBanner({ configured }: { configured: boolean }) {
       </span>
       <Link
         href="/settings"
-        className="text-[#4ef2d9] hover:underline whitespace-nowrap"
+        className="text-mint hover:underline whitespace-nowrap"
       >
         Open Settings →
       </Link>

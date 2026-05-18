@@ -60,7 +60,7 @@ export function DurationSlider({
             : min;
           onChange(next);
         }}
-        className="w-full accent-[#4ef2d9] cursor-pointer"
+        className="w-full accent-mint cursor-pointer"
       />
       {helper ? (
         <p className="text-[10px] text-neutral-600 mt-2 leading-relaxed">

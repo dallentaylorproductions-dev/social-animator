@@ -22,7 +22,7 @@ export function SkillTile({ skill }: SkillTileProps) {
   return (
     <Link
       href={skillRoute(skill.id)}
-      className="group block rounded-xl bg-neutral-900 border border-neutral-800 p-4 transition hover:border-[#4ef2d9]/50 hover:bg-neutral-800"
+      className="group block rounded-xl bg-neutral-900 border border-neutral-800 p-4 transition hover:border-mint/50 hover:bg-neutral-800"
     >
       <div className="flex items-start justify-between gap-3">
         <h3 className="text-sm font-semibold leading-tight">{skill.name}</h3>
@@ -33,7 +33,7 @@ export function SkillTile({ skill }: SkillTileProps) {
       <p className="text-xs text-neutral-400 mt-2 leading-relaxed line-clamp-2">
         {skill.purpose}
       </p>
-      <p className="text-[10px] uppercase tracking-wider text-[#4ef2d9] mt-3 opacity-0 group-hover:opacity-100 transition">
+      <p className="text-[10px] uppercase tracking-wider text-mint mt-3 opacity-0 group-hover:opacity-100 transition">
         Open →
       </p>
     </Link>
