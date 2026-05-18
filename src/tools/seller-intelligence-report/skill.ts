@@ -12,6 +12,7 @@ export const SELLER_INTELLIGENCE_REPORT_SKILL: CallableSkill = {
   name: 'Seller Intelligence Report',
   purpose:
     "Generate the agent's private prep document for a listing appointment — comps, talking points, pricing strategy, and operational notes.",
+  category: 'Seller pitch',
   inputs: {
     required: [
       { key: 'propertyAddress', type: 'string', description: 'Property address', source: 'listing-profile' },
