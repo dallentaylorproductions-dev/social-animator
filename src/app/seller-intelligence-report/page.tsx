@@ -29,6 +29,12 @@ type StepId = (typeof STEPS)[number]['id'];
  * Other steps don't gate — comp data, talking points, notes are all
  * optional past Step 1 (validateForExport on the Review step covers
  * comp+price+address). Step 1 is the only must-fill gate.
+ *
+ * v1.45.2 hardening: coerce-safe trim via String(value ?? '') so a
+ * non-string field default (e.g. undefined or a number from a malformed
+ * legacy draft) doesn't throw. The Next button click handler also
+ * re-checks this before advancing — belt and suspenders against any
+ * disabled-prop binding issue.
  */
 function isCurrentStepValid(
   stepId: StepId,
@@ -37,8 +43,8 @@ function isCurrentStepValid(
   if (!draft) return false;
   if (stepId === 'property') {
     return (
-      draft.propertyAddress.trim().length > 0 &&
-      draft.recommendedListPrice.trim().length > 0
+      String(draft.propertyAddress ?? '').trim().length > 0 &&
+      String(draft.recommendedListPrice ?? '').trim().length > 0
     );
   }
   return true;
@@ -94,6 +100,7 @@ export default function SellerIntelligenceReportPage() {
 
       <nav className="mt-8 flex justify-between">
         <button
+          type="button"
           onClick={() => {
             const idx = STEPS.findIndex((s) => s.id === currentStep);
             if (idx > 0) setCurrentStep(STEPS[idx - 1].id);
@@ -104,7 +111,14 @@ export default function SellerIntelligenceReportPage() {
           ← Previous
         </button>
         <button
+          type="button"
           onClick={() => {
+            // v1.45.2 P1-R01 hardening: re-check validity in the click
+            // handler. Belt-and-suspenders against any disabled-prop
+            // binding regression (the v2 QA smoke caught one such case
+            // on the v1.45.1 production deploy where the styled disable
+            // didn't actually block clicks).
+            if (!isCurrentStepValid(currentStep, draft)) return;
             const idx = STEPS.findIndex((s) => s.id === currentStep);
             if (idx < STEPS.length - 1) setCurrentStep(STEPS[idx + 1].id);
           }}
