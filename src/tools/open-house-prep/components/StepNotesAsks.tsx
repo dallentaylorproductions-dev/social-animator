@@ -5,6 +5,11 @@ import type {
   OpenHousePrepDraft,
 } from '../engine/types';
 import { FieldHelp } from '@/tools/seller-intelligence-report/components/FieldHelp';
+import {
+  COMMITMENT_HINTS,
+  NEIGHBORHOOD_FACT_HINTS,
+  getHintByIndex,
+} from '@/lib/wizard-hints';
 
 interface StepProps {
   draft: OpenHousePrepDraft;
@@ -93,21 +98,23 @@ export function StepNotesAsks({ draft, setDraft }: StepProps) {
           {draft.neighborhoodFacts.length === 0 && (
             <p className="text-xs text-gray-500 italic">No facts added yet.</p>
           )}
-          {draft.neighborhoodFacts.map((fact, idx) => (
+          {draft.neighborhoodFacts.map((fact, idx) => {
+            const factHint = getHintByIndex(NEIGHBORHOOD_FACT_HINTS, idx);
+            return (
             <div key={idx} className="flex gap-2 items-start">
               <input
                 type="text"
                 className={`${inputCls} flex-1`}
                 value={fact.label}
                 onChange={(e) => updateFact(idx, { label: e.target.value })}
-                placeholder="Walk score"
+                placeholder={factHint.label}
               />
               <input
                 type="text"
                 className={`${inputCls} flex-1`}
                 value={fact.value}
                 onChange={(e) => updateFact(idx, { value: e.target.value })}
-                placeholder="82 / 100"
+                placeholder={factHint.value}
               />
               <button
                 type="button"
@@ -118,7 +125,8 @@ export function StepNotesAsks({ draft, setDraft }: StepProps) {
                 ✕
               </button>
             </div>
-          ))}
+            );
+          })}
           <button
             type="button"
             onClick={addFact}
@@ -152,14 +160,16 @@ export function StepNotesAsks({ draft, setDraft }: StepProps) {
           {draft.followUpCommitments.length === 0 && (
             <p className="text-xs text-gray-500 italic">No commitments yet.</p>
           )}
-          {draft.followUpCommitments.map((c, idx) => (
+          {draft.followUpCommitments.map((c, idx) => {
+            const commitHint = getHintByIndex(COMMITMENT_HINTS, idx);
+            return (
             <div key={idx} className="flex gap-2 items-start">
               <input
                 type="text"
                 className={inputCls}
                 value={c}
                 onChange={(e) => updateCommitment(idx, e.target.value)}
-                placeholder="Text everyone who signed in with the market report"
+                placeholder={commitHint}
               />
               <button
                 type="button"
@@ -170,7 +180,8 @@ export function StepNotesAsks({ draft, setDraft }: StepProps) {
                 ✕
               </button>
             </div>
-          ))}
+            );
+          })}
           <button
             type="button"
             onClick={addCommitment}

@@ -2,6 +2,11 @@
 
 import type { SellerIntelligenceReportDraft } from '../engine/types';
 import { FieldHelp } from './FieldHelp';
+import {
+  ASK_HINTS,
+  COMMITMENT_HINTS,
+  getHintByIndex,
+} from '@/lib/wizard-hints';
 
 interface StepProps {
   draft: SellerIntelligenceReportDraft;
@@ -43,7 +48,7 @@ export function StepNotes({ draft, setDraft }: StepProps) {
       <BulletList
         label="What I'll do"
         helpText="Promises you're making to the seller if they sign. Will appear under 'What I'll do' in the PDF."
-        placeholder="Professional photography + drone footage"
+        placeholder={(i) => getHintByIndex(COMMITMENT_HINTS, i)}
         values={draft.commitments}
         onChange={(next) => setDraft({ ...draft, commitments: next })}
       />
@@ -51,7 +56,7 @@ export function StepNotes({ draft, setDraft }: StepProps) {
       <BulletList
         label="What I need from you"
         helpText="Things you need from the seller — access, paperwork, decisions. Will appear under 'What I need from you'."
-        placeholder="Approve photography window within 48 hours"
+        placeholder={(i) => getHintByIndex(ASK_HINTS, i)}
         values={draft.asks}
         onChange={(next) => setDraft({ ...draft, asks: next })}
       />
@@ -68,10 +73,16 @@ function BulletList({
 }: {
   label: string;
   helpText: string;
-  placeholder: string;
+  /**
+   * Per-row placeholder. Pass a string for a static placeholder, or a
+   * function for per-slot rotation (Commit 7 wizard-hints pattern).
+   */
+  placeholder: string | ((index: number) => string);
   values: string[];
   onChange: (next: string[]) => void;
 }) {
+  const placeholderFor = (index: number): string =>
+    typeof placeholder === 'function' ? placeholder(index) : placeholder;
   const update = (index: number, text: string) => {
     onChange(values.map((v, i) => (i === index ? text : v)));
   };
@@ -96,7 +107,7 @@ function BulletList({
               className={inputCls}
               value={value}
               onChange={(e) => update(index, e.target.value)}
-              placeholder={placeholder}
+              placeholder={placeholderFor(index)}
             />
             <button
               type="button"

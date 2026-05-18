@@ -30,6 +30,36 @@ export function StepTalkingPoints({ draft, setDraft }: StepProps) {
   const talkingOverrides = draft.talkingPointOverrides ?? {};
   const questionOverrides = draft.commonQuestionOverrides ?? {};
 
+  // Commit 7 collapse pattern: by default, render only pre-selected library
+  // defaults plus any currently-selected non-default entries. Hidden entries
+  // reveal via the per-section "Show all" affordance. Reduces first-time
+  // visible items from 31 to ~10 without losing selected work.
+  const [showAllTalking, setShowAllTalking] = useState(false);
+  const [showAllQuestions, setShowAllQuestions] = useState(false);
+  const [showAllPrompts, setShowAllPrompts] = useState(false);
+
+  function isVisibleByDefault(
+    entry: { id: string; isDefaultSelected?: boolean },
+    selected: Set<string>,
+  ): boolean {
+    return Boolean(entry.isDefaultSelected) || selected.has(entry.id);
+  }
+
+  const visibleTalking = showAllTalking
+    ? TALKING_POINTS
+    : TALKING_POINTS.filter((tp) => isVisibleByDefault(tp, selectedTalking));
+  const hiddenTalkingCount = TALKING_POINTS.length - visibleTalking.length;
+
+  const visibleQuestions = showAllQuestions
+    ? COMMON_QUESTIONS
+    : COMMON_QUESTIONS.filter((q) => isVisibleByDefault(q, selectedQuestions));
+  const hiddenQuestionsCount = COMMON_QUESTIONS.length - visibleQuestions.length;
+
+  const visiblePrompts = showAllPrompts
+    ? CONVERSION_PROMPTS
+    : CONVERSION_PROMPTS.filter((p) => isVisibleByDefault(p, selectedPrompts));
+  const hiddenPromptsCount = CONVERSION_PROMPTS.length - visiblePrompts.length;
+
   const questionsByCategory = useMemo(() => {
     const m = new Map<string, CommonQuestion[]>();
     for (const q of COMMON_QUESTIONS) {
@@ -86,7 +116,7 @@ export function StepTalkingPoints({ draft, setDraft }: StepProps) {
         counter={`${selectedTalking.size} of ${TALKING_POINTS.length} selected`}
       >
         <div className="space-y-2">
-          {TALKING_POINTS.map((tp) => (
+          {visibleTalking.map((tp) => (
             <TalkingPointRow
               key={tp.id}
               entry={tp}
@@ -99,6 +129,15 @@ export function StepTalkingPoints({ draft, setDraft }: StepProps) {
             />
           ))}
         </div>
+        {hiddenTalkingCount > 0 && (
+          <button
+            type="button"
+            onClick={() => setShowAllTalking(true)}
+            className="mt-2 text-sm text-mint hover:underline"
+          >
+            + Show all {TALKING_POINTS.length} talking points
+          </button>
+        )}
       </Section>
 
       <Section
@@ -106,30 +145,46 @@ export function StepTalkingPoints({ draft, setDraft }: StepProps) {
         counter={`${selectedQuestions.size} of ${COMMON_QUESTIONS.length} selected`}
       >
         <div className="space-y-6">
-          {questionsByCategory.map(([category, entries]) => (
-            <div key={category} className="space-y-2">
-              <h3 className="text-xs uppercase tracking-wider text-gray-500">
-                {category}
-              </h3>
-              {entries.map((q) => (
-                <QuestionRow
-                  key={q.id}
-                  entry={q}
-                  selected={selectedQuestions.has(q.id)}
-                  override={questionOverrides[q.id] ?? ''}
-                  onToggle={() =>
-                    toggle(
-                      selectedQuestions,
-                      q.id,
-                      'selectedCommonQuestionIds',
-                    )
-                  }
-                  onOverrideChange={(text) => setQuestionOverride(q.id, text)}
-                />
-              ))}
-            </div>
-          ))}
+          {questionsByCategory.map(([category, entries]) => {
+            // When collapsed, drop categories whose entries are all hidden.
+            const visibleEntries = entries.filter((q) =>
+              visibleQuestions.includes(q),
+            );
+            if (visibleEntries.length === 0) return null;
+            return (
+              <div key={category} className="space-y-2">
+                <h3 className="text-xs uppercase tracking-wider text-gray-500">
+                  {category}
+                </h3>
+                {visibleEntries.map((q) => (
+                  <QuestionRow
+                    key={q.id}
+                    entry={q}
+                    selected={selectedQuestions.has(q.id)}
+                    override={questionOverrides[q.id] ?? ''}
+                    onToggle={() =>
+                      toggle(
+                        selectedQuestions,
+                        q.id,
+                        'selectedCommonQuestionIds',
+                      )
+                    }
+                    onOverrideChange={(text) => setQuestionOverride(q.id, text)}
+                  />
+                ))}
+              </div>
+            );
+          })}
         </div>
+        {hiddenQuestionsCount > 0 && (
+          <button
+            type="button"
+            onClick={() => setShowAllQuestions(true)}
+            className="mt-2 text-sm text-mint hover:underline"
+          >
+            + Show all {COMMON_QUESTIONS.length} questions
+          </button>
+        )}
       </Section>
 
       <Section
@@ -137,7 +192,7 @@ export function StepTalkingPoints({ draft, setDraft }: StepProps) {
         counter={`${selectedPrompts.size} of ${CONVERSION_PROMPTS.length} selected`}
       >
         <div className="space-y-2">
-          {CONVERSION_PROMPTS.map((p) => (
+          {visiblePrompts.map((p) => (
             <PromptRow
               key={p.id}
               entry={p}
@@ -152,6 +207,15 @@ export function StepTalkingPoints({ draft, setDraft }: StepProps) {
             />
           ))}
         </div>
+        {hiddenPromptsCount > 0 && (
+          <button
+            type="button"
+            onClick={() => setShowAllPrompts(true)}
+            className="mt-2 text-sm text-mint hover:underline"
+          >
+            + Show all {CONVERSION_PROMPTS.length} prompts
+          </button>
+        )}
       </Section>
     </div>
   );

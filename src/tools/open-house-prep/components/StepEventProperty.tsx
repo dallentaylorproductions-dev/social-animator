@@ -1,7 +1,9 @@
 'use client';
 
+import { useState } from 'react';
 import type { OpenHousePrepDraft } from '../engine/types';
 import { FieldHelp } from '@/tools/seller-intelligence-report/components/FieldHelp';
+import { resizeImageToDataURL } from '@/lib/image-utils';
 
 interface StepProps {
   draft: OpenHousePrepDraft;
@@ -87,15 +89,7 @@ export function StepEventProperty({ draft, setDraft }: StepProps) {
         </FieldHelp>
       </div>
 
-      <FieldHelp label="Hero photo URL" helpText="Direct URL to the listing photo (or upload below).">
-        <input
-          type="text"
-          className={inputCls}
-          value={draft.propertyPhotoUrl ?? ''}
-          onChange={(e) => update('propertyPhotoUrl', e.target.value || undefined)}
-          placeholder="https://…"
-        />
-      </FieldHelp>
+      <HeroPhotoField draft={draft} setDraft={setDraft} />
 
       <div className="grid grid-cols-1 sm:grid-cols-3 gap-4">
         <FieldHelp label="Event date" required helpText="When the open house is.">
@@ -140,5 +134,122 @@ export function StepEventProperty({ draft, setDraft }: StepProps) {
         />
       </FieldHelp>
     </div>
+  );
+}
+
+function HeroPhotoField({
+  draft,
+  setDraft,
+}: {
+  draft: OpenHousePrepDraft;
+  setDraft: (d: OpenHousePrepDraft) => void;
+}) {
+  const [advancedMode, setAdvancedMode] = useState(false);
+  const [uploading, setUploading] = useState(false);
+  const [uploadError, setUploadError] = useState<string | null>(null);
+
+  async function handleFile(file: File) {
+    setUploading(true);
+    setUploadError(null);
+    try {
+      const dataUrl = await resizeImageToDataURL(file);
+      setDraft({ ...draft, propertyPhotoUrl: dataUrl });
+    } catch (err) {
+      const message =
+        err instanceof Error ? err.message : 'Could not load that image.';
+      setUploadError(message);
+    } finally {
+      setUploading(false);
+    }
+  }
+
+  const photoUrl = draft.propertyPhotoUrl;
+
+  return (
+    <FieldHelp
+      label="Hero photo"
+      helpText="Pick a photo of the property — we'll resize it automatically."
+    >
+      {photoUrl ? (
+        <div className="space-y-3">
+          {/* eslint-disable-next-line @next/next/no-img-element */}
+          <img
+            src={photoUrl}
+            alt="Property"
+            className="rounded-lg max-w-[200px] border border-neutral-700"
+          />
+          <div className="flex gap-3 text-sm">
+            <label className="cursor-pointer text-mint hover:underline">
+              Replace
+              <input
+                type="file"
+                accept="image/*"
+                capture="environment"
+                className="hidden"
+                onChange={(e) => {
+                  const f = e.target.files?.[0];
+                  if (f) void handleFile(f);
+                  e.target.value = '';
+                }}
+              />
+            </label>
+            <button
+              type="button"
+              onClick={() =>
+                setDraft({ ...draft, propertyPhotoUrl: undefined })
+              }
+              className="text-neutral-400 hover:text-neutral-200"
+            >
+              Remove
+            </button>
+          </div>
+        </div>
+      ) : (
+        <div>
+          <label
+            className={`inline-flex items-center px-4 py-2 text-sm border border-neutral-700 rounded-lg cursor-pointer hover:border-mint transition ${
+              uploading ? 'opacity-50 pointer-events-none' : ''
+            }`}
+          >
+            {uploading ? 'Resizing…' : 'Upload photo'}
+            <input
+              type="file"
+              accept="image/*"
+              capture="environment"
+              className="hidden"
+              onChange={(e) => {
+                const f = e.target.files?.[0];
+                if (f) void handleFile(f);
+                e.target.value = '';
+              }}
+            />
+          </label>
+        </div>
+      )}
+      {uploadError && (
+        <p className="text-xs text-red-400 mt-2">{uploadError}</p>
+      )}
+      <button
+        type="button"
+        onClick={() => setAdvancedMode((v) => !v)}
+        className="text-xs text-neutral-500 hover:text-neutral-300 mt-3 block"
+      >
+        {advancedMode ? '← Use upload' : 'Or paste a URL (advanced)'}
+      </button>
+      {advancedMode && (
+        <input
+          type="url"
+          className={`${inputCls} mt-2`}
+          value={photoUrl ?? ''}
+          onChange={(e) =>
+            setDraft({
+              ...draft,
+              propertyPhotoUrl: e.target.value || undefined,
+            })
+          }
+          placeholder="https://example.com/photo.jpg"
+        />
+      )}
+    </FieldHelp>
   );
 }

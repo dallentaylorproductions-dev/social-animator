@@ -2,6 +2,7 @@
 
 import type { Comp, SellerIntelligenceReportDraft } from '../engine/types';
 import { FieldHelp } from './FieldHelp';
+import { COMP_HINTS, getHintByIndex } from '@/lib/wizard-hints';
 
 interface StepProps {
   draft: SellerIntelligenceReportDraft;
@@ -88,6 +89,7 @@ export function StepComps({ draft, setDraft }: StepProps) {
     onUpdate: (patch: Partial<Comp>) => void;
     onRemove: () => void;
   }) {
+    const hint = getHintByIndex(COMP_HINTS, index);
     return (
       <div className="p-4 rounded border border-neutral-700 space-y-4 bg-neutral-900/30">
         <div className="flex items-center justify-between">
@@ -107,7 +109,7 @@ export function StepComps({ draft, setDraft }: StepProps) {
             className={inputCls}
             value={comp.address}
             onChange={(e) => onUpdate({ address: e.target.value })}
-            placeholder="1240 Maple Heights Dr"
+            placeholder={hint.address}
           />
         </FieldHelp>
 
@@ -122,7 +124,7 @@ export function StepComps({ draft, setDraft }: StepProps) {
               className={inputCls}
               value={comp.soldPrice}
               onChange={(e) => onUpdate({ soldPrice: e.target.value })}
-              placeholder="$680,000"
+              placeholder={hint.soldPrice}
             />
           </FieldHelp>
 
@@ -132,7 +134,7 @@ export function StepComps({ draft, setDraft }: StepProps) {
               className={inputCls}
               value={comp.daysOnMarket ?? ''}
               onChange={(e) => onUpdate({ daysOnMarket: e.target.value || undefined })}
-              placeholder="12"
+              placeholder={hint.daysOnMarket}
             />
           </FieldHelp>
 
@@ -147,7 +149,7 @@ export function StepComps({ draft, setDraft }: StepProps) {
               onChange={(e) =>
                 onUpdate({ saleToListPercent: e.target.value || undefined })
               }
-              placeholder="98%"
+              placeholder={hint.saleToList}
             />
           </FieldHelp>
 
@@ -157,7 +159,7 @@ export function StepComps({ draft, setDraft }: StepProps) {
               className={inputCls}
               value={comp.squareFeet ?? ''}
               onChange={(e) => onUpdate({ squareFeet: e.target.value || undefined })}
-              placeholder="2,840"
+              placeholder={hint.squareFeet}
             />
           </FieldHelp>
 
@@ -170,7 +172,7 @@ export function StepComps({ draft, setDraft }: StepProps) {
               className={inputCls}
               value={comp.distanceMiles ?? ''}
               onChange={(e) => onUpdate({ distanceMiles: e.target.value || undefined })}
-              placeholder="0.3"
+              placeholder={hint.distance}
             />
           </FieldHelp>
 
@@ -193,7 +195,7 @@ export function StepComps({ draft, setDraft }: StepProps) {
             className={textareaCls}
             value={comp.notes ?? ''}
             onChange={(e) => onUpdate({ notes: e.target.value || undefined })}
-            placeholder="Kitchen renovation explains the higher price."
+            placeholder={hint.notes}
           />
         </FieldHelp>
       </div>

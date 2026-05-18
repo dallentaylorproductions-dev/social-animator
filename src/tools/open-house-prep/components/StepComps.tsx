@@ -2,6 +2,7 @@
 
 import type { Comp, OpenHousePrepDraft } from '../engine/types';
 import { FieldHelp } from '@/tools/seller-intelligence-report/components/FieldHelp';
+import { COMP_HINTS, getHintByIndex } from '@/lib/wizard-hints';
 
 interface StepProps {
   draft: OpenHousePrepDraft;
@@ -48,7 +49,9 @@ export function StepComps({ draft, setDraft }: StepProps) {
       )}
 
       <div className="space-y-4">
-        {draft.comps.map((comp, idx) => (
+        {draft.comps.map((comp, idx) => {
+          const hint = getHintByIndex(COMP_HINTS, idx);
+          return (
           <div
             key={idx}
             className="p-4 rounded border border-neutral-700 space-y-4 bg-neutral-900/30"
@@ -70,7 +73,7 @@ export function StepComps({ draft, setDraft }: StepProps) {
                 className={inputCls}
                 value={comp.address}
                 onChange={(e) => updateComp(idx, { address: e.target.value })}
-                placeholder="1240 Maple Heights Dr"
+                placeholder={hint.address}
               />
             </FieldHelp>
 
@@ -81,7 +84,7 @@ export function StepComps({ draft, setDraft }: StepProps) {
                   className={inputCls}
                   value={comp.soldPrice}
                   onChange={(e) => updateComp(idx, { soldPrice: e.target.value })}
-                  placeholder="$680,000"
+                  placeholder={hint.soldPrice}
                 />
               </FieldHelp>
               <FieldHelp label="Days on market" helpText="How long it sat before pending.">
@@ -92,7 +95,7 @@ export function StepComps({ draft, setDraft }: StepProps) {
                   onChange={(e) =>
                     updateComp(idx, { daysOnMarket: e.target.value || undefined })
                   }
-                  placeholder="12"
+                  placeholder={hint.daysOnMarket}
                 />
               </FieldHelp>
               <FieldHelp label="Sale-to-list %" helpText="e.g. 98%.">
@@ -103,7 +106,7 @@ export function StepComps({ draft, setDraft }: StepProps) {
                   onChange={(e) =>
                     updateComp(idx, { saleToListPercent: e.target.value || undefined })
                   }
-                  placeholder="98%"
+                  placeholder={hint.saleToList}
                 />
               </FieldHelp>
               <FieldHelp label="Square feet" helpText="Skip if not comparable.">
@@ -114,7 +117,7 @@ export function StepComps({ draft, setDraft }: StepProps) {
                   onChange={(e) =>
                     updateComp(idx, { squareFeet: e.target.value || undefined })
                   }
-                  placeholder="2,840"
+                  placeholder={hint.squareFeet}
                 />
               </FieldHelp>
               <FieldHelp label="Distance (miles)" helpText="From the subject property.">
@@ -125,7 +128,7 @@ export function StepComps({ draft, setDraft }: StepProps) {
                   onChange={(e) =>
                     updateComp(idx, { distanceMiles: e.target.value || undefined })
                   }
-                  placeholder="0.3"
+                  placeholder={hint.distance}
                 />
               </FieldHelp>
               <FieldHelp label="Sold date" helpText="Recent sales carry more weight.">
@@ -148,11 +151,12 @@ export function StepComps({ draft, setDraft }: StepProps) {
                 onChange={(e) =>
                   updateComp(idx, { notes: e.target.value || undefined })
                 }
-                placeholder="Kitchen renovation explains the higher price."
+                placeholder={hint.notes}
               />
             </FieldHelp>
           </div>
-        ))}
+        );
+        })}
       </div>
 
       <button
