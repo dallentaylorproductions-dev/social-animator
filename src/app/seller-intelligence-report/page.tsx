@@ -20,6 +20,30 @@ const STEPS = [
 
 type StepId = (typeof STEPS)[number]['id'];
 
+/**
+ * Per-step required-field validation. v1.45.1 fix: Step 1 advances were
+ * not gated, so users could click through 5 steps before learning Step 1
+ * was incomplete. Now the Next button disables on Step 1 until the SIR's
+ * required fields (propertyAddress + recommendedListPrice) are non-empty.
+ *
+ * Other steps don't gate — comp data, talking points, notes are all
+ * optional past Step 1 (validateForExport on the Review step covers
+ * comp+price+address). Step 1 is the only must-fill gate.
+ */
+function isCurrentStepValid(
+  stepId: StepId,
+  draft: SellerIntelligenceReportDraft | null,
+): boolean {
+  if (!draft) return false;
+  if (stepId === 'property') {
+    return (
+      draft.propertyAddress.trim().length > 0 &&
+      draft.recommendedListPrice.trim().length > 0
+    );
+  }
+  return true;
+}
+
 export default function SellerIntelligenceReportPage() {
   const [draft, setDraft] = useState<SellerIntelligenceReportDraft | null>(null);
   const [currentStep, setCurrentStep] = useState<StepId>('property');
@@ -84,8 +108,11 @@ export default function SellerIntelligenceReportPage() {
             const idx = STEPS.findIndex((s) => s.id === currentStep);
             if (idx < STEPS.length - 1) setCurrentStep(STEPS[idx + 1].id);
           }}
-          disabled={currentStep === STEPS[STEPS.length - 1].id}
-          className="px-4 py-2 text-sm bg-mint text-black font-medium rounded disabled:opacity-50"
+          disabled={
+            currentStep === STEPS[STEPS.length - 1].id ||
+            !isCurrentStepValid(currentStep, draft)
+          }
+          className="px-4 py-2 text-sm bg-mint text-black font-medium rounded disabled:opacity-50 disabled:cursor-not-allowed"
         >
           Next →
         </button>

@@ -86,3 +86,18 @@ body {
     font-size: 16px;
   }
 }
+
+/*
+ * v1.45.1 fix: placeholder text needs to read as visually distinct from
+ * real input values. The v2 SEP QA smoke flagged that placeholders on the
+ * PDF-generator tools (Listing Flyer / OH Promo / Listing Presentation)
+ * looked identical to filled-in values, leading first-time users to think
+ * the form was pre-filled. Applied globally — placeholders should always
+ * be less prominent than real text across every surface.
+ */
+input::placeholder,
+textarea::placeholder {
+  color: #525252;
+  font-style: italic;
+  opacity: 1;
+}

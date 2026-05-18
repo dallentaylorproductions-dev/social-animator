@@ -13,7 +13,25 @@ test.describe('Open House Prep — wizard', () => {
   test('renders the 5-step wizard and advances Next / Previous', async ({ page }) => {
     // Start fresh — clear any prior OH Prep draft so the wizard opens on step 1.
     await page.addInitScript(() => {
-      window.localStorage.removeItem('openHousePrep:draft');
+      // v1.45.1: Step 1 Next now gates on propertyAddress + listPrice +
+      // eventDate. Seed a minimal valid draft so the wizard advances.
+      // Empty selection arrays trigger the page's mount-time default
+      // pre-selection (talking points / questions / prompts).
+      window.localStorage.setItem(
+        'openHousePrep:draft',
+        JSON.stringify({
+          propertyAddress: '1234 Test Drive NE',
+          listPrice: '$685,000',
+          eventDate: '2099-01-01',
+          comps: [],
+          neighborhoodFacts: [],
+          selectedTalkingPointIds: [],
+          selectedCommonQuestionIds: [],
+          selectedConversionPromptIds: [],
+          followUpCommitments: [],
+          dataSource: 'manual',
+        }),
+      );
     });
 
     await page.goto('/open-house-prep');
@@ -57,7 +75,25 @@ test.describe('Open House Prep — wizard', () => {
     // Guarantee a fresh draft so the page applies DEFAULT_SELECTED_*_IDS
     // from each library on first load.
     await page.addInitScript(() => {
-      window.localStorage.removeItem('openHousePrep:draft');
+      // v1.45.1: Step 1 Next now gates on propertyAddress + listPrice +
+      // eventDate. Seed a minimal valid draft so the wizard advances.
+      // Empty selection arrays trigger the page's mount-time default
+      // pre-selection (talking points / questions / prompts).
+      window.localStorage.setItem(
+        'openHousePrep:draft',
+        JSON.stringify({
+          propertyAddress: '1234 Test Drive NE',
+          listPrice: '$685,000',
+          eventDate: '2099-01-01',
+          comps: [],
+          neighborhoodFacts: [],
+          selectedTalkingPointIds: [],
+          selectedCommonQuestionIds: [],
+          selectedConversionPromptIds: [],
+          followUpCommitments: [],
+          dataSource: 'manual',
+        }),
+      );
     });
 
     await page.goto('/open-house-prep');

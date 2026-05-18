@@ -32,6 +32,30 @@ const STEPS = [
   { id: 'review', label: 'Review' },
 ] as const;
 
+/**
+ * Per-step required-field validation. v1.45.1 fix: Step 1 must gate
+ * advancement so users don't click through 5 steps before learning their
+ * required fields are empty. OH Prep's required Step 1 fields are
+ * propertyAddress + listPrice + eventDate.
+ *
+ * Other steps don't gate — comp data, talking points, notes are all
+ * optional past Step 1 (validateForExport on Review covers the rest).
+ */
+function isCurrentStepValid(
+  stepId: (typeof STEPS)[number]['id'],
+  draft: OpenHousePrepDraft | null,
+): boolean {
+  if (!draft) return false;
+  if (stepId === 'event-property') {
+    return (
+      draft.propertyAddress.trim().length > 0 &&
+      draft.listPrice.trim().length > 0 &&
+      draft.eventDate.trim().length > 0
+    );
+  }
+  return true;
+}
+
 type StepId = (typeof STEPS)[number]['id'];
 
 export default function OpenHousePrepPage() {
@@ -116,8 +140,11 @@ export default function OpenHousePrepPage() {
             const idx = STEPS.findIndex((s) => s.id === currentStep);
             if (idx < STEPS.length - 1) setCurrentStep(STEPS[idx + 1].id);
           }}
-          disabled={currentStep === STEPS[STEPS.length - 1].id}
-          className="px-4 py-2 text-sm bg-mint text-black font-medium rounded disabled:opacity-50"
+          disabled={
+            currentStep === STEPS[STEPS.length - 1].id ||
+            !isCurrentStepValid(currentStep, draft)
+          }
+          className="px-4 py-2 text-sm bg-mint text-black font-medium rounded disabled:opacity-50 disabled:cursor-not-allowed"
         >
           Next →
         </button>

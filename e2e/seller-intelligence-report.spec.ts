@@ -16,7 +16,19 @@ test.describe('Seller Intelligence Report — wizard', () => {
   test('renders the 5-step wizard and advances Next / Previous', async ({ page }) => {
     // Start fresh — clear any prior SIR draft so the wizard opens on step 1.
     await page.addInitScript(() => {
-      window.localStorage.removeItem('sellerIntelligenceReport:draft');
+      // v1.45.1: Step 1 Next now gates on required fields. Seed a minimal
+      // valid draft so the wizard can advance.
+      window.localStorage.setItem(
+        'sellerIntelligenceReport:draft',
+        JSON.stringify({
+          propertyAddress: '1234 Test Drive NE',
+          recommendedListPrice: '$685,000',
+          comps: [],
+          selectedObjectionIds: [],
+          commitments: [],
+          asks: [],
+        }),
+      );
     });
 
     await page.goto('/seller-intelligence-report');
@@ -53,7 +65,19 @@ test.describe('Seller Intelligence Report — wizard', () => {
   test('pre-checks the universal-default objections on a fresh draft', async ({ page }) => {
     // Guarantee a fresh draft so DEFAULT_SELECTED_OBJECTION_IDS gets applied.
     await page.addInitScript(() => {
-      window.localStorage.removeItem('sellerIntelligenceReport:draft');
+      // v1.45.1: Step 1 Next now gates on required fields. Seed a minimal
+      // valid draft so the wizard can advance.
+      window.localStorage.setItem(
+        'sellerIntelligenceReport:draft',
+        JSON.stringify({
+          propertyAddress: '1234 Test Drive NE',
+          recommendedListPrice: '$685,000',
+          comps: [],
+          selectedObjectionIds: [],
+          commitments: [],
+          asks: [],
+        }),
+      );
     });
 
     await page.goto('/seller-intelligence-report');

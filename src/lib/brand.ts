@@ -200,10 +200,19 @@ export function saveBrandSettings(settings: BrandSettings): void {
  * (since canvas drawing needs an image element, not a data URL string).
  */
 export function useBrandSettings() {
-  const [settings, setSettings] = useState<BrandSettings>(() =>
-    loadBrandSettings()
-  );
+  // v1.45.1 hydration fix: initialize state to DEFAULT_BRAND on BOTH server
+  // and client first-render so SSR HTML matches client hydration. Reading
+  // localStorage in the useState initializer (the prior pattern) caused
+  // React error #418 — server returned DEFAULT_BRAND (no window), client
+  // returned whatever the user had stored, downstream JSX trees diverged
+  // (BrandBanner especially). Load via useEffect post-mount so the first
+  // render is identity across environments.
+  const [settings, setSettings] = useState<BrandSettings>(DEFAULT_BRAND);
   const [logoImg, setLogoImg] = useState<HTMLImageElement | null>(null);
+
+  useEffect(() => {
+    setSettings(loadBrandSettings());
+  }, []);
 
   useEffect(() => {
     if (!settings.logoDataUrl) {

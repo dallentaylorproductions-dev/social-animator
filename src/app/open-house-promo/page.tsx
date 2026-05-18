@@ -6,6 +6,7 @@ import { useBrandSettings } from "@/lib/brand";
 import {
   type PromoDraft,
   EMPTY_DRAFT,
+  todayIsoDate,
 } from "@/tools/open-house-promo/engine/types";
 import {
   loadDraft,
@@ -27,7 +28,15 @@ export default function OpenHousePromoPage() {
   const errorTimerRef = useRef<ReturnType<typeof setTimeout> | null>(null);
 
   useEffect(() => {
-    setDraft(loadDraft());
+    const loaded = loadDraft();
+    // v1.45.1 hydration fix: EMPTY_DRAFT.eventDate is now empty at module
+    // load so SSR + client first-render agree. Populate today's date here
+    // (client-only, post-hydration) when the loaded draft has no saved
+    // eventDate yet.
+    if (!loaded.eventDate) {
+      loaded.eventDate = todayIsoDate();
+    }
+    setDraft(loaded);
     setHydrated(true);
   }, []);
 
