@@ -110,10 +110,11 @@ export const MAX_PHOTOS = 5;
 export const PHOTO_MAX_EDGE = 1600;
 export const PHOTO_QUALITY = 0.85;
 
-/** Today's date as YYYY-MM-DD in the user's local timezone. Used as
- *  the EMPTY_DRAFT default so a fresh draft starts on the user's
- *  current day rather than 1970-01-01. */
-function todayIsoDate(): string {
+/** Today's date as YYYY-MM-DD in the user's local timezone. Computed
+ *  on demand (NOT at module load) so SSR and client hydration agree on
+ *  the same value — v1.45.1 fix for hydration error #418 caused by
+ *  server vs client clock differences when this ran at module-load. */
+export function todayIsoDate(): string {
   const d = new Date();
   const yyyy = d.getFullYear();
   const mm = String(d.getMonth() + 1).padStart(2, "0");
@@ -122,7 +123,10 @@ function todayIsoDate(): string {
 }
 
 export const EMPTY_DRAFT: PromoDraft = {
-  eventDate: todayIsoDate(),
+  // v1.45.1: empty on initial render to keep SSR + client hydration in
+  // sync. src/app/open-house-promo/page.tsx populates with todayIsoDate()
+  // in a client-only useEffect after mount.
+  eventDate: "",
   eventStartTime: "12:00",
   eventEndTime: "15:00",
   propertyAddress: "",
