@@ -45,6 +45,12 @@ export default function SellerIntelligenceReportPage() {
   return (
     <div className="mx-auto max-w-3xl px-4 py-8">
       <header className="mb-8">
+        <a
+          href="/dashboard"
+          className="inline-flex items-center text-xs uppercase tracking-[0.18em] text-neutral-500 hover:text-mint mb-4 transition-colors"
+        >
+          ← Dashboard
+        </a>
         <h1 className="text-2xl font-semibold">Seller Intelligence Report</h1>
         <p className="mt-1 text-sm text-gray-400">
           Your private prep document for a listing appointment. Step{' '}
@@ -84,6 +90,17 @@ export default function SellerIntelligenceReportPage() {
           Next →
         </button>
       </nav>
+
+      {currentStep === 'review' && (
+        <div className="mt-8 pt-6 border-t border-neutral-800">
+          <a
+            href="/dashboard"
+            className="inline-flex items-center text-sm text-neutral-400 hover:text-mint transition-colors"
+          >
+            Done — back to dashboard →
+          </a>
+        </div>
+      )}
     </div>
   );
 }

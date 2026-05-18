@@ -66,6 +66,12 @@ export default function OpenHousePrepPage() {
   return (
     <div className="mx-auto max-w-3xl px-4 py-8">
       <header className="mb-8">
+        <a
+          href="/dashboard"
+          className="inline-flex items-center text-xs uppercase tracking-[0.18em] text-neutral-500 hover:text-mint mb-4 transition-colors"
+        >
+          ← Dashboard
+        </a>
         <h1 className="text-2xl font-semibold">Open House Prep</h1>
         <p className="mt-1 text-sm text-gray-400">
           Generate your private prep doc + a shareable visitor handout from one
@@ -116,6 +122,17 @@ export default function OpenHousePrepPage() {
           Next →
         </button>
       </nav>
+
+      {currentStep === 'review' && (
+        <div className="mt-8 pt-6 border-t border-neutral-800">
+          <a
+            href="/dashboard"
+            className="inline-flex items-center text-sm text-neutral-400 hover:text-mint transition-colors"
+          >
+            Done — back to dashboard →
+          </a>
+        </div>
+      )}
     </div>
   );
 }

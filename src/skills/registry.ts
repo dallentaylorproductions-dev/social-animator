@@ -38,6 +38,7 @@ export const SKILL_CATEGORY_ORDER: readonly SkillCategory[] = [
   'Marketing assets',
   'Seller pitch',
   'Social content',
+  'Open house',
 ] as const;
 
 /**

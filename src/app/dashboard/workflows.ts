@@ -7,15 +7,20 @@ import { getSkillById } from '@/skills/registry';
  * surfaces workflows as primary "next best action" cards; each card resolves
  * to the workflow's first skill and chains via recommendedNextSkills.
  *
- * Phase 1 wires 5 of the 7 named workflows per W-1 Half B audit section 5:
+ * Phase 1 wires 6 of the 7 named workflows per W-1 Half B audit section 5:
  *   1. Listing Launch OS
- *   2. Open House OS
+ *   2. Open House marketing (existing — pre-event promo)
+ *   2b. Open House OS (NEW — agent prep + visitor handout, OH Prep tool)
  *   4. Momentum Engine (partial — full needs Phase 2 behavior tracking)
  *   5. Seller Win System (agent half — wired when SIR shipped)
  *   6. Content Engine
  *
  * Workflows 3 (Buyer Tour) and 7 (Authority foundation) require new skills
  * that don't exist yet per the gap analysis.
+ *
+ * D14: Open House Prep card supplements rather than replaces the existing
+ * Open House marketing card. Both surface adjacently when an open house is
+ * in the agent's pipeline (different states fire each card).
  */
 
 export interface Workflow {
@@ -69,12 +74,31 @@ export const WORKFLOWS: Workflow[] = [
     ],
     primarySkillId: 'seller-intelligence-report',
   },
+  {
+    id: 'open-house-prep',
+    name: 'Open House OS',
+    emotionalDriver:
+      "Prep for this weekend's open house — your private prep doc plus a shareable visitor handout URL.",
+    triggerStates: ['open_house_prep_state', 'open_house_active_state'],
+    // recommendedNextSkills chip derives from the OH Prep skill record's
+    // own recommendedNextSkills field (['open-house-promo']), resolved
+    // server-side via getRecommendedNextSkills. No hardcoded coupling.
+    primarySkillId: 'open-house-prep',
+  },
 ];
 
-// 'seller-win' slots between listing-launch and momentum: winning the listing
-// is a launch-precursor, so when it surfaces it ranks above general momentum
-// and content cadences but below an active launch in progress.
-const PRIORITY_ORDER = ['listing-launch', 'seller-win', 'momentum', 'content', 'open-house'];
+// Priority order for "next best action" card placement when multiple
+// workflows match. Open House Prep slots above the marketing Open House
+// because prep is more time-sensitive (the event is imminent); the
+// marketing card stays at the end since it's a different lifecycle phase.
+const PRIORITY_ORDER = [
+  'listing-launch',
+  'seller-win',
+  'open-house-prep',
+  'momentum',
+  'content',
+  'open-house',
+];
 
 /**
  * Find workflows whose trigger states overlap with the agent's active states.

@@ -14,6 +14,7 @@ import type { WorkflowState } from '@/skills/types';
  *   openHousePromo:draft             — src/tools/open-house-promo/engine/draft-storage.ts
  *   listingPresentation:draft        — src/tools/listing-presentation/engine/draft-storage.ts
  *   sellerIntelligenceReport:draft   — src/tools/seller-intelligence-report/engine/draft-storage.ts
+ *   openHousePrep:draft              — src/tools/open-house-prep/engine/draft-storage.ts
  */
 
 function readJson<T>(key: string): T | null {
@@ -81,6 +82,33 @@ export function detectActiveStates(): WorkflowState[] {
       firstComp?.soldPrice?.trim()
     ) {
       active.push('seller_conversion_state');
+    }
+  }
+
+  // OH Prep draft — agent-facing prep doc + visitor handout for an
+  // upcoming open house (Commit 6 wiring of the workflow audited in 1C).
+  const ohPrepDraft = readJson<{
+    propertyAddress?: string;
+    eventDate?: string;
+  }>('openHousePrep:draft');
+  if (ohPrepDraft?.propertyAddress?.trim() && ohPrepDraft.eventDate?.trim()) {
+    const eventTs = new Date(ohPrepDraft.eventDate).getTime();
+    if (Number.isFinite(eventTs)) {
+      const now = new Date();
+      const todayStart = new Date(
+        now.getFullYear(),
+        now.getMonth(),
+        now.getDate(),
+      ).getTime();
+      const todayEnd = todayStart + 24 * 60 * 60 * 1000;
+      // Event today: between today's 00:00 and 23:59 local time.
+      if (eventTs >= todayStart && eventTs < todayEnd) {
+        active.push('open_house_active_state');
+        active.push('open_house_prep_state');
+      } else if (eventTs >= todayStart) {
+        // Event still in the future (including today's-onward but after now).
+        active.push('open_house_prep_state');
+      }
     }
   }
 
