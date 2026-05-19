@@ -1,5 +1,6 @@
 import { auth } from "@/lib/auth";
 import { hasActiveSubscription } from "@/lib/subscription";
+import { isDevAccessGranted } from "@/lib/dev-access";
 import { NextResponse } from "next/server";
 
 /**
@@ -53,6 +54,15 @@ export default auth(async (req) => {
 
   const email = req.auth?.user?.email;
   if (email) {
+    // v1.45.3 dev-access bypass: invited beta cohort members who
+    // signed up via /access + access code skip the Stripe paywall.
+    // The dev_access:[email] KV record is written by the signIn
+    // callback in src/lib/auth.ts after the user clicked their
+    // magic link (proves email control). Reversible at paid launch
+    // by deleting this branch + /access route + /api/access/grant.
+    if (await isDevAccessGranted(email)) {
+      return NextResponse.next();
+    }
     const active = await hasActiveSubscription(email);
     if (!active) {
       return NextResponse.redirect(new URL("/paywall", req.url));

@@ -65,6 +65,13 @@ function PaywallBody() {
         monthly. Cancel from Settings at any time.
       </p>
 
+      <p className="mt-6 text-xs text-neutral-500">
+        Have a beta code?{" "}
+        <a href="/access" className="text-mint hover:underline">
+          Enter it here →
+        </a>
+      </p>
+
       <button
         onClick={() => signOut({ callbackUrl: "/" })}
         className="mt-8 text-xs text-neutral-500 hover:text-neutral-300 underline"
