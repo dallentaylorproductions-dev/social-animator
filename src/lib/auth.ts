@@ -64,25 +64,41 @@ export const { handlers, signIn, signOut, auth } = NextAuth({
   pages: {
     signIn: "/login",
     verifyRequest: "/login?check=email",
-    error: "/login?error=true",
+    // Bare path — Auth.js's top-level error handler appends
+    // `?error=<Type>` via naive `?` concatenation
+    // (@auth/core/src/index.ts:194), so any trailing query string here
+    // produces `/login?error=true?error=Verification` on the wire.
+    error: "/login",
   },
   callbacks: {
     // v1.45.3 dev-access bypass: promote a pending dev-access record
-    // to a permanent grant when the user clicks the magic link. The
-    // pending record is written by /api/access/grant only after the
-    // beta access code validates server-side; this callback only fires
-    // after Auth.js verifies the magic-link token, proving the user
-    // controls the email. So the bypass is granted exactly when both
-    // (1) the access code was correct and (2) the email was confirmed.
+    // to a permanent grant when the user clicks the magic link.
     //
-    // Idempotent: repeated sign-ins by an already-granted user are
-    // no-ops here (the pending record was consumed and deleted on the
-    // first click). Existing permanent record stays in place.
-    async signIn({ user }) {
+    // The Auth.js v5 Email provider invokes this callback twice:
+    //   Phase 1 (link CREATION, sendToken): `email.verificationRequest`
+    //     is true. The user hasn't clicked anything yet — only the
+    //     server has decided to send a link. Do NOT consume the pending
+    //     record here; that would defeat the email-control proof.
+    //   Phase 2 (link CLICK, callback handler): `email` is absent. The
+    //     token was just verified against the adapter, so we know the
+    //     user controls the email. Promote pending → permanent here.
+    //
+    // Graceful degradation: KV failures must never break sign-in.
+    // Throwing here is caught upstream and converted to AccessDenied,
+    // which redirects the user to the error page. A missing pending
+    // record is also fine — the user just signs in without bypass and
+    // hits the normal paywall.
+    async signIn({ user, email }) {
+      const isVerificationRequest = email?.verificationRequest === true;
+      if (isVerificationRequest) return true;
       if (user?.email) {
-        const wasPending = await consumeDevAccessPending(user.email);
-        if (wasPending) {
-          await grantDevAccess(user.email);
+        try {
+          const wasPending = await consumeDevAccessPending(user.email);
+          if (wasPending) {
+            await grantDevAccess(user.email);
+          }
+        } catch (err) {
+          console.error("[dev-access] signIn callback KV failure:", err);
         }
       }
       return true;
