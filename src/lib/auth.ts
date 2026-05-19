@@ -2,6 +2,7 @@ import NextAuth from "next-auth";
 import Resend from "next-auth/providers/resend";
 import { UpstashRedisAdapter } from "@auth/upstash-redis-adapter";
 import { Redis } from "@upstash/redis";
+import { consumeDevAccessPending, grantDevAccess } from "@/lib/dev-access";
 
 const resendKey = process.env.AUTH_RESEND_KEY;
 const fromAddress =
@@ -64,6 +65,28 @@ export const { handlers, signIn, signOut, auth } = NextAuth({
     signIn: "/login",
     verifyRequest: "/login?check=email",
     error: "/login?error=true",
+  },
+  callbacks: {
+    // v1.45.3 dev-access bypass: promote a pending dev-access record
+    // to a permanent grant when the user clicks the magic link. The
+    // pending record is written by /api/access/grant only after the
+    // beta access code validates server-side; this callback only fires
+    // after Auth.js verifies the magic-link token, proving the user
+    // controls the email. So the bypass is granted exactly when both
+    // (1) the access code was correct and (2) the email was confirmed.
+    //
+    // Idempotent: repeated sign-ins by an already-granted user are
+    // no-ops here (the pending record was consumed and deleted on the
+    // first click). Existing permanent record stays in place.
+    async signIn({ user }) {
+      if (user?.email) {
+        const wasPending = await consumeDevAccessPending(user.email);
+        if (wasPending) {
+          await grantDevAccess(user.email);
+        }
+      }
+      return true;
+    },
   },
 });
 
