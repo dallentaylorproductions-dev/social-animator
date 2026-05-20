@@ -142,9 +142,50 @@ export function clampDraft(
 /**
  * True iff Step 1 (Property) is fully cleared — a saved Property
  * primitive id AND a non-empty address. The wizard shell uses this
- * to gate Step 1's "Next" button; the runtime uses it for the
- * SkillStatus.missingRequiredInputs derivation.
+ * to gate Step 1's "Next" button.
  */
 export function isStepPropertyComplete(draft: SellerPresentationDraft): boolean {
   return Boolean(draft.propertyId && draft.propertyAddress?.trim());
+}
+
+/**
+ * Field keys (per the skill contract) currently empty on the draft.
+ * Single source of truth for export gating — both the runtime's
+ * SkillStatus.missingRequiredInputs (which surfaces blockers in the
+ * dashboard) and StepReview's pre-publish validation (which renders
+ * "Missing: X → Go back to fix →") read from this.
+ *
+ * Mirrors the skill record's `inputs.required`: propertyAddress is
+ * always required; recommendedPrice is required for export (gates the
+ * agent prep PDF + the published web page); comps require at least
+ * one row with address + soldPrice (the published page renders the
+ * price-justification table from `comps[].public`).
+ */
+export function getMissingRequiredInputs(
+  draft: SellerPresentationDraft,
+): string[] {
+  const missing: string[] = [];
+  if (!draft.propertyAddress?.trim()) missing.push("propertyAddress");
+  if (!draft.recommendedPrice?.trim()) missing.push("recommendedPrice");
+  if (draft.comps.length === 0) {
+    missing.push("comps");
+  } else if (
+    !draft.comps[0].address.trim() ||
+    !draft.comps[0].soldPrice.trim()
+  ) {
+    missing.push("comps[0]");
+  }
+  return missing;
+}
+
+/**
+ * The single field key blocking export, or null when none. Convenience
+ * over `getMissingRequiredInputs[0]` for the StepReview / button paths
+ * that only show one blocker at a time. Mirrors the SIR + OH Prep
+ * `validateForExport` shape.
+ */
+export function validateForExport(
+  draft: SellerPresentationDraft,
+): string | null {
+  return getMissingRequiredInputs(draft)[0] ?? null;
 }

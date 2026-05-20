@@ -2,6 +2,7 @@ import { registerRuntime } from "@/skills/runtime";
 import type { SkillRuntime, SkillStatus } from "@/skills/types";
 import type { WorkflowInstance } from "@/skills/workflow-instance";
 import {
+  getMissingRequiredInputs,
   isStepPropertyComplete,
   type SellerPresentationDraft,
 } from "./engine/types";
@@ -47,20 +48,37 @@ import {
  * files have to update — that's a trivial grep.
  */
 
-function deriveMissingRequiredInputs(
-  draft: SellerPresentationDraft,
-): string[] {
-  const missing: string[] = [];
-  if (!draft.propertyAddress?.trim()) missing.push("propertyAddress");
-  // A5b extends this list — recommendedPrice, comps[0], etc.
-  return missing;
+/**
+ * Map a missing field key to the wizard step that owns it. Drives
+ * the runtime's `runBlockers[].resolutionAction.targetStepId` so the
+ * dashboard / wizard can jump the agent straight to the offending
+ * field. A5b/A6 added `recommendedPrice` (strategy) and `comps[*]`
+ * (comps); A5a only knew about `propertyAddress`.
+ */
+function fieldToStepId(field: string): {
+  stepId: "property" | "comps" | "strategy" | "pitch" | "review";
+  label: string;
+} {
+  switch (field) {
+    case "propertyAddress":
+      return { stepId: "property", label: "Fix on Step 1" };
+    case "recommendedPrice":
+      return { stepId: "strategy", label: "Fix on Step 3 (Strategy)" };
+    case "comps":
+    case "comps[0]":
+      return { stepId: "comps", label: "Fix on Step 2 (Comps)" };
+    default:
+      return { stepId: "property", label: "Fix on Step 1" };
+  }
 }
 
 export const sellerPresentationRuntime: SkillRuntime<SellerPresentationDraft> =
   {
     getStatus(instance: WorkflowInstance<SellerPresentationDraft>): SkillStatus {
       const { draft, currentStep, timestamps, resolvedPrimitives } = instance;
-      const missingRequiredInputs = deriveMissingRequiredInputs(draft);
+      // Delegate to engine/types so StepReview's validateForExport and the
+      // runtime stay in lockstep — A5b unified the gating logic in one place.
+      const missingRequiredInputs = getMissingRequiredInputs(draft);
       const stepPropertyComplete = isStepPropertyComplete(draft);
 
       const state: SkillStatus["state"] = timestamps.completedAt
@@ -70,14 +88,14 @@ export const sellerPresentationRuntime: SkillRuntime<SellerPresentationDraft> =
           : "blocked";
 
       const runBlockers: SkillStatus["runBlockers"] = missingRequiredInputs.map(
-        (field) => ({
-          type: "missing-input",
-          label: `Required field empty: ${field}`,
-          resolutionAction: {
-            label: "Fix on Step 1",
-            targetStepId: "property",
-          },
-        }),
+        (field) => {
+          const { stepId, label } = fieldToStepId(field);
+          return {
+            type: "missing-input",
+            label: `Required field empty: ${field}`,
+            resolutionAction: { label, targetStepId: stepId },
+          };
+        },
       );
 
       return {
