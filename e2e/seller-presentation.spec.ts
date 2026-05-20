@@ -320,13 +320,15 @@ test.describe('Seller Presentation — A5b per-step content', () => {
     await expect(page.getByTestId('step-review-download')).toBeDisabled();
   });
 
-  test('StepReview publish + download fail gracefully against absent backends', async ({
-    page,
-  }) => {
+  /**
+   * Helper: fill the minimum-required set + drive to the Review step.
+   * Used by the three publish/download specs below so each one starts
+   * from a clean wizard with the export-gating satisfied.
+   */
+  async function fillToReview(page: import('@playwright/test').Page) {
     await page.goto('/seller-presentation');
     await expect(page.getByTestId('step-property')).toBeVisible();
 
-    // Fill the minimum required set so the buttons enable.
     await page.getByTestId('step-property-address').fill('1234 Test Drive NE');
     const nextButton = page.getByTestId('wizard-next');
     await nextButton.click();
@@ -336,21 +338,72 @@ test.describe('Seller Presentation — A5b per-step content', () => {
     await nextButton.click();
     await page.getByLabel('recommended-price').fill('700000');
     await nextButton.click();
-    await nextButton.click(); // skip pitch
+    await nextButton.click(); // skip pitch — public/private toggle covered elsewhere
     await expect(page.getByTestId('step-review')).toBeVisible();
     await expect(page.getByTestId('step-review-ready')).toBeVisible();
+  }
 
-    // Publish → /api/seller-presentation/publish doesn't exist (A6
-    // lands it). The route returns 404; the StepReview state machine
-    // catches it and surfaces a recoverable error panel.
-    await page.getByTestId('step-review-publish').click();
-    await expect(page.getByTestId('step-review-publish-error')).toBeVisible({
-      timeout: 10_000,
+  test('StepReview publish SUCCESS: mocked 200 renders the published URL block', async ({
+    page,
+  }) => {
+    // Intercept the publish call so the test asserts the UI state
+    // transition (idle → published) without needing real auth + KV.
+    // The privacy boundary itself is proven separately by
+    // e2e/seller-presentation.publish-allowlist.spec.ts.
+    const MOCK_SLUG = 'mockslug';
+    await page.route('**/api/seller-presentation/publish', async (route) => {
+      await route.fulfill({
+        status: 200,
+        contentType: 'application/json',
+        body: JSON.stringify({ ok: true, slug: MOCK_SLUG }),
+      });
     });
 
-    // Download prep PDF → dynamic-imports a module that doesn't exist
-    // yet (A7 lands ../output/prep-pdf). The import throws, the catch
-    // surfaces the download-error message.
+    await fillToReview(page);
+    await page.getByTestId('step-review-publish').click();
+
+    // Published-state block renders with the /h/<slug> URL + copy + revoke.
+    const publishedBlock = page.getByTestId('step-review-published');
+    await expect(publishedBlock).toBeVisible({ timeout: 10_000 });
+    await expect(publishedBlock).toContainText(`/h/${MOCK_SLUG}`);
+    await expect(publishedBlock).toContainText('Copy URL');
+    await expect(publishedBlock).toContainText('Revoke this URL');
+  });
+
+  test('StepReview publish ERROR: mocked 500 surfaces a recoverable error panel', async ({
+    page,
+  }) => {
+    // Simulate the backend being down or the request failing — the
+    // ported OH Prep state machine catches it and shows a "Try again"
+    // panel without crashing the wizard.
+    await page.route('**/api/seller-presentation/publish', async (route) => {
+      await route.fulfill({
+        status: 500,
+        contentType: 'application/json',
+        body: JSON.stringify({ ok: false, error: 'simulated backend outage' }),
+      });
+    });
+
+    await fillToReview(page);
+    await page.getByTestId('step-review-publish').click();
+
+    const errorBlock = page.getByTestId('step-review-publish-error');
+    await expect(errorBlock).toBeVisible({ timeout: 10_000 });
+    await expect(errorBlock).toContainText('simulated backend outage');
+    // "Try again" button is present + clickable from the error state.
+    await expect(
+      errorBlock.getByRole('button', { name: /Try again/ }),
+    ).toBeVisible();
+  });
+
+  test('StepReview download: graceful-fail against absent PDF module (A7 lands it)', async ({
+    page,
+  }) => {
+    // The prep-PDF dynamic import targets ../output/prep-pdf, which
+    // A7 ships. Until then the import throws ModuleNotFoundError and
+    // the catch surfaces the download-error message. The publish
+    // mock isn't needed here — the download path is independent.
+    await fillToReview(page);
     await page.getByTestId('step-review-download').click();
     await expect(page.getByTestId('step-review-download-error')).toBeVisible({
       timeout: 10_000,
