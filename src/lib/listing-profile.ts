@@ -1,6 +1,7 @@
 "use client";
 
 import { useEffect, useRef, useState } from "react";
+import { generateId } from "./ids";
 
 /**
  * Per-listing property data shared across templates that render
@@ -26,6 +27,15 @@ import { useEffect, useRef, useState } from "react";
  * canvas timeline's assets map.
  */
 export interface ListingProfile {
+  /**
+   * Stable identifier for this property (Substrate §2.3). Optional in
+   * the type because legacy records persisted before v1.47 don't carry
+   * one; `saveListingProfile` backfills on the next write so the field
+   * becomes effectively-present for any record the user touches. The
+   * Seller Presentation workflow requires a populated value before it
+   * can construct a WorkflowInstance.
+   */
+  propertyId?: string;
   heroPhoto: string;       // data URL or empty
   status: string;          // "Just Listed", "Just Sold", "Open House", etc.
   address: string;
@@ -39,6 +49,9 @@ export interface ListingProfile {
 const STORAGE_KEY = "socanim_listing_profile";
 
 const DEFAULT_LISTING_PROFILE: ListingProfile = {
+  // propertyId intentionally absent — the default record represents
+  // "no listing yet", and a stable id is only assigned once the user
+  // saves real data (see saveListingProfile).
   heroPhoto: "",
   status: "Just Listed",
   address: "",
@@ -70,6 +83,10 @@ export function loadListingProfile(): ListingProfile {
     if (!raw) return DEFAULT_LISTING_PROFILE;
     const parsed = JSON.parse(raw) as Record<string, unknown>;
     return {
+      propertyId:
+        typeof parsed.propertyId === "string" && parsed.propertyId.length > 0
+          ? parsed.propertyId
+          : undefined,
       heroPhoto: str(parsed.heroPhoto),
       status: str(parsed.status, DEFAULT_LISTING_PROFILE.status),
       address: str(parsed.address),
@@ -84,13 +101,24 @@ export function loadListingProfile(): ListingProfile {
   }
 }
 
-export function saveListingProfile(profile: ListingProfile): void {
-  if (typeof window === "undefined") return;
+/**
+ * Persist the profile, backfilling `propertyId` when absent (Substrate
+ * §2.3 — stable IDs on first write). Returns the exact shape that was
+ * persisted so callers (in particular `useListingProfile.update`) can
+ * mirror the newly-assigned id into their in-memory state without a
+ * round-trip through `loadListingProfile`.
+ */
+export function saveListingProfile(profile: ListingProfile): ListingProfile {
+  const withId: ListingProfile = profile.propertyId
+    ? profile
+    : { ...profile, propertyId: generateId("property") };
+  if (typeof window === "undefined") return withId;
   try {
-    window.localStorage.setItem(STORAGE_KEY, JSON.stringify(profile));
+    window.localStorage.setItem(STORAGE_KEY, JSON.stringify(withId));
   } catch {
     // ignore quota / storage-disabled
   }
+  return withId;
 }
 
 /**
@@ -140,8 +168,11 @@ export function useListingProfile() {
 
   const update = (next: Partial<ListingProfile>) => {
     const merged = { ...settings, ...next };
-    setSettings(merged);
-    saveListingProfile(merged);
+    // saveListingProfile backfills propertyId when absent and returns
+    // the persisted shape — mirror that into local state so the id
+    // shows up in the same render cycle as the user's first save.
+    const persisted = saveListingProfile(merged);
+    setSettings(persisted);
   };
 
   return { settings, heroPhotoImg, update, hydrated };
