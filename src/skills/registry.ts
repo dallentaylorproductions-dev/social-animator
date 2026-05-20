@@ -9,6 +9,12 @@ import { OPEN_HOUSE_PROMO_SKILL } from '@/tools/open-house-promo/skill';
 import { LISTING_PRESENTATION_SKILL } from '@/tools/listing-presentation/skill';
 import { SELLER_INTELLIGENCE_REPORT_SKILL } from '@/tools/seller-intelligence-report/skill';
 import { OPEN_HOUSE_PREP_SKILL } from '@/tools/open-house-prep/skill';
+import { SELLER_PRESENTATION_SKILL } from '@/tools/seller-presentation/skill';
+// Side-effect: the Seller Presentation runtime self-registers via
+// `registerRuntime` at module-load time (Substrate §3.2, v1.47 / A5a).
+// Importing the module here ensures the registration happens before
+// anything in the dashboard / SkillStatus path tries to look it up.
+import '@/tools/seller-presentation/runtime';
 import { SOCIAL_ANIMATOR_SKILLS } from '@/templates/skills';
 
 /**
@@ -25,6 +31,7 @@ export const ALL_SKILLS: CallableSkill[] = [
   LISTING_PRESENTATION_SKILL,
   SELLER_INTELLIGENCE_REPORT_SKILL,
   OPEN_HOUSE_PREP_SKILL,
+  SELLER_PRESENTATION_SKILL,
   ...SOCIAL_ANIMATOR_SKILLS,
 ];
 
