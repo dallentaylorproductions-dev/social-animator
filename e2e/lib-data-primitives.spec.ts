@@ -1,10 +1,11 @@
 import { test, expect } from '@playwright/test';
 
 /**
- * Unit-style coverage for the v1.47 data-primitive layer:
+ * Unit-style coverage for the v1.47 data + runtime scaffolding layer:
  *   - src/lib/ids.ts                            — A2; generateId uniqueness + prefix shape
  *   - src/lib/client-profile.ts                 — A2; addressable Client store round-trip
  *   - src/skills/workflow-instance-storage.ts   — A3; converged WorkflowInstance CRUD
+ *   - src/skills/runtime.ts                     — A4; SkillRuntime registry lookup
  *
  * No browser. These specs run inside Playwright's Node worker; the
  * `page` fixture is intentionally not destructured. A tiny in-memory
@@ -38,6 +39,12 @@ import {
   saveInstance,
 } from '../src/skills/workflow-instance-storage';
 import type { WorkflowInstance } from '../src/skills/workflow-instance';
+import {
+  getRuntime,
+  registerRuntime,
+  unregisterRuntime,
+} from '../src/skills/runtime';
+import type { SkillRuntime, SkillStatus } from '../src/skills/types';
 
 /**
  * Static imports rather than dynamic `await import(…)` — Playwright's
@@ -401,5 +408,192 @@ test.describe('src/skills/workflow-instance-storage.ts — per-record CRUD', () 
     saveInstance(orphan);
     expect(listInstanceIds()).toEqual(['workflow_orphan']);
     expect(loadInstance('workflow_orphan')).not.toBeNull();
+  });
+});
+
+test.describe('src/skills/runtime.ts — SkillRuntime registry', () => {
+  // Distinct fake skill id namespace so we never collide with real
+  // skill ids (no production skill begins with `__test_`). Each test
+  // unregisters after itself so cross-test leakage is impossible even
+  // though Playwright runs these specs serially.
+  const FAKE_SKILL_ID = '__test_fake_skill__';
+  const OTHER_FAKE_SKILL_ID = '__test_other_fake_skill__';
+
+  // Localhost shim isn't strictly needed for the registry tests
+  // (the registry doesn't touch localStorage), but we install it so
+  // the `WorkflowInstance` fixtures used by the getStatus assertion
+  // can be constructed without surprise.
+  test.beforeEach(installLocalStorageShim);
+
+  test.afterEach(() => {
+    uninstallLocalStorageShim();
+    unregisterRuntime(FAKE_SKILL_ID);
+    unregisterRuntime(OTHER_FAKE_SKILL_ID);
+  });
+
+  interface FakeDraft {
+    propertyAddress: string;
+  }
+
+  function makeInstance(): WorkflowInstance<FakeDraft> {
+    const now = new Date().toISOString();
+    return {
+      instanceId: 'workflow_runtime_test',
+      skillId: FAKE_SKILL_ID,
+      draft: { propertyAddress: '1234 Test Drive NE' },
+      resolvedPrimitives: { propertyId: 'property_test' },
+      currentStep: 'property',
+      timestamps: { createdAt: now, updatedAt: now },
+    };
+  }
+
+  function makeFakeRuntime(): SkillRuntime<FakeDraft> {
+    return {
+      getStatus(instance) {
+        const missing = instance.draft.propertyAddress.trim()
+          ? []
+          : ['propertyAddress'];
+        return {
+          state: missing.length === 0 ? 'in-progress' : 'blocked',
+          currentStep: instance.currentStep,
+          missingRequiredInputs: missing,
+          resolvedPrimitives: { ...instance.resolvedPrimitives },
+          producedArtifacts: [],
+          timestamps: { ...instance.timestamps },
+          canRun: missing.length === 0,
+          runBlockers: missing.map((field) => ({
+            type: 'missing-input',
+            label: `Missing required field: ${field}`,
+            resolutionAction: {
+              label: 'Fix on Step 1',
+              targetStepId: 'property',
+            },
+          })),
+          recommendedNextActions: {
+            primary: {
+              label: 'Continue to comps',
+              skillId: FAKE_SKILL_ID,
+              reason: 'Property looks good — next is comps.',
+            },
+          },
+        };
+      },
+    };
+  }
+
+  test('getRuntime returns undefined for an unregistered skill', () => {
+    expect(getRuntime(FAKE_SKILL_ID)).toBeUndefined();
+    expect(getRuntime('seller-presentation')).toBeUndefined();
+  });
+
+  test('registerRuntime + getRuntime round-trip the same runtime instance', () => {
+    const runtime = makeFakeRuntime();
+    registerRuntime<FakeDraft>(FAKE_SKILL_ID, runtime);
+    expect(getRuntime<FakeDraft>(FAKE_SKILL_ID)).toBe(runtime);
+  });
+
+  test('getStatus on a synthetic instance returns the full SkillStatus shape', () => {
+    registerRuntime<FakeDraft>(FAKE_SKILL_ID, makeFakeRuntime());
+    const runtime = getRuntime<FakeDraft>(FAKE_SKILL_ID);
+    expect(runtime).toBeDefined();
+
+    const status: SkillStatus = runtime!.getStatus(makeInstance());
+
+    // Every §3.3 field is present and the right shape.
+    expect(status.state).toBe('in-progress');
+    expect(status.currentStep).toBe('property');
+    expect(Array.isArray(status.missingRequiredInputs)).toBe(true);
+    expect(status.missingRequiredInputs).toEqual([]);
+    expect(status.resolvedPrimitives.propertyId).toBe('property_test');
+    expect(status.resolvedPrimitives.clientId).toBeUndefined();
+    expect(Array.isArray(status.producedArtifacts)).toBe(true);
+    expect(status.producedArtifacts).toEqual([]);
+    expect(typeof status.timestamps.createdAt).toBe('string');
+    expect(typeof status.timestamps.updatedAt).toBe('string');
+    expect(status.canRun).toBe(true);
+    expect(Array.isArray(status.runBlockers)).toBe(true);
+    expect(status.runBlockers).toEqual([]);
+    expect(status.recommendedNextActions.primary?.label).toBe(
+      'Continue to comps',
+    );
+    expect(status.recommendedNextActions.primary?.skillId).toBe(FAKE_SKILL_ID);
+  });
+
+  test('getStatus surfaces missing-input blockers when the draft is incomplete', () => {
+    registerRuntime<FakeDraft>(FAKE_SKILL_ID, makeFakeRuntime());
+    const runtime = getRuntime<FakeDraft>(FAKE_SKILL_ID)!;
+    const incompleteInstance: WorkflowInstance<FakeDraft> = {
+      ...makeInstance(),
+      draft: { propertyAddress: '' },
+    };
+
+    const status = runtime.getStatus(incompleteInstance);
+    expect(status.state).toBe('blocked');
+    expect(status.canRun).toBe(false);
+    expect(status.missingRequiredInputs).toEqual(['propertyAddress']);
+    expect(status.runBlockers).toHaveLength(1);
+    expect(status.runBlockers[0].type).toBe('missing-input');
+    expect(status.runBlockers[0].resolutionAction?.targetStepId).toBe(
+      'property',
+    );
+  });
+
+  test('re-registering the same skillId overwrites (last-write-wins)', () => {
+    const first = makeFakeRuntime();
+    const second: SkillRuntime<FakeDraft> = {
+      getStatus: () => ({
+        state: 'complete',
+        missingRequiredInputs: [],
+        resolvedPrimitives: {},
+        producedArtifacts: [],
+        timestamps: {
+          createdAt: '2026-01-01T00:00:00.000Z',
+          updatedAt: '2026-01-01T00:00:00.000Z',
+        },
+        canRun: false,
+        runBlockers: [],
+        recommendedNextActions: {},
+      }),
+    };
+
+    registerRuntime<FakeDraft>(FAKE_SKILL_ID, first);
+    registerRuntime<FakeDraft>(FAKE_SKILL_ID, second);
+
+    const resolved = getRuntime<FakeDraft>(FAKE_SKILL_ID);
+    expect(resolved).toBe(second);
+    expect(resolved!.getStatus(makeInstance()).state).toBe('complete');
+  });
+
+  test('unregisterRuntime removes the entry and reports whether it existed', () => {
+    expect(unregisterRuntime(FAKE_SKILL_ID)).toBe(false);
+    registerRuntime<FakeDraft>(FAKE_SKILL_ID, makeFakeRuntime());
+    expect(getRuntime(FAKE_SKILL_ID)).toBeDefined();
+    expect(unregisterRuntime(FAKE_SKILL_ID)).toBe(true);
+    expect(getRuntime(FAKE_SKILL_ID)).toBeUndefined();
+    expect(unregisterRuntime(FAKE_SKILL_ID)).toBe(false);
+  });
+
+  test('two registered skills are isolated from each other', () => {
+    const a = makeFakeRuntime();
+    const b: SkillRuntime<FakeDraft> = {
+      getStatus: () => ({
+        state: 'not-started',
+        missingRequiredInputs: [],
+        resolvedPrimitives: {},
+        producedArtifacts: [],
+        timestamps: {
+          createdAt: '2026-01-01T00:00:00.000Z',
+          updatedAt: '2026-01-01T00:00:00.000Z',
+        },
+        canRun: true,
+        runBlockers: [],
+        recommendedNextActions: {},
+      }),
+    };
+    registerRuntime<FakeDraft>(FAKE_SKILL_ID, a);
+    registerRuntime<FakeDraft>(OTHER_FAKE_SKILL_ID, b);
+
+    expect(getRuntime(FAKE_SKILL_ID)).toBe(a);
+    expect(getRuntime(OTHER_FAKE_SKILL_ID)).toBe(b);
   });
 });

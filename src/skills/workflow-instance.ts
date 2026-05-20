@@ -1,4 +1,4 @@
-import type { SkillId } from "./types";
+import type { SkillId, SkillStatusState } from "./types";
 
 /**
  * Converged workflow draft shape (Substrate §9.5, v1.47 / A3).
@@ -69,21 +69,27 @@ export interface WorkflowInstanceTimestamps {
 }
 
 /**
- * Cached validation snapshot. Optional — A3 carries the raw material
- * but does not compute anything here. The SkillRuntime layer (A4)
- * populates this when it derives SkillStatus so the dashboard can
- * render "blocked at step 2" without re-running the skill contract
- * on every render.
+ * Cached `SkillStatus` snapshot — the subset of orchestration-status
+ * fields it pays to memoize between renders. A4 tightens the shape
+ * to mirror the SkillStatus fields a runtime might cache; A5+
+ * runtimes populate; A4 itself never writes here.
  *
- * Every field optional. Adding a field is additive; tightening any
- * existing field's type is not.
+ * Cache-validity convention: a runtime treats this as fresh iff
+ * `lastCheckedAt >= WorkflowInstance.timestamps.updatedAt`. A draft
+ * mutation always bumps `updatedAt` (via `saveInstance`), so any
+ * post-edit `getStatus` recomputes. Writers update `lastCheckedAt`
+ * to `WorkflowInstance.timestamps.updatedAt` after a fresh compute.
+ *
+ * Every field optional — a brand-new instance has no cached state,
+ * and a runtime may legitimately choose not to cache. Adding fields
+ * is additive; tightening any existing field's type is not.
  */
 export interface WorkflowInstanceValidation {
-  /** Step ids the agent has fully cleared. Order-insensitive. */
-  completedSteps?: string[];
-  /** Required field keys currently missing on the draft. */
-  missingRequired?: string[];
-  /** ISO 8601 UTC of when this snapshot was last refreshed. */
+  /** Cached `SkillStatus.state`. */
+  state?: SkillStatusState;
+  /** Cached `SkillStatus.missingRequiredInputs`. Required field keys empty on the draft. */
+  missingRequiredInputs?: string[];
+  /** ISO 8601 UTC of the most recent recompute. Compare to `timestamps.updatedAt` to test freshness. */
   lastCheckedAt?: string;
 }
 

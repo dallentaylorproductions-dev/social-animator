@@ -135,3 +135,154 @@ export interface CallableSkill {
   supportedStates: WorkflowState[];
   recommendedNextSkills?: SkillId[];
 }
+
+// ----- SkillStatus + SkillRuntime (Substrate §3.2 + §3.3, v1.47 / A4) -----
+//
+// The orchestration-readable status surface. `CallableSkill` (above) is
+// the STATIC skill contract — pure declaration the dashboard reads to
+// list, route, and chain skills. `SkillStatus` is the DYNAMIC counterpart
+// — what a specific workflow instance looks like right now, derived by
+// the per-skill `SkillRuntime` from the instance's draft + resolved
+// primitive refs.
+//
+// A4 defines the types in full (every §3.3 field is present even when
+// no skill computes it yet). Per-skill runtime registration starts at
+// A5 (Seller Presentation); the dashboard begins consuming runtimes
+// later still. Skills without a registered runtime have no computable
+// status — `getRuntime(skillId)` returns `undefined`, and the dashboard
+// treats that as "status unavailable" rather than an error (pinned
+// decision A4.4).
+//
+// Type-only cycle with workflow-instance.ts: `import type` keeps the
+// cycle at the type layer where it's erased at runtime. Both files
+// reference each other through type-only imports.
+
+import type { WorkflowInstance } from './workflow-instance';
+
+export type SkillStatusState =
+  | 'not-started'
+  | 'in-progress'
+  | 'blocked'
+  | 'complete';
+
+/**
+ * Refs to shared primitives resolved for this workflow instance.
+ * Mirror of `WorkflowInstanceResolvedPrimitives` — both fields optional
+ * because a fresh instance exists before any primitive is selected.
+ */
+export interface SkillResolvedPrimitives {
+  propertyId?: string;
+  clientId?: string;
+}
+
+/**
+ * Reference to an artifact the workflow has produced (Substrate §2).
+ * `kind` is an open string union — different skills produce different
+ * kinds (web pages, PDFs, MP4 reels). `slug` is set for HandoutRecord-
+ * backed artifacts addressable under `/h/[slug]`; locally-exported
+ * artifacts (downloaded PDFs) leave it absent. `artifactId` is minted
+ * by `generateId('artifact')`.
+ */
+export interface SkillProducedArtifact {
+  artifactId: string;
+  kind: string;
+  /** Public slug under `/h/[slug]` when the artifact is HandoutRecord-backed. */
+  slug?: string;
+  /** Absolute URL when the artifact is reachable publicly. */
+  url?: string;
+  /** ISO 8601 UTC. */
+  createdAt: string;
+  /** Optional human label (e.g. "Seller presentation v2"). */
+  label?: string;
+}
+
+/**
+ * Timestamp surface for SkillStatus. Shape matches
+ * `WorkflowInstanceTimestamps` — the runtime typically passes the
+ * instance timestamps through unchanged (and may derive `completedAt`
+ * from `state === 'complete'` or vice versa).
+ */
+export interface SkillStatusTimestamps {
+  createdAt: string;
+  updatedAt: string;
+  lastOpenedAt?: string;
+  completedAt?: string;
+}
+
+/**
+ * A reason the workflow can't run right now, with optional
+ * resolution. `type` is an open string union — common values include
+ * `'missing-input'` (a required field is empty) and
+ * `'subscription-required'` (an availability gate is denying access);
+ * skills may emit their own kinds. `resolutionAction` is the CTA the
+ * dashboard renders next to the blocker.
+ */
+export interface SkillRunBlocker {
+  type: string;
+  label: string;
+  resolutionAction?: {
+    label: string;
+    /** Wizard step the agent should jump to. */
+    targetStepId?: string;
+    /** Absolute route override (e.g. `/settings` to fix brand profile). */
+    href?: string;
+  };
+}
+
+/**
+ * A "do this next" recommendation surfaced after completion (or
+ * during, as a side-quest). `skillId` chains into another workflow;
+ * `href` overrides for non-skill jumps. The dashboard renders the
+ * `primary` action as the main CTA and `secondary[]` as ghost buttons.
+ */
+export interface SkillRecommendedAction {
+  label: string;
+  skillId?: SkillId;
+  href?: string;
+  /** Optional short reason shown beneath the CTA. */
+  reason?: string;
+}
+
+export interface SkillRecommendedNextActions {
+  primary?: SkillRecommendedAction;
+  secondary?: SkillRecommendedAction[];
+}
+
+export interface SkillStatus {
+  state: SkillStatusState;
+  currentStep?: string;
+  /**
+   * Field keys (per `SkillContract.inputs.required[].key`) that are
+   * required but currently empty on the draft. Empty array means
+   * "all required inputs satisfied" — orthogonal to `canRun`, which
+   * may still be false for non-input reasons (entitlement, etc.).
+   */
+  missingRequiredInputs: string[];
+  resolvedPrimitives: SkillResolvedPrimitives;
+  producedArtifacts: SkillProducedArtifact[];
+  timestamps: SkillStatusTimestamps;
+  /**
+   * True iff every blocker is resolved AND state isn't already
+   * `complete`. Convention: `canRun === runBlockers.length === 0 &&
+   * state !== 'complete'`. The runtime computes the boolean; the
+   * dashboard reads it without re-deriving.
+   */
+  canRun: boolean;
+  runBlockers: SkillRunBlocker[];
+  recommendedNextActions: SkillRecommendedNextActions;
+}
+
+/**
+ * Dynamic counterpart to `CallableSkill`. Skills register one of
+ * these at module-load time via `registerRuntime` from
+ * `./runtime.ts`. `getStatus` reads a typed `WorkflowInstance` and
+ * derives the orchestration-readable status; it MAY consult and
+ * write to `instance.validation` to cache results across calls.
+ *
+ * Skills without a runtime continue to work — they just have no
+ * computable status, which the dashboard interprets as "no resume
+ * card to render."
+ */
+export interface SkillRuntime<TDraft = unknown> {
+  getStatus(instance: WorkflowInstance<TDraft>): SkillStatus;
+}
