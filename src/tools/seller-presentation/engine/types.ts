@@ -165,6 +165,14 @@ export interface SellerPresentationDraft {
   propertyZip?: string;
   /** A7a — hero photo (data URL or external URL). Nullable → renderer falls back to monogram. */
   heroPhotoUrl?: string;
+  /**
+   * A7b.1 — editorial photo band (renderer puts it ABOVE the dark
+   * buyer-quote panel as a visual lead-in). Public-safe, agent-
+   * entered; intentionally distinct from heroPhotoUrl (the design
+   * wants a different image here). Nullable → renderer hides the
+   * band entirely when absent (quote panel renders solo).
+   */
+  editorialPhotoUrl?: string;
 
   // ---- Step 3 (A5b): Pricing & strategy ----
   recommendedPrice?: string;
@@ -407,6 +415,7 @@ export function clampDraft(
     propertyState: clampString(raw.propertyState),
     propertyZip: clampString(raw.propertyZip),
     heroPhotoUrl: clampString(raw.heroPhotoUrl),
+    editorialPhotoUrl: clampString(raw.editorialPhotoUrl),
     recommendedPrice: clampString(raw.recommendedPrice),
     priceRationale: clampString(raw.priceRationale),
     pricingStrategyId: clampString(raw.pricingStrategyId),

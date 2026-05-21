@@ -529,12 +529,27 @@
   max-width: 14ch;
 }
 .sep-presentation .video-poster {
+  /* A7b.1 collapse fix: the renderer emits .video-poster as an
+     <a> (inline by default), so aspect-ratio + width:100% don't
+     apply and the box would collapse to 0 — letting the
+     absolutely-positioned .play + .meta children spill into
+     neighboring sections. `display: block` engages the box-model
+     math; min-height is a belt-and-suspenders floor in case the
+     aspect-ratio computation fails (very old browsers). */
+  display: block;
   margin-top: 28px;
   position: relative;
   aspect-ratio: 4 / 5;
+  min-height: 380px;
   border-radius: var(--r-md);
   overflow: hidden;
-  background-color: #5e544a;
+  /* Solid fallback surface so the poster is always a filled box,
+     even with no posterUrl. Deeper warm ink-2 reads as intentional
+     editorial when no image is set (vs the lighter #5e544a which
+     looked like a missing image). The background-image is applied
+     INLINE by the renderer only when video.posterUrl is present —
+     never as a broken/empty url(). */
+  background-color: var(--ink-2);
   background-size: cover;
   background-position: center 25%;
   background-repeat: no-repeat;
@@ -1217,6 +1232,26 @@
   color: var(--ink-muted);
   margin-top: 8px;
   line-height: 1.55;
+}
+
+/* =====================================================================
+   EDITORIAL PAIR — photo band + dark buyer-quote panel (A7b.1)
+   ===================================================================== */
+.sep-presentation .editorial-pair {
+  border-bottom: 1px solid var(--paper-line);
+}
+.sep-presentation .editorial-photo {
+  /* Height-reserved like the hero — never collapses regardless of
+     image load state. Fallback warm-tone background reads as
+     intentional even if the URL is broken or still loading; the
+     renderer only attaches background-image inline when
+     editorialPhotoUrl is present, never an empty/broken url(). */
+  height: 280px;
+  min-height: 280px;
+  background-color: #b9a78a;
+  background-size: cover;
+  background-position: center 40%;
+  background-repeat: no-repeat;
 }
 
 /* =====================================================================

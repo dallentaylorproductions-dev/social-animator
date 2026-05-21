@@ -175,6 +175,13 @@ export interface PublicPayload {
   property: PublicProperty;
   preparedFor?: string;
   agentNote?: string;
+  /**
+   * A7b.1 — editorial photo band rendered ABOVE the dark buyer-quote
+   * panel as a visual lead-in. Public-safe, agent-entered; distinct
+   * from `property.heroPhotoUrl`. Optional → renderer hides the band
+   * when absent. Wizard capture lands in A7c.
+   */
+  editorialPhotoUrl?: string;
   video?: PresentationVideo;
   whyPrice: PublicWhyPrice;
   pitchPublicCards: PublicPitchCard[];
@@ -370,6 +377,7 @@ export function toPublicPayload(
     },
     preparedFor: draft.preparedFor,
     agentNote: draft.agentNote,
+    editorialPhotoUrl: draft.editorialPhotoUrl,
     video: projectPresentationVideo(draft.video),
     whyPrice: {
       publicRationale: priceRationale ?? "",
@@ -435,6 +443,8 @@ export function clampPublicPayload(raw: unknown): PublicPayload {
       rationaleShort: priceRationale,
     }),
     preparedFor: typeof r.preparedFor === "string" ? r.preparedFor : undefined,
+    editorialPhotoUrl:
+      typeof r.editorialPhotoUrl === "string" ? r.editorialPhotoUrl : undefined,
     agentNote: typeof r.agentNote === "string" ? r.agentNote : undefined,
     video: clampPresentationVideo(r.video),
     whyPrice: clampPublicWhyPrice(r.whyPrice, {

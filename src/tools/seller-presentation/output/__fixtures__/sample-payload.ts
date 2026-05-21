@@ -80,6 +80,14 @@ export const FULL_PAYLOAD: PublicPayload = {
   preparedFor: "the Halloran family",
   agentNote:
     "Here's exactly what I'd do to sell your home — and why I'm so confident in the number.",
+  // A7b.1: a small inline SVG so the editorial-band render path is
+  // exercised without depending on a network image. Renders as a
+  // warm-toned solid block (the locked design's fallback color) —
+  // proves the band reserves height + the renderer paints it.
+  // Wizard capture (A7c) will replace this with a real agent-entered
+  // photo URL.
+  editorialPhotoUrl:
+    "data:image/svg+xml;utf8,<svg xmlns='http://www.w3.org/2000/svg' viewBox='0 0 1 1' preserveAspectRatio='none'><rect width='1' height='1' fill='%23b9a78a'/></svg>",
   video: {
     posterUrl: undefined,
     videoUrl: "https://example.com/marisol-note.mp4",

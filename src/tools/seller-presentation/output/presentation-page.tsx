@@ -41,12 +41,11 @@ import "./presentation-page.css";
  *   - agent.photoUrl null       → monogram well in same dimensions
  *   - buyerQuote null           → quote panel hidden entirely
  *
- * Editorial photo gap (surfaced for the handoff, not patched here):
- * the locked design's `.editorial-pair` includes an editorial photo
- * band ABOVE the dark buyer-quote panel. A7a's payload has no field
- * for it; we render the dark quote panel solo. If Dallen wants the
- * full pair back, A7a can add `editorialPhotoUrl?: string` to the
- * payload (or the renderer can reuse property.heroPhotoUrl).
+ * Editorial photo band (A7b.1): the locked design's `.editorial-pair`
+ * includes an editorial photo ABOVE the dark buyer-quote panel as a
+ * visual lead-in — a different image than the hero. Renders when
+ * `payload.editorialPhotoUrl` is present; hides when absent (quote
+ * panel renders solo). Wizard capture for the field lands in A7c.
  */
 
 export function SellerPresentationPage({
@@ -861,11 +860,23 @@ function formatCompact(n: number): string {
 function BuyerQuoteSection({ payload }: { payload: PublicPayload }) {
   const q = payload.buyerQuote;
   if (!q) return null;
+  const editorialPhoto = payload.editorialPhotoUrl?.trim();
   return (
     <section className="editorial-pair" data-testid="sep-buyer-quote">
-      {/* Editorial photo band intentionally omitted — A7a's payload
-          has no field for it. See file header note for the A7a touch-up
-          if Dallen wants the full pair back. */}
+      {/* A7b.1: the editorial photo band lands above the dark quote
+          panel as a visual lead-in. Hides cleanly when editorialPhotoUrl
+          is absent (quote panel renders solo, A7b's behavior). Height
+          is reserved by CSS regardless of image load state. */}
+      {editorialPhoto && (
+        <div
+          className="editorial-photo"
+          aria-hidden="true"
+          data-testid="sep-editorial-photo"
+          style={{
+            backgroundImage: `url("${editorialPhoto.replace(/"/g, '\\"')}")`,
+          }}
+        />
+      )}
       <div className="quote-panel">
         <span className="qmark" aria-hidden="true">
           &ldquo;

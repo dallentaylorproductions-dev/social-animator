@@ -86,8 +86,9 @@ test.describe('Seller Presentation — A7b premium page render', () => {
     await expect(area).toBeVisible();
     await expect(area).not.toHaveClass(/area--empty/);
 
-    // Buyer quote (dark inset panel).
+    // Buyer quote (dark inset panel) + editorial photo band above it (A7b.1).
     await expect(page.getByTestId('sep-buyer-quote')).toBeVisible();
+    await expect(page.getByTestId('sep-editorial-photo')).toBeVisible();
 
     // Agent (dark chapter) — name + CTA.
     const agent = page.getByTestId('sep-agent');
@@ -120,6 +121,7 @@ test.describe('Seller Presentation — A7b premium page render', () => {
       'sep-testimonial',
       'sep-reviews',
       'sep-buyer-quote',
+      'sep-editorial-photo',
     ]) {
       await expect(page.getByTestId(testid)).toHaveCount(0);
     }
@@ -191,5 +193,76 @@ test.describe('Seller Presentation — A7b premium page render', () => {
     } finally {
       await context.close();
     }
+  });
+
+  test('A7b.1 — video-poster reserves height and keeps children INSIDE the poster (no overlap with neighboring sections)', async ({
+    page,
+  }) => {
+    // Dallen's A7b mobile smoke caught the video-poster collapsing
+    // to ~0 height — the absolutely-positioned .play + .meta children
+    // spilled out and overlapped the price-rationale above + the
+    // section title. Root cause: the renderer emits <a> for the
+    // poster (inline by default), so `aspect-ratio: 4/5` +
+    // `width: 100%` didn't apply. A7b.1 added `display: block` +
+    // `min-height: 380px` + a deeper warm fallback color. This spec
+    // asserts the box has real height AND that .play + .meta stay
+    // INSIDE the poster's bounding rect — the structural property
+    // that prevents the overlap.
+    //
+    // FULL fixture intentionally has `video.posterUrl: undefined`
+    // (the exact bug repro). The test runs against that path so the
+    // fix is validated against the same shape Dallen hit.
+    await page.goto('/seller-presentation-preview?fixture=full');
+    const poster = page.locator('.sep-presentation .video-poster');
+    await expect(poster).toBeVisible();
+
+    const posterBox = await poster.boundingBox();
+    expect(posterBox).not.toBeNull();
+    expect(posterBox!.height).toBeGreaterThanOrEqual(380);
+
+    const playBox = await poster.locator('.play').boundingBox();
+    const metaBox = await poster.locator('.meta').boundingBox();
+    expect(playBox).not.toBeNull();
+    expect(metaBox).not.toBeNull();
+
+    const within = (
+      inner: { x: number; y: number; width: number; height: number },
+      outer: { x: number; y: number; width: number; height: number },
+    ) =>
+      inner.x >= outer.x - 0.5 &&
+      inner.y >= outer.y - 0.5 &&
+      inner.x + inner.width <= outer.x + outer.width + 0.5 &&
+      inner.y + inner.height <= outer.y + outer.height + 0.5;
+
+    expect(
+      within(playBox!, posterBox!),
+      'video-poster .play overflowed the poster bounding box',
+    ).toBe(true);
+    expect(
+      within(metaBox!, posterBox!),
+      'video-poster .meta overflowed the poster bounding box',
+    ).toBe(true);
+  });
+
+  test('A7b.1 — editorial photo band reserves height and renders above the buyer-quote panel', async ({
+    page,
+  }) => {
+    await page.goto('/seller-presentation-preview?fixture=full');
+    const band = page.getByTestId('sep-editorial-photo');
+    await expect(band).toBeVisible();
+
+    // The band reserves a non-zero height via CSS regardless of
+    // image load state (height: 280px + min-height: 280px fallback).
+    const bandBox = await band.boundingBox();
+    expect(bandBox).not.toBeNull();
+    expect(bandBox!.height).toBeGreaterThanOrEqual(260);
+
+    // Visual lead-in ordering: the band sits ABOVE the quote panel
+    // (its top edge is higher in the page flow). bounding box `y` is
+    // increasing-downwards in Playwright's coordinate system.
+    const quote = page.locator('.sep-presentation .quote-panel');
+    const quoteBox = await quote.boundingBox();
+    expect(quoteBox).not.toBeNull();
+    expect(bandBox!.y).toBeLessThan(quoteBox!.y);
   });
 });

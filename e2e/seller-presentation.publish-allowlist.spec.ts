@@ -69,6 +69,7 @@ const S = {
   // ---- A7a public-safe sentinels (positive round-trip checks) ----
   preparedFor: 'the PUBLIC_SENTINEL_FAMILY family',
   agentNote: 'PUBLIC_SENTINEL_AGENT_NOTE_BODY',
+  editorialPhotoUrl: 'https://example.com/PUBLIC_SENTINEL_EDITORIAL.jpg',
   propertyState: 'WA',
   propertyZip: '98404',
   heroPhotoUrl: 'data:image/png;base64,PUBLIC_SENTINEL_HERO',
@@ -134,6 +135,7 @@ function maxedDraft(): SellerPresentationDraft {
 
     preparedFor: S.preparedFor,
     agentNote: S.agentNote,
+    editorialPhotoUrl: S.editorialPhotoUrl,
     video: {
       posterUrl: S.videoPoster,
       videoUrl: S.videoUrl,
@@ -283,6 +285,7 @@ test.describe('toPublicPayload — privacy allowlist (R-1 proof)', () => {
 
     expect(payload.preparedFor).toBe(S.preparedFor);
     expect(payload.agentNote).toBe(S.agentNote);
+    expect(payload.editorialPhotoUrl).toBe(S.editorialPhotoUrl);
 
     expect(payload.video).toBeDefined();
     expect(payload.video?.videoUrl).toBe(S.videoUrl);
@@ -538,6 +541,7 @@ test.describe('toPublicPayload — privacy allowlist (R-1 proof)', () => {
       'buyerQuote',
       'preparedFor',
       'agentNote',
+      'editorialPhotoUrl',
     ]) {
       expect(serialized).not.toContain(`"${optionalKey}":`);
     }
@@ -551,6 +555,7 @@ test.describe('toPublicPayload — privacy allowlist (R-1 proof)', () => {
     expect(payload.buyerQuote).toBeUndefined();
     expect(payload.preparedFor).toBeUndefined();
     expect(payload.agentNote).toBeUndefined();
+    expect(payload.editorialPhotoUrl).toBeUndefined();
 
     // Required grouped blocks still emit with sane defaults.
     expect(payload.property.address).toBe('');
