@@ -1,0 +1,4176 @@
+<!-- ===== LOCKED SELLER-PRESENTATION DESIGN (cleaned reference: markup + CSS; fonts/images stripped) ===== -->
+<style>
+<style>
+    * { margin: 0; padding: 0; box-sizing: border-box; }
+    body { background: #E8E0D2; display: flex; align-items: center; justify-content: center; min-height: 100vh; font-family: -apple-system, BlinkMacSystemFont, sans-serif; }
+    #__bundler_loading { position: fixed; bottom: 20px; right: 20px; font: 13px/1.4 -apple-system, BlinkMacSystemFont, sans-serif; color: #666; background: #fff; padding: 8px 14px; border-radius: 8px; box-shadow: 0 1px 4px rgba(0,0,0,0.12); z-index: 10000; }
+    #__bundler_thumbnail { position: fixed; inset: 0; width: 100%; height: 100%; display: flex; align-items: center; justify-content: center; background: #E8E0D2; z-index: 9999; }
+    #__bundler_thumbnail svg { width: 100%; height: 100%; object-fit: contain; }
+    #__bundler_placeholder { color: #999; font-size: 14px; }
+  </style>
+<style>#__bundler_loading { display: none; }</style>
+<style>/* cyrillic-ext */
+/* @font-face omitted */
+/* cyrillic */
+/* @font-face omitted */
+/* vietnamese */
+/* @font-face omitted */
+/* latin-ext */
+/* @font-face omitted */
+/* latin */
+/* @font-face omitted */
+/* cyrillic-ext */
+/* @font-face omitted */
+/* cyrillic */
+/* @font-face omitted */
+/* vietnamese */
+/* @font-face omitted */
+/* latin-ext */
+/* @font-face omitted */
+/* latin */
+/* @font-face omitted */
+/* cyrillic-ext */
+/* @font-face omitted */
+/* cyrillic */
+/* @font-face omitted */
+/* vietnamese */
+/* @font-face omitted */
+/* latin-ext */
+/* @font-face omitted */
+/* latin */
+/* @font-face omitted */
+/* cyrillic-ext */
+/* @font-face omitted */
+/* cyrillic */
+/* @font-face omitted */
+/* vietnamese */
+/* @font-face omitted */
+/* latin-ext */
+/* @font-face omitted */
+/* latin */
+/* @font-face omitted */
+/* cyrillic-ext */
+/* @font-face omitted */
+/* cyrillic */
+/* @font-face omitted */
+/* vietnamese */
+/* @font-face omitted */
+/* latin-ext */
+/* @font-face omitted */
+/* latin */
+/* @font-face omitted */
+/* cyrillic-ext */
+/* @font-face omitted */
+/* cyrillic */
+/* @font-face omitted */
+/* symbols2 */
+/* @font-face omitted */
+/* vietnamese */
+/* @font-face omitted */
+/* latin-ext */
+/* @font-face omitted */
+/* latin */
+/* @font-face omitted */
+/* cyrillic-ext */
+/* @font-face omitted */
+/* cyrillic */
+/* @font-face omitted */
+/* symbols2 */
+/* @font-face omitted */
+/* vietnamese */
+/* @font-face omitted */
+/* latin-ext */
+/* @font-face omitted */
+/* latin */
+/* @font-face omitted */
+/* latin-ext */
+/* @font-face omitted */
+/* latin */
+/* @font-face omitted */
+/* latin-ext */
+/* @font-face omitted */
+/* latin */
+/* @font-face omitted */
+</style>
+<style>
+  /* ============================================
+     STUDIO SEP — Seller Presentation (Consumer)
+     Warm paper register · mobile-first · editorial
+     ============================================ */
+  :root {
+    --paper: #F1EBE0;
+    --paper-deep: #E8E0D2;
+    --paper-raise: #FBF7EE;
+    --paper-card: #FCF9F2;
+    --paper-line: #E0D6C5;
+    --paper-line-soft: #EAE1D0;
+    --ink: #1A1612;
+    --ink-2: #2A241F;
+    --ink-muted: #6E665B;
+    --ink-faint: #A29888;
+    --mint: #4EF2D9;
+    --mint-deep: #1F8F7C;
+    --gold: #C9A86A;
+    --gold-warm: #B8965A;
+    --brick: #C26A4E;
+    --brick-deep: #A85439;
+    --rose: #D29A9A;
+    --pos: #1D9E75;
+    --pos-bright: #6EE7A8;
+    --chart-blue: #3F6C8E;
+    --chart-blue-deep: #2C5474;
+    --display: "Instrument Serif", "Iowan Old Style", Georgia, serif;
+    --ui: "Geist", -apple-system, BlinkMacSystemFont, "Segoe UI", system-ui, sans-serif;
+    --mono: "Geist Mono", ui-monospace, SFMono-Regular, Menlo, monospace;
+    --r-md: 10px; --r-lg: 14px; --r-xl: 20px; --r-2xl: 28px; --r-pill: 999px;
+    --ease: cubic-bezier(.2,.7,.1,1);
+    --shadow-card: 0 1px 0 rgba(255,255,255,.7) inset, 0 18px 40px -26px rgba(40,28,16,.18);
+    --shadow-paper: 0 1px 0 rgba(255,255,255,.6) inset, 0 32px 80px -40px rgba(40,28,16,.22);
+  }
+  * { box-sizing: border-box; }
+  html, body { margin: 0; padding: 0; }
+  body {
+    font-family: var(--ui);
+    background: var(--paper-deep);
+    color: var(--ink);
+    -webkit-font-smoothing: antialiased;
+    text-rendering: optimizeLegibility;
+    font-feature-settings: "ss01", "cv11";
+    min-height: 100vh;
+  }
+
+  /* ===== Outer stage (so the phone-width page feels presented) ===== */
+  .stage {
+    min-height: 100vh;
+    padding: 56px 24px 80px;
+    display: flex;
+    flex-direction: column;
+    align-items: center;
+    gap: 40px;
+    background:
+      radial-gradient(60% 40% at 50% 0%, #F1E9DA 0%, transparent 60%),
+      var(--paper-deep);
+  }
+  .stage-head {
+    width: 100%; max-width: 460px;
+    display: flex; align-items: center; justify-content: space-between;
+    font-family: var(--mono); font-size: 10.5px;
+    color: var(--ink-faint); letter-spacing: .14em; text-transform: uppercase;
+  }
+  .stage-head .brand {
+    display: flex; align-items: center; gap: 10px;
+    color: var(--ink-muted);
+  }
+  .stage-head .brand .glyph {
+    width: 18px; height: 18px;
+    border-radius: 5px;
+    background: var(--mint);
+    color: #0A2A24;
+    display: grid; place-items: center;
+    font-family: var(--display); font-size: 13px; font-style: italic;
+    letter-spacing: -.02em; line-height: 1;
+  }
+  .stage-head .brand .wordmark {
+    font-family: var(--display); font-size: 15px;
+    color: var(--ink); letter-spacing: -.01em;
+    text-transform: none;
+  }
+  .stage-head .brand .wordmark em { font-style: italic; color: var(--mint-deep); }
+  .stage-head .url { text-transform: lowercase; letter-spacing: .04em; }
+
+  /* ===== The page itself ===== */
+  .page {
+    width: 100%;
+    max-width: 430px;
+    background: var(--paper);
+    border-radius: 32px;
+    overflow: hidden;
+    box-shadow: var(--shadow-paper);
+    position: relative;
+    color: var(--ink);
+  }
+
+  /* ===== Top app-bar inside the page ===== */
+  .appbar {
+    position: absolute;
+    top: 0; left: 0; right: 0;
+    padding: 18px 22px 14px;
+    display: flex; align-items: center; justify-content: space-between;
+    z-index: 5;
+    background: linear-gradient(180deg, rgba(0,0,0,.32) 0%, rgba(0,0,0,0) 100%);
+    color: #fbf6ec;
+  }
+  .appbar .prepared {
+    font-family: var(--mono);
+    font-size: 9.5px;
+    letter-spacing: .18em;
+    text-transform: uppercase;
+    opacity: .9;
+  }
+  .appbar .share {
+    width: 30px; height: 30px;
+    border-radius: 50%;
+    background: rgba(255,255,255,.14);
+    backdrop-filter: blur(8px);
+    display: grid; place-items: center;
+    border: 1px solid rgba(255,255,255,.18);
+  }
+  .appbar .share svg {
+    width: 14px; height: 14px;
+    stroke: #fbf6ec; stroke-width: 1.5;
+    fill: none; stroke-linecap: round; stroke-linejoin: round;
+  }
+
+  /* ===== Hero photo (clean band — no text over the image) ===== */
+  .hero {
+    position: relative;
+    height: 480px;
+    background: #1A1612;
+    color: #fbf6ec;
+    overflow: hidden;
+    margin-bottom: 0;
+  }
+  /* 1px inset frame — subtle craft detail */
+  .hero::after {
+    content: "";
+    position: absolute;
+    inset: 14px;
+    border: 1px solid rgba(255,255,255,.10);
+    pointer-events: none;
+    z-index: 4;
+  }
+  .hero-photo {
+    position: absolute;
+    inset: -2%;
+    background:
+      url("9852360d-e764-4f4d-b47d-aed100095ba1") center 38% / cover no-repeat,
+      #c8b69a;
+    z-index: 0;
+    animation: kenburns 22s cubic-bezier(.4,.0,.6,1) forwards;
+    transform-origin: 50% 45%;
+  }
+  .hero .appbar { position: relative; z-index: 2; }
+
+  /* ===== Caption card — dark ink, overlaps bottom of photo ===== */
+  .caption-wrap {
+    position: relative;
+    margin: -44px 18px 0; /* overlap the photo by 44px */
+    z-index: 3;
+  }
+  .caption-card {
+    background: #16110D;
+    color: #F4EFE4;
+    border-radius: 14px;
+    padding: 22px 26px 26px;
+    box-shadow:
+      0 1px 0 rgba(255,255,255,.05) inset,
+      0 22px 50px -28px rgba(20,12,4,.55),
+      0 6px 18px -10px rgba(20,12,4,.35);
+    border: 1px solid rgba(255,255,255,.04);
+  }
+  .caption-card .for {
+    font-family: var(--mono);
+    font-size: 9.5px;
+    letter-spacing: .22em;
+    text-transform: uppercase;
+    color: var(--mint);
+    display: flex; align-items: center; gap: 10px;
+    margin-bottom: 12px;
+  }
+  .caption-card .for::before {
+    content: "";
+    width: 6px; height: 6px;
+    background: var(--mint);
+    border-radius: 50%;
+  }
+  .caption-card .kicker {
+    font-family: var(--mono);
+    font-size: 10.5px;
+    letter-spacing: .18em;
+    text-transform: uppercase;
+    color: rgba(244,239,228,.65);
+    margin-bottom: 16px;
+    display: flex; align-items: center; gap: 10px;
+  }
+  .caption-card .kicker::before {
+    content: "";
+    width: 18px; height: 1px;
+    background: currentColor;
+    opacity: .55;
+  }
+  .caption-card .addr {
+    font-family: var(--display);
+    font-weight: 400;
+    font-size: 40px;
+    line-height: 1.02;
+    letter-spacing: -.025em;
+    margin: 0;
+    color: #F4EFE4;
+    /* Avoid the street number breaking from "Kenilworth" */
+    text-wrap: balance;
+  }
+  .caption-card .addr em {
+    font-style: italic;
+    display: block;
+    margin-top: 2px;
+  }
+  .caption-card .city {
+    font-family: var(--mono);
+    font-size: 10.5px;
+    letter-spacing: .14em;
+    text-transform: uppercase;
+    margin-top: 18px;
+    padding-top: 18px;
+    border-top: 1px solid rgba(244,239,228,.12);
+    color: rgba(244,239,228,.55);
+  }
+
+  /* ===== Price panel directly below caption card ===== */
+  /* HERO PRICE TREATMENT — oversized serif w/ brick side accent */
+  .price-panel {
+    padding: 52px 28px 40px;
+    margin-top: 0;
+    background: var(--paper-raise);
+    border-bottom: 1px solid var(--paper-line);
+    position: relative;
+  }
+  .price-panel::before {
+    /* brick vertical accent bar */
+    content: "";
+    position: absolute;
+    left: 28px; top: 52px;
+    width: 3px; height: calc(100% - 92px);
+    background: var(--brick);
+  }
+  .price-panel .lbl {
+    font-family: var(--mono);
+    font-size: 10.5px;
+    letter-spacing: .18em;
+    text-transform: uppercase;
+    color: var(--brick);
+    margin-bottom: 18px;
+    padding-left: 18px;
+    display: flex; align-items: center; gap: 10px;
+  }
+  .price-panel .lbl::before { display: none; }
+  .price-panel .price {
+    border-bottom: 1px solid var(--paper-line-soft);
+    padding: 0 0 26px 18px;
+  }
+  .price-panel .rationale {
+    padding-left: 18px;
+  }
+
+  /* ===== Personal note from agent (warm paper, between caption + price) ===== */
+  .personal-note {
+    margin: 18px 0 0;
+    padding: 36px 28px 30px;
+    background: var(--paper);
+    text-align: left;
+    position: relative;
+  }
+  .personal-note .from {
+    font-family: var(--mono);
+    font-size: 10px;
+    letter-spacing: .18em;
+    text-transform: uppercase;
+    color: var(--ink-faint);
+    margin-bottom: 14px;
+    display: flex; align-items: center; gap: 10px;
+  }
+  .personal-note .from::before {
+    content: "";
+    width: 18px; height: 1px;
+    background: currentColor;
+    opacity: .55;
+  }
+  .personal-note .pn-body {
+    font-family: var(--display);
+    font-style: italic;
+    font-size: 24px;
+    line-height: 1.28;
+    letter-spacing: -.015em;
+    color: var(--ink);
+    margin: 0;
+    max-width: 30ch;
+  }
+  .personal-note .sig {
+    margin-top: 18px;
+    font-family: var(--display);
+    font-style: italic;
+    font-size: 17px;
+    letter-spacing: -.005em;
+    color: var(--brick);
+  }
+  .personal-note .sig::before {
+    content: "";
+    display: inline-block;
+    width: 22px; height: 1px;
+    background: var(--brick);
+    vertical-align: middle;
+    margin-right: 10px;
+    opacity: .8;
+  }
+
+  /* ===== Track record block — DARK CHAPTER ===== */
+  .track {
+    padding: 64px 28px 60px;
+    border-bottom: 1px solid rgba(0,0,0,.4);
+    background:
+      radial-gradient(120% 60% at 0% 0%, rgba(201,168,106,.06) 0%, transparent 60%),
+      linear-gradient(180deg, #1A1612 0%, #14110D 100%);
+    color: #F4EFE4;
+    position: relative;
+  }
+  .track .sec-label { color: rgba(244,239,228,.55); }
+  .track .sec-label .num { color: var(--gold); }
+  .track .sec-label .num::before { background: var(--mint); }
+  .track .sec-label .lbl { background: rgba(244,239,228,.16); }
+  .track .sec-label .name { color: rgba(244,239,228,.55); }
+  .track .sec-title { color: #F4EFE4; max-width: 14ch; }
+  .track .sec-title em { color: var(--gold); font-style: italic; }
+  .track .sec-body { color: rgba(244,239,228,.72); }
+
+  /* Structured stat ROWS on the dark chapter — horizontal layout
+     for clean baselines: [BIG NUMBER]  |  LABEL / descriptor */
+  .track-figures {
+    margin-top: 40px;
+    border-top: 1px solid rgba(244,239,228,.14);
+    border-bottom: 1px solid rgba(244,239,228,.14);
+  }
+  .tf {
+    padding: 28px 0 26px;
+    border-bottom: 1px solid rgba(244,239,228,.10);
+    display: grid;
+    grid-template-columns: 130px 1fr;
+    gap: 28px;
+    align-items: center;
+    background: transparent;
+  }
+  .tf:last-child { border-bottom: 0; }
+  .tf .v {
+    font-family: var(--display);
+    font-size: 64px;
+    line-height: .9;
+    letter-spacing: -.035em;
+    color: var(--gold);
+    display: flex;
+    align-items: baseline;
+  }
+  .tf .v em {
+    font-style: italic;
+    font-size: 30px;
+    color: rgba(201,168,106,.65);
+    letter-spacing: -.02em;
+    margin-left: 2px;
+  }
+  .tf .l {
+    font-family: var(--mono);
+    font-size: 10px;
+    letter-spacing: .16em;
+    text-transform: uppercase;
+    color: rgba(244,239,228,.5);
+    line-height: 1.4;
+  }
+  .tf .l strong {
+    display: block;
+    color: #F4EFE4;
+    font-weight: 500;
+    margin-bottom: 8px;
+    letter-spacing: .14em;
+    font-size: 11px;
+  }
+  .tf .l small {
+    display: block;
+    font-family: var(--ui);
+    font-size: 13px;
+    color: rgba(244,239,228,.62);
+    letter-spacing: 0;
+    text-transform: none;
+    margin-top: 0;
+    line-height: 1.45;
+    font-weight: 400;
+    max-width: 30ch;
+  }
+
+  /* Past-seller testimonial on the dark chapter */
+  .testimonial {
+    margin-top: 40px;
+    padding-top: 4px;
+    display: grid;
+    grid-template-columns: 22px 1fr;
+    gap: 18px;
+    align-items: start;
+  }
+  .testimonial .rule {
+    width: 1px;
+    background: var(--brick);
+    align-self: stretch;
+    margin-top: 6px;
+    opacity: .9;
+  }
+  .testimonial .ts-body {
+    font-family: var(--display);
+    font-style: italic;
+    font-size: 22px;
+    line-height: 1.32;
+    letter-spacing: -.01em;
+    color: #F4EFE4;
+    margin: 0 0 16px;
+    max-width: 36ch;
+  }
+  .testimonial .att {
+    font-family: var(--mono);
+    font-size: 10px;
+    letter-spacing: .16em;
+    text-transform: uppercase;
+    color: rgba(244,239,228,.5);
+    display: flex; align-items: center; gap: 10px;
+  }
+  .testimonial .att .nm { color: rgba(244,239,228,.85); font-weight: 500; }
+
+  /* ===== CTA reassurance microcopy ===== */
+  .cta-reassure {
+    margin: 14px 22px 0;
+    font-family: var(--ui);
+    font-size: 12.5px;
+    line-height: 1.55;
+    color: rgba(244,239,228,.55);
+    font-style: italic;
+    letter-spacing: -.005em;
+    text-align: center;
+  }
+
+  /* ============================================
+     VIDEO BLOCK (optional — hides if no video)
+     ============================================ */
+  .video-block {
+    padding: 56px 28px;
+    background: var(--paper-card);
+    border-bottom: 1px solid var(--paper-line);
+  }
+  .video-block .sec-title { max-width: 14ch; }
+  .video-poster {
+    margin-top: 28px;
+    position: relative;
+    aspect-ratio: 4 / 5;
+    border-radius: var(--r-md);
+    overflow: hidden;
+    background:
+      linear-gradient(180deg, rgba(0,0,0,0) 50%, rgba(20,14,8,.55) 100%),
+      url("7a6f56bc-31d1-48cf-844e-b9d6407b6783") center 25% / cover no-repeat,
+      #5e544a;
+    box-shadow: var(--shadow-card);
+    cursor: pointer;
+    transition: transform var(--ease) 220ms;
+  }
+  /* subtle inset frame, mirrors hero photo */
+  .video-poster::after {
+    content: "";
+    position: absolute;
+    inset: 10px;
+    border: 1px solid rgba(255,255,255,.18);
+    pointer-events: none;
+    border-radius: 4px;
+  }
+  .video-poster:hover { transform: translateY(-2px); }
+  .video-poster .play {
+    position: absolute;
+    top: 50%; left: 50%;
+    transform: translate(-50%, -50%);
+    width: 64px; height: 64px;
+    border-radius: 50%;
+    background: rgba(244,239,228,.92);
+    backdrop-filter: blur(6px);
+    border: 1px solid rgba(255,255,255,.4);
+    display: grid; place-items: center;
+    transition: background var(--ease) 140ms, transform var(--ease) 140ms;
+  }
+  .video-poster:hover .play { background: #FFFFFF; transform: translate(-50%, -50%) scale(1.04); }
+  .video-poster .play::before {
+    content: "";
+    width: 0; height: 0;
+    border-left: 14px solid var(--ink);
+    border-top: 9px solid transparent;
+    border-bottom: 9px solid transparent;
+    margin-left: 4px;
+  }
+  .video-poster .meta {
+    position: absolute;
+    left: 22px; bottom: 22px; right: 22px;
+    color: #fbf6ec;
+    z-index: 2;
+  }
+  .video-poster .meta .ttl {
+    font-family: var(--display);
+    font-size: 24px;
+    line-height: 1.18;
+    letter-spacing: -.015em;
+    text-shadow: 0 1px 1px rgba(0,0,0,.55), 0 2px 18px rgba(0,0,0,.45);
+    max-width: 22ch;
+  }
+  .video-poster .meta .ttl em { font-style: italic; }
+  .video-poster .meta .runtime {
+    font-family: var(--mono);
+    font-size: 10px;
+    letter-spacing: .18em;
+    text-transform: uppercase;
+    opacity: .88;
+    margin-top: 10px;
+    display: flex; align-items: center; gap: 10px;
+  }
+  .video-poster .meta .runtime::before {
+    content: "";
+    width: 18px; height: 1px;
+    background: currentColor;
+    opacity: .55;
+  }
+
+  /* ============================================
+     REVIEWS BLOCK (optional — hides if no reviews)
+     ============================================ */
+  .reviews {
+    padding: 60px 28px 56px;
+    background: var(--paper-raise);
+    border-bottom: 1px solid var(--paper-line);
+  }
+  .reviews .sec-title { max-width: 16ch; }
+  .reviews-list {
+    margin-top: 32px;
+    display: flex; flex-direction: column;
+    gap: 0;
+    border-top: 1px solid var(--paper-line-soft);
+  }
+  .review {
+    padding: 26px 0 24px;
+    border-bottom: 1px solid var(--paper-line-soft);
+    display: grid;
+    grid-template-columns: auto 1fr;
+    gap: 18px;
+    align-items: start;
+  }
+  .review .qm {
+    font-family: var(--display);
+    font-style: italic;
+    font-size: 32px;
+    line-height: .5;
+    color: var(--rose);
+    padding-top: 18px;
+    width: 18px;
+    text-align: center;
+  }
+  .review .rv-body {
+    font-family: var(--display);
+    font-size: 19px;
+    line-height: 1.36;
+    letter-spacing: -.005em;
+    color: var(--ink);
+    margin: 0 0 14px;
+    max-width: 36ch;
+  }
+  .review .rv-body em { font-style: italic; }
+  .review .att {
+    font-family: var(--mono);
+    font-size: 10px;
+    letter-spacing: .16em;
+    text-transform: uppercase;
+    color: var(--ink-faint);
+  }
+  .review .att .nm { color: var(--ink-muted); font-weight: 500; }
+  .reviews-outlink {
+    margin-top: 24px;
+    display: inline-flex; align-items: center; gap: 10px;
+    font-family: var(--ui);
+    font-size: 13px;
+    color: var(--ink);
+    text-decoration: none;
+    border-bottom: 1px solid var(--brick);
+    padding-bottom: 2px;
+    letter-spacing: -.005em;
+    transition: gap var(--ease) 140ms;
+  }
+  .reviews-outlink:hover { gap: 14px; }
+  .reviews-outlink::after {
+    content: "→";
+    color: var(--brick);
+    font-size: 14px;
+  }
+
+  /* ============================================
+     Closing mark (signature mint dot at the end)
+     ============================================ */
+  .end-mark {
+    text-align: center;
+    padding: 36px 28px 18px;
+    background: var(--ink);
+  }
+  .end-mark .dot {
+    display: inline-block;
+    width: 5px; height: 5px;
+    background: var(--mint);
+    border-radius: 50%;
+    margin: 0 6px;
+    vertical-align: middle;
+  }
+  .end-mark .rule {
+    display: inline-block;
+    width: 18px; height: 1px;
+    background: rgba(244,239,228,.18);
+    vertical-align: middle;
+  }
+  .price {
+    font-family: var(--display);
+    font-weight: 400;
+    font-size: 108px;
+    line-height: .88;
+    letter-spacing: -.04em;
+    color: var(--ink);
+    display: flex; align-items: flex-start;
+  }
+  .price .dollar {
+    font-size: 42px;
+    line-height: 1;
+    margin: 10px 4px 0 0;
+    color: var(--brick);
+    letter-spacing: -.02em;
+  }
+  .rationale {
+    margin-top: 22px;
+    font-family: var(--display);
+    font-style: italic;
+    font-size: 22px;
+    line-height: 1.28;
+    letter-spacing: -.01em;
+    color: var(--ink-2);
+    max-width: 32ch;
+  }
+  .rationale::before {
+    content: "";
+    display: block;
+    width: 28px; height: 1px;
+    background: var(--brick);
+    margin-bottom: 18px;
+  }
+
+  /* ===== Section scaffolding ===== */
+  section.block {
+    padding: 56px 28px;
+    border-bottom: 1px solid var(--paper-line);
+  }
+  section.block:last-of-type { border-bottom: 0; }
+  /* Background variants for editorial rhythm */
+  section.block.paper { background: var(--paper); }
+  section.block.raise { background: var(--paper-raise); }
+  section.block.card { background: var(--paper-card); }
+
+  /* ===== Refined numbered-section ornament =====
+     [mint dot] [italic serif numeral] [hairline] [mono label]
+     ============================================ */
+  .sec-label {
+    font-family: var(--mono);
+    font-size: 10.5px;
+    letter-spacing: .18em;
+    text-transform: uppercase;
+    color: var(--ink-faint);
+    margin-bottom: 22px;
+    display: flex; align-items: center; gap: 14px;
+  }
+  .sec-label::after { display: none; }
+  .sec-label .num {
+    font-family: var(--display);
+    font-style: italic;
+    font-size: 17px;
+    line-height: 1;
+    letter-spacing: -.01em;
+    color: var(--brick);
+    text-transform: none;
+    position: relative;
+    padding-left: 14px;
+    font-weight: 400;
+  }
+  .sec-label .num::before {
+    content: "";
+    position: absolute;
+    left: 0; top: 50%;
+    width: 5px; height: 5px;
+    background: var(--mint);
+    border-radius: 50%;
+    transform: translateY(-50%);
+  }
+  .sec-label .lbl {
+    flex: 1;
+    height: 1px;
+    background: var(--paper-line);
+    align-self: center;
+  }
+  .sec-label .name {
+    color: var(--ink-muted);
+    letter-spacing: .18em;
+    text-transform: uppercase;
+    font-family: var(--mono);
+    font-size: 10.5px;
+  }
+  .sec-title {
+    font-family: var(--display);
+    font-weight: 400;
+    font-size: 44px;
+    line-height: 1;
+    letter-spacing: -.025em;
+    margin: 0 0 22px;
+    color: var(--ink);
+    max-width: 12ch;
+  }
+  .sec-title em { font-style: italic; }
+  .sec-body {
+    font-size: 16px;
+    line-height: 1.55;
+    color: var(--ink-2);
+    margin: 0;
+    max-width: 38ch;
+  }
+  .sec-body + .sec-body { margin-top: 14px; }
+
+  /* Serif drop-cap (used on the first paragraph of “Why this price”) */
+  .sec-body.drop-cap::first-letter {
+    font-family: var(--display);
+    font-size: 64px;
+    line-height: .85;
+    float: left;
+    color: var(--brick);
+    padding: 4px 12px 0 0;
+    margin-top: 4px;
+    font-style: italic;
+    letter-spacing: -.02em;
+  }
+
+  /* ===== Why this price — comps ===== */
+  .comps {
+    margin-top: 36px;
+    border-top: 1px solid var(--paper-line-soft);
+  }
+  .comp {
+    display: grid;
+    grid-template-columns: 28px 1fr auto;
+    align-items: baseline;
+    gap: 16px;
+    padding: 22px 0;
+    border-bottom: 1px solid var(--paper-line-soft);
+  }
+  .comp .idx {
+    font-family: var(--mono);
+    font-size: 10.5px;
+    color: var(--ink-faint);
+    letter-spacing: .12em;
+    line-height: 1.3;
+    padding-top: 4px;
+  }
+  .comp .addr {
+    font-family: var(--display);
+    font-size: 21px;
+    line-height: 1.18;
+    letter-spacing: -.01em;
+    color: var(--ink);
+  }
+  .comp .addr small {
+    display: block;
+    font-family: var(--ui);
+    font-size: 11.5px;
+    color: var(--ink-muted);
+    letter-spacing: 0;
+    margin-top: 3px;
+    font-weight: 400;
+  }
+  .comp .sold {
+    font-family: var(--display);
+    font-size: 24px;
+    color: var(--ink);
+    letter-spacing: -.015em;
+    text-align: right;
+    line-height: 1;
+  }
+  .comp .sold small {
+    display: block;
+    font-family: var(--mono);
+    font-size: 9.5px;
+    color: var(--ink-faint);
+    letter-spacing: .12em;
+    text-transform: uppercase;
+    margin-top: 6px;
+    font-weight: 400;
+  }
+  .comps-note {
+    margin-top: 18px;
+    font-family: var(--mono);
+    font-size: 10.5px;
+    color: var(--ink-faint);
+    letter-spacing: .06em;
+    line-height: 1.6;
+  }
+
+  /* graceful missing-comp state */
+  .comp.missing {
+    grid-template-columns: 28px 1fr;
+    color: var(--ink-faint);
+  }
+  .comp.missing .addr {
+    font-family: var(--ui);
+    font-size: 13px;
+    font-style: italic;
+    color: var(--ink-faint);
+    letter-spacing: 0;
+  }
+
+  /* ===== "What I'll do for you" — pitch points ===== */
+  .pitch {
+    background: var(--paper-card);
+    margin: 0;
+    padding: 56px 28px;
+    border-bottom: 1px solid var(--paper-line);
+    position: relative;
+  }
+  .pitch .sec-title { max-width: 14ch; }
+  .pitches {
+    margin-top: 32px;
+    display: flex; flex-direction: column;
+    gap: 28px;
+  }
+  .pp {
+    display: grid;
+    grid-template-columns: 40px 1fr;
+    gap: 18px;
+    align-items: baseline;
+  }
+  .pp .n {
+    font-family: var(--display);
+    font-style: italic;
+    font-size: 30px;
+    color: var(--brick);
+    line-height: 1;
+    letter-spacing: -.01em;
+    padding-top: 2px;
+  }
+  .pp .t {
+    font-family: var(--display);
+    font-size: 22px;
+    line-height: 1.22;
+    letter-spacing: -.015em;
+    color: var(--ink);
+  }
+  .pp .t small {
+    display: block;
+    font-family: var(--ui);
+    font-size: 13.5px;
+    color: var(--ink-muted);
+    line-height: 1.5;
+    margin-top: 6px;
+    letter-spacing: 0;
+  }
+
+  /* ===== Recent area sales (kept as comment anchor) ===== */
+  /* (styles consolidated into the new block above) */
+
+  /* ===== area-head (kept) ===== */
+  .area-head {
+    display: flex; justify-content: space-between; align-items: baseline;
+    margin-bottom: 28px;
+  }
+  .area-head .zip {
+    font-family: var(--mono);
+    font-size: 10.5px;
+    color: var(--ink-faint);
+    letter-spacing: .14em;
+    text-transform: uppercase;
+  }
+  .chart-wrap {
+    margin-top: 36px;
+    padding: 44px 28px 40px;
+    background: linear-gradient(180deg, #FCF9F2 0%, #FBF6EA 100%);
+    border: 1px solid var(--paper-line);
+    border-radius: 14px;
+  }
+  .chart-head {
+    display: flex; justify-content: space-between; align-items: flex-end;
+    margin-bottom: 44px;
+  }
+  .chart-head .l {
+    font-family: var(--mono);
+    font-size: 10px;
+    letter-spacing: .16em;
+    text-transform: uppercase;
+    color: var(--ink-faint);
+    line-height: 1.4;
+  }
+  .chart-head .l strong {
+    display: block;
+    color: var(--ink-muted);
+    font-weight: 500;
+    margin-bottom: 4px;
+    font-size: 10px;
+    letter-spacing: .16em;
+  }
+  .chart-head .pct {
+    font-family: var(--display);
+    font-size: 28px;
+    line-height: 1;
+    letter-spacing: -.02em;
+    color: var(--pos);
+    display: flex; align-items: baseline; gap: 8px;
+  }
+  .chart-head .pct small {
+    font-family: var(--mono);
+    font-size: 9.5px;
+    color: var(--ink-faint);
+    letter-spacing: .14em;
+    text-transform: uppercase;
+  }
+  .chart {
+    width: 100%;
+    display: block;
+    overflow: visible;
+    font-family: var(--mono);
+  }
+  .chart .gridline { stroke: var(--paper-line-soft); stroke-width: 1; }
+  .chart .baseline { stroke: var(--ink); stroke-opacity: .22; stroke-width: 1; }
+  .chart .y-label, .chart .x-label {
+    font-size: 8.5px;
+    letter-spacing: .14em;
+    text-transform: uppercase;
+    fill: var(--ink-faint);
+  }
+  /* Engaging area fill — gradient that intensifies toward the current month */
+  .chart .area-fill {
+    fill: url(#chartFill);
+  }
+  .chart .line-stroke {
+    fill: none;
+    stroke: var(--chart-blue);
+    stroke-width: 2.6;
+    stroke-linejoin: round;
+    stroke-linecap: round;
+  }
+  /* Small subtle dots at each month */
+  .chart .point {
+    fill: var(--paper-card);
+    stroke: var(--chart-blue);
+    stroke-width: 1.4;
+  }
+  /* Current month — layered marker: a soft ring + filled dot */
+  .chart .point-current-ring {
+    fill: rgba(63, 108, 142, .22);
+    stroke: none;
+  }
+  .chart .point-current {
+    fill: var(--chart-blue);
+    stroke: var(--paper-card);
+    stroke-width: 2.5;
+  }
+  /* Sonar pulse — two layered circles scale outward and fade */
+  .chart .point-current-pulse {
+    fill: var(--chart-blue);
+    transform-origin: center;
+    transform-box: fill-box;
+    animation: sonar 2.6s cubic-bezier(0,0,.2,1) infinite;
+  }
+  .chart .point-current-pulse.delay { animation-delay: 1.3s; }
+  @keyframes sonar {
+    0%   { transform: scale(1);   opacity: 0.55; }
+    80%  { opacity: 0; }
+    100% { transform: scale(5);   opacity: 0; }
+  }
+  /* Vertical guide from current point down to baseline */
+  .chart .current-guide {
+    stroke: var(--gold);
+    stroke-width: 1;
+    stroke-dasharray: 2 3;
+    opacity: .35;
+  }
+  /* Callout */
+  .chart .callout-line {
+    stroke: var(--gold);
+    stroke-width: 1;
+    stroke-dasharray: 2 3;
+    opacity: .65;
+  }
+  .chart .callout-bg {
+    fill: var(--paper-card);
+    stroke: rgba(184, 150, 90, .35);
+    stroke-width: 1;
+  }
+  .chart .callout-text {
+    font-family: var(--display);
+    font-size: 22px;
+    fill: var(--chart-blue-deep);
+    letter-spacing: -.02em;
+    font-weight: 500;
+  }
+  .chart .callout-sub {
+    font-family: var(--mono);
+    font-size: 8px;
+    letter-spacing: .14em;
+    text-transform: uppercase;
+    fill: var(--ink-faint);
+  }
+  /* Recommended-list horizontal line: cleaner approach — dashed line across,
+     small brick text tag at right with NO background box (per feedback). */
+  .chart .rec-line {
+    stroke: var(--brick);
+    stroke-opacity: .9;
+    stroke-width: 1;
+    stroke-dasharray: 4 4;
+  }
+  .chart .rec-tag-text {
+    font-family: var(--mono);
+    font-size: 8px;
+    letter-spacing: .16em;
+    text-transform: uppercase;
+    fill: var(--brick);
+    font-weight: 500;
+  }
+  .chart .rec-tag-num {
+    font-family: var(--display);
+    font-size: 16px;
+    letter-spacing: -.02em;
+    fill: var(--brick);
+  }
+
+  /* Subtle, elegant "alive" sway on the line group.
+     Slow and small — a breath, not a bounce. */
+  @keyframes chartSway {
+    0%, 100% { transform: translateY(0); }
+    50%     { transform: translateY(-1.6px); }
+  }
+  .chart .line-group {
+    animation: chartSway 5.8s ease-in-out infinite;
+    transform-origin: 50% 100%;
+    transform-box: fill-box;
+  }
+  @media (prefers-reduced-motion: reduce) {
+    .chart .line-group,
+    .chart .point-current-pulse { animation: none !important; opacity: 0 !important; }
+  }
+
+  /* ===== Graceful: market snapshot coming soon ===== */
+  .area--empty .area-stats,
+  .area--empty .chart-wrap { display: none; }
+  .area:not(.area--empty) .empty { display: none; }
+  .area--empty .empty {
+    margin-top: 18px;
+    padding: 38px 28px;
+    border: 1px solid var(--paper-line);
+    border-radius: var(--r-md);
+    background: var(--paper-card);
+    text-align: center;
+  }
+  .area--empty .empty .icon {
+    width: 26px; height: 26px;
+    margin: 0 auto 14px;
+    border-radius: 50%;
+    border: 1px solid var(--paper-line);
+    display: grid; place-items: center;
+    color: var(--ink-faint);
+  }
+  .area--empty .empty .h {
+    font-family: var(--display);
+    font-size: 22px;
+    line-height: 1.2;
+    letter-spacing: -.01em;
+    color: var(--ink);
+    font-style: italic;
+  }
+  .area--empty .empty .p {
+    font-family: var(--ui);
+    font-size: 13px;
+    color: var(--ink-muted);
+    margin-top: 8px;
+    line-height: 1.55;
+  }
+
+  /* ===== Graceful: agent monogram fallback ===== */
+  .agent-photo--monogram {
+    background: linear-gradient(135deg, #2A241F 0%, #1A1612 100%) !important;
+    display: grid; place-items: center;
+  }
+  .agent-photo--monogram::before {
+    content: attr(data-monogram);
+    font-family: var(--display);
+    font-size: 36px;
+    color: #F4EFE4;
+    letter-spacing: -.02em;
+    line-height: 1;
+  }
+  /* ===== Recent area sales — structured cards w/ directional deltas ===== */
+  .area {
+    padding: 56px 28px;
+    background: var(--paper);
+    border-bottom: 1px solid var(--paper-line);
+  }
+  .area-stats {
+    display: grid;
+    grid-template-columns: 1fr 1fr;
+    gap: 1px;
+    background: var(--paper-line);
+    border: 1px solid var(--paper-line);
+    border-radius: 10px;
+    overflow: hidden;
+  }
+  .as {
+    padding: 22px 18px 20px;
+    background: var(--paper-raise);
+    border: 0;
+    display: flex; flex-direction: column;
+    gap: 10px;
+  }
+  .as:nth-child(odd) { padding-right: 18px; border-right: 0; }
+  .as:nth-child(even) { padding-left: 18px; }
+  .as:nth-last-child(-n+2) { border-bottom: 0; }
+  .as .l {
+    font-family: var(--mono);
+    font-size: 10px;
+    letter-spacing: .14em;
+    text-transform: uppercase;
+    color: var(--ink-faint);
+    margin-bottom: 0;
+  }
+  .as .v {
+    font-family: var(--display);
+    font-size: 40px;
+    line-height: 1;
+    letter-spacing: -.025em;
+    color: var(--gold-warm);
+  }
+  .as .ctx {
+    font-family: var(--mono);
+    font-size: 10px;
+    letter-spacing: .08em;
+    color: var(--ink-muted);
+    line-height: 1.4;
+    margin-top: 0;
+    display: flex; align-items: center; gap: 6px;
+  }
+  .as .ctx .pos { color: var(--pos); font-weight: 500; }
+  .as .ctx .neg { color: var(--brick); font-weight: 500; }
+
+  .trend {
+    margin-top: 26px;
+    padding-top: 6px;
+  }
+  .trend .l {
+    font-family: var(--mono);
+    font-size: 10px;
+    letter-spacing: .14em;
+    text-transform: uppercase;
+    color: var(--ink-faint);
+    margin-bottom: 14px;
+  }
+  .spark {
+    display: flex; align-items: flex-end;
+    gap: 6px;
+    height: 56px;
+  }
+  .spark .bar {
+    flex: 1;
+    background: var(--ink);
+    opacity: .12;
+    border-radius: 1px;
+    transition: opacity .2s var(--ease);
+  }
+  .spark .bar.acc { opacity: .85; background: var(--brick); }
+  .spark .bar.cur { opacity: 1; background: var(--ink); }
+  .trend-axis {
+    display: flex; justify-content: space-between;
+    margin-top: 8px;
+    font-family: var(--mono);
+    font-size: 9.5px;
+    color: var(--ink-faint);
+    letter-spacing: .12em;
+    text-transform: uppercase;
+  }
+
+  /* ===== Editorial detail + buyer quote (photo band + dark-ink panel) ===== */
+  .editorial-pair {
+    border-bottom: 1px solid var(--paper-line);
+  }
+  .editorial-photo {
+    height: 280px;
+    background:
+      url("170f7c74-0574-4a3b-8d67-5f559cd24e72") center 40% / cover no-repeat,
+      #b9a78a;
+  }
+  .quote-panel {
+    background: #16110D;
+    color: #F4EFE4;
+    padding: 48px 28px 52px;
+  }
+  .quote-panel .qmark {
+    font-family: var(--display);
+    font-style: italic;
+    font-size: 56px;
+    line-height: .6;
+    color: var(--brick);
+    margin-bottom: 8px;
+    display: block;
+  }
+  .quote-panel .quote-body {
+    font-family: var(--display);
+    font-style: italic;
+    font-size: 26px;
+    line-height: 1.28;
+    letter-spacing: -.015em;
+    color: #F4EFE4;
+    margin: 0 0 22px;
+    max-width: 28ch;
+  }
+  .quote-panel .quote-att {
+    font-family: var(--mono);
+    font-size: 10px;
+    letter-spacing: .18em;
+    text-transform: uppercase;
+    color: rgba(244,239,228,.55);
+    display: flex; align-items: center; gap: 12px;
+  }
+  .quote-panel .quote-att::before {
+    content: "";
+    width: 24px; height: 1px;
+    background: currentColor;
+    opacity: .5;
+  }
+
+  /* ===== Your agent ===== */
+  .agent {
+    background: var(--ink);
+    color: #F4EFE4;
+    padding: 56px 28px 48px;
+    position: relative;
+  }
+  .agent .sec-label { color: rgba(244,239,228,.55); }
+  .agent .sec-label .num { color: var(--gold); }
+  .agent .sec-label .num::before { background: var(--mint); }
+  .agent .sec-label .lbl { background: rgba(244,239,228,.16); }
+  .agent .sec-label .name { color: rgba(244,239,228,.55); }
+  .agent .sec-title { color: #F4EFE4; }
+
+  .agent-card {
+    display: grid;
+    grid-template-columns: 92px 1fr;
+    gap: 20px;
+    align-items: center;
+    margin-top: 8px;
+    padding-bottom: 28px;
+    border-bottom: 1px solid rgba(244,239,228,.12);
+  }
+  .agent-photo {
+    width: 92px; height: 92px;
+    border-radius: 50%;
+    background:
+      url("07d69447-ecda-4653-8f33-6a29df302392") center / cover no-repeat,
+      #5e544a;
+    position: relative;
+    border: 1px solid rgba(244,239,228,.18);
+  }
+  .agent-photo .verify {
+    position: absolute;
+    right: -2px; bottom: -2px;
+    width: 22px; height: 22px;
+    border-radius: 50%;
+    background: var(--mint);
+    color: #0A2A24;
+    display: grid; place-items: center;
+    border: 2px solid var(--ink);
+  }
+  .agent-photo .verify svg {
+    width: 11px; height: 11px;
+    stroke: currentColor; stroke-width: 2.2;
+    fill: none; stroke-linecap: round; stroke-linejoin: round;
+  }
+  .agent-name {
+    font-family: var(--display);
+    font-weight: 400;
+    font-size: 32px;
+    letter-spacing: -.015em;
+    line-height: 1;
+    color: #F4EFE4;
+  }
+  .agent-role {
+    margin-top: 8px;
+    font-size: 13px;
+    color: rgba(244,239,228,.65);
+    line-height: 1.5;
+  }
+  .agent-role em {
+    font-style: italic;
+    color: rgba(244,239,228,.85);
+    font-family: var(--display);
+    font-size: 14px;
+  }
+
+  .agent-bio {
+    padding: 26px 0 28px;
+    font-family: var(--display);
+    font-style: italic;
+    font-size: 18px;
+    line-height: 1.4;
+    letter-spacing: -.005em;
+    color: rgba(244,239,228,.82);
+    border-bottom: 1px solid rgba(244,239,228,.12);
+    max-width: 36ch;
+  }
+
+  .agent-meta {
+    padding-top: 26px;
+    display: grid;
+    grid-template-columns: 1fr 1fr;
+    gap: 22px 18px;
+  }
+  .am .l {
+    font-family: var(--mono);
+    font-size: 9.5px;
+    letter-spacing: .16em;
+    text-transform: uppercase;
+    color: rgba(244,239,228,.45);
+    margin-bottom: 6px;
+  }
+  .am .v {
+    font-size: 13.5px;
+    color: #F4EFE4;
+    line-height: 1.45;
+    letter-spacing: -.005em;
+  }
+  .am .v.mono {
+    font-family: var(--mono);
+    font-size: 12.5px;
+    letter-spacing: .02em;
+  }
+
+  .agent-ctas {
+    margin-top: 32px;
+    display: flex; flex-direction: column; gap: 10px;
+  }
+  .cta {
+    display: flex; align-items: center; justify-content: space-between;
+    padding: 18px 22px;
+    border-radius: var(--r-pill);
+    font-family: var(--ui);
+    font-size: 15px;
+    font-weight: 500;
+    text-decoration: none;
+    letter-spacing: -.005em;
+    transition: transform .14s var(--ease), background .14s var(--ease);
+  }
+  .cta:hover { transform: translateY(-1px); }
+  .cta.primary {
+    background: #F4EFE4;
+    color: var(--ink);
+  }
+  .cta.outline {
+    background: transparent;
+    color: #F4EFE4;
+    border: 1px solid rgba(244,239,228,.32);
+  }
+  .cta .ar {
+    width: 22px; height: 22px;
+    border-radius: 50%;
+    background: var(--ink);
+    color: #F4EFE4;
+    display: grid; place-items: center;
+  }
+  .cta.outline .ar { background: #F4EFE4; color: var(--ink); }
+  .cta .ar svg {
+    width: 11px; height: 11px;
+    stroke: currentColor; stroke-width: 1.8;
+    fill: none; stroke-linecap: round; stroke-linejoin: round;
+  }
+
+  /* ===== Foot ===== */
+  .foot {
+    padding: 34px 28px 40px;
+    background: var(--ink);
+    color: rgba(244,239,228,.45);
+    border-top: 1px solid rgba(244,239,228,.08);
+    font-family: var(--mono);
+    font-size: 10px;
+    letter-spacing: .14em;
+    text-transform: uppercase;
+    line-height: 1.7;
+  }
+  .foot .row {
+    display: flex; justify-content: space-between; align-items: center;
+    gap: 12px;
+  }
+  .foot .brand {
+    display: flex; align-items: center; gap: 8px;
+    color: rgba(244,239,228,.65);
+  }
+  .foot .brand .glyph {
+    width: 16px; height: 16px;
+    border-radius: 4px;
+    background: var(--mint);
+    color: #0A2A24;
+    display: grid; place-items: center;
+    font-family: var(--display); font-size: 12px; font-style: italic;
+    line-height: 1; letter-spacing: -.02em;
+  }
+  .foot .brand .wm {
+    font-family: var(--display);
+    font-size: 13px;
+    color: rgba(244,239,228,.85);
+    text-transform: none;
+    letter-spacing: -.01em;
+  }
+  .foot .brand .wm em { font-style: italic; color: var(--mint); }
+  .foot .small {
+    margin-top: 18px;
+    color: rgba(244,239,228,.32);
+    line-height: 1.7;
+  }
+
+  /* ===== Stage-level legend (annotation block — outside the rendered page) ===== */
+  .legend {
+    width: 100%; max-width: 460px;
+    color: var(--ink-muted);
+    font-size: 12px;
+    line-height: 1.6;
+    font-family: var(--mono);
+    letter-spacing: .04em;
+  }
+  .legend .ttl {
+    color: var(--ink);
+    font-family: var(--display);
+    font-size: 20px;
+    letter-spacing: -.01em;
+    margin-bottom: 8px;
+    text-transform: none;
+  }
+  .legend a { color: var(--brick); text-decoration: none; }
+
+  /* ============================================
+     MOTION LAYER (CSS-first)
+     Reveal ease + 3 durations · structural, never decorative
+     ============================================ */
+  :root {
+    --r-ease: cubic-bezier(.16,.84,.3,1);
+    --r-quick: 140ms;
+    --r-std:   220ms;
+    --r-slow:  360ms;
+    --r-rise:  640ms; /* reveal duration */
+  }
+
+  /* ---- scroll-reveal primitives (restraint mode — opacity-only, no slide) ---- */
+  .reveal {
+    opacity: 0;
+    transition: opacity 720ms var(--r-ease);
+    will-change: opacity;
+  }
+  .reveal.in { opacity: 1; }
+  /* stagger left intentionally as a no-op so legacy markup still works */
+  .stagger > * { transition-delay: 0ms; }
+
+  /* ---- hero Ken Burns (slow, barely-perceptible) ---- */
+  .hero { overflow: hidden; }
+  @keyframes kenburns {
+    from { transform: scale(1) translate3d(0,0,0); }
+    to   { transform: scale(1.035) translate3d(-1.2%, .8%, 0); }
+  }
+
+  /* ---- price reveal removed: hero price is always visible (no reveal animation) ---- */
+  .price-reveal { opacity: 1 !important; -webkit-clip-path: none !important; clip-path: none !important; transform: none !important; }
+
+  /* ---- CTA micro-interactions ---- */
+  .cta .ar { transition: transform var(--r-quick) var(--r-ease), background var(--r-quick) var(--r-ease); }
+  .cta:hover .ar { transform: translateX(3px); }
+  .cta.primary:hover { background: #FFFCF4; }
+  .cta.outline:hover { background: rgba(244,239,228,.08); border-color: rgba(244,239,228,.55); }
+
+  /* ---- verified tick entrance (delayed) ---- */
+  .agent-photo .verify {
+    transform: scale(.3);
+    opacity: 0;
+    transition:
+      transform 420ms var(--r-ease) 220ms,
+      opacity 240ms ease-out 220ms;
+  }
+  .agent-photo.in .verify {
+    transform: scale(1);
+    opacity: 1;
+  }
+
+  /* ---- chart line draw-on ---- */
+  .chart .area-fill {
+    opacity: 0;
+    transition: opacity 520ms var(--r-ease) 120ms;
+  }
+  .chart .line-stroke {
+    stroke-dasharray: 600;
+    stroke-dashoffset: 600;
+    transition: stroke-dashoffset 1100ms var(--r-ease) 80ms;
+  }
+  .chart .point {
+    opacity: 0;
+    transform: scale(.5);
+    transform-origin: center;
+    transition: opacity 240ms var(--r-ease) 900ms, transform 320ms var(--r-ease) 900ms;
+  }
+  .chart.in .area-fill { opacity: 1; }
+  .chart.in .line-stroke { stroke-dashoffset: 0; }
+  .chart.in .point { opacity: 1; transform: scale(1); }
+
+  /* ---- reduced motion ---- */
+  @media (prefers-reduced-motion: reduce) {
+    .reveal, .price-reveal, .agent-photo .verify,
+    .chart .line-stroke, .chart .area-fill, .chart .point {
+      opacity: 1 !important;
+      transform: none !important;
+      transition: none !important;
+      -webkit-clip-path: none !important;
+              clip-path: none !important;
+      stroke-dashoffset: 0 !important;
+    }
+    .hero-photo { animation: none !important; }
+  }
+</style>
+</style>
+
+
+  <div id="__bundler_thumbnail">
+  <svg viewBox="0 0 1200 800" xmlns="http://www.w3.org/2000/svg">
+    <rect x="240" y="200" width="720" height="500" rx="42" fill="#F1EBE0"></rect>
+    <rect x="240" y="200" width="720" height="280" rx="42" fill="#B6987A"></rect>
+    <rect x="240" y="430" width="720" height="50" fill="#B6987A"></rect>
+    <rect x="290" y="430" width="620" height="120" rx="14" fill="#16110D"></rect>
+    <circle cx="314" cy="450" r="4" fill="#4EF2D9"></circle>
+    <rect x="328" y="446" width="180" height="9" rx="2" fill="#4EF2D9" opacity="0.9"></rect>
+    <rect x="312" y="498" width="280" height="22" rx="3" fill="#F4EFE4"></rect>
+    <rect x="312" y="582" width="6" height="80" rx="2" fill="#C26A4E"></rect>
+    <rect x="332" y="580" width="120" height="14" rx="3" fill="#C26A4E" opacity="0.85"></rect>
+    <rect x="332" y="612" width="360" height="64" rx="6" fill="#1A1612"></rect>
+    <circle cx="900" cy="700" r="12" fill="#3F6C8E"></circle>
+    <circle cx="900" cy="700" r="28" fill="#3F6C8E" opacity="0.25"></circle>
+  </svg>
+</div>
+  <div id="__bundler_loading">Unpacking...</div>
+
+  <script>
+    
+document.addEventListener('DOMContentLoaded', async function() {
+  const loading = document.getElementById('__bundler_loading');
+  function setStatus(msg) { if (loading) loading.textContent = msg; }
+
+  // Error sink persists across replaceWith since it's on window, not the DOM.
+  window.addEventListener('error', function(e) {
+    var p = document.body || document.documentElement;
+    var d = document.getElementById('__bundler_err') || p.appendChild(document.createElement('div'));
+    d.id = '__bundler_err';
+    d.style.cssText = 'position:fixed;bottom:12px;left:12px;right:12px;font:12px/1.4 ui-monospace,monospace;background:#2a1215;color:#ff8a80;padding:10px 14px;border-radius:8px;border:1px solid #5c2b2e;z-index:99999;white-space:pre-wrap;max-height:40vh;overflow:auto';
+    d.textContent = (d.textContent ? d.textContent + String.fromCharCode(10) : '') +
+      '[bundle] ' + (e.message || e.type) +
+      (e.filename ? ' (' + e.filename.slice(0, 60) + ':' + e.lineno + ')' : '');
+  }, true);
+
+  try {
+    const manifestEl = document.querySelector('script[type="__bundler/manifest"]');
+    const templateEl = document.querySelector('script[type="__bundler/template"]');
+    if (!manifestEl || !templateEl) {
+      setStatus('Error: missing bundle data');
+      console.error('[bundler] Missing script tags — manifestEl:', !!manifestEl, 'templateEl:', !!templateEl);
+      return;
+    }
+
+    const manifest = JSON.parse(manifestEl.textContent);
+    let template = JSON.parse(templateEl.textContent);
+
+    const uuids = Object.keys(manifest);
+    setStatus('Unpacking ' + uuids.length + ' assets...');
+
+    const blobUrls = {};
+    await Promise.all(uuids.map(async (uuid) => {
+      const entry = manifest[uuid];
+      try {
+        const binaryStr = atob(entry.data);
+        const bytes = new Uint8Array(binaryStr.length);
+        for (let i = 0; i < binaryStr.length; i++) bytes[i] = binaryStr.charCodeAt(i);
+
+        let finalBytes = bytes;
+        if (entry.compressed) {
+          if (typeof DecompressionStream !== 'undefined') {
+            const ds = new DecompressionStream('gzip');
+            const writer = ds.writable.getWriter();
+            const reader = ds.readable.getReader();
+            writer.write(bytes);
+            writer.close();
+            const chunks = [];
+            let totalLen = 0;
+            while (true) {
+              const { done, value } = await reader.read();
+              if (done) break;
+              chunks.push(value);
+              totalLen += value.length;
+            }
+            finalBytes = new Uint8Array(totalLen);
+            let offset = 0;
+            for (const chunk of chunks) { finalBytes.set(chunk, offset); offset += chunk.length; }
+          } else {
+            console.warn('DecompressionStream not available, asset ' + uuid + ' may not render');
+          }
+        }
+
+        blobUrls[uuid] = URL.createObjectURL(new Blob([finalBytes], { type: entry.mime }));
+      } catch (err) {
+        console.error('Failed to decode asset ' + uuid + ':', err);
+        blobUrls[uuid] = URL.createObjectURL(new Blob([], { type: entry.mime }));
+      }
+    }));
+
+    const extResEl = document.querySelector('script[type="__bundler/ext_resources"]');
+    const extResources = extResEl ? JSON.parse(extResEl.textContent) : [];
+    const resourceMap = {};
+    for (const entry of extResources) {
+      if (blobUrls[entry.uuid]) resourceMap[entry.id] = blobUrls[entry.uuid];
+    }
+
+    setStatus('Rendering...');
+    for (const uuid of uuids) template = template.split(uuid).join(blobUrls[uuid]);
+
+    // Strip integrity + crossorigin — blob URLs from a file:// document inherit
+    // a null origin, so crossorigin forces a CORS fetch that SRI then rejects.
+    // The manifest bytes are ours; SRI protects against CDN compromise, not this.
+    template = template.replace(/\s+integrity="[^"]*"/gi, '').replace(/\s+crossorigin="[^"]*"/gi, '');
+
+    const resourceScript = '<script>window.__resources = ' +
+      JSON.stringify(resourceMap).split('</' + 'script>').join('<\\/' + 'script>') +
+      ';</' + 'script>';
+    // Inject after <head> so the DOCTYPE stays first; prepending the script
+    // would push the parser into quirks mode. DOMParser always emits a <head>
+    // (synthesizing one if the source HTML omitted it) but may carry
+    // attributes through, so match the full opening tag. slice() rather than
+    // replace() keeps us clear of $-pattern substitution in resourceScript.
+    const headOpen = template.match(/<head[^>]*>/i);
+    if (headOpen) {
+      const i = headOpen.index + headOpen[0].length;
+      template = template.slice(0, i) + resourceScript + template.slice(i);
+    }
+
+    // Parse the template and swap the root element. Scripts inserted via
+    // DOMParser/replaceWith are inert per spec — re-create each with
+    // createElement so they execute, awaiting onload for src scripts to
+    // preserve ordering (React before ReactDOM before Babel before text/babel).
+    const doc = new DOMParser().parseFromString(template, 'text/html');
+    document.documentElement.replaceWith(doc.documentElement);
+    const dead = Array.from(document.scripts);
+    for (const old of dead) {
+      const s = document.createElement('script');
+      for (const a of old.attributes) s.setAttribute(a.name, a.value);
+      s.textContent = old.textContent;
+      // text/babel scripts with a src: fetch and inline. transformScriptTags
+      // does XHR against the src, but blob:null/ from a file:// origin is
+      // silently dropped. Inlining makes it a plain inline babel script,
+      // which transformScriptTags handles unconditionally.
+      if ((s.type === 'text/babel' || s.type === 'text/jsx') && s.src) {
+        const r = await fetch(s.src);
+        s.textContent = await r.text();
+        s.removeAttribute('src');
+      }
+      const p = s.src ? new Promise(function(r) { s.onload = s.onerror = r; }) : null;
+      old.replaceWith(s);
+      if (p) await p;
+    }
+    // Babel standalone auto-transforms type=text/babel on DOMContentLoaded,
+    // which fired before we swapped the document. Trigger manually if present.
+    if (window.Babel && typeof window.Babel.transformScriptTags === 'function') {
+      window.Babel.transformScriptTags();
+    }
+  } catch (err) {
+    setStatus('Error unpacking: ' + err.message);
+    console.error('Bundle unpack error:', err);
+  }
+});
+
+  </script>
+
+  <script type="__bundler/manifest">
+{"f74d8787-f718-4f9a-b46b-22da26be2894":{"mime":"font/woff2","compressed":false,"data":"/* long-blob omitted */"},"bfe01db1-958c-453f-bb82-11ad2706fad7":{"mime":"font/woff2","compressed":false,"data":"/* long-blob omitted */"},"43b7ae07-bd27-4752-a33f-e7faeef77ca7":{"mime":"font/woff2","compressed":false,"data":"/* long-blob omitted */"},"74018901-9f5d-4a89-9e6d-82cdb49451e2":{"mime":"font/woff2","compressed":false,"data":"/* long-blob omitted */"},"f96e8a3c-a79d-4507-97ec-17b3bcd3f6df":{"mime":"font/woff2","compressed":false,"data":"/* long-blob omitted */"},"d273f215-b13d-4e6d-8abf-97489f3d6e9d":{"mime":"font/woff2","compressed":false,"data":"/* long-blob omitted */"},"395ae869-db7f-4137-aa5d-2d463aa48939":{"mime":"font/woff2","compressed":false,"data":"/* long-blob omitted */"},"5b3f44f2-8971-46ac-8906-74500106db69":{"mime":"font/woff2","compressed":false,"data":"/* long-blob omitted */"},"e9584393-249f-4ad1-852b-e88243427b21":{"mime":"font/woff2","compressed":false,"data":"/* long-blob omitted */"},"e30c8938-b319-4907-9874-2df59141b57b":{"mime":"font/woff2","compressed":false,"data":"/* long-blob omitted */"},"4df7c02c-e3dd-471c-8523-b81b78ab4c33":{"mime":"font/woff2","compressed":false,"data":"/* long-blob omitted */"},"7c626561-eb8a-4330-858b-c1015128c41f":{"mime":"font/woff2","compressed":false,"data":"/* long-blob omitted */"},"5be741f8-6191-45cc-bef2-bf6a5d902819":{"mime":"font/woff2","compressed":false,"data":"/* long-blob omitted */"},"29630409-8cea-43b0-8ca1-0cdfe5311434":{"mime":"font/woff2","compressed":false,"data":"/* long-blob omitted */"},"1820347f-15ef-448b-82c0-3251e5f3702b":{"mime":"font/woff2","compressed":false,"data":"/* long-blob omitted */"},"9852360d-e764-4f4d-b47d-aed100095ba1":{"mime":"image/jpeg","compressed":false,"data":"/* long-blob omitted */"},"7a6f56bc-31d1-48cf-844e-b9d6407b6783":{"mime":"image/jpeg","compressed":false,"data":"/* long-blob omitted */"},"170f7c74-0574-4a3b-8d67-5f559cd24e72":{"mime":"image/jpeg","compressed":false,"data":"/* long-blob omitted */"},"07d69447-ecda-4653-8f33-6a29df302392":{"mime":"image/jpeg","compressed":false,"data":"/* long-blob omitted */"}}
+  </script>
+
+  <script type="__bundler/ext_resources">
+[]
+  </script>
+
+  <script type="__bundler/template">
+"<!DOCTYPE html>
+<html lang="en"><head>
+<meta charset="utf-8">
+<meta name="viewport" content="width=device-width, initial-scale=1">
+<title>1742 Kenilworth Avenue — Prepared for the Halloran family</title>
+
+<link rel="preconnect" href="https://fonts.googleapis.com">
+<link rel="preconnect" href="https://fonts.gstatic.com" crossorigin="">
+<style>/* cyrillic-ext */
+@font-face {
+  font-family: 'Geist';
+  font-style: normal;
+  font-weight: 300;
+  font-display: swap;
+  src: url("f74d8787-f718-4f9a-b46b-22da26be2894") format('woff2');
+  unicode-range: U+0460-052F, U+1C80-1C8A, U+20B4, U+2DE0-2DFF, U+A640-A69F, U+FE2E-FE2F;
+}
+/* cyrillic */
+@font-face {
+  font-family: 'Geist';
+  font-style: normal;
+  font-weight: 300;
+  font-display: swap;
+  src: url("bfe01db1-958c-453f-bb82-11ad2706fad7") format('woff2');
+  unicode-range: U+0301, U+0400-045F, U+0490-0491, U+04B0-04B1, U+2116;
+}
+/* vietnamese */
+@font-face {
+  font-family: 'Geist';
+  font-style: normal;
+  font-weight: 300;
+  font-display: swap;
+  src: url("43b7ae07-bd27-4752-a33f-e7faeef77ca7") format('woff2');
+  unicode-range: U+0102-0103, U+0110-0111, U+0128-0129, U+0168-0169, U+01A0-01A1, U+01AF-01B0, U+0300-0301, U+0303-0304, U+0308-0309, U+0323, U+0329, U+1EA0-1EF9, U+20AB;
+}
+/* latin-ext */
+@font-face {
+  font-family: 'Geist';
+  font-style: normal;
+  font-weight: 300;
+  font-display: swap;
+  src: url("74018901-9f5d-4a89-9e6d-82cdb49451e2") format('woff2');
+  unicode-range: U+0100-02BA, U+02BD-02C5, U+02C7-02CC, U+02CE-02D7, U+02DD-02FF, U+0304, U+0308, U+0329, U+1D00-1DBF, U+1E00-1E9F, U+1EF2-1EFF, U+2020, U+20A0-20AB, U+20AD-20C0, U+2113, U+2C60-2C7F, U+A720-A7FF;
+}
+/* latin */
+@font-face {
+  font-family: 'Geist';
+  font-style: normal;
+  font-weight: 300;
+  font-display: swap;
+  src: url("f96e8a3c-a79d-4507-97ec-17b3bcd3f6df") format('woff2');
+  unicode-range: U+0000-00FF, U+0131, U+0152-0153, U+02BB-02BC, U+02C6, U+02DA, U+02DC, U+0304, U+0308, U+0329, U+2000-206F, U+20AC, U+2122, U+2191, U+2193, U+2212, U+2215, U+FEFF, U+FFFD;
+}
+/* cyrillic-ext */
+@font-face {
+  font-family: 'Geist';
+  font-style: normal;
+  font-weight: 400;
+  font-display: swap;
+  src: url("f74d8787-f718-4f9a-b46b-22da26be2894") format('woff2');
+  unicode-range: U+0460-052F, U+1C80-1C8A, U+20B4, U+2DE0-2DFF, U+A640-A69F, U+FE2E-FE2F;
+}
+/* cyrillic */
+@font-face {
+  font-family: 'Geist';
+  font-style: normal;
+  font-weight: 400;
+  font-display: swap;
+  src: url("bfe01db1-958c-453f-bb82-11ad2706fad7") format('woff2');
+  unicode-range: U+0301, U+0400-045F, U+0490-0491, U+04B0-04B1, U+2116;
+}
+/* vietnamese */
+@font-face {
+  font-family: 'Geist';
+  font-style: normal;
+  font-weight: 400;
+  font-display: swap;
+  src: url("43b7ae07-bd27-4752-a33f-e7faeef77ca7") format('woff2');
+  unicode-range: U+0102-0103, U+0110-0111, U+0128-0129, U+0168-0169, U+01A0-01A1, U+01AF-01B0, U+0300-0301, U+0303-0304, U+0308-0309, U+0323, U+0329, U+1EA0-1EF9, U+20AB;
+}
+/* latin-ext */
+@font-face {
+  font-family: 'Geist';
+  font-style: normal;
+  font-weight: 400;
+  font-display: swap;
+  src: url("74018901-9f5d-4a89-9e6d-82cdb49451e2") format('woff2');
+  unicode-range: U+0100-02BA, U+02BD-02C5, U+02C7-02CC, U+02CE-02D7, U+02DD-02FF, U+0304, U+0308, U+0329, U+1D00-1DBF, U+1E00-1E9F, U+1EF2-1EFF, U+2020, U+20A0-20AB, U+20AD-20C0, U+2113, U+2C60-2C7F, U+A720-A7FF;
+}
+/* latin */
+@font-face {
+  font-family: 'Geist';
+  font-style: normal;
+  font-weight: 400;
+  font-display: swap;
+  src: url("f96e8a3c-a79d-4507-97ec-17b3bcd3f6df") format('woff2');
+  unicode-range: U+0000-00FF, U+0131, U+0152-0153, U+02BB-02BC, U+02C6, U+02DA, U+02DC, U+0304, U+0308, U+0329, U+2000-206F, U+20AC, U+2122, U+2191, U+2193, U+2212, U+2215, U+FEFF, U+FFFD;
+}
+/* cyrillic-ext */
+@font-face {
+  font-family: 'Geist';
+  font-style: normal;
+  font-weight: 500;
+  font-display: swap;
+  src: url("f74d8787-f718-4f9a-b46b-22da26be2894") format('woff2');
+  unicode-range: U+0460-052F, U+1C80-1C8A, U+20B4, U+2DE0-2DFF, U+A640-A69F, U+FE2E-FE2F;
+}
+/* cyrillic */
+@font-face {
+  font-family: 'Geist';
+  font-style: normal;
+  font-weight: 500;
+  font-display: swap;
+  src: url("bfe01db1-958c-453f-bb82-11ad2706fad7") format('woff2');
+  unicode-range: U+0301, U+0400-045F, U+0490-0491, U+04B0-04B1, U+2116;
+}
+/* vietnamese */
+@font-face {
+  font-family: 'Geist';
+  font-style: normal;
+  font-weight: 500;
+  font-display: swap;
+  src: url("43b7ae07-bd27-4752-a33f-e7faeef77ca7") format('woff2');
+  unicode-range: U+0102-0103, U+0110-0111, U+0128-0129, U+0168-0169, U+01A0-01A1, U+01AF-01B0, U+0300-0301, U+0303-0304, U+0308-0309, U+0323, U+0329, U+1EA0-1EF9, U+20AB;
+}
+/* latin-ext */
+@font-face {
+  font-family: 'Geist';
+  font-style: normal;
+  font-weight: 500;
+  font-display: swap;
+  src: url("74018901-9f5d-4a89-9e6d-82cdb49451e2") format('woff2');
+  unicode-range: U+0100-02BA, U+02BD-02C5, U+02C7-02CC, U+02CE-02D7, U+02DD-02FF, U+0304, U+0308, U+0329, U+1D00-1DBF, U+1E00-1E9F, U+1EF2-1EFF, U+2020, U+20A0-20AB, U+20AD-20C0, U+2113, U+2C60-2C7F, U+A720-A7FF;
+}
+/* latin */
+@font-face {
+  font-family: 'Geist';
+  font-style: normal;
+  font-weight: 500;
+  font-display: swap;
+  src: url("f96e8a3c-a79d-4507-97ec-17b3bcd3f6df") format('woff2');
+  unicode-range: U+0000-00FF, U+0131, U+0152-0153, U+02BB-02BC, U+02C6, U+02DA, U+02DC, U+0304, U+0308, U+0329, U+2000-206F, U+20AC, U+2122, U+2191, U+2193, U+2212, U+2215, U+FEFF, U+FFFD;
+}
+/* cyrillic-ext */
+@font-face {
+  font-family: 'Geist';
+  font-style: normal;
+  font-weight: 600;
+  font-display: swap;
+  src: url("f74d8787-f718-4f9a-b46b-22da26be2894") format('woff2');
+  unicode-range: U+0460-052F, U+1C80-1C8A, U+20B4, U+2DE0-2DFF, U+A640-A69F, U+FE2E-FE2F;
+}
+/* cyrillic */
+@font-face {
+  font-family: 'Geist';
+  font-style: normal;
+  font-weight: 600;
+  font-display: swap;
+  src: url("bfe01db1-958c-453f-bb82-11ad2706fad7") format('woff2');
+  unicode-range: U+0301, U+0400-045F, U+0490-0491, U+04B0-04B1, U+2116;
+}
+/* vietnamese */
+@font-face {
+  font-family: 'Geist';
+  font-style: normal;
+  font-weight: 600;
+  font-display: swap;
+  src: url("43b7ae07-bd27-4752-a33f-e7faeef77ca7") format('woff2');
+  unicode-range: U+0102-0103, U+0110-0111, U+0128-0129, U+0168-0169, U+01A0-01A1, U+01AF-01B0, U+0300-0301, U+0303-0304, U+0308-0309, U+0323, U+0329, U+1EA0-1EF9, U+20AB;
+}
+/* latin-ext */
+@font-face {
+  font-family: 'Geist';
+  font-style: normal;
+  font-weight: 600;
+  font-display: swap;
+  src: url("74018901-9f5d-4a89-9e6d-82cdb49451e2") format('woff2');
+  unicode-range: U+0100-02BA, U+02BD-02C5, U+02C7-02CC, U+02CE-02D7, U+02DD-02FF, U+0304, U+0308, U+0329, U+1D00-1DBF, U+1E00-1E9F, U+1EF2-1EFF, U+2020, U+20A0-20AB, U+20AD-20C0, U+2113, U+2C60-2C7F, U+A720-A7FF;
+}
+/* latin */
+@font-face {
+  font-family: 'Geist';
+  font-style: normal;
+  font-weight: 600;
+  font-display: swap;
+  src: url("f96e8a3c-a79d-4507-97ec-17b3bcd3f6df") format('woff2');
+  unicode-range: U+0000-00FF, U+0131, U+0152-0153, U+02BB-02BC, U+02C6, U+02DA, U+02DC, U+0304, U+0308, U+0329, U+2000-206F, U+20AC, U+2122, U+2191, U+2193, U+2212, U+2215, U+FEFF, U+FFFD;
+}
+/* cyrillic-ext */
+@font-face {
+  font-family: 'Geist';
+  font-style: normal;
+  font-weight: 700;
+  font-display: swap;
+  src: url("f74d8787-f718-4f9a-b46b-22da26be2894") format('woff2');
+  unicode-range: U+0460-052F, U+1C80-1C8A, U+20B4, U+2DE0-2DFF, U+A640-A69F, U+FE2E-FE2F;
+}
+/* cyrillic */
+@font-face {
+  font-family: 'Geist';
+  font-style: normal;
+  font-weight: 700;
+  font-display: swap;
+  src: url("bfe01db1-958c-453f-bb82-11ad2706fad7") format('woff2');
+  unicode-range: U+0301, U+0400-045F, U+0490-0491, U+04B0-04B1, U+2116;
+}
+/* vietnamese */
+@font-face {
+  font-family: 'Geist';
+  font-style: normal;
+  font-weight: 700;
+  font-display: swap;
+  src: url("43b7ae07-bd27-4752-a33f-e7faeef77ca7") format('woff2');
+  unicode-range: U+0102-0103, U+0110-0111, U+0128-0129, U+0168-0169, U+01A0-01A1, U+01AF-01B0, U+0300-0301, U+0303-0304, U+0308-0309, U+0323, U+0329, U+1EA0-1EF9, U+20AB;
+}
+/* latin-ext */
+@font-face {
+  font-family: 'Geist';
+  font-style: normal;
+  font-weight: 700;
+  font-display: swap;
+  src: url("74018901-9f5d-4a89-9e6d-82cdb49451e2") format('woff2');
+  unicode-range: U+0100-02BA, U+02BD-02C5, U+02C7-02CC, U+02CE-02D7, U+02DD-02FF, U+0304, U+0308, U+0329, U+1D00-1DBF, U+1E00-1E9F, U+1EF2-1EFF, U+2020, U+20A0-20AB, U+20AD-20C0, U+2113, U+2C60-2C7F, U+A720-A7FF;
+}
+/* latin */
+@font-face {
+  font-family: 'Geist';
+  font-style: normal;
+  font-weight: 700;
+  font-display: swap;
+  src: url("f96e8a3c-a79d-4507-97ec-17b3bcd3f6df") format('woff2');
+  unicode-range: U+0000-00FF, U+0131, U+0152-0153, U+02BB-02BC, U+02C6, U+02DA, U+02DC, U+0304, U+0308, U+0329, U+2000-206F, U+20AC, U+2122, U+2191, U+2193, U+2212, U+2215, U+FEFF, U+FFFD;
+}
+/* cyrillic-ext */
+@font-face {
+  font-family: 'Geist Mono';
+  font-style: normal;
+  font-weight: 400;
+  font-display: swap;
+  src: url("d273f215-b13d-4e6d-8abf-97489f3d6e9d") format('woff2');
+  unicode-range: U+0460-052F, U+1C80-1C8A, U+20B4, U+2DE0-2DFF, U+A640-A69F, U+FE2E-FE2F;
+}
+/* cyrillic */
+@font-face {
+  font-family: 'Geist Mono';
+  font-style: normal;
+  font-weight: 400;
+  font-display: swap;
+  src: url("395ae869-db7f-4137-aa5d-2d463aa48939") format('woff2');
+  unicode-range: U+0301, U+0400-045F, U+0490-0491, U+04B0-04B1, U+2116;
+}
+/* symbols2 */
+@font-face {
+  font-family: 'Geist Mono';
+  font-style: normal;
+  font-weight: 400;
+  font-display: swap;
+  src: url("5b3f44f2-8971-46ac-8906-74500106db69") format('woff2');
+  unicode-range: U+2000-2001, U+2004-2008, U+200A, U+23B8-23BD, U+2500-259F;
+}
+/* vietnamese */
+@font-face {
+  font-family: 'Geist Mono';
+  font-style: normal;
+  font-weight: 400;
+  font-display: swap;
+  src: url("e9584393-249f-4ad1-852b-e88243427b21") format('woff2');
+  unicode-range: U+0102-0103, U+0110-0111, U+0128-0129, U+0168-0169, U+01A0-01A1, U+01AF-01B0, U+0300-0301, U+0303-0304, U+0308-0309, U+0323, U+0329, U+1EA0-1EF9, U+20AB;
+}
+/* latin-ext */
+@font-face {
+  font-family: 'Geist Mono';
+  font-style: normal;
+  font-weight: 400;
+  font-display: swap;
+  src: url("e30c8938-b319-4907-9874-2df59141b57b") format('woff2');
+  unicode-range: U+0100-02BA, U+02BD-02C5, U+02C7-02CC, U+02CE-02D7, U+02DD-02FF, U+0304, U+0308, U+0329, U+1D00-1DBF, U+1E00-1E9F, U+1EF2-1EFF, U+2020, U+20A0-20AB, U+20AD-20C0, U+2113, U+2C60-2C7F, U+A720-A7FF;
+}
+/* latin */
+@font-face {
+  font-family: 'Geist Mono';
+  font-style: normal;
+  font-weight: 400;
+  font-display: swap;
+  src: url("4df7c02c-e3dd-471c-8523-b81b78ab4c33") format('woff2');
+  unicode-range: U+0000-00FF, U+0131, U+0152-0153, U+02BB-02BC, U+02C6, U+02DA, U+02DC, U+0304, U+0308, U+0329, U+2000-206F, U+20AC, U+2122, U+2191, U+2193, U+2212, U+2215, U+FEFF, U+FFFD;
+}
+/* cyrillic-ext */
+@font-face {
+  font-family: 'Geist Mono';
+  font-style: normal;
+  font-weight: 500;
+  font-display: swap;
+  src: url("d273f215-b13d-4e6d-8abf-97489f3d6e9d") format('woff2');
+  unicode-range: U+0460-052F, U+1C80-1C8A, U+20B4, U+2DE0-2DFF, U+A640-A69F, U+FE2E-FE2F;
+}
+/* cyrillic */
+@font-face {
+  font-family: 'Geist Mono';
+  font-style: normal;
+  font-weight: 500;
+  font-display: swap;
+  src: url("395ae869-db7f-4137-aa5d-2d463aa48939") format('woff2');
+  unicode-range: U+0301, U+0400-045F, U+0490-0491, U+04B0-04B1, U+2116;
+}
+/* symbols2 */
+@font-face {
+  font-family: 'Geist Mono';
+  font-style: normal;
+  font-weight: 500;
+  font-display: swap;
+  src: url("5b3f44f2-8971-46ac-8906-74500106db69") format('woff2');
+  unicode-range: U+2000-2001, U+2004-2008, U+200A, U+23B8-23BD, U+2500-259F;
+}
+/* vietnamese */
+@font-face {
+  font-family: 'Geist Mono';
+  font-style: normal;
+  font-weight: 500;
+  font-display: swap;
+  src: url("e9584393-249f-4ad1-852b-e88243427b21") format('woff2');
+  unicode-range: U+0102-0103, U+0110-0111, U+0128-0129, U+0168-0169, U+01A0-01A1, U+01AF-01B0, U+0300-0301, U+0303-0304, U+0308-0309, U+0323, U+0329, U+1EA0-1EF9, U+20AB;
+}
+/* latin-ext */
+@font-face {
+  font-family: 'Geist Mono';
+  font-style: normal;
+  font-weight: 500;
+  font-display: swap;
+  src: url("e30c8938-b319-4907-9874-2df59141b57b") format('woff2');
+  unicode-range: U+0100-02BA, U+02BD-02C5, U+02C7-02CC, U+02CE-02D7, U+02DD-02FF, U+0304, U+0308, U+0329, U+1D00-1DBF, U+1E00-1E9F, U+1EF2-1EFF, U+2020, U+20A0-20AB, U+20AD-20C0, U+2113, U+2C60-2C7F, U+A720-A7FF;
+}
+/* latin */
+@font-face {
+  font-family: 'Geist Mono';
+  font-style: normal;
+  font-weight: 500;
+  font-display: swap;
+  src: url("4df7c02c-e3dd-471c-8523-b81b78ab4c33") format('woff2');
+  unicode-range: U+0000-00FF, U+0131, U+0152-0153, U+02BB-02BC, U+02C6, U+02DA, U+02DC, U+0304, U+0308, U+0329, U+2000-206F, U+20AC, U+2122, U+2191, U+2193, U+2212, U+2215, U+FEFF, U+FFFD;
+}
+/* latin-ext */
+@font-face {
+  font-family: 'Instrument Serif';
+  font-style: italic;
+  font-weight: 400;
+  font-display: swap;
+  src: url("7c626561-eb8a-4330-858b-c1015128c41f") format('woff2');
+  unicode-range: U+0100-02BA, U+02BD-02C5, U+02C7-02CC, U+02CE-02D7, U+02DD-02FF, U+0304, U+0308, U+0329, U+1D00-1DBF, U+1E00-1E9F, U+1EF2-1EFF, U+2020, U+20A0-20AB, U+20AD-20C0, U+2113, U+2C60-2C7F, U+A720-A7FF;
+}
+/* latin */
+@font-face {
+  font-family: 'Instrument Serif';
+  font-style: italic;
+  font-weight: 400;
+  font-display: swap;
+  src: url("5be741f8-6191-45cc-bef2-bf6a5d902819") format('woff2');
+  unicode-range: U+0000-00FF, U+0131, U+0152-0153, U+02BB-02BC, U+02C6, U+02DA, U+02DC, U+0304, U+0308, U+0329, U+2000-206F, U+20AC, U+2122, U+2191, U+2193, U+2212, U+2215, U+FEFF, U+FFFD;
+}
+/* latin-ext */
+@font-face {
+  font-family: 'Instrument Serif';
+  font-style: normal;
+  font-weight: 400;
+  font-display: swap;
+  src: url("29630409-8cea-43b0-8ca1-0cdfe5311434") format('woff2');
+  unicode-range: U+0100-02BA, U+02BD-02C5, U+02C7-02CC, U+02CE-02D7, U+02DD-02FF, U+0304, U+0308, U+0329, U+1D00-1DBF, U+1E00-1E9F, U+1EF2-1EFF, U+2020, U+20A0-20AB, U+20AD-20C0, U+2113, U+2C60-2C7F, U+A720-A7FF;
+}
+/* latin */
+@font-face {
+  font-family: 'Instrument Serif';
+  font-style: normal;
+  font-weight: 400;
+  font-display: swap;
+  src: url("1820347f-15ef-448b-82c0-3251e5f3702b") format('woff2');
+  unicode-range: U+0000-00FF, U+0131, U+0152-0153, U+02BB-02BC, U+02C6, U+02DA, U+02DC, U+0304, U+0308, U+0329, U+2000-206F, U+20AC, U+2122, U+2191, U+2193, U+2212, U+2215, U+FEFF, U+FFFD;
+}
+</style>
+<style>
+  /* ============================================
+     STUDIO SEP — Seller Presentation (Consumer)
+     Warm paper register · mobile-first · editorial
+     ============================================ */
+  :root {
+    --paper: #F1EBE0;
+    --paper-deep: #E8E0D2;
+    --paper-raise: #FBF7EE;
+    --paper-card: #FCF9F2;
+    --paper-line: #E0D6C5;
+    --paper-line-soft: #EAE1D0;
+    --ink: #1A1612;
+    --ink-2: #2A241F;
+    --ink-muted: #6E665B;
+    --ink-faint: #A29888;
+    --mint: #4EF2D9;
+    --mint-deep: #1F8F7C;
+    --gold: #C9A86A;
+    --gold-warm: #B8965A;
+    --brick: #C26A4E;
+    --brick-deep: #A85439;
+    --rose: #D29A9A;
+    --pos: #1D9E75;
+    --pos-bright: #6EE7A8;
+    --chart-blue: #3F6C8E;
+    --chart-blue-deep: #2C5474;
+    --display: "Instrument Serif", "Iowan Old Style", Georgia, serif;
+    --ui: "Geist", -apple-system, BlinkMacSystemFont, "Segoe UI", system-ui, sans-serif;
+    --mono: "Geist Mono", ui-monospace, SFMono-Regular, Menlo, monospace;
+    --r-md: 10px; --r-lg: 14px; --r-xl: 20px; --r-2xl: 28px; --r-pill: 999px;
+    --ease: cubic-bezier(.2,.7,.1,1);
+    --shadow-card: 0 1px 0 rgba(255,255,255,.7) inset, 0 18px 40px -26px rgba(40,28,16,.18);
+    --shadow-paper: 0 1px 0 rgba(255,255,255,.6) inset, 0 32px 80px -40px rgba(40,28,16,.22);
+  }
+  * { box-sizing: border-box; }
+  html, body { margin: 0; padding: 0; }
+  body {
+    font-family: var(--ui);
+    background: var(--paper-deep);
+    color: var(--ink);
+    -webkit-font-smoothing: antialiased;
+    text-rendering: optimizeLegibility;
+    font-feature-settings: "ss01", "cv11";
+    min-height: 100vh;
+  }
+
+  /* ===== Outer stage (so the phone-width page feels presented) ===== */
+  .stage {
+    min-height: 100vh;
+    padding: 56px 24px 80px;
+    display: flex;
+    flex-direction: column;
+    align-items: center;
+    gap: 40px;
+    background:
+      radial-gradient(60% 40% at 50% 0%, #F1E9DA 0%, transparent 60%),
+      var(--paper-deep);
+  }
+  .stage-head {
+    width: 100%; max-width: 460px;
+    display: flex; align-items: center; justify-content: space-between;
+    font-family: var(--mono); font-size: 10.5px;
+    color: var(--ink-faint); letter-spacing: .14em; text-transform: uppercase;
+  }
+  .stage-head .brand {
+    display: flex; align-items: center; gap: 10px;
+    color: var(--ink-muted);
+  }
+  .stage-head .brand .glyph {
+    width: 18px; height: 18px;
+    border-radius: 5px;
+    background: var(--mint);
+    color: #0A2A24;
+    display: grid; place-items: center;
+    font-family: var(--display); font-size: 13px; font-style: italic;
+    letter-spacing: -.02em; line-height: 1;
+  }
+  .stage-head .brand .wordmark {
+    font-family: var(--display); font-size: 15px;
+    color: var(--ink); letter-spacing: -.01em;
+    text-transform: none;
+  }
+  .stage-head .brand .wordmark em { font-style: italic; color: var(--mint-deep); }
+  .stage-head .url { text-transform: lowercase; letter-spacing: .04em; }
+
+  /* ===== The page itself ===== */
+  .page {
+    width: 100%;
+    max-width: 430px;
+    background: var(--paper);
+    border-radius: 32px;
+    overflow: hidden;
+    box-shadow: var(--shadow-paper);
+    position: relative;
+    color: var(--ink);
+  }
+
+  /* ===== Top app-bar inside the page ===== */
+  .appbar {
+    position: absolute;
+    top: 0; left: 0; right: 0;
+    padding: 18px 22px 14px;
+    display: flex; align-items: center; justify-content: space-between;
+    z-index: 5;
+    background: linear-gradient(180deg, rgba(0,0,0,.32) 0%, rgba(0,0,0,0) 100%);
+    color: #fbf6ec;
+  }
+  .appbar .prepared {
+    font-family: var(--mono);
+    font-size: 9.5px;
+    letter-spacing: .18em;
+    text-transform: uppercase;
+    opacity: .9;
+  }
+  .appbar .share {
+    width: 30px; height: 30px;
+    border-radius: 50%;
+    background: rgba(255,255,255,.14);
+    backdrop-filter: blur(8px);
+    display: grid; place-items: center;
+    border: 1px solid rgba(255,255,255,.18);
+  }
+  .appbar .share svg {
+    width: 14px; height: 14px;
+    stroke: #fbf6ec; stroke-width: 1.5;
+    fill: none; stroke-linecap: round; stroke-linejoin: round;
+  }
+
+  /* ===== Hero photo (clean band — no text over the image) ===== */
+  .hero {
+    position: relative;
+    height: 480px;
+    background: #1A1612;
+    color: #fbf6ec;
+    overflow: hidden;
+    margin-bottom: 0;
+  }
+  /* 1px inset frame — subtle craft detail */
+  .hero::after {
+    content: "";
+    position: absolute;
+    inset: 14px;
+    border: 1px solid rgba(255,255,255,.10);
+    pointer-events: none;
+    z-index: 4;
+  }
+  .hero-photo {
+    position: absolute;
+    inset: -2%;
+    background:
+      url("9852360d-e764-4f4d-b47d-aed100095ba1") center 38% / cover no-repeat,
+      #c8b69a;
+    z-index: 0;
+    animation: kenburns 22s cubic-bezier(.4,.0,.6,1) forwards;
+    transform-origin: 50% 45%;
+  }
+  .hero .appbar { position: relative; z-index: 2; }
+
+  /* ===== Caption card — dark ink, overlaps bottom of photo ===== */
+  .caption-wrap {
+    position: relative;
+    margin: -44px 18px 0; /* overlap the photo by 44px */
+    z-index: 3;
+  }
+  .caption-card {
+    background: #16110D;
+    color: #F4EFE4;
+    border-radius: 14px;
+    padding: 22px 26px 26px;
+    box-shadow:
+      0 1px 0 rgba(255,255,255,.05) inset,
+      0 22px 50px -28px rgba(20,12,4,.55),
+      0 6px 18px -10px rgba(20,12,4,.35);
+    border: 1px solid rgba(255,255,255,.04);
+  }
+  .caption-card .for {
+    font-family: var(--mono);
+    font-size: 9.5px;
+    letter-spacing: .22em;
+    text-transform: uppercase;
+    color: var(--mint);
+    display: flex; align-items: center; gap: 10px;
+    margin-bottom: 12px;
+  }
+  .caption-card .for::before {
+    content: "";
+    width: 6px; height: 6px;
+    background: var(--mint);
+    border-radius: 50%;
+  }
+  .caption-card .kicker {
+    font-family: var(--mono);
+    font-size: 10.5px;
+    letter-spacing: .18em;
+    text-transform: uppercase;
+    color: rgba(244,239,228,.65);
+    margin-bottom: 16px;
+    display: flex; align-items: center; gap: 10px;
+  }
+  .caption-card .kicker::before {
+    content: "";
+    width: 18px; height: 1px;
+    background: currentColor;
+    opacity: .55;
+  }
+  .caption-card .addr {
+    font-family: var(--display);
+    font-weight: 400;
+    font-size: 40px;
+    line-height: 1.02;
+    letter-spacing: -.025em;
+    margin: 0;
+    color: #F4EFE4;
+    /* Avoid the street number breaking from "Kenilworth" */
+    text-wrap: balance;
+  }
+  .caption-card .addr em {
+    font-style: italic;
+    display: block;
+    margin-top: 2px;
+  }
+  .caption-card .city {
+    font-family: var(--mono);
+    font-size: 10.5px;
+    letter-spacing: .14em;
+    text-transform: uppercase;
+    margin-top: 18px;
+    padding-top: 18px;
+    border-top: 1px solid rgba(244,239,228,.12);
+    color: rgba(244,239,228,.55);
+  }
+
+  /* ===== Price panel directly below caption card ===== */
+  /* HERO PRICE TREATMENT — oversized serif w/ brick side accent */
+  .price-panel {
+    padding: 52px 28px 40px;
+    margin-top: 0;
+    background: var(--paper-raise);
+    border-bottom: 1px solid var(--paper-line);
+    position: relative;
+  }
+  .price-panel::before {
+    /* brick vertical accent bar */
+    content: "";
+    position: absolute;
+    left: 28px; top: 52px;
+    width: 3px; height: calc(100% - 92px);
+    background: var(--brick);
+  }
+  .price-panel .lbl {
+    font-family: var(--mono);
+    font-size: 10.5px;
+    letter-spacing: .18em;
+    text-transform: uppercase;
+    color: var(--brick);
+    margin-bottom: 18px;
+    padding-left: 18px;
+    display: flex; align-items: center; gap: 10px;
+  }
+  .price-panel .lbl::before { display: none; }
+  .price-panel .price {
+    border-bottom: 1px solid var(--paper-line-soft);
+    padding: 0 0 26px 18px;
+  }
+  .price-panel .rationale {
+    padding-left: 18px;
+  }
+
+  /* ===== Personal note from agent (warm paper, between caption + price) ===== */
+  .personal-note {
+    margin: 18px 0 0;
+    padding: 36px 28px 30px;
+    background: var(--paper);
+    text-align: left;
+    position: relative;
+  }
+  .personal-note .from {
+    font-family: var(--mono);
+    font-size: 10px;
+    letter-spacing: .18em;
+    text-transform: uppercase;
+    color: var(--ink-faint);
+    margin-bottom: 14px;
+    display: flex; align-items: center; gap: 10px;
+  }
+  .personal-note .from::before {
+    content: "";
+    width: 18px; height: 1px;
+    background: currentColor;
+    opacity: .55;
+  }
+  .personal-note .pn-body {
+    font-family: var(--display);
+    font-style: italic;
+    font-size: 24px;
+    line-height: 1.28;
+    letter-spacing: -.015em;
+    color: var(--ink);
+    margin: 0;
+    max-width: 30ch;
+  }
+  .personal-note .sig {
+    margin-top: 18px;
+    font-family: var(--display);
+    font-style: italic;
+    font-size: 17px;
+    letter-spacing: -.005em;
+    color: var(--brick);
+  }
+  .personal-note .sig::before {
+    content: "";
+    display: inline-block;
+    width: 22px; height: 1px;
+    background: var(--brick);
+    vertical-align: middle;
+    margin-right: 10px;
+    opacity: .8;
+  }
+
+  /* ===== Track record block — DARK CHAPTER ===== */
+  .track {
+    padding: 64px 28px 60px;
+    border-bottom: 1px solid rgba(0,0,0,.4);
+    background:
+      radial-gradient(120% 60% at 0% 0%, rgba(201,168,106,.06) 0%, transparent 60%),
+      linear-gradient(180deg, #1A1612 0%, #14110D 100%);
+    color: #F4EFE4;
+    position: relative;
+  }
+  .track .sec-label { color: rgba(244,239,228,.55); }
+  .track .sec-label .num { color: var(--gold); }
+  .track .sec-label .num::before { background: var(--mint); }
+  .track .sec-label .lbl { background: rgba(244,239,228,.16); }
+  .track .sec-label .name { color: rgba(244,239,228,.55); }
+  .track .sec-title { color: #F4EFE4; max-width: 14ch; }
+  .track .sec-title em { color: var(--gold); font-style: italic; }
+  .track .sec-body { color: rgba(244,239,228,.72); }
+
+  /* Structured stat ROWS on the dark chapter — horizontal layout
+     for clean baselines: [BIG NUMBER]  |  LABEL / descriptor */
+  .track-figures {
+    margin-top: 40px;
+    border-top: 1px solid rgba(244,239,228,.14);
+    border-bottom: 1px solid rgba(244,239,228,.14);
+  }
+  .tf {
+    padding: 28px 0 26px;
+    border-bottom: 1px solid rgba(244,239,228,.10);
+    display: grid;
+    grid-template-columns: 130px 1fr;
+    gap: 28px;
+    align-items: center;
+    background: transparent;
+  }
+  .tf:last-child { border-bottom: 0; }
+  .tf .v {
+    font-family: var(--display);
+    font-size: 64px;
+    line-height: .9;
+    letter-spacing: -.035em;
+    color: var(--gold);
+    display: flex;
+    align-items: baseline;
+  }
+  .tf .v em {
+    font-style: italic;
+    font-size: 30px;
+    color: rgba(201,168,106,.65);
+    letter-spacing: -.02em;
+    margin-left: 2px;
+  }
+  .tf .l {
+    font-family: var(--mono);
+    font-size: 10px;
+    letter-spacing: .16em;
+    text-transform: uppercase;
+    color: rgba(244,239,228,.5);
+    line-height: 1.4;
+  }
+  .tf .l strong {
+    display: block;
+    color: #F4EFE4;
+    font-weight: 500;
+    margin-bottom: 8px;
+    letter-spacing: .14em;
+    font-size: 11px;
+  }
+  .tf .l small {
+    display: block;
+    font-family: var(--ui);
+    font-size: 13px;
+    color: rgba(244,239,228,.62);
+    letter-spacing: 0;
+    text-transform: none;
+    margin-top: 0;
+    line-height: 1.45;
+    font-weight: 400;
+    max-width: 30ch;
+  }
+
+  /* Past-seller testimonial on the dark chapter */
+  .testimonial {
+    margin-top: 40px;
+    padding-top: 4px;
+    display: grid;
+    grid-template-columns: 22px 1fr;
+    gap: 18px;
+    align-items: start;
+  }
+  .testimonial .rule {
+    width: 1px;
+    background: var(--brick);
+    align-self: stretch;
+    margin-top: 6px;
+    opacity: .9;
+  }
+  .testimonial .ts-body {
+    font-family: var(--display);
+    font-style: italic;
+    font-size: 22px;
+    line-height: 1.32;
+    letter-spacing: -.01em;
+    color: #F4EFE4;
+    margin: 0 0 16px;
+    max-width: 36ch;
+  }
+  .testimonial .att {
+    font-family: var(--mono);
+    font-size: 10px;
+    letter-spacing: .16em;
+    text-transform: uppercase;
+    color: rgba(244,239,228,.5);
+    display: flex; align-items: center; gap: 10px;
+  }
+  .testimonial .att .nm { color: rgba(244,239,228,.85); font-weight: 500; }
+
+  /* ===== CTA reassurance microcopy ===== */
+  .cta-reassure {
+    margin: 14px 22px 0;
+    font-family: var(--ui);
+    font-size: 12.5px;
+    line-height: 1.55;
+    color: rgba(244,239,228,.55);
+    font-style: italic;
+    letter-spacing: -.005em;
+    text-align: center;
+  }
+
+  /* ============================================
+     VIDEO BLOCK (optional — hides if no video)
+     ============================================ */
+  .video-block {
+    padding: 56px 28px;
+    background: var(--paper-card);
+    border-bottom: 1px solid var(--paper-line);
+  }
+  .video-block .sec-title { max-width: 14ch; }
+  .video-poster {
+    margin-top: 28px;
+    position: relative;
+    aspect-ratio: 4 / 5;
+    border-radius: var(--r-md);
+    overflow: hidden;
+    background:
+      linear-gradient(180deg, rgba(0,0,0,0) 50%, rgba(20,14,8,.55) 100%),
+      url("7a6f56bc-31d1-48cf-844e-b9d6407b6783") center 25% / cover no-repeat,
+      #5e544a;
+    box-shadow: var(--shadow-card);
+    cursor: pointer;
+    transition: transform var(--ease) 220ms;
+  }
+  /* subtle inset frame, mirrors hero photo */
+  .video-poster::after {
+    content: "";
+    position: absolute;
+    inset: 10px;
+    border: 1px solid rgba(255,255,255,.18);
+    pointer-events: none;
+    border-radius: 4px;
+  }
+  .video-poster:hover { transform: translateY(-2px); }
+  .video-poster .play {
+    position: absolute;
+    top: 50%; left: 50%;
+    transform: translate(-50%, -50%);
+    width: 64px; height: 64px;
+    border-radius: 50%;
+    background: rgba(244,239,228,.92);
+    backdrop-filter: blur(6px);
+    border: 1px solid rgba(255,255,255,.4);
+    display: grid; place-items: center;
+    transition: background var(--ease) 140ms, transform var(--ease) 140ms;
+  }
+  .video-poster:hover .play { background: #FFFFFF; transform: translate(-50%, -50%) scale(1.04); }
+  .video-poster .play::before {
+    content: "";
+    width: 0; height: 0;
+    border-left: 14px solid var(--ink);
+    border-top: 9px solid transparent;
+    border-bottom: 9px solid transparent;
+    margin-left: 4px;
+  }
+  .video-poster .meta {
+    position: absolute;
+    left: 22px; bottom: 22px; right: 22px;
+    color: #fbf6ec;
+    z-index: 2;
+  }
+  .video-poster .meta .ttl {
+    font-family: var(--display);
+    font-size: 24px;
+    line-height: 1.18;
+    letter-spacing: -.015em;
+    text-shadow: 0 1px 1px rgba(0,0,0,.55), 0 2px 18px rgba(0,0,0,.45);
+    max-width: 22ch;
+  }
+  .video-poster .meta .ttl em { font-style: italic; }
+  .video-poster .meta .runtime {
+    font-family: var(--mono);
+    font-size: 10px;
+    letter-spacing: .18em;
+    text-transform: uppercase;
+    opacity: .88;
+    margin-top: 10px;
+    display: flex; align-items: center; gap: 10px;
+  }
+  .video-poster .meta .runtime::before {
+    content: "";
+    width: 18px; height: 1px;
+    background: currentColor;
+    opacity: .55;
+  }
+
+  /* ============================================
+     REVIEWS BLOCK (optional — hides if no reviews)
+     ============================================ */
+  .reviews {
+    padding: 60px 28px 56px;
+    background: var(--paper-raise);
+    border-bottom: 1px solid var(--paper-line);
+  }
+  .reviews .sec-title { max-width: 16ch; }
+  .reviews-list {
+    margin-top: 32px;
+    display: flex; flex-direction: column;
+    gap: 0;
+    border-top: 1px solid var(--paper-line-soft);
+  }
+  .review {
+    padding: 26px 0 24px;
+    border-bottom: 1px solid var(--paper-line-soft);
+    display: grid;
+    grid-template-columns: auto 1fr;
+    gap: 18px;
+    align-items: start;
+  }
+  .review .qm {
+    font-family: var(--display);
+    font-style: italic;
+    font-size: 32px;
+    line-height: .5;
+    color: var(--rose);
+    padding-top: 18px;
+    width: 18px;
+    text-align: center;
+  }
+  .review .rv-body {
+    font-family: var(--display);
+    font-size: 19px;
+    line-height: 1.36;
+    letter-spacing: -.005em;
+    color: var(--ink);
+    margin: 0 0 14px;
+    max-width: 36ch;
+  }
+  .review .rv-body em { font-style: italic; }
+  .review .att {
+    font-family: var(--mono);
+    font-size: 10px;
+    letter-spacing: .16em;
+    text-transform: uppercase;
+    color: var(--ink-faint);
+  }
+  .review .att .nm { color: var(--ink-muted); font-weight: 500; }
+  .reviews-outlink {
+    margin-top: 24px;
+    display: inline-flex; align-items: center; gap: 10px;
+    font-family: var(--ui);
+    font-size: 13px;
+    color: var(--ink);
+    text-decoration: none;
+    border-bottom: 1px solid var(--brick);
+    padding-bottom: 2px;
+    letter-spacing: -.005em;
+    transition: gap var(--ease) 140ms;
+  }
+  .reviews-outlink:hover { gap: 14px; }
+  .reviews-outlink::after {
+    content: "→";
+    color: var(--brick);
+    font-size: 14px;
+  }
+
+  /* ============================================
+     Closing mark (signature mint dot at the end)
+     ============================================ */
+  .end-mark {
+    text-align: center;
+    padding: 36px 28px 18px;
+    background: var(--ink);
+  }
+  .end-mark .dot {
+    display: inline-block;
+    width: 5px; height: 5px;
+    background: var(--mint);
+    border-radius: 50%;
+    margin: 0 6px;
+    vertical-align: middle;
+  }
+  .end-mark .rule {
+    display: inline-block;
+    width: 18px; height: 1px;
+    background: rgba(244,239,228,.18);
+    vertical-align: middle;
+  }
+  .price {
+    font-family: var(--display);
+    font-weight: 400;
+    font-size: 108px;
+    line-height: .88;
+    letter-spacing: -.04em;
+    color: var(--ink);
+    display: flex; align-items: flex-start;
+  }
+  .price .dollar {
+    font-size: 42px;
+    line-height: 1;
+    margin: 10px 4px 0 0;
+    color: var(--brick);
+    letter-spacing: -.02em;
+  }
+  .rationale {
+    margin-top: 22px;
+    font-family: var(--display);
+    font-style: italic;
+    font-size: 22px;
+    line-height: 1.28;
+    letter-spacing: -.01em;
+    color: var(--ink-2);
+    max-width: 32ch;
+  }
+  .rationale::before {
+    content: "";
+    display: block;
+    width: 28px; height: 1px;
+    background: var(--brick);
+    margin-bottom: 18px;
+  }
+
+  /* ===== Section scaffolding ===== */
+  section.block {
+    padding: 56px 28px;
+    border-bottom: 1px solid var(--paper-line);
+  }
+  section.block:last-of-type { border-bottom: 0; }
+  /* Background variants for editorial rhythm */
+  section.block.paper { background: var(--paper); }
+  section.block.raise { background: var(--paper-raise); }
+  section.block.card { background: var(--paper-card); }
+
+  /* ===== Refined numbered-section ornament =====
+     [mint dot] [italic serif numeral] [hairline] [mono label]
+     ============================================ */
+  .sec-label {
+    font-family: var(--mono);
+    font-size: 10.5px;
+    letter-spacing: .18em;
+    text-transform: uppercase;
+    color: var(--ink-faint);
+    margin-bottom: 22px;
+    display: flex; align-items: center; gap: 14px;
+  }
+  .sec-label::after { display: none; }
+  .sec-label .num {
+    font-family: var(--display);
+    font-style: italic;
+    font-size: 17px;
+    line-height: 1;
+    letter-spacing: -.01em;
+    color: var(--brick);
+    text-transform: none;
+    position: relative;
+    padding-left: 14px;
+    font-weight: 400;
+  }
+  .sec-label .num::before {
+    content: "";
+    position: absolute;
+    left: 0; top: 50%;
+    width: 5px; height: 5px;
+    background: var(--mint);
+    border-radius: 50%;
+    transform: translateY(-50%);
+  }
+  .sec-label .lbl {
+    flex: 1;
+    height: 1px;
+    background: var(--paper-line);
+    align-self: center;
+  }
+  .sec-label .name {
+    color: var(--ink-muted);
+    letter-spacing: .18em;
+    text-transform: uppercase;
+    font-family: var(--mono);
+    font-size: 10.5px;
+  }
+  .sec-title {
+    font-family: var(--display);
+    font-weight: 400;
+    font-size: 44px;
+    line-height: 1;
+    letter-spacing: -.025em;
+    margin: 0 0 22px;
+    color: var(--ink);
+    max-width: 12ch;
+  }
+  .sec-title em { font-style: italic; }
+  .sec-body {
+    font-size: 16px;
+    line-height: 1.55;
+    color: var(--ink-2);
+    margin: 0;
+    max-width: 38ch;
+  }
+  .sec-body + .sec-body { margin-top: 14px; }
+
+  /* Serif drop-cap (used on the first paragraph of “Why this price”) */
+  .sec-body.drop-cap::first-letter {
+    font-family: var(--display);
+    font-size: 64px;
+    line-height: .85;
+    float: left;
+    color: var(--brick);
+    padding: 4px 12px 0 0;
+    margin-top: 4px;
+    font-style: italic;
+    letter-spacing: -.02em;
+  }
+
+  /* ===== Why this price — comps ===== */
+  .comps {
+    margin-top: 36px;
+    border-top: 1px solid var(--paper-line-soft);
+  }
+  .comp {
+    display: grid;
+    grid-template-columns: 28px 1fr auto;
+    align-items: baseline;
+    gap: 16px;
+    padding: 22px 0;
+    border-bottom: 1px solid var(--paper-line-soft);
+  }
+  .comp .idx {
+    font-family: var(--mono);
+    font-size: 10.5px;
+    color: var(--ink-faint);
+    letter-spacing: .12em;
+    line-height: 1.3;
+    padding-top: 4px;
+  }
+  .comp .addr {
+    font-family: var(--display);
+    font-size: 21px;
+    line-height: 1.18;
+    letter-spacing: -.01em;
+    color: var(--ink);
+  }
+  .comp .addr small {
+    display: block;
+    font-family: var(--ui);
+    font-size: 11.5px;
+    color: var(--ink-muted);
+    letter-spacing: 0;
+    margin-top: 3px;
+    font-weight: 400;
+  }
+  .comp .sold {
+    font-family: var(--display);
+    font-size: 24px;
+    color: var(--ink);
+    letter-spacing: -.015em;
+    text-align: right;
+    line-height: 1;
+  }
+  .comp .sold small {
+    display: block;
+    font-family: var(--mono);
+    font-size: 9.5px;
+    color: var(--ink-faint);
+    letter-spacing: .12em;
+    text-transform: uppercase;
+    margin-top: 6px;
+    font-weight: 400;
+  }
+  .comps-note {
+    margin-top: 18px;
+    font-family: var(--mono);
+    font-size: 10.5px;
+    color: var(--ink-faint);
+    letter-spacing: .06em;
+    line-height: 1.6;
+  }
+
+  /* graceful missing-comp state */
+  .comp.missing {
+    grid-template-columns: 28px 1fr;
+    color: var(--ink-faint);
+  }
+  .comp.missing .addr {
+    font-family: var(--ui);
+    font-size: 13px;
+    font-style: italic;
+    color: var(--ink-faint);
+    letter-spacing: 0;
+  }
+
+  /* ===== "What I'll do for you" — pitch points ===== */
+  .pitch {
+    background: var(--paper-card);
+    margin: 0;
+    padding: 56px 28px;
+    border-bottom: 1px solid var(--paper-line);
+    position: relative;
+  }
+  .pitch .sec-title { max-width: 14ch; }
+  .pitches {
+    margin-top: 32px;
+    display: flex; flex-direction: column;
+    gap: 28px;
+  }
+  .pp {
+    display: grid;
+    grid-template-columns: 40px 1fr;
+    gap: 18px;
+    align-items: baseline;
+  }
+  .pp .n {
+    font-family: var(--display);
+    font-style: italic;
+    font-size: 30px;
+    color: var(--brick);
+    line-height: 1;
+    letter-spacing: -.01em;
+    padding-top: 2px;
+  }
+  .pp .t {
+    font-family: var(--display);
+    font-size: 22px;
+    line-height: 1.22;
+    letter-spacing: -.015em;
+    color: var(--ink);
+  }
+  .pp .t small {
+    display: block;
+    font-family: var(--ui);
+    font-size: 13.5px;
+    color: var(--ink-muted);
+    line-height: 1.5;
+    margin-top: 6px;
+    letter-spacing: 0;
+  }
+
+  /* ===== Recent area sales (kept as comment anchor) ===== */
+  /* (styles consolidated into the new block above) */
+
+  /* ===== area-head (kept) ===== */
+  .area-head {
+    display: flex; justify-content: space-between; align-items: baseline;
+    margin-bottom: 28px;
+  }
+  .area-head .zip {
+    font-family: var(--mono);
+    font-size: 10.5px;
+    color: var(--ink-faint);
+    letter-spacing: .14em;
+    text-transform: uppercase;
+  }
+  .chart-wrap {
+    margin-top: 36px;
+    padding: 44px 28px 40px;
+    background: linear-gradient(180deg, #FCF9F2 0%, #FBF6EA 100%);
+    border: 1px solid var(--paper-line);
+    border-radius: 14px;
+  }
+  .chart-head {
+    display: flex; justify-content: space-between; align-items: flex-end;
+    margin-bottom: 44px;
+  }
+  .chart-head .l {
+    font-family: var(--mono);
+    font-size: 10px;
+    letter-spacing: .16em;
+    text-transform: uppercase;
+    color: var(--ink-faint);
+    line-height: 1.4;
+  }
+  .chart-head .l strong {
+    display: block;
+    color: var(--ink-muted);
+    font-weight: 500;
+    margin-bottom: 4px;
+    font-size: 10px;
+    letter-spacing: .16em;
+  }
+  .chart-head .pct {
+    font-family: var(--display);
+    font-size: 28px;
+    line-height: 1;
+    letter-spacing: -.02em;
+    color: var(--pos);
+    display: flex; align-items: baseline; gap: 8px;
+  }
+  .chart-head .pct small {
+    font-family: var(--mono);
+    font-size: 9.5px;
+    color: var(--ink-faint);
+    letter-spacing: .14em;
+    text-transform: uppercase;
+  }
+  .chart {
+    width: 100%;
+    display: block;
+    overflow: visible;
+    font-family: var(--mono);
+  }
+  .chart .gridline { stroke: var(--paper-line-soft); stroke-width: 1; }
+  .chart .baseline { stroke: var(--ink); stroke-opacity: .22; stroke-width: 1; }
+  .chart .y-label, .chart .x-label {
+    font-size: 8.5px;
+    letter-spacing: .14em;
+    text-transform: uppercase;
+    fill: var(--ink-faint);
+  }
+  /* Engaging area fill — gradient that intensifies toward the current month */
+  .chart .area-fill {
+    fill: url(#chartFill);
+  }
+  .chart .line-stroke {
+    fill: none;
+    stroke: var(--chart-blue);
+    stroke-width: 2.6;
+    stroke-linejoin: round;
+    stroke-linecap: round;
+  }
+  /* Small subtle dots at each month */
+  .chart .point {
+    fill: var(--paper-card);
+    stroke: var(--chart-blue);
+    stroke-width: 1.4;
+  }
+  /* Current month — layered marker: a soft ring + filled dot */
+  .chart .point-current-ring {
+    fill: rgba(63, 108, 142, .22);
+    stroke: none;
+  }
+  .chart .point-current {
+    fill: var(--chart-blue);
+    stroke: var(--paper-card);
+    stroke-width: 2.5;
+  }
+  /* Sonar pulse — two layered circles scale outward and fade */
+  .chart .point-current-pulse {
+    fill: var(--chart-blue);
+    transform-origin: center;
+    transform-box: fill-box;
+    animation: sonar 2.6s cubic-bezier(0,0,.2,1) infinite;
+  }
+  .chart .point-current-pulse.delay { animation-delay: 1.3s; }
+  @keyframes sonar {
+    0%   { transform: scale(1);   opacity: 0.55; }
+    80%  { opacity: 0; }
+    100% { transform: scale(5);   opacity: 0; }
+  }
+  /* Vertical guide from current point down to baseline */
+  .chart .current-guide {
+    stroke: var(--gold);
+    stroke-width: 1;
+    stroke-dasharray: 2 3;
+    opacity: .35;
+  }
+  /* Callout */
+  .chart .callout-line {
+    stroke: var(--gold);
+    stroke-width: 1;
+    stroke-dasharray: 2 3;
+    opacity: .65;
+  }
+  .chart .callout-bg {
+    fill: var(--paper-card);
+    stroke: rgba(184, 150, 90, .35);
+    stroke-width: 1;
+  }
+  .chart .callout-text {
+    font-family: var(--display);
+    font-size: 22px;
+    fill: var(--chart-blue-deep);
+    letter-spacing: -.02em;
+    font-weight: 500;
+  }
+  .chart .callout-sub {
+    font-family: var(--mono);
+    font-size: 8px;
+    letter-spacing: .14em;
+    text-transform: uppercase;
+    fill: var(--ink-faint);
+  }
+  /* Recommended-list horizontal line: cleaner approach — dashed line across,
+     small brick text tag at right with NO background box (per feedback). */
+  .chart .rec-line {
+    stroke: var(--brick);
+    stroke-opacity: .9;
+    stroke-width: 1;
+    stroke-dasharray: 4 4;
+  }
+  .chart .rec-tag-text {
+    font-family: var(--mono);
+    font-size: 8px;
+    letter-spacing: .16em;
+    text-transform: uppercase;
+    fill: var(--brick);
+    font-weight: 500;
+  }
+  .chart .rec-tag-num {
+    font-family: var(--display);
+    font-size: 16px;
+    letter-spacing: -.02em;
+    fill: var(--brick);
+  }
+
+  /* Subtle, elegant "alive" sway on the line group.
+     Slow and small — a breath, not a bounce. */
+  @keyframes chartSway {
+    0%, 100% { transform: translateY(0); }
+    50%     { transform: translateY(-1.6px); }
+  }
+  .chart .line-group {
+    animation: chartSway 5.8s ease-in-out infinite;
+    transform-origin: 50% 100%;
+    transform-box: fill-box;
+  }
+  @media (prefers-reduced-motion: reduce) {
+    .chart .line-group,
+    .chart .point-current-pulse { animation: none !important; opacity: 0 !important; }
+  }
+
+  /* ===== Graceful: market snapshot coming soon ===== */
+  .area--empty .area-stats,
+  .area--empty .chart-wrap { display: none; }
+  .area:not(.area--empty) .empty { display: none; }
+  .area--empty .empty {
+    margin-top: 18px;
+    padding: 38px 28px;
+    border: 1px solid var(--paper-line);
+    border-radius: var(--r-md);
+    background: var(--paper-card);
+    text-align: center;
+  }
+  .area--empty .empty .icon {
+    width: 26px; height: 26px;
+    margin: 0 auto 14px;
+    border-radius: 50%;
+    border: 1px solid var(--paper-line);
+    display: grid; place-items: center;
+    color: var(--ink-faint);
+  }
+  .area--empty .empty .h {
+    font-family: var(--display);
+    font-size: 22px;
+    line-height: 1.2;
+    letter-spacing: -.01em;
+    color: var(--ink);
+    font-style: italic;
+  }
+  .area--empty .empty .p {
+    font-family: var(--ui);
+    font-size: 13px;
+    color: var(--ink-muted);
+    margin-top: 8px;
+    line-height: 1.55;
+  }
+
+  /* ===== Graceful: agent monogram fallback ===== */
+  .agent-photo--monogram {
+    background: linear-gradient(135deg, #2A241F 0%, #1A1612 100%) !important;
+    display: grid; place-items: center;
+  }
+  .agent-photo--monogram::before {
+    content: attr(data-monogram);
+    font-family: var(--display);
+    font-size: 36px;
+    color: #F4EFE4;
+    letter-spacing: -.02em;
+    line-height: 1;
+  }
+  /* ===== Recent area sales — structured cards w/ directional deltas ===== */
+  .area {
+    padding: 56px 28px;
+    background: var(--paper);
+    border-bottom: 1px solid var(--paper-line);
+  }
+  .area-stats {
+    display: grid;
+    grid-template-columns: 1fr 1fr;
+    gap: 1px;
+    background: var(--paper-line);
+    border: 1px solid var(--paper-line);
+    border-radius: 10px;
+    overflow: hidden;
+  }
+  .as {
+    padding: 22px 18px 20px;
+    background: var(--paper-raise);
+    border: 0;
+    display: flex; flex-direction: column;
+    gap: 10px;
+  }
+  .as:nth-child(odd) { padding-right: 18px; border-right: 0; }
+  .as:nth-child(even) { padding-left: 18px; }
+  .as:nth-last-child(-n+2) { border-bottom: 0; }
+  .as .l {
+    font-family: var(--mono);
+    font-size: 10px;
+    letter-spacing: .14em;
+    text-transform: uppercase;
+    color: var(--ink-faint);
+    margin-bottom: 0;
+  }
+  .as .v {
+    font-family: var(--display);
+    font-size: 40px;
+    line-height: 1;
+    letter-spacing: -.025em;
+    color: var(--gold-warm);
+  }
+  .as .ctx {
+    font-family: var(--mono);
+    font-size: 10px;
+    letter-spacing: .08em;
+    color: var(--ink-muted);
+    line-height: 1.4;
+    margin-top: 0;
+    display: flex; align-items: center; gap: 6px;
+  }
+  .as .ctx .pos { color: var(--pos); font-weight: 500; }
+  .as .ctx .neg { color: var(--brick); font-weight: 500; }
+
+  .trend {
+    margin-top: 26px;
+    padding-top: 6px;
+  }
+  .trend .l {
+    font-family: var(--mono);
+    font-size: 10px;
+    letter-spacing: .14em;
+    text-transform: uppercase;
+    color: var(--ink-faint);
+    margin-bottom: 14px;
+  }
+  .spark {
+    display: flex; align-items: flex-end;
+    gap: 6px;
+    height: 56px;
+  }
+  .spark .bar {
+    flex: 1;
+    background: var(--ink);
+    opacity: .12;
+    border-radius: 1px;
+    transition: opacity .2s var(--ease);
+  }
+  .spark .bar.acc { opacity: .85; background: var(--brick); }
+  .spark .bar.cur { opacity: 1; background: var(--ink); }
+  .trend-axis {
+    display: flex; justify-content: space-between;
+    margin-top: 8px;
+    font-family: var(--mono);
+    font-size: 9.5px;
+    color: var(--ink-faint);
+    letter-spacing: .12em;
+    text-transform: uppercase;
+  }
+
+  /* ===== Editorial detail + buyer quote (photo band + dark-ink panel) ===== */
+  .editorial-pair {
+    border-bottom: 1px solid var(--paper-line);
+  }
+  .editorial-photo {
+    height: 280px;
+    background:
+      url("170f7c74-0574-4a3b-8d67-5f559cd24e72") center 40% / cover no-repeat,
+      #b9a78a;
+  }
+  .quote-panel {
+    background: #16110D;
+    color: #F4EFE4;
+    padding: 48px 28px 52px;
+  }
+  .quote-panel .qmark {
+    font-family: var(--display);
+    font-style: italic;
+    font-size: 56px;
+    line-height: .6;
+    color: var(--brick);
+    margin-bottom: 8px;
+    display: block;
+  }
+  .quote-panel .quote-body {
+    font-family: var(--display);
+    font-style: italic;
+    font-size: 26px;
+    line-height: 1.28;
+    letter-spacing: -.015em;
+    color: #F4EFE4;
+    margin: 0 0 22px;
+    max-width: 28ch;
+  }
+  .quote-panel .quote-att {
+    font-family: var(--mono);
+    font-size: 10px;
+    letter-spacing: .18em;
+    text-transform: uppercase;
+    color: rgba(244,239,228,.55);
+    display: flex; align-items: center; gap: 12px;
+  }
+  .quote-panel .quote-att::before {
+    content: "";
+    width: 24px; height: 1px;
+    background: currentColor;
+    opacity: .5;
+  }
+
+  /* ===== Your agent ===== */
+  .agent {
+    background: var(--ink);
+    color: #F4EFE4;
+    padding: 56px 28px 48px;
+    position: relative;
+  }
+  .agent .sec-label { color: rgba(244,239,228,.55); }
+  .agent .sec-label .num { color: var(--gold); }
+  .agent .sec-label .num::before { background: var(--mint); }
+  .agent .sec-label .lbl { background: rgba(244,239,228,.16); }
+  .agent .sec-label .name { color: rgba(244,239,228,.55); }
+  .agent .sec-title { color: #F4EFE4; }
+
+  .agent-card {
+    display: grid;
+    grid-template-columns: 92px 1fr;
+    gap: 20px;
+    align-items: center;
+    margin-top: 8px;
+    padding-bottom: 28px;
+    border-bottom: 1px solid rgba(244,239,228,.12);
+  }
+  .agent-photo {
+    width: 92px; height: 92px;
+    border-radius: 50%;
+    background:
+      url("07d69447-ecda-4653-8f33-6a29df302392") center / cover no-repeat,
+      #5e544a;
+    position: relative;
+    border: 1px solid rgba(244,239,228,.18);
+  }
+  .agent-photo .verify {
+    position: absolute;
+    right: -2px; bottom: -2px;
+    width: 22px; height: 22px;
+    border-radius: 50%;
+    background: var(--mint);
+    color: #0A2A24;
+    display: grid; place-items: center;
+    border: 2px solid var(--ink);
+  }
+  .agent-photo .verify svg {
+    width: 11px; height: 11px;
+    stroke: currentColor; stroke-width: 2.2;
+    fill: none; stroke-linecap: round; stroke-linejoin: round;
+  }
+  .agent-name {
+    font-family: var(--display);
+    font-weight: 400;
+    font-size: 32px;
+    letter-spacing: -.015em;
+    line-height: 1;
+    color: #F4EFE4;
+  }
+  .agent-role {
+    margin-top: 8px;
+    font-size: 13px;
+    color: rgba(244,239,228,.65);
+    line-height: 1.5;
+  }
+  .agent-role em {
+    font-style: italic;
+    color: rgba(244,239,228,.85);
+    font-family: var(--display);
+    font-size: 14px;
+  }
+
+  .agent-bio {
+    padding: 26px 0 28px;
+    font-family: var(--display);
+    font-style: italic;
+    font-size: 18px;
+    line-height: 1.4;
+    letter-spacing: -.005em;
+    color: rgba(244,239,228,.82);
+    border-bottom: 1px solid rgba(244,239,228,.12);
+    max-width: 36ch;
+  }
+
+  .agent-meta {
+    padding-top: 26px;
+    display: grid;
+    grid-template-columns: 1fr 1fr;
+    gap: 22px 18px;
+  }
+  .am .l {
+    font-family: var(--mono);
+    font-size: 9.5px;
+    letter-spacing: .16em;
+    text-transform: uppercase;
+    color: rgba(244,239,228,.45);
+    margin-bottom: 6px;
+  }
+  .am .v {
+    font-size: 13.5px;
+    color: #F4EFE4;
+    line-height: 1.45;
+    letter-spacing: -.005em;
+  }
+  .am .v.mono {
+    font-family: var(--mono);
+    font-size: 12.5px;
+    letter-spacing: .02em;
+  }
+
+  .agent-ctas {
+    margin-top: 32px;
+    display: flex; flex-direction: column; gap: 10px;
+  }
+  .cta {
+    display: flex; align-items: center; justify-content: space-between;
+    padding: 18px 22px;
+    border-radius: var(--r-pill);
+    font-family: var(--ui);
+    font-size: 15px;
+    font-weight: 500;
+    text-decoration: none;
+    letter-spacing: -.005em;
+    transition: transform .14s var(--ease), background .14s var(--ease);
+  }
+  .cta:hover { transform: translateY(-1px); }
+  .cta.primary {
+    background: #F4EFE4;
+    color: var(--ink);
+  }
+  .cta.outline {
+    background: transparent;
+    color: #F4EFE4;
+    border: 1px solid rgba(244,239,228,.32);
+  }
+  .cta .ar {
+    width: 22px; height: 22px;
+    border-radius: 50%;
+    background: var(--ink);
+    color: #F4EFE4;
+    display: grid; place-items: center;
+  }
+  .cta.outline .ar { background: #F4EFE4; color: var(--ink); }
+  .cta .ar svg {
+    width: 11px; height: 11px;
+    stroke: currentColor; stroke-width: 1.8;
+    fill: none; stroke-linecap: round; stroke-linejoin: round;
+  }
+
+  /* ===== Foot ===== */
+  .foot {
+    padding: 34px 28px 40px;
+    background: var(--ink);
+    color: rgba(244,239,228,.45);
+    border-top: 1px solid rgba(244,239,228,.08);
+    font-family: var(--mono);
+    font-size: 10px;
+    letter-spacing: .14em;
+    text-transform: uppercase;
+    line-height: 1.7;
+  }
+  .foot .row {
+    display: flex; justify-content: space-between; align-items: center;
+    gap: 12px;
+  }
+  .foot .brand {
+    display: flex; align-items: center; gap: 8px;
+    color: rgba(244,239,228,.65);
+  }
+  .foot .brand .glyph {
+    width: 16px; height: 16px;
+    border-radius: 4px;
+    background: var(--mint);
+    color: #0A2A24;
+    display: grid; place-items: center;
+    font-family: var(--display); font-size: 12px; font-style: italic;
+    line-height: 1; letter-spacing: -.02em;
+  }
+  .foot .brand .wm {
+    font-family: var(--display);
+    font-size: 13px;
+    color: rgba(244,239,228,.85);
+    text-transform: none;
+    letter-spacing: -.01em;
+  }
+  .foot .brand .wm em { font-style: italic; color: var(--mint); }
+  .foot .small {
+    margin-top: 18px;
+    color: rgba(244,239,228,.32);
+    line-height: 1.7;
+  }
+
+  /* ===== Stage-level legend (annotation block — outside the rendered page) ===== */
+  .legend {
+    width: 100%; max-width: 460px;
+    color: var(--ink-muted);
+    font-size: 12px;
+    line-height: 1.6;
+    font-family: var(--mono);
+    letter-spacing: .04em;
+  }
+  .legend .ttl {
+    color: var(--ink);
+    font-family: var(--display);
+    font-size: 20px;
+    letter-spacing: -.01em;
+    margin-bottom: 8px;
+    text-transform: none;
+  }
+  .legend a { color: var(--brick); text-decoration: none; }
+
+  /* ============================================
+     MOTION LAYER (CSS-first)
+     Reveal ease + 3 durations · structural, never decorative
+     ============================================ */
+  :root {
+    --r-ease: cubic-bezier(.16,.84,.3,1);
+    --r-quick: 140ms;
+    --r-std:   220ms;
+    --r-slow:  360ms;
+    --r-rise:  640ms; /* reveal duration */
+  }
+
+  /* ---- scroll-reveal primitives (restraint mode — opacity-only, no slide) ---- */
+  .reveal {
+    opacity: 0;
+    transition: opacity 720ms var(--r-ease);
+    will-change: opacity;
+  }
+  .reveal.in { opacity: 1; }
+  /* stagger left intentionally as a no-op so legacy markup still works */
+  .stagger > * { transition-delay: 0ms; }
+
+  /* ---- hero Ken Burns (slow, barely-perceptible) ---- */
+  .hero { overflow: hidden; }
+  @keyframes kenburns {
+    from { transform: scale(1) translate3d(0,0,0); }
+    to   { transform: scale(1.035) translate3d(-1.2%, .8%, 0); }
+  }
+
+  /* ---- price reveal removed: hero price is always visible (no reveal animation) ---- */
+  .price-reveal { opacity: 1 !important; -webkit-clip-path: none !important; clip-path: none !important; transform: none !important; }
+
+  /* ---- CTA micro-interactions ---- */
+  .cta .ar { transition: transform var(--r-quick) var(--r-ease), background var(--r-quick) var(--r-ease); }
+  .cta:hover .ar { transform: translateX(3px); }
+  .cta.primary:hover { background: #FFFCF4; }
+  .cta.outline:hover { background: rgba(244,239,228,.08); border-color: rgba(244,239,228,.55); }
+
+  /* ---- verified tick entrance (delayed) ---- */
+  .agent-photo .verify {
+    transform: scale(.3);
+    opacity: 0;
+    transition:
+      transform 420ms var(--r-ease) 220ms,
+      opacity 240ms ease-out 220ms;
+  }
+  .agent-photo.in .verify {
+    transform: scale(1);
+    opacity: 1;
+  }
+
+  /* ---- chart line draw-on ---- */
+  .chart .area-fill {
+    opacity: 0;
+    transition: opacity 520ms var(--r-ease) 120ms;
+  }
+  .chart .line-stroke {
+    stroke-dasharray: 600;
+    stroke-dashoffset: 600;
+    transition: stroke-dashoffset 1100ms var(--r-ease) 80ms;
+  }
+  .chart .point {
+    opacity: 0;
+    transform: scale(.5);
+    transform-origin: center;
+    transition: opacity 240ms var(--r-ease) 900ms, transform 320ms var(--r-ease) 900ms;
+  }
+  .chart.in .area-fill { opacity: 1; }
+  .chart.in .line-stroke { stroke-dashoffset: 0; }
+  .chart.in .point { opacity: 1; transform: scale(1); }
+
+  /* ---- reduced motion ---- */
+  @media (prefers-reduced-motion: reduce) {
+    .reveal, .price-reveal, .agent-photo .verify,
+    .chart .line-stroke, .chart .area-fill, .chart .point {
+      opacity: 1 !important;
+      transform: none !important;
+      transition: none !important;
+      -webkit-clip-path: none !important;
+              clip-path: none !important;
+      stroke-dashoffset: 0 !important;
+    }
+    .hero-photo { animation: none !important; }
+  }
+</style>
+</head>
+<body data-screen-label="Seller Presentation — Consumer Page">
+<!--
+  ========================================================================
+  DATA FIELDS USED BY THIS PAGE (public-safe payload)
+  ========================================================================
+  property: { address, city, state, zip, hero_photo_url, recommended_list,
+              rationale_short }
+  prepared_for: string                    // "the Halloran family" — surfaced in caption + footer
+  agent_note: string | null               // italic personal sentence near top (OPTIONAL)
+  video: {                                // OPTIONAL — hides cleanly if missing
+    poster_url, video_url,
+    title, runtime, recorded_on
+  } | null
+  why_price: {
+    public_rationale: string,             // 1-2 short paragraphs
+    comps: [{ address, sold_price, sold_date, sqft }]  // up to 3
+  }
+  pitch_points: [{ title, support }]      // 2–4 items
+  agent_track_record: {                   // OPTIONAL — hides cleanly if missing
+    figures: [{ label, value, ctx }],     // 0–3 editorial data figures
+    testimonial: {                        // OPTIONAL on its own
+      body, attribution_short, area_or_year
+    } | null
+  } | null
+  reviews: [{                             // OPTIONAL — hides cleanly if empty
+    body, attribution_name, attribution_year, attribution_street
+  }] | null
+  reviews_outlink: { label, url } | null  // "See all reviews on Zillow →"
+  area_stats: {                           // OPTIONAL — "snapshot coming soon" fallback
+    median_sale, median_sale_delta_yoy,
+    days_on_market, days_on_market_zip_avg,
+    closings_90d, list_to_sale_ratio,
+    monthly_series: [{ month, median_price }]   // 12 entries
+  } | null
+  buyer_quote: { body, source } | null    // editorial pull-quote about the HOME
+  agent: {
+    name, brokerage, areas_served,
+    photo_url | null,                     // fallback: monogram
+    bio_short,                            // one italic sentence
+    direct_phone, email, license_number, years_in_area,
+    cta_reassurance: string | null        // microcopy under primary CTA
+  }
+  ========================================================================
+  GRACEFUL STATES rendered in this file:
+    • agent_note absent          → the personal-note band is hidden
+    • video null                 → the video block is hidden entirely
+    • agent_track_record null    → the entire "track record" section is hidden
+    • figures empty / testimonial null → the missing sub-block hides individually
+    • reviews null/empty         → the reviews block is hidden entirely
+    • area_stats null            → "market snapshot coming soon" treatment
+    • agent.photo_url null       → monogram well in same dimensions
+    • missing comp row           → italic "held back by request" line
+  ========================================================================
+-->
+<div class="stage">
+
+  <header class="stage-head">
+    <div class="brand">
+      <div class="glyph">S</div>
+      <div class="wordmark">Studio <em>SEP</em></div>
+    </div>
+    <div class="url">sep.to / kenilworth</div>
+  </header>
+
+  <article class="page" data-screen-label="01 Seller Presentation">
+
+    <!-- ===== HERO + CAPTION CARD ===== -->
+    <header class="hero">
+      <div class="hero-photo" aria-hidden="true"></div>
+      <!-- App bar lives inside hero so the share affordance sits on the photo -->
+      <div class="appbar">
+        <div class="prepared">Prepared for the Halloran family · May 20</div>
+        <a href="#" class="share" aria-label="Share">
+          <svg viewBox="0 0 24 24"><path d="M4 12v7a1 1 0 0 0 1 1h14a1 1 0 0 0 1-1v-7"></path><path d="M16 6l-4-4-4 4"></path><path d="M12 2v13"></path></svg>
+        </a>
+      </div>
+    </header>
+    <div class="caption-wrap">
+      <div class="caption-card">
+        <div class="for">For the Halloran family</div>
+        <div class="kicker">A Recommendation · Tremont, Cleveland</div>
+        <h1 class="addr">1742 Kenilworth <em>Avenue</em></h1>
+        <div class="city">Tremont, OH&nbsp;&nbsp;44113</div>
+      </div>
+    </div>
+
+    <!-- ===== PERSONAL NOTE (OPTIONAL: hides if agent_note is null) ===== -->
+    <section class="personal-note">
+      <div class="from">Marisol's note for you</div>
+      <p class="pn-body">Here's exactly what I'd do to sell your home — and why I'm so confident in the number.</p>
+      <div class="sig">Marisol</div>
+    </section>
+
+    <!-- ===== PRICE — hero value moment (always visible, never reveal-hidden) ===== -->
+    <section class="price-panel">
+      <div class="lbl">Recommended list</div>
+      <div class="price"><span class="dollar">$</span>675<span style="color:var(--ink-muted)">,</span>000</div>
+      <p class="rationale">A price the market will meet quickly — and one that gives the right buyer room to fall in love.</p>
+    </section>
+
+    <!-- ===== VIDEO BLOCK (OPTIONAL: hides if no video_url) ===== -->
+    <section class="video-block">
+      <div class="sec-label"><span class="num">01</span><span class="lbl"></span><span class="name">A short note from Marisol</span></div>
+      <h2 class="sec-title">Two <em>minutes,</em> on your home.</h2>
+      <div class="video-poster" role="button" tabindex="0" aria-label="Play Marisol's note">
+        <div class="play" aria-hidden="true"></div>
+        <div class="meta">
+          <div class="ttl">A walk-through of <em>your plan</em> — recorded yesterday.</div>
+          <div class="runtime">2 min 14 sec · Recorded May 19</div>
+        </div>
+      </div>
+    </section>
+
+    <!-- ===== WHY THIS PRICE ===== -->
+    <section class="block paper">
+      <div class="sec-label"><span class="num">02</span><span class="lbl"></span><span class="name">Why this price</span></div>
+      <h2 class="sec-title">A confident, <em>defensible</em> number.</h2>
+      <p class="sec-body drop-cap">Three recently-sold homes within four blocks anchor the recommendation. Each closed in the last ninety days and shares the bones of your home — era, footprint, lot orientation.</p>
+      <p class="sec-body">At <strong style="font-weight:500">$675,000</strong> you're a step above the average closing price for the block, which reflects the original woodwork, the south-facing kitchen, and the recent mechanicals — without pricing past the comparable range. We'll see strong activity in the first two weekends.</p>
+
+      <div class="comps stagger">
+        <div class="comp reveal">
+          <div class="idx">01</div>
+          <div class="addr">2218 W&nbsp;14th Street<small>Sold March 14, 2026 · 1,810 sqft</small></div>
+          <div class="sold">$648k<small>Closed</small></div>
+        </div>
+        <div class="comp reveal">
+          <div class="idx">02</div>
+          <div class="addr">1908 Castle Avenue<small>Sold April 02, 2026 · 1,920 sqft</small></div>
+          <div class="sold">$691k<small>Closed</small></div>
+        </div>
+        <div class="comp reveal">
+          <div class="idx">03</div>
+          <div class="addr">2401 Professor Avenue<small>Sold April 28, 2026 · 1,760 sqft</small></div>
+          <div class="sold">$662k<small>Closed</small></div>
+        </div>
+      </div>
+      <div class="comps-note reveal">Source · Cuyahoga County MLS · Public record</div>
+    </section>
+
+    <!-- ===== WHAT I'LL DO FOR YOU ===== -->
+    <section class="pitch">
+      <div class="sec-label reveal"><span class="num">03</span><span class="lbl"></span><span class="name">What I'll do for you</span></div>
+      <h2 class="sec-title reveal" style="--d: 80ms">A quiet, <em>thorough</em> way to sell.</h2>
+      <p class="sec-body reveal" style="--d: 160ms">You'll know what's happening, when, and why. No surprises — and nothing you have to manage yourself.</p>
+
+      <div class="pitches stagger">
+        <div class="pp reveal">
+          <div class="n"><em>1.</em></div>
+          <div class="t">A photographer the magazines use.<small>Two-hour session, twilight pass, and a drone exterior — staged by my team the morning of, at no cost to you.</small></div>
+        </div>
+        <div class="pp reveal">
+          <div class="n"><em>2.</em></div>
+          <div class="t">A launch built around the first weekend.<small>Pre-market push on Thursday, broker preview Friday, public open Saturday — designed to compress the offer window.</small></div>
+        </div>
+        <div class="pp reveal">
+          <div class="n"><em>3.</em></div>
+          <div class="t">A friday-evening update, every week.<small>A short, written note — showings, feedback, and what we're adjusting. No dashboards to check.</small></div>
+        </div>
+        <div class="pp reveal">
+          <div class="n"><em>4.</em></div>
+          <div class="t">Negotiation handled in person.<small>Offers reviewed face-to-face, not over text. You'll see every term, in plain English, before we respond.</small></div>
+        </div>
+      </div>
+    </section>
+
+    <!-- ===== TRACK RECORD (OPTIONAL: hides if agent_track_record is null) ===== -->
+    <section class="track">
+      <div class="sec-label"><span class="num">04</span><span class="lbl"></span><span class="name">A track record</span></div>
+      <h2 class="sec-title">Eleven years, <em>here.</em></h2>
+      <p class="sec-body">A short list of numbers I keep, so the claims above aren't just words. Cross-checked against MLS — happy to walk you through any of them.</p>
+
+      <div class="track-figures">
+        <div class="tf">
+          <div class="v">40</div>
+          <div class="l"><strong>Homes sold in Tremont</strong><small>Closed by Marisol · trailing 36 months</small></div>
+        </div>
+        <div class="tf">
+          <div class="v">11<em>&nbsp;days</em></div>
+          <div class="l"><strong>Average days on market</strong><small>Her listings, vs. 21 days area-wide.</small></div>
+        </div>
+        <div class="tf">
+          <div class="v">102<em>%</em></div>
+          <div class="l"><strong>List‑to‑sale ratio</strong><small>How close her listings close to ask price.</small></div>
+        </div>
+      </div>
+
+      <!-- Past-seller testimonial (OPTIONAL: hides if testimonial is null) -->
+      <div class="testimonial">
+        <div class="rule"></div>
+        <div>
+          <p class="ts-body">“She walked us through every offer in plain English and never once made us feel rushed. We closed at $24k over ask and still felt like the decision was ours.”</p>
+          <div class="att"><span class="nm">D. &amp; K. Bauer</span> · Sold on Castle Avenue, 2025</div>
+        </div>
+      </div>
+    </section>
+
+    <!-- ===== REVIEWS (OPTIONAL: hides if reviews list is empty) ===== -->
+    <section class="reviews">
+      <div class="sec-label"><span class="num">05</span><span class="lbl"></span><span class="name">In their words</span></div>
+      <h2 class="sec-title">From families <em>like yours.</em></h2>
+
+      <div class="reviews-list">
+        <article class="review">
+          <div class="qm">“</div>
+          <div>
+            <p class="rv-body">Marisol made us feel like the only clients she had. She knew the neighborhood cold and was honest with us about which offers to take seriously and which to pass on.</p>
+            <div class="att"><span class="nm">J. Mendoza</span> · Sold on W 14th, 2024</div>
+          </div>
+        </article>
+        <article class="review">
+          <div class="qm">“</div>
+          <div>
+            <p class="rv-body">Quiet, calm, prepared. We had a clear plan from week one and never once felt like we were chasing her for an answer.</p>
+            <div class="att"><span class="nm">A. Park</span> · Sold on Professor Avenue, 2024</div>
+          </div>
+        </article>
+        <article class="review">
+          <div class="qm">“</div>
+          <div>
+            <p class="rv-body">She turned what we thought would be a stressful summer into something almost easy. Closed at ask in nine days.</p>
+            <div class="att"><span class="nm">E. &amp; T. Chen</span> · Sold on Castle Avenue, 2023</div>
+          </div>
+        </article>
+      </div>
+
+      <a href="#" class="reviews-outlink">See all reviews on Zillow</a>
+    </section>
+
+    <!-- ===== AREA SALES ===== -->
+    <section class="area">
+      <div class="area-head">
+        <div class="sec-label reveal" style="margin-bottom:0"><span class="num">06</span><span class="lbl"></span><span class="name">Recent area sales</span></div>
+      </div>
+      <h2 class="sec-title reveal" style="margin-bottom:28px; --d: 80ms">A neighborhood that <em>moves.</em></h2>
+
+      <div class="area-stats stagger">
+        <div class="as reveal">
+          <div class="l">Median sale · 90 days</div>
+          <div class="v">$642k</div>
+          <div class="ctx"><span class="pos">↑ 4.1%</span> vs prior year</div>
+        </div>
+        <div class="as reveal">
+          <div class="l">Days on market</div>
+          <div class="v">14</div>
+          <div class="ctx"><span class="pos">↓ 7</span> vs Tremont avg 21</div>
+        </div>
+        <div class="as reveal">
+          <div class="l">Closings, 44113</div>
+          <div class="v">38</div>
+          <div class="ctx">Last 90 days</div>
+        </div>
+        <div class="as reveal">
+          <div class="l">List‑to‑sale ratio</div>
+          <div class="v">101%</div>
+          <div class="ctx"><span class="pos">+ 1.0%</span> slight overbid trend</div>
+        </div>
+      </div>
+
+      <div class="chart-wrap reveal">
+        <div class="chart-head">
+          <div class="l"><strong>Median sale price</strong>Twelve months · 44113</div>
+          <div class="pct">+6.1%<small>YoY</small></div>
+        </div>
+
+        <svg class="chart" viewBox="0 0 400 234" role="img" aria-label="Median sale price, twelve months" preserveAspectRatio="none">
+          <defs>
+            <linearGradient id="chartFill" x1="0" y1="0" x2="0" y2="1">
+              <stop offset="0%" stop-color="#3F6C8E" stop-opacity="0.30"></stop>
+              <stop offset="55%" stop-color="#3F6C8E" stop-opacity="0.10"></stop>
+              <stop offset="100%" stop-color="#3F6C8E" stop-opacity="0"></stop>
+            </linearGradient>
+          </defs>
+
+          <!-- Recommended-list dashed line at the very top - brick text only -->
+          <line class="rec-line" x1="40" x2="388" y1="24" y2="24"></line>
+          <text class="rec-tag-text" x="40" y="15">Recommended</text>
+          <text class="rec-tag-num" x="388" y="17" text-anchor="end">$675k</text>
+
+          <!-- callout for current month - given more space below the rec-line/chart-head -->
+          <text class="callout-sub" x="388" y="52" text-anchor="end">May ’26 · current</text>
+          <text class="callout-text" x="388" y="86" text-anchor="end">$642k</text>
+
+          <!-- gridlines (plot zone shifted down) -->
+          <g>
+            <line class="gridline" x1="40" x2="388" y1="104" y2="104"></line>
+            <line class="gridline" x1="40" x2="388" y1="134" y2="134"></line>
+            <line class="gridline" x1="40" x2="388" y1="164" y2="164"></line>
+            <line class="baseline" x1="40" x2="388" y1="184" y2="184"></line>
+          </g>
+          <g>
+            <text class="y-label" x="4" y="107">$650k</text>
+            <text class="y-label" x="4" y="137">$625k</text>
+            <text class="y-label" x="4" y="167">$600k</text>
+          </g>
+
+          <g class="line-group">
+            <path class="area-fill" d="M40 159 L71.6 152 L103.3 155 L134.9 142 L166.6 134 L198.2 137 L229.8 127 L261.5 122 L293.1 116 L324.7 112 L356.4 108 L388 106 L388 184 L40 184 Z"></path>
+            <path class="line-stroke" pathLength="600" d="M40 159 L71.6 152 L103.3 155 L134.9 142 L166.6 134 L198.2 137 L229.8 127 L261.5 122 L293.1 116 L324.7 112 L356.4 108 L388 106"></path>
+            <circle class="point" cx="40" cy="159" r="2.8"></circle>
+            <circle class="point" cx="71.6" cy="152" r="2.8"></circle>
+            <circle class="point" cx="103.3" cy="155" r="2.8"></circle>
+            <circle class="point" cx="134.9" cy="142" r="2.8"></circle>
+            <circle class="point" cx="166.6" cy="134" r="2.8"></circle>
+            <circle class="point" cx="198.2" cy="137" r="2.8"></circle>
+            <circle class="point" cx="229.8" cy="127" r="2.8"></circle>
+            <circle class="point" cx="261.5" cy="122" r="2.8"></circle>
+            <circle class="point" cx="293.1" cy="116" r="2.8"></circle>
+            <circle class="point" cx="324.7" cy="112" r="2.8"></circle>
+            <circle class="point" cx="356.4" cy="108" r="2.8"></circle>
+            <!-- sonar pulses -->
+            <circle class="point-current-pulse" cx="388" cy="106" r="5"></circle>
+            <circle class="point-current-pulse delay" cx="388" cy="106" r="5"></circle>
+            <circle class="point-current-ring" cx="388" cy="106" r="11"></circle>
+            <circle class="point-current" cx="388" cy="106" r="5"></circle>
+          </g>
+
+          <g>
+            <text class="x-label" x="40" y="204">Jun ’25</text>
+            <text class="x-label" x="166.6" y="204" text-anchor="middle">Oct ’25</text>
+            <text class="x-label" x="293.1" y="204" text-anchor="middle">Feb ’26</text>
+            <text class="x-label" x="388" y="204" text-anchor="end">May ’26</text>
+          </g>
+        </svg>
+      </div>
+
+      <!-- Graceful empty-state markup (hidden unless .area has .area--empty) -->
+      <div class="empty" aria-hidden="true">
+        <div class="icon">
+          <svg width="12" height="12" viewBox="0 0 24 24" stroke="currentColor" stroke-width="1.6" fill="none" stroke-linecap="round" stroke-linejoin="round"><path d="M3 17l6-6 4 4 8-8"></path><path d="M17 7h4v4"></path></svg>
+        </div>
+        <div class="h">A market snapshot is on the way.</div>
+        <div class="p">We're cross-checking the freshest closings before showing them here. You'll see this section update within a few days.</div>
+      </div>
+    </section>
+
+    <!-- ===== EDITORIAL PAIR — photo band + dark quote panel ===== -->
+    <section class="editorial-pair">
+      <div class="editorial-photo" aria-hidden="true"></div>
+      <div class="quote-panel">
+        <span class="qmark">“</span>
+        <p class="quote-body">A house like this doesn't sit on the market — it gets chosen, quickly, by the right person.</p>
+        <div class="quote-att">From a buyer's offer letter · April 2026</div>
+      </div>
+    </section>
+
+    <!-- ===== AGENT ===== -->
+    <section class="agent">
+      <div class="sec-label reveal"><span class="num">07</span><span class="lbl"></span><span class="name">Your agent</span></div>
+      <h2 class="sec-title reveal" style="--d: 80ms">Marisol Reyes.</h2>
+
+      <div class="agent-card reveal" style="--d: 160ms">
+        <div class="agent-photo" data-monogram="MR">
+          <div class="verify" aria-label="Verified agent">
+            <svg viewBox="0 0 24 24"><path d="M5 12l4 4 10-10"></path></svg>
+          </div>
+        </div>
+        <div>
+          <div class="agent-name">Marisol Reyes</div>
+          <div class="agent-role">Howard Hanna Real Estate<br><em>Tremont · Ohio City · Detroit‑Shoreway</em></div>
+        </div>
+      </div>
+
+      <p class="agent-bio reveal" style="--d: 220ms">“I work with eight families a year, on purpose. It means your sale gets the time and attention I'd want for my own.”</p>
+
+      <div class="agent-meta stagger">
+        <div class="am reveal">
+          <div class="l">Direct</div>
+          <div class="v mono">(216) 555 · 0188</div>
+        </div>
+        <div class="am reveal">
+          <div class="l">Email</div>
+          <div class="v mono">marisol@hhanna.com</div>
+        </div>
+        <div class="am reveal">
+          <div class="l">Ohio License</div>
+          <div class="v mono">SAL.2018003412</div>
+        </div>
+        <div class="am reveal">
+          <div class="l">Years in Tremont</div>
+          <div class="v">Eleven.</div>
+        </div>
+      </div>
+
+      <div class="agent-ctas stagger">
+        <a href="#" class="cta primary reveal">
+          <span>Schedule a listing call</span>
+          <span class="ar"><svg viewBox="0 0 24 24"><path d="M5 12h14M13 6l6 6-6 6"></path></svg></span>
+        </a>
+        <div class="cta-reassure">A 20-minute call, no obligation — just a plan for your home.</div>
+        <a href="tel:+12165550188" class="cta outline reveal">
+          <span>Call Marisol directly</span>
+          <span class="ar"><svg viewBox="0 0 24 24"><path d="M22 16.92v3a2 2 0 0 1-2.18 2 19.79 19.79 0 0 1-8.63-3.07 19.5 19.5 0 0 1-6-6A19.79 19.79 0 0 1 2.12 4.18 2 2 0 0 1 4.11 2h3a2 2 0 0 1 2 1.72c.13.96.36 1.9.7 2.81a2 2 0 0 1-.45 2.11L8.09 9.91a16 16 0 0 0 6 6l1.27-1.27a2 2 0 0 1 2.11-.45c.91.34 1.85.57 2.81.7A2 2 0 0 1 22 16.92z"></path></svg></span>
+        </a>
+      </div>
+    </section>
+
+    <!-- ===== END MARK ===== -->
+    <div class="end-mark">
+      <span class="rule"></span>
+      <span class="dot" aria-hidden="true"></span>
+      <span class="rule"></span>
+    </div>
+
+    <!-- ===== FOOT ===== -->
+    <footer class="foot">
+      <div class="row">
+        <div class="brand">
+          <div class="glyph">S</div>
+          <div class="wm">Studio <em>SEP</em></div>
+        </div>
+        <div>sep.to · kenilworth</div>
+      </div>
+      <div class="small">Prepared privately for the Halloran family. The information above is drawn from public record. This page is not an advertisement and does not constitute an offer.</div>
+    </footer>
+
+  </article>
+
+  <!-- Designer note (outside the rendered page) -->
+  <div class="legend">
+    <div class="ttl">Graceful states</div>
+    Phone-width preview · the page renders edge-to-edge in production.<br>
+    <strong style="color:var(--ink)">No market data?</strong> Add <em>.area--empty</em> to the <em>&lt;section class="area"&gt;</em> — stats &amp; chart hide, an editorial “snapshot coming soon” block takes their place.<br>
+    <strong style="color:var(--ink)">No agent photo?</strong> Add <em>.agent-photo--monogram</em> to the photo well — falls back to a typeset “MR” monogram on a deep-ink gradient, same dimensions.<br>
+    <strong style="color:var(--ink)">Missing comp?</strong> Replace the row body with <em>.comp.missing</em> for an italic “held back by request” single-line state.
+  </div>
+
+</div>
+<script>
+  /* ============================================
+     MOTION CONTROLLER (CSS-first — IntersectionObserver)
+     ============================================ */
+  (function () {
+    const prefersReduced = window.matchMedia('(prefers-reduced-motion: reduce)').matches;
+
+    // Helper: add .in to a node (and any chart/agent-photo grouping helpers)
+    const reveal = (el) => {
+      el.classList.add('in');
+    };
+
+    if (prefersReduced) {
+      // surface everything immediately
+      document.querySelectorAll('.reveal, .price-reveal, .chart, .agent-photo')
+        .forEach(reveal);
+      return;
+    }
+
+    const io = new IntersectionObserver((entries) => {
+      entries.forEach((entry) => {
+        if (entry.isIntersecting) {
+          reveal(entry.target);
+          io.unobserve(entry.target);
+        }
+      });
+    }, {
+      rootMargin: '0px 0px -8% 0px',
+      threshold: 0.12
+    });
+
+    // Observe revealable elements
+    document.querySelectorAll('.reveal, .price-reveal, .chart, .agent-photo')
+      .forEach((el) => io.observe(el));
+  })();
+</script>
+
+
