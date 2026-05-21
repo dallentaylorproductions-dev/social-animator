@@ -80,14 +80,14 @@ export const FULL_PAYLOAD: PublicPayload = {
   preparedFor: "the Halloran family",
   agentNote:
     "Here's exactly what I'd do to sell your home — and why I'm so confident in the number.",
-  // A7b.1: a small inline SVG so the editorial-band render path is
-  // exercised without depending on a network image. Renders as a
-  // warm-toned solid block (the locked design's fallback color) —
-  // proves the band reserves height + the renderer paints it.
-  // Wizard capture (A7c) will replace this with a real agent-entered
-  // photo URL.
+  // A7b.2: a photo-like inline SVG so the editorial band reads as
+  // editorial photography (warm gradient + soft horizon + vignette)
+  // rather than the flat tan swatch the A7b.1 placeholder produced.
+  // Still self-contained (no network dependency for tests + smoke).
+  // Wizard capture (A7c) will replace this with the agent's real
+  // editorial photo URL.
   editorialPhotoUrl:
-    "data:image/svg+xml;utf8,<svg xmlns='http://www.w3.org/2000/svg' viewBox='0 0 1 1' preserveAspectRatio='none'><rect width='1' height='1' fill='%23b9a78a'/></svg>",
+    "data:image/svg+xml;utf8,<svg xmlns='http://www.w3.org/2000/svg' viewBox='0 0 800 280' preserveAspectRatio='xMidYMid slice'><defs><linearGradient id='sky' x1='0' y1='0' x2='0' y2='1'><stop offset='0%25' stop-color='%23d8c2a3'/><stop offset='35%25' stop-color='%23c4ad8a'/><stop offset='62%25' stop-color='%239b805e'/><stop offset='100%25' stop-color='%235c4d3a'/></linearGradient><radialGradient id='vig' cx='0.5' cy='0.5' r='0.75'><stop offset='55%25' stop-color='rgba(0,0,0,0)'/><stop offset='100%25' stop-color='rgba(20,12,4,0.38)'/></radialGradient></defs><rect width='800' height='280' fill='url(%23sky)'/><rect x='0' y='196' width='800' height='1' fill='rgba(35,25,15,0.22)'/><rect width='800' height='280' fill='url(%23vig)'/></svg>",
   video: {
     posterUrl: undefined,
     videoUrl: "https://example.com/marisol-note.mp4",

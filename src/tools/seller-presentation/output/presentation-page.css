@@ -53,6 +53,20 @@
   --sep-mono: var(--font-geist-mono), ui-monospace, SFMono-Regular, Menlo,
     monospace;
 
+  /* ---- Layout tokens ---- */
+  /* A7b.2: horizontal text-gutter for content sections. The locked
+     design was authored inside a 24px .stage frame that added cushion
+     ON TOP of each section's 28px inset (≈52px of felt gutter). The
+     native port (correctly) dropped the .stage chrome, so sections
+     had only their 28px inner inset and read tight at ~390px mobile.
+     30px gives back ~2px on each side as a uniform token applied to
+     EVERY content section's horizontal padding. Full-bleed elements
+     (hero photo, dark chapter backgrounds, editorial band, end-mark,
+     foot) keep their backgrounds edge-to-edge — only their TEXT
+     content gets the gutter, because background-color paints the
+     section box while padding insets the content. */
+  --sep-gutter: 30px;
+
   /* ---- Radii ---- */
   --r-md: 10px;
   --r-lg: 14px;
@@ -284,7 +298,7 @@
    ===================================================================== */
 .sep-presentation .personal-note {
   margin: 18px 0 0;
-  padding: 36px 28px 30px;
+  padding: 36px var(--sep-gutter) 30px;
   background: var(--paper);
   text-align: left;
   position: relative;
@@ -340,16 +354,18 @@
    PRICE PANEL — hero value moment ($675k)
    ===================================================================== */
 .sep-presentation .price-panel {
-  padding: 52px 28px 40px;
+  padding: 52px var(--sep-gutter) 40px;
   margin-top: 0;
   background: var(--paper-raise);
   border-bottom: 1px solid var(--paper-line);
   position: relative;
 }
 .sep-presentation .price-panel::before {
+  /* Brick vertical accent — its `left` value tracks the gutter so
+     the bar aligns with the section's text-edge. */
   content: "";
   position: absolute;
-  left: 28px;
+  left: var(--sep-gutter);
   top: 52px;
   width: 3px;
   height: calc(100% - 92px);
@@ -418,7 +434,7 @@
    SECTION SCAFFOLDING — block, sec-label, sec-title, sec-body
    ===================================================================== */
 .sep-presentation .block {
-  padding: 56px 28px;
+  padding: 56px var(--sep-gutter);
   border-bottom: 1px solid var(--paper-line);
 }
 .sep-presentation .block:last-of-type {
@@ -521,7 +537,7 @@
    VIDEO BLOCK
    ===================================================================== */
 .sep-presentation .video-block {
-  padding: 56px 28px;
+  padding: 56px var(--sep-gutter);
   background: var(--paper-card);
   border-bottom: 1px solid var(--paper-line);
 }
@@ -720,7 +736,7 @@
 .sep-presentation .pitch {
   background: var(--paper-card);
   margin: 0;
-  padding: 56px 28px;
+  padding: 56px var(--sep-gutter);
   border-bottom: 1px solid var(--paper-line);
   position: relative;
 }
@@ -769,7 +785,7 @@
    TRACK RECORD — DARK CHAPTER
    ===================================================================== */
 .sep-presentation .track {
-  padding: 64px 28px 60px;
+  padding: 64px var(--sep-gutter) 60px;
   border-bottom: 1px solid rgba(0, 0, 0, 0.4);
   background:
     radial-gradient(120% 60% at 0% 0%, rgba(201, 168, 106, 0.06) 0%, transparent 60%),
@@ -910,7 +926,7 @@
    REVIEWS
    ===================================================================== */
 .sep-presentation .reviews {
-  padding: 60px 28px 56px;
+  padding: 60px var(--sep-gutter) 56px;
   background: var(--paper-raise);
   border-bottom: 1px solid var(--paper-line);
 }
@@ -992,7 +1008,7 @@
    AREA STATS + CHART
    ===================================================================== */
 .sep-presentation .area {
-  padding: 56px 28px;
+  padding: 56px var(--sep-gutter);
   background: var(--paper);
   border-bottom: 1px solid var(--paper-line);
 }
@@ -1241,14 +1257,25 @@
   border-bottom: 1px solid var(--paper-line);
 }
 .sep-presentation .editorial-photo {
-  /* Height-reserved like the hero — never collapses regardless of
-     image load state. Fallback warm-tone background reads as
-     intentional even if the URL is broken or still loading; the
-     renderer only attaches background-image inline when
-     editorialPhotoUrl is present, never an empty/broken url(). */
+  /* A7b.2: the editorial band is purely DECORATIVE (no overlaid
+     play button / title / meta — unlike .video-poster, which keeps
+     its A7b.1 reserved-box behavior precisely because it has
+     overlaid children that must stay positioned even if the image
+     is missing). For the editorial band, an empty-image fallback
+     reads as a "broken/random empty section" rather than intentional
+     editorial — Dallen's A7b.1 smoke caught this. So:
+       - the RENDERER (BuyerQuoteSection in presentation-page.tsx)
+         only emits the .editorial-photo div when editorialPhotoUrl
+         is a real, present string;
+       - the CSS provides a `height` so the band has visual presence
+         when it IS rendered (a 0-height div would render the
+         background-image into nothing);
+       - NO fallback background-color and NO min-height — when the
+         image is broken/loading, the parent section's paper tone
+         shows through briefly rather than a flat colored block.
+     Net: present + real image → 280px photo band. Absent → element
+     not rendered at all. No middle "empty colored rectangle" state. */
   height: 280px;
-  min-height: 280px;
-  background-color: #b9a78a;
   background-size: cover;
   background-position: center 40%;
   background-repeat: no-repeat;
@@ -1260,7 +1287,7 @@
 .sep-presentation .quote-panel {
   background: #16110d;
   color: #f4efe4;
-  padding: 48px 28px 52px;
+  padding: 48px var(--sep-gutter) 52px;
 }
 .sep-presentation .quote-panel .qmark {
   font-family: var(--sep-display);
@@ -1305,7 +1332,7 @@
 .sep-presentation .agent {
   background: var(--ink);
   color: #f4efe4;
-  padding: 56px 28px 48px;
+  padding: 56px var(--sep-gutter) 48px;
   position: relative;
 }
 .sep-presentation .agent .sec-label {
@@ -1517,7 +1544,7 @@
    ===================================================================== */
 .sep-presentation .end-mark {
   text-align: center;
-  padding: 36px 28px 18px;
+  padding: 36px var(--sep-gutter) 18px;
   background: var(--ink);
 }
 .sep-presentation .end-mark .dot {
@@ -1537,7 +1564,7 @@
   vertical-align: middle;
 }
 .sep-presentation .foot {
-  padding: 34px 28px 40px;
+  padding: 34px var(--sep-gutter) 40px;
   background: var(--ink);
   color: rgba(244, 239, 228, 0.45);
   border-top: 1px solid rgba(244, 239, 228, 0.08);
