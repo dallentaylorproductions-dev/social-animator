@@ -3,7 +3,7 @@
 import { useEffect, useState } from "react";
 import {
   createInstance,
-  loadInstance,
+  findLatestInProgress,
   markOpened,
   saveInstance,
 } from "@/skills/workflow-instance-storage";
@@ -29,8 +29,24 @@ import { StepReview } from "@/tools/seller-presentation/components/StepReview";
  * Prep): persistence flows through the CONVERGED WorkflowInstance
  * storage (src/skills/workflow-instance-storage.ts) keyed by a URL
  * `?id=<workflowInstanceId>` parameter — NOT a per-tool *:draft
- * localStorage key. On fresh entry: createInstance + replaceState
- * the URL so reload restores. On entry with ?id=: markOpened + load.
+ * localStorage key.
+ *
+ * Open-behavior (A6.1 — Dallen's smoke surfaced a continuity bug
+ * in the original A5a flow):
+ *   - `?id=` present → markOpened that specific instance
+ *   - `?id=` absent + an in-progress SP instance exists → RESUME the
+ *     most recent one (the dashboard-tile reopen flow goes here)
+ *   - `?id=` absent + no in-progress SP instance → createInstance
+ *   In all three cases the URL ends up at `?id=<currentInstanceId>`
+ *   via history.replaceState, so reload + share-link are stable.
+ *
+ * "Start a new presentation" affordance (also A6.1): the agent can
+ * always abandon the current draft and begin a fresh one without
+ * touching localStorage by hand. Rendered when an instance is
+ * loaded — it's both the "I want a new one" path AND the visible
+ * proof that an existing draft was resumed (without it, the agent
+ * has no way to know a resume happened vs. starting fresh).
+ *
  * On every draft / step change: saveInstance (which bumps updatedAt).
  *
  * SSR-safe per Substrate §9.7: initialize empty on server + first
@@ -76,34 +92,62 @@ export default function SellerPresentationPage() {
     useState<WorkflowInstance<SellerPresentationDraft> | null>(null);
   const [currentStep, setCurrentStepState] = useState<StepId>("property");
 
-  // Mount: load existing instance from ?id=, else create a fresh one
-  // and replace the URL so reload restores. Run once.
+  // Mount: resolve which instance to open. Three branches:
+  //   (a) explicit ?id= → markOpened that one (A5a behavior, unchanged)
+  //   (b) no ?id= + an in-progress SP instance exists → RESUME it
+  //       (A6.1 fix — was previously branch (c), losing draft state on
+  //       a dashboard-tile reopen)
+  //   (c) no ?id= + nothing to resume → createInstance
+  // Every branch ends by setting the URL to `?id=<currentInstanceId>`
+  // via replaceState so reload + share-link are stable. Runs once.
   useEffect(() => {
     const params = new URLSearchParams(window.location.search);
     const id = params.get("id");
 
+    // (a) explicit ?id= takes precedence.
     if (id) {
-      // markOpened stamps lastOpenedAt + returns the loaded instance,
-      // or null if the id was nuked / never existed.
       const opened = markOpened<SellerPresentationDraft>(id);
       if (opened) {
-        setInstance(opened);
-        if (isValidStepId(opened.currentStep)) {
-          setCurrentStepState(opened.currentStep);
-        }
+        adoptInstance(opened);
         return;
       }
+      // Fall through if the id was nuked / never existed — treat as
+      // (b) or (c).
     }
 
+    // (b) Resume the most recent in-progress SP draft.
+    const resumed = findLatestInProgress<SellerPresentationDraft>(SKILL_ID);
+    if (resumed) {
+      const reopened = markOpened<SellerPresentationDraft>(resumed.instanceId);
+      adoptInstance(reopened ?? resumed);
+      return;
+    }
+
+    // (c) Nothing to resume — start fresh.
     const created = createInstance<SellerPresentationDraft>({
       skillId: SKILL_ID,
       draft: { ...EMPTY_DRAFT },
       currentStep: "property",
     });
-    setInstance(created);
-    // replaceState (not pushState) — back button still leaves the wizard.
-    const newUrl = `${window.location.pathname}?id=${created.instanceId}`;
-    window.history.replaceState({}, "", newUrl);
+    adoptInstance(created);
+
+    // Helper hoisted into the effect so it can read setState directly
+    // and stay synchronous; the URL replaceState happens after both
+    // state setters fire so all three branches share the same exit.
+    function adoptInstance(loaded: WorkflowInstance<SellerPresentationDraft>) {
+      setInstance(loaded);
+      if (isValidStepId(loaded.currentStep)) {
+        setCurrentStepState(loaded.currentStep);
+      } else {
+        setCurrentStepState("property");
+      }
+      const newUrl = `${window.location.pathname}?id=${loaded.instanceId}`;
+      if (window.location.search !== `?id=${loaded.instanceId}`) {
+        // replaceState (not pushState) — back button still leaves the
+        // wizard to wherever the agent came from.
+        window.history.replaceState({}, "", newUrl);
+      }
+    }
   }, []);
 
   // Persist any change to the instance (draft or currentStep). saveInstance
@@ -123,6 +167,25 @@ export default function SellerPresentationPage() {
     setInstance((prev) => (prev ? { ...prev, currentStep: next } : prev));
   };
 
+  /**
+   * Abandon the currently-loaded instance and start a fresh draft.
+   * The old instance stays in storage (it's just no longer the
+   * "most recent in-progress" one — A7's dashboard polish surfaces
+   * the full list). Updates the URL so a subsequent reload still
+   * resolves to this new instance.
+   */
+  const startNew = () => {
+    const created = createInstance<SellerPresentationDraft>({
+      skillId: SKILL_ID,
+      draft: { ...EMPTY_DRAFT },
+      currentStep: "property",
+    });
+    setInstance(created);
+    setCurrentStepState("property");
+    const newUrl = `${window.location.pathname}?id=${created.instanceId}`;
+    window.history.replaceState({}, "", newUrl);
+  };
+
   if (!instance) {
     return (
       <div className="p-8 text-sm text-gray-400" data-testid="wizard-loading">
@@ -134,12 +197,27 @@ export default function SellerPresentationPage() {
   return (
     <div className="mx-auto max-w-3xl px-4 py-8" data-testid="seller-presentation-wizard">
       <header className="mb-8">
-        <a
-          href="/dashboard"
-          className="mb-4 inline-flex items-center text-xs uppercase tracking-[0.18em] text-neutral-500 transition-colors hover:text-mint"
-        >
-          ← Dashboard
-        </a>
+        <div className="mb-4 flex items-center justify-between gap-4">
+          <a
+            href="/dashboard"
+            className="inline-flex items-center text-xs uppercase tracking-[0.18em] text-neutral-500 transition-colors hover:text-mint"
+          >
+            ← Dashboard
+          </a>
+          {/* "Start a new presentation" — A6.1. Always rendered (an
+              instance is always loaded by the time this returns).
+              Without this affordance, an agent could never start a
+              second presentation once the resume-on-open behavior was
+              in place. */}
+          <button
+            type="button"
+            onClick={startNew}
+            data-testid="wizard-start-new"
+            className="inline-flex items-center text-xs uppercase tracking-[0.18em] text-neutral-500 transition-colors hover:text-mint"
+          >
+            + Start a new presentation
+          </button>
+        </div>
         <h1 className="text-2xl font-semibold">Seller Presentation</h1>
         <p className="mt-1 text-sm text-gray-400">
           Listing-appointment prep + premium seller-facing page. Step{" "}

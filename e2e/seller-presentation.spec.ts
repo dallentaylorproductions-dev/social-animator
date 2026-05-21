@@ -410,3 +410,180 @@ test.describe('Seller Presentation — A5b per-step content', () => {
     });
   });
 });
+
+test.describe('Seller Presentation — A6.1 resume-on-open', () => {
+  /**
+   * Reproduces Dallen's smoke bug: a dashboard-tile reopen of
+   * /seller-presentation (no ?id=) was losing draft state on steps
+   * 2–5 because the original A5a mount logic always called
+   * createInstance on an unseeded URL. A6.1 changes that branch to
+   * resume the most recent in-progress instance.
+   */
+  test('reopening with no ?id= resumes the most recent in-progress draft', async ({
+    page,
+  }) => {
+    // ---- Set up: create + fill a draft past Step 1 ----
+    await page.goto('/seller-presentation');
+    await expect(page.getByTestId('step-property')).toBeVisible();
+    await page.waitForURL(/\/seller-presentation\?id=workflow_[a-z0-9]+/);
+    const originalId = new URL(page.url()).searchParams.get('id')!;
+
+    await page.getByTestId('step-property-address').fill('1234 Test Drive NE');
+    const nextButton = page.getByTestId('wizard-next');
+    await nextButton.click();
+    await page.getByTestId('step-comps-add').click();
+    await page.getByTestId('step-comps-address-0').fill('5678 Elm Ave NE');
+    await page.getByLabel('comp-1-sold-price').fill('685000');
+    await nextButton.click();
+    await page.getByLabel('recommended-price').fill('700000');
+    await nextButton.click();
+    await nextButton.click(); // skip Pitch
+    await expect(page.getByTestId('step-review')).toBeVisible();
+
+    // Gate on the persisted record carrying the full state before we
+    // navigate away. React commits the DOM before the save effect
+    // fires; without this we'd race the localStorage write.
+    await page.waitForFunction(
+      (id) => {
+        const raw = window.localStorage.getItem(`workflowInstance:${id}`);
+        if (!raw) return false;
+        try {
+          const parsed = JSON.parse(raw) as {
+            currentStep?: string;
+            draft?: {
+              recommendedPrice?: string;
+              comps?: unknown[];
+            };
+          };
+          return (
+            parsed.currentStep === 'review' &&
+            parsed.draft?.recommendedPrice === '$700,000' &&
+            (parsed.draft?.comps?.length ?? 0) === 1
+          );
+        } catch {
+          return false;
+        }
+      },
+      originalId,
+    );
+
+    // ---- Repro: reopen WITHOUT ?id= (the dashboard-tile flow) ----
+    await page.goto('/seller-presentation');
+    // Wait for the mount effect to resolve which instance to load
+    // and replace the URL accordingly. The URL eventually carries
+    // the SAME id as the original draft (resume), not a new one.
+    // We can't gate on a single step's testid here because the resume
+    // restores `currentStep: 'review'` from the persisted record, so
+    // the wizard lands on StepReview not StepProperty.
+    await page.waitForFunction(
+      (id) => window.location.search === `?id=${id}`,
+      originalId,
+    );
+
+    // The resumed instance restored the agent's step position…
+    await expect(page.getByTestId('step-review')).toBeVisible();
+    await expect(page.getByText('Step 5 of 5')).toBeVisible();
+
+    // …and the per-step content survives intact (the bug had
+    // step-property restored, steps 2–5 empty).
+    const prevButton = page.getByTestId('wizard-prev');
+    await prevButton.click(); // → Pitch
+    await prevButton.click(); // → Strategy
+    await expect(page.getByLabel('recommended-price')).toHaveValue('$700,000');
+    await prevButton.click(); // → Comps
+    await expect(page.getByTestId('step-comps-address-0')).toHaveValue(
+      '5678 Elm Ave NE',
+    );
+    await expect(page.getByLabel('comp-1-sold-price')).toHaveValue('$685,000');
+  });
+
+  test('"Start a new presentation" creates a fresh empty instance', async ({
+    page,
+  }) => {
+    // Build up an existing draft first.
+    await page.goto('/seller-presentation');
+    await expect(page.getByTestId('step-property')).toBeVisible();
+    const originalId = new URL(page.url()).searchParams.get('id')!;
+    await page.getByTestId('step-property-address').fill('1234 Test Drive NE');
+    await page.getByTestId('wizard-next').click();
+    await page.getByTestId('step-comps-add').click();
+    await page.getByTestId('step-comps-address-0').fill('5678 Elm Ave NE');
+
+    // Click "Start a new presentation".
+    await page.getByTestId('wizard-start-new').click();
+
+    // URL now points at a different instance id, the wizard is back
+    // on Step 1, and the comp from the prior draft is gone.
+    await page.waitForFunction(
+      (oldId) => {
+        const params = new URLSearchParams(window.location.search);
+        const id = params.get('id');
+        return Boolean(id && id !== oldId && id.startsWith('workflow_'));
+      },
+      originalId,
+    );
+    await expect(page.getByText('Step 1 of 5')).toBeVisible();
+    // Property primitive is SHARED across instances, so the address
+    // legitimately persists — only the per-instance SP draft resets.
+    // Verify the comps-step shows the empty-state copy.
+    await page.getByTestId('wizard-next').click();
+    await expect(page.getByTestId('step-comps')).toBeVisible();
+    await expect(
+      page.getByText(/No comps yet/),
+    ).toBeVisible();
+  });
+
+  test('completed instances do NOT auto-resume — a fresh draft is created instead', async ({
+    page,
+  }) => {
+    // Open + fill a draft, then mutate localStorage to mark it
+    // complete (the wizard has no explicit "mark complete" control
+    // yet — A7 work). The next no-?id= open MUST NOT resume it.
+    await page.goto('/seller-presentation');
+    await expect(page.getByTestId('step-property')).toBeVisible();
+    const completedId = new URL(page.url()).searchParams.get('id')!;
+    await page.getByTestId('step-property-address').fill('1234 Test Drive NE');
+    await page.getByTestId('wizard-next').click();
+    await page.getByTestId('step-comps-add').click();
+    await page.getByTestId('step-comps-address-0').fill('5678 Elm Ave NE');
+
+    // Wait for the save effect to flush before we patch the record.
+    await page.waitForFunction(
+      (id) => {
+        const raw = window.localStorage.getItem(`workflowInstance:${id}`);
+        if (!raw) return false;
+        try {
+          const parsed = JSON.parse(raw) as { draft?: { comps?: unknown[] } };
+          return (parsed.draft?.comps?.length ?? 0) >= 1;
+        } catch {
+          return false;
+        }
+      },
+      completedId,
+    );
+
+    // Mark the instance complete by patching `timestamps.completedAt`
+    // directly in localStorage. (The wizard doesn't expose a
+    // "mark complete" control yet; A7's dashboard polish will.)
+    await page.evaluate((id) => {
+      const key = `workflowInstance:${id}`;
+      const raw = window.localStorage.getItem(key);
+      if (!raw) return;
+      const parsed = JSON.parse(raw) as {
+        timestamps: { createdAt: string; updatedAt: string; completedAt?: string };
+      };
+      parsed.timestamps.completedAt = new Date().toISOString();
+      window.localStorage.setItem(key, JSON.stringify(parsed));
+    }, completedId);
+
+    // Now reopen without ?id=. findLatestInProgress filters out the
+    // completed instance → falls through to createInstance.
+    await page.goto('/seller-presentation');
+    await expect(page.getByTestId('step-property')).toBeVisible();
+    await page.waitForURL(/\/seller-presentation\?id=workflow_[a-z0-9]+/);
+    const newId = new URL(page.url()).searchParams.get('id');
+    expect(newId).toBeTruthy();
+    expect(newId).not.toBe(completedId);
+    await expect(page.getByText('Step 1 of 5')).toBeVisible();
+  });
+});

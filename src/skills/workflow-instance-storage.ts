@@ -259,6 +259,36 @@ export function listInstanceIds(): string[] {
 }
 
 /**
+ * The most recent IN-PROGRESS instance for a given skill, or null if
+ * none. "In-progress" = `timestamps.completedAt` is unset — same
+ * convention the per-skill runtime uses to derive
+ * `SkillStatus.state === 'complete'`.
+ *
+ * Sort: `timestamps.updatedAt` descending. ISO 8601 strings compare
+ * lexicographically the same as chronologically, so `localeCompare`
+ * suffices — no Date parsing required.
+ *
+ * Use case: the Seller Presentation wizard's mount effect calls this
+ * when the URL has no `?id=`, so a dashboard-tile reopen resumes the
+ * agent's in-progress draft instead of starting an empty one (v1.47 /
+ * A6.1 bug fix). Caller's generic param narrows the per-skill draft
+ * shape — same unchecked-cast boundary as `loadInstance<TDraft>`.
+ */
+export function findLatestInProgress<TDraft = unknown>(
+  skillId: SkillId,
+): WorkflowInstance<TDraft> | null {
+  const all = listInstances();
+  const candidates = all.filter(
+    (i) => i.skillId === skillId && !i.timestamps.completedAt,
+  );
+  if (candidates.length === 0) return null;
+  candidates.sort((a, b) =>
+    b.timestamps.updatedAt.localeCompare(a.timestamps.updatedAt),
+  );
+  return candidates[0] as WorkflowInstance<TDraft>;
+}
+
+/**
  * Remove the record + the index entry. Returns true if the record
  * existed, false otherwise (mirror of `removeClient`'s contract).
  */
