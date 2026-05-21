@@ -280,18 +280,24 @@ export function StepReview({ draft, goToStep }: StepReviewProps) {
         />
 
         <div className="flex flex-col gap-2">
+          {/* A7c.1: prep-PDF is disabled with a "coming soon" label
+              until A7e ships the renderer. Clicking can't happen
+              while disabled, so the dynamic-import to ../output/prep-pdf
+              never executes — the previous flow that surfaced a
+              "Cannot find module" error in Dallen's smoke is gone.
+              The handleDownloadPrep wiring + the @ts-expect-error
+              dynamic-import stay in the file for A7e to light up
+              (the directive will self-delete when prep-pdf.tsx
+              lands and the suppression goes unused). */}
           <button
             type="button"
             onClick={handleDownloadPrep}
-            disabled={Boolean(missing) || exportState === "downloading"}
+            disabled
             data-testid="step-review-download"
-            className="self-start rounded border border-mint/40 px-5 py-2.5 text-sm font-medium text-mint hover:bg-mint/10 disabled:cursor-not-allowed disabled:opacity-40"
+            aria-label="Prep PDF — coming soon (A7e)"
+            className="self-start rounded border border-neutral-700 px-5 py-2.5 text-sm font-medium text-neutral-500 disabled:cursor-not-allowed"
           >
-            {exportState === "downloading"
-              ? "Generating PDF…"
-              : exportState === "done"
-                ? "Downloaded ✓"
-                : "Download your prep doc (PDF)"}
+            Prep PDF — coming soon
           </button>
           {typeof exportState === "object" && "error" in exportState && (
             <p

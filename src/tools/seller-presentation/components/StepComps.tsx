@@ -175,12 +175,16 @@ function CompCard({ comp, index, onUpdate, onRemove }: CompCardProps) {
           <span className="text-xs uppercase tracking-wider text-gray-500">
             Days on market
           </span>
+          {/* A7c.1: numeric integer keypad on iOS. */}
           <input
             type="text"
+            inputMode="numeric"
             className={`${inputCls} mt-1`}
             value={comp.daysOnMarket ?? ""}
             onChange={(e) =>
-              onUpdate({ daysOnMarket: e.target.value || undefined })
+              onUpdate({
+                daysOnMarket: e.target.value.replace(/[^0-9]/g, "") || undefined,
+              })
             }
             placeholder="11"
           />
@@ -190,13 +194,28 @@ function CompCard({ comp, index, onUpdate, onRemove }: CompCardProps) {
           <span className="text-xs uppercase tracking-wider text-gray-500">
             Sale-to-list %
           </span>
+          {/* A7c.1: decimal keypad (the plain numeric pad omits the
+              dot, blocking fractional ratios like 101.5). Auto-
+              append "%" on blur if missing AND content present, so
+              the stored value reads consistently ("98%") for the
+              renderer. Doesn't fight the user mid-edit. */}
           <input
             type="text"
+            inputMode="decimal"
             className={`${inputCls} mt-1`}
             value={comp.saleToListPercent ?? ""}
             onChange={(e) =>
               onUpdate({ saleToListPercent: e.target.value || undefined })
             }
+            onBlur={(e) => {
+              const raw = e.target.value.trim();
+              if (!raw) {
+                onUpdate({ saleToListPercent: undefined });
+                return;
+              }
+              const next = raw.endsWith("%") ? raw : `${raw}%`;
+              if (next !== raw) onUpdate({ saleToListPercent: next });
+            }}
             placeholder="98%"
           />
         </label>
@@ -217,8 +236,11 @@ function CompCard({ comp, index, onUpdate, onRemove }: CompCardProps) {
           <span className="text-xs uppercase tracking-wider text-gray-500">
             Distance (miles)
           </span>
+          {/* A7c.1: decimal keypad so sub-mile distances (0.4) are
+              typeable on iOS — the plain numeric pad omits the dot. */}
           <input
             type="text"
+            inputMode="decimal"
             className={`${inputCls} mt-1`}
             value={comp.distanceMiles ?? ""}
             onChange={(e) =>
@@ -232,14 +254,19 @@ function CompCard({ comp, index, onUpdate, onRemove }: CompCardProps) {
           <span className="text-xs uppercase tracking-wider text-gray-500">
             Sold date
           </span>
+          {/* A7c.1: native date picker opens the iOS calendar. Stored
+              as ISO YYYY-MM-DD which the renderer displays verbatim
+              (e.g. "Sold 2026-04-15") — agents can leave a free-text
+              date format intact on older drafts (the field accepts
+              any value via Comp.soldDate?: string; the date picker
+              just shows blank if the existing value isn't ISO-shaped). */}
           <input
-            type="text"
+            type="date"
             className={`${inputCls} mt-1`}
             value={comp.soldDate ?? ""}
             onChange={(e) =>
               onUpdate({ soldDate: e.target.value || undefined })
             }
-            placeholder="2026-04 or April 2026"
           />
         </label>
       </div>

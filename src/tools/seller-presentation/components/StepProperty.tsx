@@ -2,6 +2,7 @@
 
 import { useEffect, useRef } from "react";
 import { useListingProfile } from "@/lib/listing-profile";
+import { CurrencyInput } from "@/components/inputs/CurrencyInput";
 import type { SellerPresentationDraft } from "../engine/types";
 
 /**
@@ -218,13 +219,15 @@ export function StepProperty({ draft, setDraft }: StepPropertyProps) {
         <span className="text-xs uppercase tracking-wider text-gray-500">
           List price (your initial estimate)
         </span>
-        <input
-          type="text"
+        {/* A7c.1: CurrencyInput brings up the iOS numeric keypad
+            (inputMode="numeric") + live currency formatting — same
+            pattern as the comps Sold-price field. */}
+        <CurrencyInput
+          className={`${inputCls} mt-1`}
           value={settings.price}
-          onChange={(e) => update({ price: e.target.value })}
+          onChange={(v) => update({ price: v })}
           placeholder="$685,000"
-          className={inputCls}
-          data-testid="step-property-price"
+          aria-label="list-price"
         />
         <span className="mt-1 block text-[11px] text-neutral-500">
           You&apos;ll refine this on the Strategy step.

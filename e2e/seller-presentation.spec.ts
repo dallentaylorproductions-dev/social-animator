@@ -400,18 +400,24 @@ test.describe('Seller Presentation — A5b per-step content', () => {
     ).toBeVisible();
   });
 
-  test('StepReview download: graceful-fail against absent PDF module (A7 lands it)', async ({
+  test('StepReview prep-PDF button is DISABLED with "coming soon" copy until A7e ships', async ({
     page,
   }) => {
-    // The prep-PDF dynamic import targets ../output/prep-pdf, which
-    // A7 ships. Until then the import throws ModuleNotFoundError and
-    // the catch surfaces the download-error message. The publish
-    // mock isn't needed here — the download path is independent.
+    // A7c.1 replaced the previous "graceful-fail against absent PDF
+    // module" behavior. Dallen's mobile smoke caught the dynamic
+    // import path throwing "Cannot find module '../output/prep-pdf'"
+    // in the UI as an error panel, which read as broken rather than
+    // intentional. The button is now hard-disabled with "coming
+    // soon" copy until A7e lands the prep-PDF renderer — the
+    // dynamic import path stays in handleDownloadPrep for A7e to
+    // light up (its @ts-expect-error self-deletes when the file
+    // arrives), but no UI route exercises it.
     await fillToReview(page);
-    await page.getByTestId('step-review-download').click();
-    await expect(page.getByTestId('step-review-download-error')).toBeVisible({
-      timeout: 10_000,
-    });
+    const button = page.getByTestId('step-review-download');
+    await expect(button).toBeVisible();
+    await expect(button).toBeDisabled();
+    await expect(button).toContainText(/coming soon/i);
+    await expect(page.getByTestId('step-review-download-error')).toHaveCount(0);
   });
 });
 
