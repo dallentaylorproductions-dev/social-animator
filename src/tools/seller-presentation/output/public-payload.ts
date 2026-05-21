@@ -1,5 +1,5 @@
 /**
- * Public-payload serializer (Substrate §3.4, §4, v1.47 / A6).
+ * Public-payload serializer (Substrate §3.4, §4, v1.47 / A6 + A7a).
  *
  * The privacy boundary for the Seller Presentation made code. The
  * publish route calls `toPublicPayload` and passes ONLY the returned
@@ -9,53 +9,92 @@
  * a private field can't leak if it doesn't enter the persistence
  * path.
  *
- * Allowlist per audit §6 — exactly these fields, nothing else:
+ * A7a extends the contract to the locked premium-design surface
+ * area. The payload now carries TWO co-existing shapes:
  *
- *   propertyAddress       — from draft.propertyAddress
- *   recommendedPrice      — from draft.recommendedPrice
- *   priceRationale        — from draft.priceRationale (agent's voice;
- *                           distinct from PRIVATE pricingStrategyId +
- *                           confidence)
- *   comps.public[]        — projection of draft.comps that DROPS
- *                           notes, source, fieldConfidence
- *   agentBranding         — subset of agentContact passed by the
- *                           publish route from useBrandSettings
- *   pitchPublicPoints[]   — projection of draft.pitchPoints filtered
- *                           by visibility === 'public', mapped to .text
+ *   • A6 flat fields — propertyAddress / propertyCity /
+ *     recommendedPrice / priceRationale / comps[] / agentBranding /
+ *     pitchPublicPoints[]. The A6 functional renderer
+ *     (src/tools/seller-presentation/output/presentation-page.tsx)
+ *     reads these unchanged. After A7a's comp-shape trim some old
+ *     comp sub-fields (daysOnMarket, saleToListPercent, distanceMiles,
+ *     squareFeet) are no longer populated; the A6 renderer's `&&`
+ *     conditionals just don't render them. The functional page is
+ *     in its bridge state until A7b replaces it.
+ *
+ *   • A7a grouped fields — property{…} / preparedFor / agentNote /
+ *     video / whyPrice{publicRationale, comps} / pitchPublicCards /
+ *     trackRecord / reviews / reviewsOutlink / areaStats /
+ *     buyerQuote / agent{…}. The A7b premium renderer consumes these.
+ *     Grouping mirrors the locked-design data spec verbatim
+ *     (camelCase, but otherwise key-for-key).
+ *
+ * Allowlist guarantee (proven by e2e/seller-presentation.publish-allowlist.spec.ts):
+ * the SAME public source fields are enumerated TWICE (flat + grouped).
+ * No private field can leak through either shape, because both shapes
+ * are built field-by-field from explicit projections — never
+ * spread the draft.
  *
  * Explicitly NEVER allowlisted (proven by the spec):
- *   - draft.pricingStrategyId, draft.confidence (StepStrategy private half)
+ *   - draft.pricingStrategyId, draft.confidence
  *   - draft.preAppointmentNotes, draft.commitments, draft.asks
- *     (declared but currently inhabited by A5b stubs only; A5b's
- *     wizard doesn't surface them yet — the audit lists them as
- *     private and the serializer pre-emptively excludes them)
- *   - draft.themeId (A7 — concerns the renderer's theme choice, not
- *     anything published)
- *   - draft.clientId (a stable id reference; the personalization
- *     itself shows up via the address / public pitch points)
- *   - comps[].notes / source / fieldConfidence (per-comp private)
+ *   - draft.themeId, draft.clientId
+ *   - comps[].notes / source / fieldConfidence
+ *   - comps[].daysOnMarket / saleToListPercent / distanceMiles /
+ *     squareFeet — A7a's locked design dropped these from public emit;
+ *     the field NAMES survive on `PublicComp` as deprecated optional
+ *     keys ONLY so the A6 renderer continues to type-check. The
+ *     serializer never sets them. The spec proves no comp ever
+ *     carries them in the JSON output.
  *   - any pitch point with visibility !== 'public'
  *
  * Construction style: build the result object explicitly, field by
  * field. Never spread the draft. The TypeScript compiler is the
- * first line of defense — `PublicPayload` doesn't allow private
- * keys; the spec in e2e/seller-presentation.publish-allowlist.spec.ts
- * is the second.
+ * first line of defense — `PublicPayload`'s grouped sections type
+ * each emitted field; the spec is the second.
  *
  * Pure function — no I/O, no React, no `window`. Lives outside the
  * "use client" graph so the publish route can import it server-side
  * without dragging react-pdf or any browser-only dep.
  */
 
-import type { Comp, SellerPresentationDraft } from "../engine/types";
+import type {
+  AreaStats,
+  AreaStatsMonthly,
+  BuyerQuote,
+  Comp,
+  PresentationVideo,
+  Review,
+  ReviewsOutlink,
+  SellerPresentationDraft,
+  TrackRecord,
+  TrackRecordFigure,
+  TrackRecordTestimonial,
+} from "../engine/types";
+
+// Re-export the public-safe locked-design types so consumers
+// (publish route, A7b renderer, allowlist spec) can import from one
+// place. These types are public-safe BY CONSTRUCTION — they describe
+// what the wizard captures as agent-published content.
+export type {
+  AreaStats,
+  AreaStatsMonthly,
+  BuyerQuote,
+  PresentationVideo,
+  Review,
+  ReviewsOutlink,
+  TrackRecord,
+  TrackRecordFigure,
+  TrackRecordTestimonial,
+};
 
 /**
- * Agent-contact projection passed by the publish route (which sources
- * it from `useBrandSettings` at the client). Note: A5b's StepReview
- * also has access to `logoDataUrl` / colors on BrandSettings, but the
- * v1 functional consumer page doesn't render branding chrome beyond
- * agent name + brokerage + license + contact CTAs. A7's premium-themed
- * renderer can extend `AgentBranding` with logo/color refs then.
+ * Agent-contact projection passed by the publish route (sourced from
+ * `useBrandSettings` in StepReview today). A7a extends with the
+ * locked-design fields (areasServed / photoUrl / bioShort /
+ * yearsInArea / ctaReassurance) — all optional. Whether they come
+ * from BrandSettings or per-presentation draft overrides is the
+ * wizard's call (A7b/A7c). The serializer just maps what comes in.
  */
 export interface AgentBranding {
   name?: string;
@@ -63,21 +102,67 @@ export interface AgentBranding {
   phone?: string;
   email?: string;
   licenseNumber?: string;
+  // ---- A7a locked-design extensions ----
+  areasServed?: string;
+  photoUrl?: string;
+  bioShort?: string;
+  yearsInArea?: string;
+  ctaReassurance?: string;
 }
 
-/** Public projection of a comp — strict subset of `Comp`'s fields. */
+/**
+ * Public projection of a comp. A7a trims the PUBLIC emit to exactly
+ * `{address, soldPrice, soldDate, sqft}` per the locked design.
+ * The deprecated A6 keys stay on the type so the A6 functional
+ * renderer keeps compiling (they're always undefined post-A7a; the
+ * renderer's `&&` short-circuits and renders nothing for them).
+ * The spec proves no comp's JSON output ever carries an A6
+ * deprecated key.
+ */
 export interface PublicComp {
   address: string;
   soldPrice: string;
-  daysOnMarket?: string;
-  saleToListPercent?: string;
-  squareFeet?: string;
-  distanceMiles?: string;
+  // ---- A7a locked-design emit set ----
   soldDate?: string;
-  // Intentionally absent: notes, source, fieldConfidence.
+  sqft?: string;
+  // ---- A6 deprecated — never populated by toPublicPayload post-A7a.
+  //      Type kept for A6 functional renderer back-compat ONLY.
+  /** @deprecated A7a removed from public emit. Will be removed once A7b ships. */
+  daysOnMarket?: string;
+  /** @deprecated */
+  saleToListPercent?: string;
+  /** @deprecated */
+  squareFeet?: string;
+  /** @deprecated */
+  distanceMiles?: string;
+}
+
+/** A7a — locked-design pitch-point card with title + supporting copy. */
+export interface PublicPitchCard {
+  title: string;
+  /** Empty string when the agent left support blank. Renderer handles. */
+  support: string;
+}
+
+/** A7a — grouped property block matching the locked design. */
+export interface PublicProperty {
+  address: string;
+  city?: string;
+  state?: string;
+  zip?: string;
+  heroPhotoUrl?: string;
+  recommendedList: string;
+  rationaleShort?: string;
+}
+
+/** A7a — grouped why-this-price block. */
+export interface PublicWhyPrice {
+  publicRationale: string;
+  comps: PublicComp[];
 }
 
 export interface PublicPayload {
+  // ---- A6 flat fields (kept for the A6 functional renderer) ----
   propertyAddress: string;
   propertyCity?: string;
   recommendedPrice: string;
@@ -85,24 +170,155 @@ export interface PublicPayload {
   comps: PublicComp[];
   agentBranding: AgentBranding;
   pitchPublicPoints: string[];
+
+  // ---- A7a locked-design grouped fields ----
+  property: PublicProperty;
+  preparedFor?: string;
+  agentNote?: string;
+  video?: PresentationVideo;
+  whyPrice: PublicWhyPrice;
+  pitchPublicCards: PublicPitchCard[];
+  trackRecord?: TrackRecord;
+  reviews?: Review[];
+  reviewsOutlink?: ReviewsOutlink;
+  areaStats?: AreaStats;
+  buyerQuote?: BuyerQuote;
+  /** Same projection as `agentBranding` — the locked-design renderer reads `agent`. */
+  agent: AgentBranding;
 }
 
 /**
  * Build the PUBLIC projection of a comp. Explicitly enumerates the
- * fields that go out; everything not listed here (notes, source,
- * fieldConfidence) is dropped. If a private field is added to `Comp`
- * in the future, it stays private by default — only an edit to this
- * function (and the corresponding spec assertion) opens the gate.
+ * fields that go out — exactly 4 keys per the A7a locked design:
+ * address, soldPrice, soldDate, sqft. Everything else stays private
+ * (notes, source, fieldConfidence) or was deprecated from public emit
+ * in A7a (daysOnMarket, saleToListPercent, squareFeet, distanceMiles).
+ *
+ * If a private field is added to `Comp` in the future, it stays
+ * private by default — only an edit to this function (and the
+ * corresponding spec assertion) opens the gate.
  */
 function projectComp(comp: Comp): PublicComp {
   return {
     address: comp.address,
     soldPrice: comp.soldPrice,
-    daysOnMarket: comp.daysOnMarket,
-    saleToListPercent: comp.saleToListPercent,
-    squareFeet: comp.squareFeet,
-    distanceMiles: comp.distanceMiles,
     soldDate: comp.soldDate,
+    sqft: comp.squareFeet, // rename: draft uses `squareFeet`, public uses `sqft` per locked design
+  };
+}
+
+/**
+ * Project a public-visibility pitch point into the locked-design
+ * card shape. Falls back to the A5b legacy `text` field when the
+ * newer `title` isn't set (older drafts pre-date the rename).
+ * Drops points with no usable title text — they have no rendering
+ * content.
+ */
+function projectPitchCard(p: {
+  title?: string;
+  text?: string;
+  support?: string;
+}): PublicPitchCard | null {
+  const title = (p.title ?? p.text ?? "").trim();
+  if (!title) return null;
+  return {
+    title,
+    support: p.support ?? "",
+  };
+}
+
+function projectPresentationVideo(
+  v: PresentationVideo | undefined,
+): PresentationVideo | undefined {
+  if (!v) return undefined;
+  // Explicit field-by-field projection — a future rogue field on a
+  // hand-tampered draft would otherwise leak through a spread.
+  return {
+    posterUrl: v.posterUrl,
+    videoUrl: v.videoUrl,
+    title: v.title,
+    runtime: v.runtime,
+    recordedOn: v.recordedOn,
+  };
+}
+
+function projectTrackRecordFigure(f: TrackRecordFigure): TrackRecordFigure {
+  return { label: f.label, value: f.value, ctx: f.ctx };
+}
+
+function projectTrackRecordTestimonial(
+  t: TrackRecordTestimonial | undefined,
+): TrackRecordTestimonial | undefined {
+  if (!t) return undefined;
+  return {
+    body: t.body,
+    attributionShort: t.attributionShort,
+    areaOrYear: t.areaOrYear,
+  };
+}
+
+function projectTrackRecord(
+  tr: TrackRecord | undefined,
+): TrackRecord | undefined {
+  if (!tr) return undefined;
+  const figures = tr.figures?.map(projectTrackRecordFigure);
+  const testimonial = projectTrackRecordTestimonial(tr.testimonial);
+  return { figures, testimonial };
+}
+
+function projectReview(r: Review): Review {
+  return {
+    body: r.body,
+    attributionName: r.attributionName,
+    attributionYear: r.attributionYear,
+    attributionStreet: r.attributionStreet,
+  };
+}
+
+function projectReviewsOutlink(
+  o: ReviewsOutlink | undefined,
+): ReviewsOutlink | undefined {
+  if (!o) return undefined;
+  return { label: o.label, url: o.url };
+}
+
+function projectAreaStats(s: AreaStats | undefined): AreaStats | undefined {
+  if (!s) return undefined;
+  return {
+    medianSale: s.medianSale,
+    medianSaleDeltaYoy: s.medianSaleDeltaYoy,
+    daysOnMarket: s.daysOnMarket,
+    daysOnMarketZipAvg: s.daysOnMarketZipAvg,
+    closings90d: s.closings90d,
+    listToSaleRatio: s.listToSaleRatio,
+    monthlySeries: s.monthlySeries?.map((m) => ({
+      month: m.month,
+      medianPrice: m.medianPrice,
+    })),
+  };
+}
+
+function projectBuyerQuote(
+  q: BuyerQuote | undefined,
+): BuyerQuote | undefined {
+  if (!q) return undefined;
+  return { body: q.body, source: q.source };
+}
+
+function projectAgent(agent: AgentBranding): AgentBranding {
+  // Explicit field-by-field projection — never spread an agent record
+  // unverified, so a future agent-side field doesn't accidentally leak.
+  return {
+    name: agent.name,
+    brokerage: agent.brokerage,
+    phone: agent.phone,
+    email: agent.email,
+    licenseNumber: agent.licenseNumber,
+    areasServed: agent.areasServed,
+    photoUrl: agent.photoUrl,
+    bioShort: agent.bioShort,
+    yearsInArea: agent.yearsInArea,
+    ctaReassurance: agent.ctaReassurance,
   };
 }
 
@@ -110,27 +326,62 @@ function projectComp(comp: Comp): PublicComp {
  * Build the public payload from a raw draft + the agent's contact
  * card. Pure — same draft + agentContact in always produces the
  * same payload out.
+ *
+ * The publish route MAY merge per-presentation agent overrides
+ * (draft.agentAreasServed etc.) into the incoming `agentContact`
+ * before calling this — that's the wizard layer's responsibility.
+ * Here we just project what we receive.
  */
 export function toPublicPayload(
   draft: SellerPresentationDraft,
   agentContact: AgentBranding,
 ): PublicPayload {
+  const propertyAddress = draft.propertyAddress ?? "";
+  const recommendedPrice = draft.recommendedPrice ?? "";
+  const priceRationale = draft.priceRationale;
+
+  const publicComps = draft.comps.map(projectComp);
+  const publicCards = draft.pitchPoints
+    .filter((p) => p.visibility === "public")
+    .map(projectPitchCard)
+    .filter((c): c is PublicPitchCard => c !== null);
+  const publicTitleStrings = publicCards.map((c) => c.title);
+  const agent = projectAgent(agentContact);
+
   return {
-    propertyAddress: draft.propertyAddress ?? "",
+    // ---- A6 flat fields ----
+    propertyAddress,
     propertyCity: draft.propertyCity,
-    recommendedPrice: draft.recommendedPrice ?? "",
-    priceRationale: draft.priceRationale,
-    comps: draft.comps.map(projectComp),
-    agentBranding: {
-      name: agentContact.name,
-      brokerage: agentContact.brokerage,
-      phone: agentContact.phone,
-      email: agentContact.email,
-      licenseNumber: agentContact.licenseNumber,
+    recommendedPrice,
+    priceRationale,
+    comps: publicComps,
+    agentBranding: agent,
+    pitchPublicPoints: publicTitleStrings,
+
+    // ---- A7a locked-design grouped fields ----
+    property: {
+      address: propertyAddress,
+      city: draft.propertyCity,
+      state: draft.propertyState,
+      zip: draft.propertyZip,
+      heroPhotoUrl: draft.heroPhotoUrl,
+      recommendedList: recommendedPrice,
+      rationaleShort: priceRationale,
     },
-    pitchPublicPoints: draft.pitchPoints
-      .filter((p) => p.visibility === "public")
-      .map((p) => p.text),
+    preparedFor: draft.preparedFor,
+    agentNote: draft.agentNote,
+    video: projectPresentationVideo(draft.video),
+    whyPrice: {
+      publicRationale: priceRationale ?? "",
+      comps: publicComps,
+    },
+    pitchPublicCards: publicCards,
+    trackRecord: projectTrackRecord(draft.trackRecord),
+    reviews: draft.reviews?.map(projectReview),
+    reviewsOutlink: projectReviewsOutlink(draft.reviewsOutlink),
+    areaStats: projectAreaStats(draft.areaStats),
+    buyerQuote: projectBuyerQuote(draft.buyerQuote),
+    agent,
   };
 }
 
@@ -141,32 +392,82 @@ export function toPublicPayload(
  * coerce the unknown JSON into a typed shape. Any rogue keys (e.g.
  * if a record was hand-edited in KV with private fields glued on)
  * are silently dropped — the renderer never sees them.
+ *
+ * A7a additions: clamps every new grouped block. Each optional
+ * block returns undefined when the source raw record doesn't carry
+ * it cleanly — never a half-populated object.
  */
 export function clampPublicPayload(raw: unknown): PublicPayload {
   if (!raw || typeof raw !== "object") {
-    return {
-      propertyAddress: "",
-      recommendedPrice: "",
-      comps: [],
-      agentBranding: {},
-      pitchPublicPoints: [],
-    };
+    return emptyPayload();
   }
   const r = raw as Record<string, unknown>;
+  const propertyAddress =
+    typeof r.propertyAddress === "string" ? r.propertyAddress : "";
+  const propertyCity =
+    typeof r.propertyCity === "string" ? r.propertyCity : undefined;
+  const recommendedPrice =
+    typeof r.recommendedPrice === "string" ? r.recommendedPrice : "";
+  const priceRationale =
+    typeof r.priceRationale === "string" ? r.priceRationale : undefined;
+
+  const comps = Array.isArray(r.comps)
+    ? r.comps.map(clampPublicComp).filter((c): c is PublicComp => c !== null)
+    : [];
+
+  const agent = clampAgentBranding(r.agent ?? r.agentBranding);
+
   return {
-    propertyAddress: typeof r.propertyAddress === "string" ? r.propertyAddress : "",
-    propertyCity: typeof r.propertyCity === "string" ? r.propertyCity : undefined,
-    recommendedPrice:
-      typeof r.recommendedPrice === "string" ? r.recommendedPrice : "",
-    priceRationale:
-      typeof r.priceRationale === "string" ? r.priceRationale : undefined,
-    comps: Array.isArray(r.comps)
-      ? r.comps.map(clampPublicComp).filter((c): c is PublicComp => c !== null)
-      : [],
-    agentBranding: clampAgentBranding(r.agentBranding),
+    propertyAddress,
+    propertyCity,
+    recommendedPrice,
+    priceRationale,
+    comps,
+    agentBranding: agent,
     pitchPublicPoints: Array.isArray(r.pitchPublicPoints)
       ? r.pitchPublicPoints.filter((t): t is string => typeof t === "string")
       : [],
+
+    property: clampPublicProperty(r.property, {
+      address: propertyAddress,
+      city: propertyCity,
+      recommendedList: recommendedPrice,
+      rationaleShort: priceRationale,
+    }),
+    preparedFor: typeof r.preparedFor === "string" ? r.preparedFor : undefined,
+    agentNote: typeof r.agentNote === "string" ? r.agentNote : undefined,
+    video: clampPresentationVideo(r.video),
+    whyPrice: clampPublicWhyPrice(r.whyPrice, {
+      publicRationale: priceRationale ?? "",
+      comps,
+    }),
+    pitchPublicCards: Array.isArray(r.pitchPublicCards)
+      ? r.pitchPublicCards
+          .map(clampPublicPitchCard)
+          .filter((c): c is PublicPitchCard => c !== null)
+      : [],
+    trackRecord: clampTrackRecord(r.trackRecord),
+    reviews: Array.isArray(r.reviews)
+      ? r.reviews.map(clampReview).filter((rev): rev is Review => rev !== null)
+      : undefined,
+    reviewsOutlink: clampReviewsOutlink(r.reviewsOutlink),
+    areaStats: clampAreaStats(r.areaStats),
+    buyerQuote: clampBuyerQuote(r.buyerQuote),
+    agent,
+  };
+}
+
+function emptyPayload(): PublicPayload {
+  return {
+    propertyAddress: "",
+    recommendedPrice: "",
+    comps: [],
+    agentBranding: {},
+    pitchPublicPoints: [],
+    property: { address: "", recommendedList: "" },
+    whyPrice: { publicRationale: "", comps: [] },
+    pitchPublicCards: [],
+    agent: {},
   };
 }
 
@@ -176,18 +477,24 @@ function clampPublicComp(raw: unknown): PublicComp | null {
   if (typeof r.address !== "string" || typeof r.soldPrice !== "string") {
     return null;
   }
+  // Only the A7a locked-design keys are populated on read — deprecated
+  // keys (daysOnMarket / saleToListPercent / squareFeet / distanceMiles)
+  // are intentionally ignored even if present in the source record.
   return {
     address: r.address,
     soldPrice: r.soldPrice,
-    daysOnMarket:
-      typeof r.daysOnMarket === "string" ? r.daysOnMarket : undefined,
-    saleToListPercent:
-      typeof r.saleToListPercent === "string" ? r.saleToListPercent : undefined,
-    squareFeet:
-      typeof r.squareFeet === "string" ? r.squareFeet : undefined,
-    distanceMiles:
-      typeof r.distanceMiles === "string" ? r.distanceMiles : undefined,
     soldDate: typeof r.soldDate === "string" ? r.soldDate : undefined,
+    sqft: typeof r.sqft === "string" ? r.sqft : undefined,
+  };
+}
+
+function clampPublicPitchCard(raw: unknown): PublicPitchCard | null {
+  if (!raw || typeof raw !== "object") return null;
+  const r = raw as Record<string, unknown>;
+  if (typeof r.title !== "string") return null;
+  return {
+    title: r.title,
+    support: typeof r.support === "string" ? r.support : "",
   };
 }
 
@@ -201,5 +508,177 @@ function clampAgentBranding(raw: unknown): AgentBranding {
     email: typeof r.email === "string" ? r.email : undefined,
     licenseNumber:
       typeof r.licenseNumber === "string" ? r.licenseNumber : undefined,
+    areasServed:
+      typeof r.areasServed === "string" ? r.areasServed : undefined,
+    photoUrl: typeof r.photoUrl === "string" ? r.photoUrl : undefined,
+    bioShort: typeof r.bioShort === "string" ? r.bioShort : undefined,
+    yearsInArea:
+      typeof r.yearsInArea === "string" ? r.yearsInArea : undefined,
+    ctaReassurance:
+      typeof r.ctaReassurance === "string" ? r.ctaReassurance : undefined,
   };
+}
+
+function clampPublicProperty(
+  raw: unknown,
+  fallback: PublicProperty,
+): PublicProperty {
+  if (!raw || typeof raw !== "object") return fallback;
+  const r = raw as Record<string, unknown>;
+  return {
+    address: typeof r.address === "string" ? r.address : fallback.address,
+    city: typeof r.city === "string" ? r.city : fallback.city,
+    state: typeof r.state === "string" ? r.state : undefined,
+    zip: typeof r.zip === "string" ? r.zip : undefined,
+    heroPhotoUrl:
+      typeof r.heroPhotoUrl === "string" ? r.heroPhotoUrl : undefined,
+    recommendedList:
+      typeof r.recommendedList === "string"
+        ? r.recommendedList
+        : fallback.recommendedList,
+    rationaleShort:
+      typeof r.rationaleShort === "string"
+        ? r.rationaleShort
+        : fallback.rationaleShort,
+  };
+}
+
+function clampPublicWhyPrice(
+  raw: unknown,
+  fallback: PublicWhyPrice,
+): PublicWhyPrice {
+  if (!raw || typeof raw !== "object") return fallback;
+  const r = raw as Record<string, unknown>;
+  return {
+    publicRationale:
+      typeof r.publicRationale === "string"
+        ? r.publicRationale
+        : fallback.publicRationale,
+    comps: Array.isArray(r.comps)
+      ? r.comps.map(clampPublicComp).filter((c): c is PublicComp => c !== null)
+      : fallback.comps,
+  };
+}
+
+function clampPresentationVideo(raw: unknown): PresentationVideo | undefined {
+  if (!raw || typeof raw !== "object") return undefined;
+  const r = raw as Record<string, unknown>;
+  const video: PresentationVideo = {
+    posterUrl: typeof r.posterUrl === "string" ? r.posterUrl : undefined,
+    videoUrl: typeof r.videoUrl === "string" ? r.videoUrl : undefined,
+    title: typeof r.title === "string" ? r.title : undefined,
+    runtime: typeof r.runtime === "string" ? r.runtime : undefined,
+    recordedOn: typeof r.recordedOn === "string" ? r.recordedOn : undefined,
+  };
+  return Object.values(video).some((v) => v !== undefined) ? video : undefined;
+}
+
+function clampTrackRecord(raw: unknown): TrackRecord | undefined {
+  if (!raw || typeof raw !== "object") return undefined;
+  const r = raw as Record<string, unknown>;
+  const figures = Array.isArray(r.figures)
+    ? r.figures
+        .map(clampTrackRecordFigure)
+        .filter((f): f is TrackRecordFigure => f !== null)
+        .slice(0, 3)
+    : undefined;
+  const testimonial = clampTrackRecordTestimonial(r.testimonial);
+  if (!figures?.length && !testimonial) return undefined;
+  return { figures, testimonial };
+}
+
+function clampTrackRecordFigure(raw: unknown): TrackRecordFigure | null {
+  if (!raw || typeof raw !== "object") return null;
+  const r = raw as Record<string, unknown>;
+  if (typeof r.label !== "string" || typeof r.value !== "string") return null;
+  return {
+    label: r.label,
+    value: r.value,
+    ctx: typeof r.ctx === "string" ? r.ctx : undefined,
+  };
+}
+
+function clampTrackRecordTestimonial(
+  raw: unknown,
+): TrackRecordTestimonial | undefined {
+  if (!raw || typeof raw !== "object") return undefined;
+  const r = raw as Record<string, unknown>;
+  if (typeof r.body !== "string" || typeof r.attributionShort !== "string") {
+    return undefined;
+  }
+  return {
+    body: r.body,
+    attributionShort: r.attributionShort,
+    areaOrYear: typeof r.areaOrYear === "string" ? r.areaOrYear : undefined,
+  };
+}
+
+function clampReview(raw: unknown): Review | null {
+  if (!raw || typeof raw !== "object") return null;
+  const r = raw as Record<string, unknown>;
+  if (typeof r.body !== "string" || typeof r.attributionName !== "string") {
+    return null;
+  }
+  return {
+    body: r.body,
+    attributionName: r.attributionName,
+    attributionYear:
+      typeof r.attributionYear === "string" ? r.attributionYear : undefined,
+    attributionStreet:
+      typeof r.attributionStreet === "string" ? r.attributionStreet : undefined,
+  };
+}
+
+function clampReviewsOutlink(raw: unknown): ReviewsOutlink | undefined {
+  if (!raw || typeof raw !== "object") return undefined;
+  const r = raw as Record<string, unknown>;
+  if (typeof r.label !== "string" || typeof r.url !== "string") return undefined;
+  return { label: r.label, url: r.url };
+}
+
+function clampAreaStats(raw: unknown): AreaStats | undefined {
+  if (!raw || typeof raw !== "object") return undefined;
+  const r = raw as Record<string, unknown>;
+  const monthlySeries = Array.isArray(r.monthlySeries)
+    ? r.monthlySeries
+        .map(clampAreaStatsMonthly)
+        .filter((m): m is AreaStatsMonthly => m !== null)
+        .slice(0, 12)
+    : undefined;
+  const stats: AreaStats = {
+    medianSale: typeof r.medianSale === "string" ? r.medianSale : undefined,
+    medianSaleDeltaYoy:
+      typeof r.medianSaleDeltaYoy === "string"
+        ? r.medianSaleDeltaYoy
+        : undefined,
+    daysOnMarket:
+      typeof r.daysOnMarket === "string" ? r.daysOnMarket : undefined,
+    daysOnMarketZipAvg:
+      typeof r.daysOnMarketZipAvg === "string"
+        ? r.daysOnMarketZipAvg
+        : undefined,
+    closings90d: typeof r.closings90d === "string" ? r.closings90d : undefined,
+    listToSaleRatio:
+      typeof r.listToSaleRatio === "string" ? r.listToSaleRatio : undefined,
+    monthlySeries: monthlySeries?.length ? monthlySeries : undefined,
+  };
+  return Object.values(stats).some((v) => v !== undefined) ? stats : undefined;
+}
+
+function clampAreaStatsMonthly(raw: unknown): AreaStatsMonthly | null {
+  if (!raw || typeof raw !== "object") return null;
+  const r = raw as Record<string, unknown>;
+  if (typeof r.month !== "string" || typeof r.medianPrice !== "string") {
+    return null;
+  }
+  return { month: r.month, medianPrice: r.medianPrice };
+}
+
+function clampBuyerQuote(raw: unknown): BuyerQuote | undefined {
+  if (!raw || typeof raw !== "object") return undefined;
+  const r = raw as Record<string, unknown>;
+  if (typeof r.body !== "string" || typeof r.source !== "string") {
+    return undefined;
+  }
+  return { body: r.body, source: r.source };
 }
