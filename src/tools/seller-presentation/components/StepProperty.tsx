@@ -1,11 +1,11 @@
 "use client";
 
-import { useEffect } from "react";
+import { useEffect, useRef } from "react";
 import { useListingProfile } from "@/lib/listing-profile";
 import type { SellerPresentationDraft } from "../engine/types";
 
 /**
- * Seller Presentation Step 1 — Property (v1.47 / A5a LIVE).
+ * Seller Presentation Step 1 — Property + personalization (v1.47 / A7c).
  *
  * Reads + writes the SHARED Property primitive via useListingProfile
  * (src/lib/listing-profile.ts). The substrate's "Property is shared
@@ -13,26 +13,34 @@ import type { SellerPresentationDraft } from "../engine/types";
  * Listing Flyer / OH Prep / SIR on their next mount — they all live
  * over the same `socanim_listing_profile` localStorage record.
  *
+ * Lineage:
+ *   A5a — address + cityState (single combined field).
+ *   A7c — split city/state/zip into structured fields; add hero
+ *         photo (URL input OR file upload reusing FileReader → data
+ *         URL, same pattern as BrandProfileForm's logo upload — no
+ *         new file/Blob infra); add `preparedFor` personalization
+ *         (writes direct to the SP draft; it's a per-presentation
+ *         field, not a Property primitive field).
+ *
+ * Legacy bridge: the SP wizard writes BOTH structured city/state AND
+ * the legacy `cityState` string ("${city}, ${state}") so older tools
+ * that still read `cityState` keep working. Older drafts without the
+ * structured fields just have empty city/state/zip until the user
+ * fills them in here — no fragile auto-parsing of the legacy field.
+ *
  * Mirror effect: useListingProfile is called twice in this view
  * (once here, once it could be called by future siblings) — each
  * call owns its own React state, so cross-call updates don't
  * propagate. To give the wizard SHELL a single source of truth for
  * Step 1's "Next" gating, this step mirrors the listing profile's
- * (propertyId, address, city) into the SellerPresentationDraft on
- * every relevant change. The shell reads from
- * `instance.draft.propertyId` to enable/disable Next — never from
- * its own useListingProfile hook.
- *
- * propertyId materializes automatically: useListingProfile's
- * saveListingProfile backfills it on the first save (A2 wiring).
- * The user types an address, the hook persists, propertyId appears,
- * the mirror fires, the draft updates, the shell enables Next.
+ * (propertyId, address, city, state, zip, heroPhoto) into the
+ * SellerPresentationDraft on every relevant change. The shell reads
+ * from `instance.draft.propertyId` to enable/disable Next.
  *
  * SSR-safe: useListingProfile initializes empty on server + first
  * client render, populates via useEffect (the React #418 fix
  * documented at src/lib/brand.ts:203). This component renders a
- * "Loading…" placeholder until hydrated to avoid showing empty
- * fields where saved values exist.
+ * "Loading…" placeholder until hydrated.
  */
 
 interface StepPropertyProps {
@@ -45,6 +53,7 @@ const inputCls =
 
 export function StepProperty({ draft, setDraft }: StepPropertyProps) {
   const { settings, update, hydrated } = useListingProfile();
+  const photoFileRef = useRef<HTMLInputElement>(null);
 
   // Mirror the shared Property primitive → draft so the shell's
   // gating reads from a single source. Effect deps intentionally
@@ -52,18 +61,73 @@ export function StepProperty({ draft, setDraft }: StepPropertyProps) {
   // listing changes.
   useEffect(() => {
     if (!hydrated) return;
-    const propertyIdMatches = draft.propertyId === settings.propertyId;
-    const addressMatches = draft.propertyAddress === (settings.address || undefined);
-    const cityMatches = draft.propertyCity === (settings.cityState || undefined);
-    if (propertyIdMatches && addressMatches && cityMatches) return;
+    const draftCity = draft.propertyCity ?? undefined;
+    const draftState = draft.propertyState ?? undefined;
+    const draftZip = draft.propertyZip ?? undefined;
+    const draftHero = draft.heroPhotoUrl ?? undefined;
+    const settingsCity = settings.city || undefined;
+    const settingsState = settings.state || undefined;
+    const settingsZip = settings.zip || undefined;
+    const settingsHero = settings.heroPhoto || undefined;
+    const matches =
+      draft.propertyId === settings.propertyId &&
+      draft.propertyAddress === (settings.address || undefined) &&
+      draftCity === settingsCity &&
+      draftState === settingsState &&
+      draftZip === settingsZip &&
+      draftHero === settingsHero;
+    if (matches) return;
     setDraft({
       ...draft,
       propertyId: settings.propertyId,
       propertyAddress: settings.address || undefined,
-      propertyCity: settings.cityState || undefined,
+      propertyCity: settingsCity,
+      propertyState: settingsState,
+      propertyZip: settingsZip,
+      heroPhotoUrl: settingsHero,
     });
     // eslint-disable-next-line react-hooks/exhaustive-deps
-  }, [hydrated, settings.propertyId, settings.address, settings.cityState]);
+  }, [
+    hydrated,
+    settings.propertyId,
+    settings.address,
+    settings.city,
+    settings.state,
+    settings.zip,
+    settings.heroPhoto,
+  ]);
+
+  /**
+   * Update city/state and maintain the legacy `cityState` string in
+   * sync so OH Prep / Listing Flyer / SIR (which still read the
+   * single combined field) keep rendering correctly. The structured
+   * fields are the new source of truth for the SP renderer; the
+   * derived string is the legacy bridge.
+   */
+  const updateCityState = (
+    patch: { city?: string; state?: string },
+  ) => {
+    const nextCity = patch.city ?? settings.city ?? "";
+    const nextState = patch.state ?? settings.state ?? "";
+    const derivedCityState = [nextCity, nextState]
+      .filter((s) => s.trim().length > 0)
+      .join(", ");
+    update({
+      city: nextCity || undefined,
+      state: nextState || undefined,
+      cityState: derivedCityState,
+    });
+  };
+
+  const handlePhotoFile = (file: File) => {
+    if (!file.type.startsWith("image/")) return;
+    const reader = new FileReader();
+    reader.onload = () => {
+      const dataUrl = reader.result;
+      if (typeof dataUrl === "string") update({ heroPhoto: dataUrl });
+    };
+    reader.readAsDataURL(file);
+  };
 
   if (!hydrated) {
     return (
@@ -97,19 +161,58 @@ export function StepProperty({ draft, setDraft }: StepPropertyProps) {
         />
       </label>
 
-      <label className="block">
-        <span className="text-xs uppercase tracking-wider text-gray-500">
-          City / state
-        </span>
-        <input
-          type="text"
-          value={settings.cityState}
-          onChange={(e) => update({ cityState: e.target.value })}
-          placeholder="Tacoma, WA"
-          className={inputCls}
-          data-testid="step-property-city"
-        />
-      </label>
+      {/* A7c — split city/state/zip. Legacy `cityState` is derived from
+          city + state via updateCityState() so OH Prep / Listing Flyer
+          stay aligned. Mobile: stack via grid; desktop: side-by-side. */}
+      <div className="grid grid-cols-1 gap-4 sm:grid-cols-[1fr_120px_140px]">
+        <label className="block">
+          <span className="text-xs uppercase tracking-wider text-gray-500">
+            City
+          </span>
+          <input
+            type="text"
+            value={settings.city ?? ""}
+            onChange={(e) => updateCityState({ city: e.target.value })}
+            placeholder="Tacoma"
+            className={inputCls}
+            data-testid="step-property-city"
+          />
+        </label>
+        <label className="block">
+          <span className="text-xs uppercase tracking-wider text-gray-500">
+            State
+          </span>
+          <input
+            type="text"
+            value={settings.state ?? ""}
+            onChange={(e) =>
+              updateCityState({
+                state: e.target.value.toUpperCase().slice(0, 2),
+              })
+            }
+            placeholder="WA"
+            maxLength={2}
+            className={inputCls}
+            data-testid="step-property-state"
+          />
+        </label>
+        <label className="block">
+          <span className="text-xs uppercase tracking-wider text-gray-500">
+            ZIP
+          </span>
+          <input
+            type="text"
+            inputMode="numeric"
+            value={settings.zip ?? ""}
+            onChange={(e) =>
+              update({ zip: e.target.value.replace(/[^0-9-]/g, "").slice(0, 10) })
+            }
+            placeholder="98402"
+            className={inputCls}
+            data-testid="step-property-zip"
+          />
+        </label>
+      </div>
 
       <label className="block">
         <span className="text-xs uppercase tracking-wider text-gray-500">
@@ -124,7 +227,106 @@ export function StepProperty({ draft, setDraft }: StepPropertyProps) {
           data-testid="step-property-price"
         />
         <span className="mt-1 block text-[11px] text-neutral-500">
-          You&apos;ll refine this on the Strategy step (coming in A5b).
+          You&apos;ll refine this on the Strategy step.
+        </span>
+      </label>
+
+      {/* A7c — hero photo. Reuses the existing FileReader → data URL
+          pattern from BrandProfileForm.handleLogoFile so the upload
+          stays self-contained (no new file/Blob infra). The agent can
+          ALSO paste a URL (e.g. cloud-hosted image) — both paths write
+          to settings.heroPhoto, which the mirror copies to draft.heroPhotoUrl. */}
+      <div>
+        <span className="text-xs uppercase tracking-wider text-gray-500">
+          Hero photo
+        </span>
+        <input
+          type="file"
+          accept="image/*"
+          ref={photoFileRef}
+          hidden
+          onChange={(e) => {
+            const file = e.target.files?.[0];
+            if (file) handlePhotoFile(file);
+          }}
+        />
+        {settings.heroPhoto ? (
+          <div className="mt-1 space-y-2">
+            <div className="relative overflow-hidden rounded border border-neutral-700">
+              {/* eslint-disable-next-line @next/next/no-img-element */}
+              <img
+                src={settings.heroPhoto}
+                alt="Hero photo"
+                className="aspect-[4/3] w-full object-cover"
+                data-testid="step-property-hero-preview"
+              />
+            </div>
+            <div className="flex gap-2">
+              <button
+                type="button"
+                onClick={() => photoFileRef.current?.click()}
+                className="rounded border border-neutral-700 px-3 py-1.5 text-xs text-text-primary hover:bg-neutral-800"
+                data-testid="step-property-hero-replace"
+              >
+                Replace
+              </button>
+              <button
+                type="button"
+                onClick={() => update({ heroPhoto: "" })}
+                className="px-3 py-1.5 text-xs text-neutral-500 hover:text-red-400"
+                data-testid="step-property-hero-remove"
+              >
+                Remove
+              </button>
+            </div>
+          </div>
+        ) : (
+          <button
+            type="button"
+            onClick={() => photoFileRef.current?.click()}
+            className={`${inputCls} block cursor-pointer border-dashed py-6 text-center text-neutral-400 hover:border-mint hover:text-text-primary`}
+            data-testid="step-property-hero-upload"
+          >
+            Click to upload a hero photo
+          </button>
+        )}
+        <input
+          type="url"
+          value={settings.heroPhoto.startsWith("data:") ? "" : settings.heroPhoto}
+          onChange={(e) => update({ heroPhoto: e.target.value })}
+          placeholder="…or paste an image URL"
+          className={`${inputCls} mt-2`}
+          data-testid="step-property-hero-url"
+        />
+        <span className="mt-1 block text-[11px] text-neutral-500">
+          A landscape photo of the home reads best on the published page.
+        </span>
+      </div>
+
+      {/* A7c — "prepared for" personalization. Writes DIRECT to the SP
+          draft (not the Property primitive — this is per-presentation,
+          not a property fact). Hides personalization on the published
+          page when blank (see locked design's graceful-states contract). */}
+      <label className="block">
+        <span className="text-xs uppercase tracking-wider text-gray-500">
+          Prepared for
+        </span>
+        <input
+          type="text"
+          value={draft.preparedFor ?? ""}
+          onChange={(e) =>
+            setDraft({
+              ...draft,
+              preparedFor: e.target.value || undefined,
+            })
+          }
+          placeholder="the Halloran family"
+          className={inputCls}
+          data-testid="step-property-prepared-for"
+        />
+        <span className="mt-1 block text-[11px] text-neutral-500">
+          Optional. Shows as &ldquo;For the …&rdquo; in the page caption +
+          footer. Leave blank for a non-personalized presentation.
         </span>
       </label>
 

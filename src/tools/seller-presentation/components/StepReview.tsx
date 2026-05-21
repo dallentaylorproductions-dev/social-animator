@@ -85,6 +85,16 @@ export function StepReview({ draft, goToStep }: StepReviewProps) {
     phone: brand.contactPhone || "",
     email: brand.contactEmail || "",
     licenseNumber: brand.licenseNumber || "",
+    // A7c — Seller Presentation agent-profile extensions captured in
+    // Settings/BrandProfileForm. The publish route forwards
+    // `agentContact` to `toPublicPayload` which projects these onto
+    // `payload.agent.{areasServed, photoUrl, bioShort, yearsInArea,
+    // ctaReassurance}` — the locked-design renderer reads from there.
+    areasServed: brand.agentAreasServed,
+    photoUrl: brand.agentPhotoUrl,
+    bioShort: brand.agentBioShort,
+    yearsInArea: brand.agentYearsInArea,
+    ctaReassurance: brand.agentCtaReassurance,
   };
 
   const publicPitchPoints = draft.pitchPoints.filter(

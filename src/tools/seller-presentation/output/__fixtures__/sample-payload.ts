@@ -21,7 +21,10 @@ import type { PublicPayload } from "../public-payload";
 export const FULL_PAYLOAD: PublicPayload = {
   // ---- A6 flat fields (still emitted for the bridge state) ----
   propertyAddress: "1742 Kenilworth Avenue",
-  propertyCity: "Tremont, OH",
+  // A7c cosmetic fix: city WITHOUT state baked in. The renderer
+  // composes `${city}, ${state} ${zip}` — pre-A7c the city included
+  // ", OH" which rendered "TREMONT, OH, OH 44113" (doubled state).
+  propertyCity: "Tremont",
   recommendedPrice: "$675,000",
   priceRationale:
     "Three recently-sold homes within four blocks anchor the recommendation. Each closed in the last ninety days and shares the bones of your home — era, footprint, lot orientation. At $675,000 you're a step above the average closing price for the block, which reflects the original woodwork, the south-facing kitchen, and the recent mechanicals — without pricing past the comparable range. We'll see strong activity in the first two weekends.",
@@ -69,7 +72,10 @@ export const FULL_PAYLOAD: PublicPayload = {
   // ---- A7a grouped fields (the locked-design renderer reads these) ----
   property: {
     address: "1742 Kenilworth Avenue",
-    city: "Tremont, OH",
+    // A7c: city WITHOUT state baked in (the renderer composes
+    // "${city}, ${state} ${zip}" — doubling produced the
+    // "TREMONT, OH, OH 44113" cosmetic bug A7b.2 smoke caught).
+    city: "Tremont",
     state: "OH",
     zip: "44113",
     heroPhotoUrl: undefined,

@@ -9,15 +9,25 @@ import type {
 import { AIPlugPoint } from "./AIPlugPoint";
 
 /**
- * Seller Presentation Step 4 — Pitch points (v1.47 / A5b LIVE).
+ * Seller Presentation Step 4 — Pitch points (v1.47 / A5b → A7c).
  *
  * The substrate's "agent controls what the client sees" rule
  * (§3.4, §4) made concrete. Each pitch point carries a per-point
  * `visibility: 'public' | 'private'` flag the agent toggles by
- * hand. A6's `toPublicPayload` projects `pitchPublicPoints` as
+ * hand. The serializer projects `pitchPublicCards` as
  * `draft.pitchPoints.filter(p => p.visibility === 'public').map(p =>
- * p.text)` — the toggle here directly determines what reaches the
- * published web page.
+ * ({ title, support }))` — the toggle here directly determines what
+ * reaches the published web page.
+ *
+ * A7c shape migration: input UX now captures `{ title, support }`
+ * (matching the locked design's pitch-card markup) instead of A5b's
+ * single `text` field. Older drafts with only `text` set still
+ * round-trip cleanly because:
+ *   - the serializer's title fallback (A7a) maps
+ *     `point.title ?? point.text` into the public card's `title`;
+ *   - this component shows the legacy `text` value in the Title
+ *     input until the user edits, then writes to `title` and clears
+ *     `text` on save (clean migration with no fragile parsing).
  *
  * Defaults to `private` on add — opt-in to publishing so a hasty
  * "save then publish" can't leak a point the agent intended for
@@ -25,13 +35,7 @@ import { AIPlugPoint } from "./AIPlugPoint";
  *
  * Lane C seam: `<AIPlugPoint type="copy-suggestion" />` at the top
  * renders null today; Lane C swaps in the copy-suggestion proposer
- * per the contract on `SELLER_PRESENTATION_AI_PLUG_POINTS[2]`
- * (proposes to `pitchPoints`, requires review).
- *
- * Stable per-point ids (via `generateId('artifact')` reused for the
- * local list — the artifact prefix is the closest semantic match;
- * a per-step PitchPointId prefix would be over-typing) keep React
- * keys stable across reorders/deletes.
+ * per the contract on `SELLER_PRESENTATION_AI_PLUG_POINTS[2]`.
  */
 
 interface StepPitchProps {
@@ -39,13 +43,15 @@ interface StepPitchProps {
   setDraft: (next: SellerPresentationDraft) => void;
 }
 
-const textareaCls =
-  "w-full px-3 py-2 bg-neutral-900 border border-neutral-700 rounded text-sm focus:outline-none focus:border-mint resize-y min-h-[80px]";
+const inputCls =
+  "w-full px-3 py-2 bg-neutral-900 border border-neutral-700 rounded text-sm focus:outline-none focus:border-mint";
+const textareaCls = `${inputCls} resize-y min-h-[80px]`;
 
 function newPitchPoint(): PitchPoint {
   return {
     id: generateId("artifact"),
-    text: "",
+    title: "",
+    support: "",
     visibility: "private",
   };
 }
@@ -78,9 +84,10 @@ export function StepPitch({ draft, setDraft }: StepPitchProps) {
       <header>
         <h2 className="text-lg font-medium">Your pitch</h2>
         <p className="mt-1 text-xs text-gray-500">
-          Selling-points. Toggle each point Public (appears on the seller
-          page) or Private (your prep doc only). Defaults to private —
-          you publish what you decide to publish.
+          Selling-points (2-4). Each has a short title + a supporting
+          sentence. Toggle each point Public (appears on the seller page)
+          or Private (your prep doc only). Defaults to private — you
+          publish what you decide to publish.
         </p>
       </header>
 
@@ -141,6 +148,19 @@ function PitchPointCard({
   const setVisibility = (visibility: PitchPointVisibility) =>
     onUpdate({ visibility });
 
+  // Legacy migration: a pre-A7c point may have only `text` set. Surface
+  // that value in the Title input until the user edits, then write to
+  // `title` and clear `text` so subsequent loads use the new shape.
+  const titleDisplay = point.title ?? point.text ?? "";
+  const onTitleChange = (value: string) => {
+    const patch: Partial<PitchPoint> = { title: value };
+    // Clear the legacy `text` field on first edit so the migration
+    // completes — the serializer's fallback only kicks in when
+    // `title` is unset.
+    if (point.text !== undefined) patch.text = undefined;
+    onUpdate(patch);
+  };
+
   return (
     <div
       className="space-y-3 rounded border border-neutral-700 bg-neutral-900/30 p-4"
@@ -160,13 +180,34 @@ function PitchPointCard({
         </button>
       </div>
 
-      <textarea
-        className={textareaCls}
-        value={point.text}
-        onChange={(e) => onUpdate({ text: e.target.value })}
-        placeholder="What you want to communicate"
-        data-testid={`step-pitch-text-${index}`}
-      />
+      <label className="block">
+        <span className="text-[10px] uppercase tracking-wider text-gray-500">
+          Title
+        </span>
+        <input
+          type="text"
+          className={`${inputCls} mt-1`}
+          value={titleDisplay}
+          onChange={(e) => onTitleChange(e.target.value)}
+          placeholder="A short headline (e.g. 'A photographer the magazines use.')"
+          data-testid={`step-pitch-title-${index}`}
+        />
+      </label>
+
+      <label className="block">
+        <span className="text-[10px] uppercase tracking-wider text-gray-500">
+          Support
+        </span>
+        <textarea
+          className={`${textareaCls} mt-1`}
+          value={point.support ?? ""}
+          onChange={(e) =>
+            onUpdate({ support: e.target.value || undefined })
+          }
+          placeholder="One sentence of supporting detail (optional)."
+          data-testid={`step-pitch-support-${index}`}
+        />
+      </label>
 
       <div
         className="inline-flex rounded border border-neutral-700 p-1"

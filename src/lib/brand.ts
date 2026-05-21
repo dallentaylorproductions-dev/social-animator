@@ -18,6 +18,19 @@ export interface BrandSettings {
   contactPhone: string;
   licenseNumber: string;
   brokerage: string;
+  /**
+   * A7c — Seller Presentation agent-profile extensions. All optional;
+   * the SP wizard flows these through `agentContact` to the publish
+   * route via the same path the existing brand fields use, so the
+   * page renderer's `agent.{areasServed, photoUrl, bioShort,
+   * yearsInArea, ctaReassurance}` can read them without a per-
+   * presentation override. Set-once, reused across presentations.
+   */
+  agentPhotoUrl?: string;
+  agentBioShort?: string;
+  agentAreasServed?: string;
+  agentYearsInArea?: string;
+  agentCtaReassurance?: string;
 }
 
 // Storage key kept as `socanim_*` for backwards compatibility with users who
@@ -180,6 +193,27 @@ export function loadBrandSettings(): BrandSettings {
       contactPhone: extractPhoneDigits(str(parsed.contactPhone)),
       licenseNumber: str(parsed.licenseNumber),
       brokerage: str(parsed.brokerage),
+      agentPhotoUrl:
+        typeof parsed.agentPhotoUrl === "string" && parsed.agentPhotoUrl.length > 0
+          ? parsed.agentPhotoUrl
+          : undefined,
+      agentBioShort:
+        typeof parsed.agentBioShort === "string" && parsed.agentBioShort.length > 0
+          ? parsed.agentBioShort
+          : undefined,
+      agentAreasServed:
+        typeof parsed.agentAreasServed === "string" && parsed.agentAreasServed.length > 0
+          ? parsed.agentAreasServed
+          : undefined,
+      agentYearsInArea:
+        typeof parsed.agentYearsInArea === "string" && parsed.agentYearsInArea.length > 0
+          ? parsed.agentYearsInArea
+          : undefined,
+      agentCtaReassurance:
+        typeof parsed.agentCtaReassurance === "string" &&
+        parsed.agentCtaReassurance.length > 0
+          ? parsed.agentCtaReassurance
+          : undefined,
     };
   } catch {
     return DEFAULT_BRAND;

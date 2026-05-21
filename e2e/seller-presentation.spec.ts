@@ -196,14 +196,18 @@ test.describe('Seller Presentation — A5b per-step content', () => {
     await nextButton.click();
 
     // ---------- Step 4: Pitch ----------
+    // A7c migrated the input UX from a single `text` field to
+    // `{title, support}` per the locked design. The testids changed
+    // accordingly; this test follows the new contract while the
+    // serializer's title-fallback (A7a) keeps older drafts working.
     await expect(page.getByTestId('step-pitch')).toBeVisible();
     await page.getByTestId('step-pitch-add').click();
     await page.getByTestId('step-pitch-add').click();
     await page
-      .getByTestId('step-pitch-text-0')
+      .getByTestId('step-pitch-title-0')
       .fill('Premium staging + pro photography included.');
     await page
-      .getByTestId('step-pitch-text-1')
+      .getByTestId('step-pitch-title-1')
       .fill('My private internal target: net $665k after closing costs.');
     // First point: public. Second: stays private (default).
     await page.getByTestId('step-pitch-public-0').click();
@@ -265,7 +269,7 @@ test.describe('Seller Presentation — A5b per-step content', () => {
     const prevButton = page.getByTestId('wizard-prev');
     await prevButton.click(); // → Step 4 Pitch
     await expect(page.getByTestId('step-pitch')).toBeVisible();
-    await expect(page.getByTestId('step-pitch-text-0')).toHaveValue(
+    await expect(page.getByTestId('step-pitch-title-0')).toHaveValue(
       'Premium staging + pro photography included.',
     );
     await expect(page.getByTestId('step-pitch-counter')).toHaveText(
@@ -585,5 +589,262 @@ test.describe('Seller Presentation — A6.1 resume-on-open', () => {
     expect(newId).toBeTruthy();
     expect(newId).not.toBe(completedId);
     await expect(page.getByText('Step 1 of 5')).toBeVisible();
+  });
+});
+
+test.describe('Seller Presentation — A7c wizard input round-trip', () => {
+  /**
+   * Drives the wizard's NEW A7c inputs end-to-end:
+   *   1. Settings → fill agent-profile extensions (BrandSettings).
+   *   2. Wizard Step 1 → fill structured city/state/zip + hero photo
+   *      URL + preparedFor (the doubled-state cosmetic bug is gone
+   *      because the renderer composes from structured fields).
+   *   3. Wizard Step 4 → fill pitch points as {title, support} (the
+   *      A5b legacy `text`-only shape migrated).
+   *   4. Reload the wizard (banked A5a/A6.1 convention: no
+   *      addInitScript clear before reload; waitForFunction on the
+   *      persisted instance before navigating).
+   *   5. Verify every field round-trips on resume.
+   *   6. Click Publish (mocked) and assert the request body includes
+   *      every new draft field + every new agentContact field.
+   */
+  test('property + pitch + agent extensions round-trip through resume and publish', async ({
+    page,
+  }) => {
+    // ---- (1) Settings: agent-profile extensions ----
+    await page.goto('/settings');
+    // Seed the required existing brand fields so StepReview's
+    // brand-incomplete warning doesn't gate publish — and so the
+    // mocked publish gets a full agentContact payload to assert on.
+    await page.getByPlaceholder('Aaron Thomas Home Team').fill('Marisol Reyes');
+    await page.getByPlaceholder('Acme Realty').fill('Howard Hanna Real Estate');
+    await page.getByPlaceholder('agent@example.com').fill('marisol@hhanna.com');
+    await page.getByPlaceholder('(555) 123-4567').fill('2165550188');
+    await page.getByPlaceholder('OR #...').fill('SAL.2018003412');
+
+    // A7c agent extensions.
+    await page
+      .getByPlaceholder('Tacoma · Gig Harbor · Federal Way')
+      .fill('Tremont · Ohio City · Detroit-Shoreway');
+    await page
+      .getByPlaceholder('https://… (or leave blank for monogram fallback)')
+      .fill('https://example.com/marisol.jpg');
+    await page
+      .getByPlaceholder(/I work with eight families/)
+      .fill('I work with eight families a year, on purpose.');
+    await page.getByPlaceholder('Eleven.').fill('Eleven.');
+    await page
+      .getByPlaceholder('A 20-minute call, no obligation — just a plan for your home.')
+      .fill('A 20-minute call, no obligation.');
+
+    // Gate on BrandSettings persisting all five extensions before
+    // we leave the page — the save is debounced through useState +
+    // saveBrandSettings() in BrandProfileForm.
+    await page.waitForFunction(() => {
+      const raw = window.localStorage.getItem('socanim_brand_settings');
+      if (!raw) return false;
+      try {
+        const parsed = JSON.parse(raw) as Record<string, unknown>;
+        return (
+          parsed.agentName === 'Marisol Reyes' &&
+          parsed.agentAreasServed === 'Tremont · Ohio City · Detroit-Shoreway' &&
+          parsed.agentPhotoUrl === 'https://example.com/marisol.jpg' &&
+          typeof parsed.agentBioShort === 'string' &&
+          parsed.agentYearsInArea === 'Eleven.' &&
+          typeof parsed.agentCtaReassurance === 'string'
+        );
+      } catch {
+        return false;
+      }
+    });
+
+    // ---- (2) Wizard Step 1: property + personalization ----
+    await page.goto('/seller-presentation');
+    await expect(page.getByTestId('step-property')).toBeVisible();
+    await page.waitForURL(/\/seller-presentation\?id=workflow_[a-z0-9]+/);
+    const instanceId = new URL(page.url()).searchParams.get('id')!;
+
+    await page
+      .getByTestId('step-property-address')
+      .fill('1742 Kenilworth Avenue');
+    await page.getByTestId('step-property-city').fill('Tremont');
+    await page.getByTestId('step-property-state').fill('OH');
+    await page.getByTestId('step-property-zip').fill('44113');
+    await page
+      .getByTestId('step-property-hero-url')
+      .fill('https://example.com/hero.jpg');
+    await page
+      .getByTestId('step-property-prepared-for')
+      .fill('the Halloran family');
+
+    await page.getByTestId('step-property-saved-hint').waitFor();
+
+    // Click through Step 1 → Comps → fill min comp so export gating
+    // can pass when we mock publish later. Then Strategy (price).
+    const nextButton = page.getByTestId('wizard-next');
+    await nextButton.click();
+    await page.getByTestId('step-comps-add').click();
+    await page.getByTestId('step-comps-address-0').fill('2218 W 14th Street');
+    await page.getByLabel('comp-1-sold-price').fill('648000');
+    await nextButton.click();
+    await page.getByLabel('recommended-price').fill('675000');
+    await nextButton.click(); // → Pitch
+
+    // ---- (3) Wizard Step 4: pitch with title + support ----
+    await expect(page.getByTestId('step-pitch')).toBeVisible();
+    await page.getByTestId('step-pitch-add').click();
+    await page.getByTestId('step-pitch-add').click();
+    await page
+      .getByTestId('step-pitch-title-0')
+      .fill('A photographer the magazines use.');
+    await page
+      .getByTestId('step-pitch-support-0')
+      .fill(
+        'Two-hour session, twilight pass, and a drone exterior — staged by my team the morning of.',
+      );
+    await page.getByTestId('step-pitch-public-0').click();
+    await page
+      .getByTestId('step-pitch-title-1')
+      .fill('Private prep note about pricing.');
+    // Leave point 1 private; assert public count.
+    await expect(page.getByTestId('step-pitch-counter')).toHaveText(
+      '1 of 2 marked public',
+    );
+    await nextButton.click(); // → Review
+
+    // ---- (4) Wait for the persisted record to carry every new field
+    //         BEFORE reloading. React commits the DOM before the save
+    //         effect runs; without this we'd race the localStorage write. ----
+    await page.waitForFunction(
+      (id) => {
+        const raw = window.localStorage.getItem(`workflowInstance:${id}`);
+        if (!raw) return false;
+        try {
+          const parsed = JSON.parse(raw) as {
+            currentStep?: string;
+            draft?: {
+              propertyAddress?: string;
+              propertyCity?: string;
+              propertyState?: string;
+              propertyZip?: string;
+              heroPhotoUrl?: string;
+              preparedFor?: string;
+              pitchPoints?: Array<{
+                title?: string;
+                support?: string;
+                visibility?: string;
+              }>;
+            };
+          };
+          const d = parsed.draft;
+          if (!d) return false;
+          return (
+            parsed.currentStep === 'review' &&
+            d.propertyAddress === '1742 Kenilworth Avenue' &&
+            d.propertyCity === 'Tremont' &&
+            d.propertyState === 'OH' &&
+            d.propertyZip === '44113' &&
+            d.heroPhotoUrl === 'https://example.com/hero.jpg' &&
+            d.preparedFor === 'the Halloran family' &&
+            (d.pitchPoints?.length ?? 0) === 2 &&
+            d.pitchPoints?.[0]?.title === 'A photographer the magazines use.' &&
+            d.pitchPoints?.[0]?.visibility === 'public' &&
+            typeof d.pitchPoints?.[0]?.support === 'string'
+          );
+        } catch {
+          return false;
+        }
+      },
+      instanceId,
+    );
+
+    // ---- (5) Reload + verify every field restored ----
+    await page.reload();
+    await expect(page.getByTestId('step-review')).toBeVisible();
+    const prev = page.getByTestId('wizard-prev');
+    await prev.click(); // → Pitch
+    await expect(page.getByTestId('step-pitch-title-0')).toHaveValue(
+      'A photographer the magazines use.',
+    );
+    await expect(page.getByTestId('step-pitch-support-0')).toHaveValue(
+      'Two-hour session, twilight pass, and a drone exterior — staged by my team the morning of.',
+    );
+    await prev.click(); // → Strategy
+    await prev.click(); // → Comps
+    await prev.click(); // → Property
+    await expect(page.getByTestId('step-property-address')).toHaveValue(
+      '1742 Kenilworth Avenue',
+    );
+    await expect(page.getByTestId('step-property-city')).toHaveValue('Tremont');
+    await expect(page.getByTestId('step-property-state')).toHaveValue('OH');
+    await expect(page.getByTestId('step-property-zip')).toHaveValue('44113');
+    await expect(page.getByTestId('step-property-hero-url')).toHaveValue(
+      'https://example.com/hero.jpg',
+    );
+    await expect(page.getByTestId('step-property-prepared-for')).toHaveValue(
+      'the Halloran family',
+    );
+
+    // ---- (6) Walk forward to Review + mock publish; capture body ----
+    let publishBody: unknown;
+    await page.route('**/api/seller-presentation/publish', async (route) => {
+      try {
+        publishBody = route.request().postDataJSON();
+      } catch {
+        publishBody = null;
+      }
+      await route.fulfill({
+        status: 200,
+        contentType: 'application/json',
+        body: JSON.stringify({ ok: true, slug: 'a7c-roundtrip' }),
+      });
+    });
+
+    const next = page.getByTestId('wizard-next');
+    await next.click();
+    await next.click();
+    await next.click();
+    await next.click();
+    await expect(page.getByTestId('step-review')).toBeVisible();
+    await expect(page.getByTestId('step-review-ready')).toBeVisible();
+    await page.getByTestId('step-review-publish').click();
+    await expect(page.getByTestId('step-review-published')).toBeVisible({
+      timeout: 10_000,
+    });
+
+    // The publish body should carry every new field — both on draft
+    // and on agentContact — so the serializer + page renderer can
+    // read them downstream.
+    const body = publishBody as {
+      draft?: Record<string, unknown>;
+      agentContact?: Record<string, unknown>;
+    } | null;
+    expect(body).not.toBeNull();
+    expect(body!.draft).toBeDefined();
+    expect(body!.draft!.propertyCity).toBe('Tremont');
+    expect(body!.draft!.propertyState).toBe('OH');
+    expect(body!.draft!.propertyZip).toBe('44113');
+    expect(body!.draft!.heroPhotoUrl).toBe('https://example.com/hero.jpg');
+    expect(body!.draft!.preparedFor).toBe('the Halloran family');
+    const pitchPoints = body!.draft!.pitchPoints as Array<{
+      title?: string;
+      support?: string;
+      visibility?: string;
+    }>;
+    expect(pitchPoints).toHaveLength(2);
+    expect(pitchPoints[0].title).toBe('A photographer the magazines use.');
+    expect(pitchPoints[0].visibility).toBe('public');
+    expect(typeof pitchPoints[0].support).toBe('string');
+
+    expect(body!.agentContact).toBeDefined();
+    expect(body!.agentContact!.name).toBe('Marisol Reyes');
+    expect(body!.agentContact!.brokerage).toBe('Howard Hanna Real Estate');
+    expect(body!.agentContact!.areasServed).toBe(
+      'Tremont · Ohio City · Detroit-Shoreway',
+    );
+    expect(body!.agentContact!.photoUrl).toBe('https://example.com/marisol.jpg');
+    expect(typeof body!.agentContact!.bioShort).toBe('string');
+    expect(body!.agentContact!.yearsInArea).toBe('Eleven.');
+    expect(typeof body!.agentContact!.ctaReassurance).toBe('string');
   });
 });

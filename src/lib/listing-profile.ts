@@ -39,7 +39,21 @@ export interface ListingProfile {
   heroPhoto: string;       // data URL or empty
   status: string;          // "Just Listed", "Just Sold", "Open House", etc.
   address: string;
+  /**
+   * Legacy combined "City, ST" field — kept for backward compat with
+   * Listing Flyer / OH Prep / SIR which still consume a single string.
+   * The Seller Presentation wizard (v1.47 / A7c) writes BOTH this AND
+   * the structured city/state/zip fields below, so OH-style consumers
+   * keep working while the SP renderer can compose
+   * `"${city}, ${state} ${zip}"` cleanly without duplication.
+   */
   cityState: string;
+  /** A7c — structured city. Legacy cityState is the bridge for older consumers. */
+  city?: string;
+  /** A7c — structured state abbreviation, e.g. "WA". */
+  state?: string;
+  /** A7c — structured ZIP code. */
+  zip?: string;
   price: string;           // formatted display, e.g. "$685,000" (H-7.10 state=display contract)
   beds: string;
   baths: string;
@@ -91,6 +105,9 @@ export function loadListingProfile(): ListingProfile {
       status: str(parsed.status, DEFAULT_LISTING_PROFILE.status),
       address: str(parsed.address),
       cityState: str(parsed.cityState),
+      city: typeof parsed.city === "string" && parsed.city.length > 0 ? parsed.city : undefined,
+      state: typeof parsed.state === "string" && parsed.state.length > 0 ? parsed.state : undefined,
+      zip: typeof parsed.zip === "string" && parsed.zip.length > 0 ? parsed.zip : undefined,
       price: str(parsed.price),
       beds: str(parsed.beds),
       baths: str(parsed.baths),

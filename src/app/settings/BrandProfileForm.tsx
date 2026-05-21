@@ -156,11 +156,87 @@ export function BrandProfileForm() {
         />
       </Field>
 
+      {/* A7c — Seller Presentation agent-profile extensions. Set-once,
+          flows through StepReview's `agentContact` to the SP page
+          renderer's `agent.{areasServed, photoUrl, bioShort,
+          yearsInArea, ctaReassurance}` block. All optional. */}
+      <div className="space-y-6 border-t border-neutral-900 pt-6">
+        <h3 className="text-xs uppercase tracking-[0.18em] text-neutral-500">
+          Seller Presentation — agent profile
+        </h3>
+        <p className="-mt-3 text-[11px] text-neutral-600 leading-relaxed">
+          These appear on the published seller page&apos;s &ldquo;Your
+          agent&rdquo; section. Set once; reused across every
+          presentation.
+        </p>
+
+        <Field label="Areas served">
+          <TextInput
+            value={s.agentAreasServed ?? ""}
+            onChange={(v) => update("agentAreasServed", v || undefined)}
+            placeholder="Tacoma · Gig Harbor · Federal Way"
+          />
+        </Field>
+
+        <Field label="Headshot URL">
+          <TextInput
+            type="url"
+            value={s.agentPhotoUrl ?? ""}
+            onChange={(v) => update("agentPhotoUrl", v || undefined)}
+            placeholder="https://… (or leave blank for monogram fallback)"
+          />
+        </Field>
+
+        <Field label="Short bio (one sentence, italic)">
+          <TextAreaInput
+            value={s.agentBioShort ?? ""}
+            onChange={(v) => update("agentBioShort", v || undefined)}
+            placeholder="I work with eight families a year, on purpose. It means your sale gets the time and attention I'd want for my own."
+          />
+        </Field>
+
+        <Field label="Years in your area">
+          <TextInput
+            value={s.agentYearsInArea ?? ""}
+            onChange={(v) => update("agentYearsInArea", v || undefined)}
+            placeholder="Eleven."
+          />
+        </Field>
+
+        <Field label="CTA reassurance line">
+          <TextInput
+            value={s.agentCtaReassurance ?? ""}
+            onChange={(v) => update("agentCtaReassurance", v || undefined)}
+            placeholder="A 20-minute call, no obligation — just a plan for your home."
+          />
+        </Field>
+      </div>
+
       <p className="text-[11px] text-neutral-600 leading-relaxed pt-4 border-t border-neutral-900">
         Saved automatically. Stored in your browser only — never uploaded to
         any server.
       </p>
     </div>
+  );
+}
+
+function TextAreaInput({
+  value,
+  onChange,
+  placeholder,
+}: {
+  value: string;
+  onChange: (v: string) => void;
+  placeholder?: string;
+}) {
+  return (
+    <textarea
+      value={value}
+      onChange={(e) => onChange(e.target.value)}
+      placeholder={placeholder}
+      rows={3}
+      className="w-full bg-neutral-900 border border-neutral-800 rounded-md px-3 py-2 text-base lg:text-sm focus:outline-none focus:border-mint resize-y"
+    />
   );
 }
 
