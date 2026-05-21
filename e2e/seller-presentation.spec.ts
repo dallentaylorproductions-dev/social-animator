@@ -632,8 +632,11 @@ test.describe('Seller Presentation — A7c wizard input round-trip', () => {
     await page
       .getByPlaceholder('Tacoma · Gig Harbor · Federal Way')
       .fill('Tremont · Ohio City · Detroit-Shoreway');
+    // A7c.2 swapped the URL-only headshot for the shared
+    // <ImageUploadField>. The URL-paste fallback is the second
+    // input rendered inside it; target by test id.
     await page
-      .getByPlaceholder('https://… (or leave blank for monogram fallback)')
+      .getByTestId('brand-headshot-url')
       .fill('https://example.com/marisol.jpg');
     await page
       .getByPlaceholder(/I work with eight families/)

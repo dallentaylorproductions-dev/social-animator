@@ -8,6 +8,7 @@ import {
   extractPhoneDigits,
 } from "@/lib/brand";
 import { PhoneInput } from "@/components/inputs";
+import { ImageUploadField } from "@/components/ImageUploadField";
 
 /**
  * Brand profile form. All values persist to localStorage on every change —
@@ -178,14 +179,21 @@ export function BrandProfileForm() {
           />
         </Field>
 
-        <Field label="Headshot URL">
-          <TextInput
-            type="url"
-            value={s.agentPhotoUrl ?? ""}
-            onChange={(v) => update("agentPhotoUrl", v || undefined)}
-            placeholder="https://… (or leave blank for monogram fallback)"
-          />
-        </Field>
+        {/* A7c.2 — replaces the URL-only headshot input with the
+            shared <ImageUploadField>, so agents can pick a photo
+            from their phone's camera roll. Uploads to Vercel Blob;
+            we store the hosted URL in agentPhotoUrl (no data URLs
+            in the brand settings or in the published agent block). */}
+        <ImageUploadField
+          label="Headshot"
+          value={s.agentPhotoUrl ?? ""}
+          onChange={(url) => update("agentPhotoUrl", url || undefined)}
+          previewAspect="aspect-square"
+          folder="agent-headshots"
+          testIdPrefix="brand-headshot"
+          helpText="Square crops read best. Leave blank for a monogram fallback."
+          urlPlaceholder="https://… (or paste a URL)"
+        />
 
         <Field label="Short bio (one sentence, italic)">
           <TextAreaInput

@@ -1,8 +1,9 @@
 "use client";
 
-import { useEffect, useRef } from "react";
+import { useEffect } from "react";
 import { useListingProfile } from "@/lib/listing-profile";
 import { CurrencyInput } from "@/components/inputs/CurrencyInput";
+import { ImageUploadField } from "@/components/ImageUploadField";
 import type { SellerPresentationDraft } from "../engine/types";
 
 /**
@@ -22,6 +23,12 @@ import type { SellerPresentationDraft } from "../engine/types";
  *         new file/Blob infra); add `preparedFor` personalization
  *         (writes direct to the SP draft; it's a per-presentation
  *         field, not a Property primitive field).
+ *   A7c.2 — swap the FileReader→data-URL hero pattern for the shared
+ *         <ImageUploadField>, which downscales client-side + uploads
+ *         to Vercel Blob and stores the hosted URL. Phone camera-roll
+ *         picker is the primary path; "paste URL" stays as fallback.
+ *         The data-URL path is gone — the published payload now
+ *         references a small hosted URL, not a multi-MB embedded blob.
  *
  * Legacy bridge: the SP wizard writes BOTH structured city/state AND
  * the legacy `cityState` string ("${city}, ${state}") so older tools
@@ -54,7 +61,6 @@ const inputCls =
 
 export function StepProperty({ draft, setDraft }: StepPropertyProps) {
   const { settings, update, hydrated } = useListingProfile();
-  const photoFileRef = useRef<HTMLInputElement>(null);
 
   // Mirror the shared Property primitive → draft so the shell's
   // gating reads from a single source. Effect deps intentionally
@@ -118,16 +124,6 @@ export function StepProperty({ draft, setDraft }: StepPropertyProps) {
       state: nextState || undefined,
       cityState: derivedCityState,
     });
-  };
-
-  const handlePhotoFile = (file: File) => {
-    if (!file.type.startsWith("image/")) return;
-    const reader = new FileReader();
-    reader.onload = () => {
-      const dataUrl = reader.result;
-      if (typeof dataUrl === "string") update({ heroPhoto: dataUrl });
-    };
-    reader.readAsDataURL(file);
   };
 
   if (!hydrated) {
@@ -234,77 +230,22 @@ export function StepProperty({ draft, setDraft }: StepPropertyProps) {
         </span>
       </label>
 
-      {/* A7c — hero photo. Reuses the existing FileReader → data URL
-          pattern from BrandProfileForm.handleLogoFile so the upload
-          stays self-contained (no new file/Blob infra). The agent can
-          ALSO paste a URL (e.g. cloud-hosted image) — both paths write
-          to settings.heroPhoto, which the mirror copies to draft.heroPhotoUrl. */}
-      <div>
-        <span className="text-xs uppercase tracking-wider text-gray-500">
-          Hero photo
-        </span>
-        <input
-          type="file"
-          accept="image/*"
-          ref={photoFileRef}
-          hidden
-          onChange={(e) => {
-            const file = e.target.files?.[0];
-            if (file) handlePhotoFile(file);
-          }}
-        />
-        {settings.heroPhoto ? (
-          <div className="mt-1 space-y-2">
-            <div className="relative overflow-hidden rounded border border-neutral-700">
-              {/* eslint-disable-next-line @next/next/no-img-element */}
-              <img
-                src={settings.heroPhoto}
-                alt="Hero photo"
-                className="aspect-[4/3] w-full object-cover"
-                data-testid="step-property-hero-preview"
-              />
-            </div>
-            <div className="flex gap-2">
-              <button
-                type="button"
-                onClick={() => photoFileRef.current?.click()}
-                className="rounded border border-neutral-700 px-3 py-1.5 text-xs text-text-primary hover:bg-neutral-800"
-                data-testid="step-property-hero-replace"
-              >
-                Replace
-              </button>
-              <button
-                type="button"
-                onClick={() => update({ heroPhoto: "" })}
-                className="px-3 py-1.5 text-xs text-neutral-500 hover:text-red-400"
-                data-testid="step-property-hero-remove"
-              >
-                Remove
-              </button>
-            </div>
-          </div>
-        ) : (
-          <button
-            type="button"
-            onClick={() => photoFileRef.current?.click()}
-            className={`${inputCls} block cursor-pointer border-dashed py-6 text-center text-neutral-400 hover:border-mint hover:text-text-primary`}
-            data-testid="step-property-hero-upload"
-          >
-            Click to upload a hero photo
-          </button>
-        )}
-        <input
-          type="url"
-          value={settings.heroPhoto.startsWith("data:") ? "" : settings.heroPhoto}
-          onChange={(e) => update({ heroPhoto: e.target.value })}
-          placeholder="…or paste an image URL"
-          className={`${inputCls} mt-2`}
-          data-testid="step-property-hero-url"
-        />
-        <span className="mt-1 block text-[11px] text-neutral-500">
-          A landscape photo of the home reads best on the published page.
-        </span>
-      </div>
+      {/* A7c.2 — hero photo via the shared <ImageUploadField>. The
+          component downscales client-side + uploads to Vercel Blob
+          and reports back a hosted URL. settings.heroPhoto stores
+          that URL (the mirror effect above copies it to
+          draft.heroPhotoUrl). The "paste URL" fallback inside the
+          component covers Zillow/FMLS/Dropbox links the agent
+          already has. */}
+      <ImageUploadField
+        label="Hero photo"
+        value={settings.heroPhoto}
+        onChange={(url) => update({ heroPhoto: url })}
+        previewAspect="aspect-[4/3]"
+        folder="seller-presentation"
+        testIdPrefix="step-property-hero"
+        helpText="A landscape photo of the home reads best on the published page."
+      />
 
       {/* A7c — "prepared for" personalization. Writes DIRECT to the SP
           draft (not the Property primitive — this is per-presentation,
