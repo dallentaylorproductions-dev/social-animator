@@ -18,6 +18,7 @@ import { StepComps } from "@/tools/seller-presentation/components/StepComps";
 import { StepStrategy } from "@/tools/seller-presentation/components/StepStrategy";
 import { StepPitch } from "@/tools/seller-presentation/components/StepPitch";
 import { StepReview } from "@/tools/seller-presentation/components/StepReview";
+import { StepErrorBoundary } from "@/components/StepErrorBoundary";
 
 /**
  * Seller Presentation — 5-step wizard shell (v1.47 / A5a).
@@ -227,22 +228,35 @@ export default function SellerPresentationPage() {
 
       <StepIndicator currentStep={currentStep} />
 
+      {/* StepErrorBoundary (A7c.4.1): scoped to the step body so a
+          field that throws during render degrades to an inline
+          fallback and leaves the surrounding wizard nav clickable.
+          Replaces the previous behavior where one bad field froze
+          every button on the page (Dallen's A7c.4 phone smoke).
+          `resetKey={currentStep}` clears the caught error when the
+          agent navigates away from the broken step so re-entering
+          it after a code fix or storage clear is clean. */}
       <section className="mt-8 min-h-[400px]">
-        {currentStep === "property" && (
-          <StepProperty draft={instance.draft} setDraft={setDraft} />
-        )}
-        {currentStep === "comps" && (
-          <StepComps draft={instance.draft} setDraft={setDraft} />
-        )}
-        {currentStep === "strategy" && (
-          <StepStrategy draft={instance.draft} setDraft={setDraft} />
-        )}
-        {currentStep === "pitch" && (
-          <StepPitch draft={instance.draft} setDraft={setDraft} />
-        )}
-        {currentStep === "review" && (
-          <StepReview draft={instance.draft} goToStep={setCurrentStep} />
-        )}
+        <StepErrorBoundary
+          resetKey={currentStep}
+          stepLabel={STEPS.find((s) => s.id === currentStep)?.label}
+        >
+          {currentStep === "property" && (
+            <StepProperty draft={instance.draft} setDraft={setDraft} />
+          )}
+          {currentStep === "comps" && (
+            <StepComps draft={instance.draft} setDraft={setDraft} />
+          )}
+          {currentStep === "strategy" && (
+            <StepStrategy draft={instance.draft} setDraft={setDraft} />
+          )}
+          {currentStep === "pitch" && (
+            <StepPitch draft={instance.draft} setDraft={setDraft} />
+          )}
+          {currentStep === "review" && (
+            <StepReview draft={instance.draft} goToStep={setCurrentStep} />
+          )}
+        </StepErrorBoundary>
       </section>
 
       <nav className="mt-8 flex justify-between">

@@ -100,11 +100,23 @@ export function CurrencyInput({
   };
 
   useLayoutEffect(() => {
-    if (pendingCaretRef.current !== null && inputRef.current) {
-      const c = pendingCaretRef.current;
-      inputRef.current.setSelectionRange(c, c);
+    // Only restore the caret on inputs the user is actively editing.
+    // A7c.4.1: the prior version called setSelectionRange on every
+    // render — including renders triggered by SIBLING components
+    // (e.g., a new comp row being added). Mobile WebKit can react
+    // to setSelectionRange on a non-focused element by re-focusing
+    // it or by scrolling the viewport, which on phones reads as the
+    // page "freezing." Gating on activeElement keeps the caret-
+    // preservation behavior for the focused input while leaving
+    // unfocused inputs untouched on unrelated re-renders.
+    if (pendingCaretRef.current === null || !inputRef.current) return;
+    if (document.activeElement !== inputRef.current) {
       pendingCaretRef.current = null;
+      return;
     }
+    const c = pendingCaretRef.current;
+    inputRef.current.setSelectionRange(c, c);
+    pendingCaretRef.current = null;
   });
 
   return (

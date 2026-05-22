@@ -23,6 +23,24 @@ export default defineConfig({
     {
       name: 'chromium',
       use: { ...devices['Desktop Chrome'] },
+      // Exclude the mobile-only regression specs — they have their own
+      // device-emulated project below. Without this filter chromium
+      // would re-run them with a desktop UA, which both wastes time
+      // and weakens the signal (the spec is designed to fail only
+      // under touch/mobile-WebKit conditions).
+      testIgnore: /.*\.mobile\.spec\.ts/,
+    },
+    // Mobile-WebKit project — narrowly scoped to the A7c.4.1 phone-only
+    // regression spec. Runs in addition to chromium so the per-test
+    // device emulation (touchscreen + mobile UA + small viewport)
+    // matches Dallen's iOS smoke without forcing the rest of the suite
+    // to recompile against WebKit. Add more specs to `testMatch` only
+    // when they're meaningfully mobile-shaped — otherwise the
+    // chromium project is the default home.
+    {
+      name: 'mobile-webkit',
+      use: { ...devices['iPhone 14'] },
+      testMatch: /.*\.mobile\.spec\.ts/,
     },
   ],
   webServer: {
