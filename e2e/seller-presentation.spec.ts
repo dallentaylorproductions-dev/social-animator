@@ -465,6 +465,155 @@ test.describe('Seller Presentation — A5b per-step content', () => {
     await copySample.click();
     await expect(copySample).toContainText('Copied!');
   });
+
+  /**
+   * A7c.5 — the post-publish "sample text to send" used to be a single
+   * generic line ("Hey, here's the listing presentation for…"). It now
+   * threads in the seller's name, the property, the live URL, and the
+   * agent's signature so the agent can paste it straight into iMessage
+   * without editing. Two scenarios cover both the happy path and the
+   * graceful-fallback contract: a missing seller name must become
+   * "Hi there," (not a literal `{{seller_name}}`), and no input
+   * combination is allowed to leak a `{{` into the rendered copy.
+   */
+  test('A7c.5: sample text fills tokens from draft + brand and never leaks {{', async ({
+    page,
+    context,
+  }) => {
+    const MOCK_SLUG = 'sampletoken';
+    await page.route('**/api/seller-presentation/publish', async (route) => {
+      await route.fulfill({
+        status: 200,
+        contentType: 'application/json',
+        body: JSON.stringify({ ok: true, slug: MOCK_SLUG }),
+      });
+    });
+
+    // Seed brand settings so brand.agentName feeds the signature line.
+    // addInitScript fires on every navigation — that's fine here, the
+    // seed is idempotent and we never mutate it mid-test.
+    await context.addInitScript(() => {
+      window.localStorage.setItem(
+        'socanim_brand_settings',
+        JSON.stringify({
+          agentName: 'Aaron Thomas',
+          brokerage: '',
+          contactPhone: '',
+          contactEmail: '',
+          licenseNumber: '',
+          logoDataUrl: '',
+          agentPhotoUrl: '',
+          agentBioShort: '',
+          agentAreasServed: '',
+          agentYearsInArea: '',
+          agentCtaReassurance: '',
+        }),
+      );
+    });
+
+    await page.goto('/seller-presentation');
+    await expect(page.getByTestId('step-property')).toBeVisible();
+
+    await page.getByTestId('step-property-address').fill('1234 Test Drive NE');
+    await page.getByTestId('step-property-city').fill('Tacoma, WA');
+    await page
+      .getByTestId('step-property-prepared-for')
+      .fill('the Halloran family');
+
+    const nextButton = page.getByTestId('wizard-next');
+    await nextButton.click();
+    await page.getByTestId('step-comps-add').click();
+    await page.getByTestId('step-comps-address-0').fill('5678 Elm Ave NE');
+    await page.getByLabel('comp-1-sold-price').fill('685000');
+    await nextButton.click();
+    await page.getByLabel('recommended-price').fill('700000');
+    await nextButton.click();
+    await nextButton.click(); // skip pitch
+    await expect(page.getByTestId('step-review')).toBeVisible();
+    await expect(page.getByTestId('step-review-ready')).toBeVisible();
+
+    await page.getByTestId('step-review-publish').click();
+    await expect(page.getByTestId('step-review-published')).toBeVisible({
+      timeout: 10_000,
+    });
+
+    const sample = page.getByTestId('step-review-sample-text');
+    const sampleText = (await sample.textContent()) ?? '';
+
+    // No literal token survives token-fill — regardless of which path
+    // (filled or fallback) was taken for any individual field.
+    expect(sampleText).not.toContain('{{');
+    expect(sampleText).not.toContain('}}');
+    // Em-dash sweep: the whole codebase is being scrubbed of them.
+    expect(sampleText).not.toContain('—');
+
+    // Greeting threads in the preparedFor phrase verbatim (the leading
+    // "the " phrasing reads as a greeting subject — "Hi the Halloran
+    // family,").
+    expect(sampleText).toContain('Hi the Halloran family,');
+    // Address + city compose into one human-readable line.
+    expect(sampleText).toContain(
+      'I put together the presentation for 1234 Test Drive NE, Tacoma, WA so you can review',
+    );
+    // The published /h/<slug> URL is in the link line.
+    expect(sampleText).toMatch(/Here's the link: https?:\/\/[^\s]+\/h\/sampletoken/);
+    // Signature line is the agent's name from brand settings.
+    expect(sampleText.trim().split('\n').slice(-1)[0]).toBe('Aaron Thomas');
+  });
+
+  test('A7c.5: missing seller name falls back to "Hi there,"', async ({
+    page,
+  }) => {
+    // No preparedFor entered + no brand.agentName seeded. The greeting
+    // must drop to "Hi there," and the signature line must be omitted
+    // entirely (no trailing blank, no literal token).
+    await page.route('**/api/seller-presentation/publish', async (route) => {
+      await route.fulfill({
+        status: 200,
+        contentType: 'application/json',
+        body: JSON.stringify({ ok: true, slug: 'fallback' }),
+      });
+    });
+
+    await page.goto('/seller-presentation');
+    await expect(page.getByTestId('step-property')).toBeVisible();
+
+    await page.getByTestId('step-property-address').fill('99 Anonymous Lane');
+    // Intentionally skip city + preparedFor.
+    const nextButton = page.getByTestId('wizard-next');
+    await nextButton.click();
+    await page.getByTestId('step-comps-add').click();
+    await page.getByTestId('step-comps-address-0').fill('5678 Elm Ave NE');
+    await page.getByLabel('comp-1-sold-price').fill('685000');
+    await nextButton.click();
+    await page.getByLabel('recommended-price').fill('700000');
+    await nextButton.click();
+    await nextButton.click();
+    await expect(page.getByTestId('step-review')).toBeVisible();
+
+    await page.getByTestId('step-review-publish').click();
+    await expect(page.getByTestId('step-review-published')).toBeVisible({
+      timeout: 10_000,
+    });
+
+    const sample = page.getByTestId('step-review-sample-text');
+    const sampleText = (await sample.textContent()) ?? '';
+
+    expect(sampleText).not.toContain('{{');
+    expect(sampleText).not.toContain('}}');
+    expect(sampleText).toContain('Hi there,');
+    // Address with no city = street only (no trailing comma).
+    expect(sampleText).toContain(
+      'I put together the presentation for 99 Anonymous Lane so you can review',
+    );
+    // Signature line omitted entirely — last non-link line is the
+    // closing sentence, not a stray blank or agent token.
+    const lines = sampleText
+      .split('\n')
+      .map((l) => l.trim())
+      .filter((l) => l.length > 0);
+    expect(lines[lines.length - 1]).toMatch(/walk through it with you\.$/);
+  });
 });
 
 test.describe('Seller Presentation — A6.1 resume-on-open', () => {

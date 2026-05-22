@@ -287,6 +287,9 @@ export function StepReview({ draft, goToStep }: StepReviewProps) {
           onRevoke={handleRevoke}
           disabled={Boolean(missing)}
           propertyAddress={draft.propertyAddress ?? ""}
+          propertyCity={draft.propertyCity ?? ""}
+          preparedFor={draft.preparedFor ?? ""}
+          agentName={brand.agentName ?? ""}
         />
 
         <div className="flex flex-col gap-2">
@@ -329,18 +332,30 @@ function PublishSection({
   onRevoke,
   disabled,
   propertyAddress,
+  propertyCity,
+  preparedFor,
+  agentName,
 }: {
   state: PublishState;
   onPublish: () => void;
   onRevoke: (slug: string) => void;
   disabled: boolean;
   propertyAddress: string;
+  propertyCity: string;
+  preparedFor: string;
+  agentName: string;
 }) {
   if (state.kind === "published") {
     const origin =
       typeof window !== "undefined" ? window.location.origin : "";
     const url = `${origin}/h/${state.slug}`;
-    const sample = `Hey, here's the listing presentation for ${propertyAddress || "the home"}: ${url}`;
+    const sample = buildSampleSendText({
+      preparedFor,
+      propertyAddress,
+      propertyCity,
+      presentationUrl: url,
+      agentName,
+    });
     return (
       <div
         className="space-y-3 rounded border border-mint/40 bg-mint/5 p-4"
@@ -362,7 +377,10 @@ function PublishSection({
           <p className="mt-2 text-[11px] uppercase tracking-wider text-gray-500">
             Sample text to send
           </p>
-          <p className="mt-1 text-xs italic leading-relaxed text-gray-300">
+          <p
+            className="mt-1 whitespace-pre-line text-xs italic leading-relaxed text-gray-300"
+            data-testid="step-review-sample-text"
+          >
             {sample}
           </p>
           <CopyButton
@@ -483,6 +501,69 @@ function SummaryRow({ label, value }: { label: string; value: string }) {
       <span className="flex-1">{value}</span>
     </div>
   );
+}
+
+/**
+ * A7c.5 — Personalized "Copy sample text" message builder.
+ *
+ * Renders the post-publish message the agent copies into iMessage. The
+ * generic A7c.3 string ("Hey, here's the listing presentation for…")
+ * read like an automated blast; this one threads the seller's name,
+ * the property, the live URL, and the agent's signature into copy that
+ * sounds like a real follow-up after a listing appointment.
+ *
+ * Fallbacks are deliberate so no input combination ever leaks a literal
+ * {{token}}: missing seller → "Hi there,", missing address → "your
+ * home", missing agent → signature line omitted entirely. The
+ * presentation URL is always present here because PublishSection only
+ * renders this UI in the `published` state.
+ *
+ * Em-dash-free on purpose (codebase-wide sweep — Dallen reads them as
+ * an AI tell).
+ */
+export function buildSampleSendText(input: {
+  preparedFor?: string;
+  propertyAddress?: string;
+  propertyCity?: string;
+  presentationUrl: string;
+  agentName?: string;
+}): string {
+  const sellerName = deriveSellerName(input.preparedFor);
+  const propertyLabel = derivePropertyLabel(
+    input.propertyAddress,
+    input.propertyCity,
+  );
+  const agentName = (input.agentName ?? "").trim();
+
+  const greeting = sellerName ? `Hi ${sellerName},` : "Hi there,";
+  const body = `I put together the presentation for ${propertyLabel} so you can review everything in one place, including pricing context, recent nearby sales, and the plan I'd recommend if we move forward.`;
+  const link = `Here's the link: ${input.presentationUrl}`;
+  const closing =
+    "Take a look when you have a minute, and if anything stands out or you want to talk through the pricing together, I'm happy to walk through it with you.";
+
+  const lines = [greeting, body, link, closing];
+  if (agentName) lines.push(agentName);
+  return lines.join("\n");
+}
+
+function deriveSellerName(raw?: string): string {
+  const trimmed = (raw ?? "").trim();
+  if (!trimmed) return "";
+  // "the Halloran family" / "The Smiths" already read as a greeting
+  // subject; keep verbatim instead of slicing to "the".
+  if (/^the\b/i.test(trimmed)) return trimmed;
+  // Titled forms ("Mr. Smith", "Mrs. Garcia") read better whole than
+  // as a bare title-only first token.
+  if (/^(mr|mrs|ms|dr|miss)\.?\s/i.test(trimmed)) return trimmed;
+  // Default: first whitespace-separated token reads as a first name.
+  return trimmed.split(/\s+/)[0];
+}
+
+function derivePropertyLabel(address?: string, city?: string): string {
+  const street = (address ?? "").trim();
+  const cityPart = (city ?? "").trim();
+  if (!street) return "your home";
+  return cityPart ? `${street}, ${cityPart}` : street;
 }
 
 /**
