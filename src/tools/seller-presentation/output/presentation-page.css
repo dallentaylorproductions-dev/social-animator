@@ -400,6 +400,11 @@
   display: flex;
   align-items: flex-start;
   margin: 0;
+  /* A7c.8: tabular-nums keeps each digit on a uniform advance so the
+     scroll-triggered count-up climbs without sub-digit width jitter.
+     Paired with the start-value floor in motion.ts (10^(digits-1))
+     this guarantees no layout shift mid-animation. */
+  font-variant-numeric: tabular-nums;
 }
 .sep-presentation .price .dollar {
   font-size: 42px;

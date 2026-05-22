@@ -179,10 +179,25 @@ function PersonalNote({ payload }: { payload: PublicPayload }) {
 function PricePanel({ payload }: { payload: PublicPayload }) {
   const recommended = payload.property.recommendedList || payload.recommendedPrice;
   const rationale = payload.property.rationaleShort;
+  // A7c.8: gate the scroll-triggered count-up to clean integer dollar
+  // amounts (e.g. "$675,000"). Fancy inputs like "$675k", "Call for
+  // price", or decimals fall through to the static SSR render — the
+  // count-up enhancement is opt-in via the data-attributes below.
+  const cleanInteger = /^\$?\s*\d{1,3}(?:,\d{3})*$/.test((recommended ?? "").trim());
+  const finalNumeric = cleanInteger ? parsePriceToNumber(recommended) : null;
+  // Need >= 100 so the start floor (10^(digits-1)) is strictly below
+  // the final — otherwise the climb has zero range and is a no-op.
+  const countupAttrs =
+    finalNumeric !== null && finalNumeric >= 100
+      ? {
+          "data-price-countup": "",
+          "data-price-final": String(Math.floor(finalNumeric)),
+        }
+      : {};
   return (
     <section className="price-panel" data-testid="sep-price-panel">
       <div className="lbl">Recommended list</div>
-      <div className="price">
+      <div className="price" {...countupAttrs}>
         <PriceDisplay value={recommended} />
       </div>
       {rationale && <p className="rationale">{rationale}</p>}
@@ -195,6 +210,10 @@ function PricePanel({ payload }: { payload: PublicPayload }) {
  * shape: small brick dollar sign + large ink digits with a muted
  * comma separator. Falls back to the raw string when the format
  * doesn't match (e.g. "Call for price").
+ *
+ * The digit groups are wrapped in a [data-price-digits] span so the
+ * A7c.8 count-up enhancement can mutate just the digits without
+ * touching the brick "$" or any trailing suffix.
  */
 function PriceDisplay({ value }: { value: string }) {
   const raw = (value ?? "").trim();
@@ -209,12 +228,14 @@ function PriceDisplay({ value }: { value: string }) {
   return (
     <>
       <span className="dollar">$</span>
-      {parts.map((part, i) => (
-        <span key={i}>
-          {i > 0 && <span className="sep">,</span>}
-          {part}
-        </span>
-      ))}
+      <span data-price-digits>
+        {parts.map((part, i) => (
+          <span key={i}>
+            {i > 0 && <span className="sep">,</span>}
+            {part}
+          </span>
+        ))}
+      </span>
       {tail && <span>{tail}</span>}
     </>
   );

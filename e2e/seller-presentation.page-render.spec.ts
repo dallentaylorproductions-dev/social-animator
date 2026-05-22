@@ -350,6 +350,90 @@ test.describe('Seller Presentation — A7b premium page render', () => {
     await expect(page.getByTestId('sep-editorial-photo')).toHaveCount(0);
   });
 
+  test('A7c.8 — SSR markup carries the true recommended price (count-up is enhancement-only)', async ({
+    browser,
+  }) => {
+    // Enhancement-only invariant: even without JS, the rendered HTML
+    // must already show the true price. The count-up animation is a
+    // progressive enhancement layered on a page that is correct as
+    // shipped. Verifying with `javaScriptEnabled: false` is the
+    // cleanest structural proof — there is no client island running,
+    // so anything we read came straight from the SSR response.
+    const context = await browser.newContext({ javaScriptEnabled: false });
+    const page = await context.newPage();
+    try {
+      await page.goto('/seller-presentation-preview?fixture=full');
+      const price = page.locator('.sep-presentation .price-panel .price');
+      await expect(price).toHaveText('$675,000');
+      // The opt-in data attribute is emitted regardless (the client
+      // island, when present, uses it as the entry point). The
+      // numeric is the canonical integer with no formatting drift.
+      await expect(price).toHaveAttribute('data-price-final', '675000');
+    } finally {
+      await context.close();
+    }
+  });
+
+  test('A7c.8 — count-up lands on the exact true price after scrolling into view', async ({
+    page,
+  }) => {
+    // Drive the full client island. The price panel sits below the
+    // hero, so we scroll it into view explicitly — that's exactly
+    // what the design promises ("triggered when it scrolls into
+    // view") and what Dallen will smoke on his phone. After ~1.6s
+    // of rAF easing the digits should rest on the exact true price.
+    // We poll the data-price-counted flag the island sets when it
+    // starts the animation, then wait for the digits to match the
+    // canonical SSR-equivalent string. No fixed sleep — Playwright
+    // auto-retries the assertion until the rAF loop terminates.
+    await page.goto('/seller-presentation-preview?fixture=full');
+    const price = page.locator('.sep-presentation .price-panel .price');
+    await expect(price).toBeVisible();
+    await price.scrollIntoViewIfNeeded();
+
+    // The island marks the element once it has accepted the count-up
+    // job (one-shot). Without this we could race the assertion
+    // against the very first animation frame, when digits still read
+    // the start floor (100,000).
+    await expect(price).toHaveAttribute('data-price-counted', '1');
+
+    // Wait for the rAF tick to write the final canonical value. The
+    // animation duration is ~1.6s; Playwright's default expect
+    // timeout (5s) absorbs the wait. This is the user-facing
+    // assertion — the rendered price the seller sees on their phone
+    // must be the exact true number, no rounding drift, no
+    // off-by-one. (The SSR shape is locked separately by the
+    // JS-disabled test above; this is the post-enhancement state.)
+    await expect(price).toHaveText('$675,000');
+  });
+
+  test('A7c.8 — reduced-motion short-circuits the count-up; SSR price stays put', async ({
+    browser,
+  }) => {
+    // Under `prefers-reduced-motion: reduce` the island must NOT touch
+    // the price digits at all — the SSR markup is already the true
+    // value and any animation would violate the user's motion
+    // preference. We assert: (1) the data-price-counted flag is NEVER
+    // set (the code path returns before scheduling rAF), and
+    // (2) the price text equals the true price from first paint.
+    const context = await browser.newContext({ reducedMotion: 'reduce' });
+    const page = await context.newPage();
+    try {
+      await page.goto('/seller-presentation-preview?fixture=full');
+      const price = page.locator('.sep-presentation .price-panel .price');
+      await expect(price).toBeVisible();
+      await expect(price).toHaveText('$675,000');
+      // Give the page a beat to ensure the island has mounted (any
+      // hypothetical deferred work would have fired by now). The
+      // flag must remain unset because the reduced-motion branch
+      // skips the count-up entirely.
+      await page.waitForTimeout(200);
+      await expect(price).not.toHaveAttribute('data-price-counted', '1');
+    } finally {
+      await context.close();
+    }
+  });
+
   test('A7c.7 — all comp rows align identically, regardless of rationale length (drop-cap float is contained)', async ({
     browser,
   }) => {
