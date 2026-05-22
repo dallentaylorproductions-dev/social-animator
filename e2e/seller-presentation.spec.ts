@@ -210,8 +210,9 @@ test.describe('Seller Presentation — A5b per-step content', () => {
     await page
       .getByTestId('step-pitch-title-1')
       .fill('My private internal target: net $665k after closing costs.');
-    // First point: public. Second: stays private (default).
-    await page.getByTestId('step-pitch-public-0').click();
+    // A7c.6: points default to PUBLIC. First point keeps the default;
+    // second is explicitly marked private (prep-only note).
+    await page.getByTestId('step-pitch-private-1').click();
     await expect(page.getByTestId('step-pitch-counter')).toHaveText(
       '1 of 2 marked public',
     );
@@ -686,9 +687,13 @@ test.describe('Seller Presentation — A7c wizard input round-trip', () => {
     await page
       .getByPlaceholder(/I work with eight families/)
       .fill('I work with eight families a year, on purpose.');
-    await page.getByPlaceholder('Eleven.').fill('Eleven.');
+    // A7c.6: years field is numeric (placeholder "11", inputMode="numeric",
+    // strips non-digits on change). The stored value is a numeric string.
+    await page.getByPlaceholder('11').fill('11');
+    // A7c.6: CTA reassurance placeholder rewritten to fit the visible
+    // width with no em-dash.
     await page
-      .getByPlaceholder('A 20-minute call, no obligation — just a plan for your home.')
+      .getByPlaceholder("No pressure. Reach out whenever you're ready.")
       .fill('A 20-minute call, no obligation.');
 
     // Gate on BrandSettings persisting all five extensions before
@@ -704,7 +709,7 @@ test.describe('Seller Presentation — A7c wizard input round-trip', () => {
           parsed.agentAreasServed === 'Tremont · Ohio City · Detroit-Shoreway' &&
           parsed.agentPhotoUrl === 'https://example.com/marisol.jpg' &&
           typeof parsed.agentBioShort === 'string' &&
-          parsed.agentYearsInArea === 'Eleven.' &&
+          parsed.agentYearsInArea === '11' &&
           typeof parsed.agentCtaReassurance === 'string'
         );
       } catch {
@@ -756,11 +761,12 @@ test.describe('Seller Presentation — A7c wizard input round-trip', () => {
       .fill(
         'Two-hour session, twilight pass, and a drone exterior — staged by my team the morning of.',
       );
-    await page.getByTestId('step-pitch-public-0').click();
     await page
       .getByTestId('step-pitch-title-1')
       .fill('Private prep note about pricing.');
-    // Leave point 1 private; assert public count.
+    // A7c.6: points default to PUBLIC. Mark point 1 private explicitly
+    // so it stays as a prep-only note; assert public count.
+    await page.getByTestId('step-pitch-private-1').click();
     await expect(page.getByTestId('step-pitch-counter')).toHaveText(
       '1 of 2 marked public',
     );
@@ -906,7 +912,7 @@ test.describe('Seller Presentation — A7c wizard input round-trip', () => {
     );
     expect(body!.agentContact!.photoUrl).toBe('https://example.com/marisol.jpg');
     expect(typeof body!.agentContact!.bioShort).toBe('string');
-    expect(body!.agentContact!.yearsInArea).toBe('Eleven.');
+    expect(body!.agentContact!.yearsInArea).toBe('11');
     expect(typeof body!.agentContact!.ctaReassurance).toBe('string');
   });
 });
@@ -1027,9 +1033,9 @@ test.describe('Seller Presentation — A7c.4 Pitch step guidance', () => {
     await expect(meter).toHaveAttribute('data-filled', '4');
 
     // Counter denominator reflects FILLED rows, not total slots —
-    // none marked public yet, all 4 filled.
+    // all 4 filled, all public-by-default per A7c.6.
     await expect(page.getByTestId('step-pitch-counter')).toHaveText(
-      '0 of 4 marked public',
+      '4 of 4 marked public',
     );
 
     // Soft cap: adding rows up to the cap hides the add control and
@@ -1039,5 +1045,72 @@ test.describe('Seller Presentation — A7c.4 Pitch step guidance', () => {
     await page.getByTestId('step-pitch-add').click(); // 6
     await expect(page.getByTestId('step-pitch-add')).toHaveCount(0);
     await expect(page.getByTestId('step-pitch-cap-reached')).toBeVisible();
+  });
+});
+
+/**
+ * Seller Presentation — A7c.6 Pitch default visibility.
+ *
+ * v1.46 defaulted new pitch points to PRIVATE. A first-time agent
+ * filling points quickly expected them on the buyer's page; defaulting
+ * private silently dropped them. A7c.6 flips the default to PUBLIC.
+ *
+ * The empty-row safeguard is unchanged: `projectPitchCard` in the
+ * public-payload serializer filters out content-less rows, so a
+ * seeded-but-unfilled public point still cannot render on /h/[slug].
+ * The complementary unit assertion lives in
+ * e2e/seller-presentation.publish-allowlist.spec.ts — this spec
+ * locks in the WIZARD-side default only.
+ */
+test.describe('Seller Presentation — A7c.6 Pitch default visibility', () => {
+  test('seeded and newly-added pitch points default to PUBLIC', async ({
+    page,
+  }) => {
+    await page.goto('/seller-presentation');
+    await expect(page.getByTestId('step-property')).toBeVisible();
+    await page.waitForURL(/\/seller-presentation\?id=workflow_[a-z0-9]+/);
+
+    // Walk to the Pitch step (Step 1 gates on a saved propertyId; the
+    // others are gate-free for traversal).
+    await page.getByTestId('step-property-address').fill('1234 Test Drive NE');
+    await page.getByTestId('step-property-city').fill('Tacoma, WA');
+    await expect(page.getByTestId('step-property-saved-hint')).toBeVisible();
+    const nextButton = page.getByTestId('wizard-next');
+    await expect(nextButton).toBeEnabled();
+    await nextButton.click(); // → Comps
+    await nextButton.click(); // → Strategy
+    await nextButton.click(); // → Pitch
+    await expect(page.getByTestId('step-pitch')).toBeVisible();
+
+    // The 3 seeded rows on first mount all carry visibility:'public'
+    // by default. aria-checked is the source of truth on the toggle.
+    for (const idx of [0, 1, 2]) {
+      await expect(
+        page.getByTestId(`step-pitch-public-${idx}`),
+      ).toHaveAttribute('aria-checked', 'true');
+      await expect(
+        page.getByTestId(`step-pitch-private-${idx}`),
+      ).toHaveAttribute('aria-checked', 'false');
+    }
+
+    // A newly added row also defaults to public.
+    await page.getByTestId('step-pitch-add').click();
+    await expect(page.getByTestId('step-pitch-card-3')).toBeVisible();
+    await expect(page.getByTestId('step-pitch-public-3')).toHaveAttribute(
+      'aria-checked',
+      'true',
+    );
+    await expect(page.getByTestId('step-pitch-private-3')).toHaveAttribute(
+      'aria-checked',
+      'false',
+    );
+
+    // Filling a title without touching the toggle leaves it public —
+    // counter reads "1 of 1 marked public" once row 0 has content
+    // (the unfilled rows don't count toward the denominator).
+    await page.getByTestId('step-pitch-title-0').fill('Chef-grade kitchen');
+    await expect(page.getByTestId('step-pitch-counter')).toHaveText(
+      '1 of 1 marked public',
+    );
   });
 });

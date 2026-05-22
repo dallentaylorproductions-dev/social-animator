@@ -163,7 +163,7 @@ export function BrandProfileForm() {
           yearsInArea, ctaReassurance}` block. All optional. */}
       <div className="space-y-6 border-t border-neutral-900 pt-6">
         <h3 className="text-xs uppercase tracking-[0.18em] text-neutral-500">
-          Seller Presentation — agent profile
+          Seller Presentation: agent profile
         </h3>
         <p className="-mt-3 text-[11px] text-neutral-600 leading-relaxed">
           These appear on the published seller page&apos;s &ldquo;Your
@@ -206,8 +206,16 @@ export function BrandProfileForm() {
         <Field label="Years in your area">
           <TextInput
             value={s.agentYearsInArea ?? ""}
-            onChange={(v) => update("agentYearsInArea", v || undefined)}
-            placeholder="Eleven."
+            onChange={(v) => {
+              // A7c.6 — numeric field. Strip to digits so the stored
+              // value is a clean numeric string (consistent with the
+              // downstream text render on /h/[slug] and the JSON shape
+              // on the publish payload).
+              const digits = v.replace(/\D/g, "");
+              update("agentYearsInArea", digits || undefined);
+            }}
+            placeholder="11"
+            inputMode="numeric"
           />
         </Field>
 
@@ -215,13 +223,13 @@ export function BrandProfileForm() {
           <TextInput
             value={s.agentCtaReassurance ?? ""}
             onChange={(v) => update("agentCtaReassurance", v || undefined)}
-            placeholder="A 20-minute call, no obligation — just a plan for your home."
+            placeholder="No pressure. Reach out whenever you're ready."
           />
         </Field>
       </div>
 
       <p className="text-[11px] text-neutral-600 leading-relaxed pt-4 border-t border-neutral-900">
-        Saved automatically. Stored in your browser only — never uploaded to
+        Saved automatically. Stored in your browser only. Never uploaded to
         any server.
       </p>
     </div>
@@ -270,15 +278,18 @@ function TextInput({
   onChange,
   placeholder,
   type = "text",
+  inputMode,
 }: {
   value: string;
   onChange: (v: string) => void;
   placeholder?: string;
   type?: string;
+  inputMode?: React.HTMLAttributes<HTMLInputElement>["inputMode"];
 }) {
   return (
     <input
       type={type}
+      inputMode={inputMode}
       value={value}
       onChange={(e) => onChange(e.target.value)}
       placeholder={placeholder}

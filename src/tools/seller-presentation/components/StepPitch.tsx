@@ -80,11 +80,17 @@ const inputCls =
 const textareaCls = `${inputCls} resize-y min-h-[80px]`;
 
 function newPitchPoint(): PitchPoint {
+  // A7c.6 — default visibility is PUBLIC. A first-time agent moving
+  // quickly fills points expecting them on the buyer's page; defaulting
+  // to private silently drops them. Empty points are still filtered
+  // out by `projectPitchCard` in the public-payload serializer, so a
+  // seeded-but-unfilled point cannot leak a blank card to /h/[slug].
+  // Private stays available as a per-point opt-in for prep-only points.
   return {
     id: generateId("artifact"),
     title: "",
     support: "",
-    visibility: "private",
+    visibility: "public",
   };
 }
 

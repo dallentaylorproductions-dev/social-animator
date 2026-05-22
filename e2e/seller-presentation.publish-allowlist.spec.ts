@@ -565,6 +565,44 @@ test.describe('toPublicPayload — privacy allowlist (R-1 proof)', () => {
     expect(payload.pitchPublicCards).toEqual([]);
   });
 
+  test('A7c.6 — empty public pitch points are filtered OUT of the published payload', () => {
+    // A7c.6 flipped the wizard default from private to public so first-
+    // time agents see their points on the buyer page. The complementary
+    // safeguard is `projectPitchCard`: an empty public row has no
+    // rendering content and is dropped on the way to the payload.
+    //
+    // This test proves the filter holds: a draft with public-but-empty
+    // rows emits zero pitch cards. Without this filter, defaulting
+    // public would surface blank cards on /h/[slug].
+    const draftWithEmptyPublicPoints: SellerPresentationDraft = {
+      comps: [],
+      pitchPoints: [
+        // Empty title + empty support, public-by-default per A7c.6.
+        { id: 'pp_empty_1', title: '', support: '', visibility: 'public' },
+        // Whitespace-only title still counts as empty.
+        { id: 'pp_empty_2', title: '   ', visibility: 'public' },
+        // Legacy `text` (pre-A7c rename) variant — also empty.
+        { id: 'pp_empty_3', text: '', visibility: 'public' },
+        // One real filled point so we can assert it's the ONLY card.
+        {
+          id: 'pp_filled',
+          title: 'Chef-grade kitchen',
+          support: 'Wolf range, two ovens.',
+          visibility: 'public',
+        },
+      ],
+      commitments: [],
+      asks: [],
+    };
+    const payload = toPublicPayload(draftWithEmptyPublicPoints, {});
+
+    // Only the filled point survives — empty public rows are dropped.
+    expect(payload.pitchPublicCards).toEqual([
+      { title: 'Chef-grade kitchen', support: 'Wolf range, two ovens.' },
+    ]);
+    expect(payload.pitchPublicPoints).toEqual(['Chef-grade kitchen']);
+  });
+
   test('A7a — pitch-point legacy `text` (pre-A7a drafts) still serializes via the title fallback', () => {
     // A5b drafts only populated `text`. A7a's projector falls back to
     // `text` when `title` is unset so resumed older drafts don't
