@@ -335,6 +335,25 @@ test.describe('Seller Presentation — A7b premium page render', () => {
     await expect(page.getByTestId('sep-buyer-quote')).toBeVisible();
     await expect(page.getByTestId('sep-editorial-photo')).toBeVisible();
 
+    // A7d render gate. React 18's hydration attaches `__reactFiber$…`
+    // and `__reactProps$…` properties to the hydrated root DOM node;
+    // probing for that property proves the client tree is wired BEFORE
+    // we mutate the DOM by hand. Without this gate, a slow-suite
+    // hydration could lag the page.evaluate below and React's
+    // reconciliation pass would re-insert the removed node, flaking
+    // the toHaveCount(0) assertion under full-suite load. Checking
+    // the SSR root (the .sep-presentation main element) is independent
+    // of scroll position — the IntersectionObserver-based motion
+    // island's effects sit BELOW the fold and can't be used as a
+    // hydration gate on a tall page.
+    await page.waitForFunction(() => {
+      const root = document.querySelector('.sep-presentation');
+      if (!root) return false;
+      return Object.keys(root).some(
+        (k) => k.startsWith('__reactFiber$') || k.startsWith('__reactProps$'),
+      );
+    });
+
     await page.evaluate(() => {
       document
         .querySelector('[data-testid="sep-editorial-photo"]')

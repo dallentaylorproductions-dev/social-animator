@@ -208,6 +208,7 @@ export type SellerPresentationStepId =
   | "comps"
   | "strategy"
   | "pitch"
+  | "editorial"
   | "review";
 
 export interface SellerPresentationAiPlugPoint {

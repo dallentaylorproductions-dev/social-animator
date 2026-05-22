@@ -7,7 +7,13 @@ import {
   type SellerPresentationDraft,
 } from "../engine/types";
 
-type StepId = "property" | "comps" | "strategy" | "pitch" | "review";
+type StepId =
+  | "property"
+  | "comps"
+  | "strategy"
+  | "pitch"
+  | "editorial"
+  | "review";
 
 /**
  * Seller Presentation Step 5 — Review (v1.47 / A5b LIVE).

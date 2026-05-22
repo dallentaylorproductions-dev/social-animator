@@ -17,6 +17,7 @@ import { StepProperty } from "@/tools/seller-presentation/components/StepPropert
 import { StepComps } from "@/tools/seller-presentation/components/StepComps";
 import { StepStrategy } from "@/tools/seller-presentation/components/StepStrategy";
 import { StepPitch } from "@/tools/seller-presentation/components/StepPitch";
+import { StepEditorial } from "@/tools/seller-presentation/components/StepEditorial";
 import { StepReview } from "@/tools/seller-presentation/components/StepReview";
 import { StepErrorBoundary } from "@/components/StepErrorBoundary";
 
@@ -67,6 +68,11 @@ const STEPS = [
   { id: "comps", label: "Comps" },
   { id: "strategy", label: "Strategy" },
   { id: "pitch", label: "Your pitch" },
+  // A7d — fully optional editorial step. Inserted between Pitch and
+  // Review so a publish-ready agent (steps 1–4 satisfied) can either
+  // skip it or fill any subset before reaching Review. No gating; the
+  // shell's `isStepValid` defaults to true for stub-style steps.
+  { id: "editorial", label: "Editorial" },
   { id: "review", label: "Review" },
 ] as const;
 
@@ -252,6 +258,9 @@ export default function SellerPresentationPage() {
           )}
           {currentStep === "pitch" && (
             <StepPitch draft={instance.draft} setDraft={setDraft} />
+          )}
+          {currentStep === "editorial" && (
+            <StepEditorial draft={instance.draft} setDraft={setDraft} />
           )}
           {currentStep === "review" && (
             <StepReview draft={instance.draft} goToStep={setCurrentStep} />

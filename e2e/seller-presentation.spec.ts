@@ -34,7 +34,7 @@ test.describe('Seller Presentation — A5a spine + Step 1', () => {
     await expect(
       page.getByRole('heading', { name: 'Seller Presentation' }),
     ).toBeVisible();
-    await expect(page.getByText('Step 1 of 5')).toBeVisible();
+    await expect(page.getByText('Step 1 of 6')).toBeVisible();
     await expect(page.getByTestId('step-property')).toBeVisible();
 
     // The mount effect replaced the URL with ?id=<workflow_…>.
@@ -65,22 +65,27 @@ test.describe('Seller Presentation — A5a spine + Step 1', () => {
     // Next is now enabled.
     await expect(nextButton).toBeEnabled();
 
-    // Traverse all 5 steps via Next. Each stub renders its testid.
+    // Traverse all 6 steps via Next. Each stub renders its testid.
     await nextButton.click();
     await expect(page.getByTestId('step-comps')).toBeVisible();
-    await expect(page.getByText('Step 2 of 5')).toBeVisible();
+    await expect(page.getByText('Step 2 of 6')).toBeVisible();
 
     await nextButton.click();
     await expect(page.getByTestId('step-strategy')).toBeVisible();
-    await expect(page.getByText('Step 3 of 5')).toBeVisible();
+    await expect(page.getByText('Step 3 of 6')).toBeVisible();
 
     await nextButton.click();
     await expect(page.getByTestId('step-pitch')).toBeVisible();
-    await expect(page.getByText('Step 4 of 5')).toBeVisible();
+    await expect(page.getByText('Step 4 of 6')).toBeVisible();
+
+    // A7d — fully optional Editorial step sits between Pitch and Review.
+    await nextButton.click();
+    await expect(page.getByTestId('step-editorial')).toBeVisible();
+    await expect(page.getByText('Step 5 of 6')).toBeVisible();
 
     await nextButton.click();
     await expect(page.getByTestId('step-review')).toBeVisible();
-    await expect(page.getByText('Step 5 of 5')).toBeVisible();
+    await expect(page.getByText('Step 6 of 6')).toBeVisible();
 
     // Wait for the wizard's save effect to flush `currentStep: 'review'`
     // to localStorage before reloading. The DOM render of step-review
@@ -110,14 +115,17 @@ test.describe('Seller Presentation — A5a spine + Step 1', () => {
       page.getByRole('heading', { name: 'Seller Presentation' }),
     ).toBeVisible();
     await expect(page.getByTestId('step-review')).toBeVisible();
-    await expect(page.getByText('Step 5 of 5')).toBeVisible();
+    await expect(page.getByText('Step 6 of 6')).toBeVisible();
 
-    // Walk back to Step 1 and confirm the address survived.
+    // Walk back to Step 1 and confirm the address survived. A7d adds
+    // the optional editorial step between Pitch and Review, so it now
+    // takes 5 prev clicks (Review → Editorial → Pitch → Strategy →
+    // Comps → Property).
     const prevButton = page.getByTestId('wizard-prev');
-    for (let i = 0; i < 4; i++) {
+    for (let i = 0; i < 5; i++) {
       await prevButton.click();
     }
-    await expect(page.getByText('Step 1 of 5')).toBeVisible();
+    await expect(page.getByText('Step 1 of 6')).toBeVisible();
     await expect(page.getByTestId('step-property-address')).toHaveValue(
       '1234 Test Drive NE',
     );
@@ -218,7 +226,11 @@ test.describe('Seller Presentation — A5b per-step content', () => {
     );
     await nextButton.click();
 
-    // ---------- Step 5: Review ----------
+    // ---------- Step 5: Editorial (skip — fully optional, A7d) ----------
+    await expect(page.getByTestId('step-editorial')).toBeVisible();
+    await nextButton.click();
+
+    // ---------- Step 6: Review ----------
     await expect(page.getByTestId('step-review')).toBeVisible();
     // All required fields filled → ready-to-publish banner, NOT missing.
     await expect(page.getByTestId('step-review-ready')).toBeVisible();
@@ -271,6 +283,8 @@ test.describe('Seller Presentation — A5b per-step content', () => {
     await expect(page.getByTestId('step-review')).toBeVisible();
     // Walk back to confirm each step's content survived.
     const prevButton = page.getByTestId('wizard-prev');
+    await prevButton.click(); // → Step 5 Editorial (A7d, fully optional)
+    await expect(page.getByTestId('step-editorial')).toBeVisible();
     await prevButton.click(); // → Step 4 Pitch
     await expect(page.getByTestId('step-pitch')).toBeVisible();
     await expect(page.getByTestId('step-pitch-title-0')).toHaveValue(
@@ -309,8 +323,10 @@ test.describe('Seller Presentation — A5b per-step content', () => {
     await expect(page.getByTestId('step-property-saved-hint')).toBeVisible();
 
     const nextButton = page.getByTestId('wizard-next');
-    // Click through stubs straight to Review.
-    for (let i = 0; i < 4; i++) {
+    // Click through stubs straight to Review. A7d added the optional
+    // Editorial step between Pitch and Review, so it now takes 5
+    // clicks (Property → Comps → Strategy → Pitch → Editorial → Review).
+    for (let i = 0; i < 5; i++) {
       await nextButton.click();
     }
     await expect(page.getByTestId('step-review')).toBeVisible();
@@ -347,6 +363,7 @@ test.describe('Seller Presentation — A5b per-step content', () => {
     await page.getByLabel('recommended-price').fill('700000');
     await nextButton.click();
     await nextButton.click(); // skip pitch — public/private toggle covered elsewhere
+    await nextButton.click(); // skip editorial — fully optional (A7d)
     await expect(page.getByTestId('step-review')).toBeVisible();
     await expect(page.getByTestId('step-review-ready')).toBeVisible();
   }
@@ -529,6 +546,7 @@ test.describe('Seller Presentation — A5b per-step content', () => {
     await page.getByLabel('recommended-price').fill('700000');
     await nextButton.click();
     await nextButton.click(); // skip pitch
+    await nextButton.click(); // skip editorial (A7d, fully optional)
     await expect(page.getByTestId('step-review')).toBeVisible();
     await expect(page.getByTestId('step-review-ready')).toBeVisible();
 
@@ -588,7 +606,8 @@ test.describe('Seller Presentation — A5b per-step content', () => {
     await nextButton.click();
     await page.getByLabel('recommended-price').fill('700000');
     await nextButton.click();
-    await nextButton.click();
+    await nextButton.click(); // skip pitch
+    await nextButton.click(); // skip editorial (A7d, fully optional)
     await expect(page.getByTestId('step-review')).toBeVisible();
 
     await page.getByTestId('step-review-publish').click();
@@ -643,6 +662,7 @@ test.describe('Seller Presentation — A6.1 resume-on-open', () => {
     await page.getByLabel('recommended-price').fill('700000');
     await nextButton.click();
     await nextButton.click(); // skip Pitch
+    await nextButton.click(); // skip Editorial (A7d, fully optional)
     await expect(page.getByTestId('step-review')).toBeVisible();
 
     // Gate on the persisted record carrying the full state before we
@@ -687,11 +707,12 @@ test.describe('Seller Presentation — A6.1 resume-on-open', () => {
 
     // The resumed instance restored the agent's step position…
     await expect(page.getByTestId('step-review')).toBeVisible();
-    await expect(page.getByText('Step 5 of 5')).toBeVisible();
+    await expect(page.getByText('Step 6 of 6')).toBeVisible();
 
     // …and the per-step content survives intact (the bug had
     // step-property restored, steps 2–5 empty).
     const prevButton = page.getByTestId('wizard-prev');
+    await prevButton.click(); // → Editorial (A7d, fully optional)
     await prevButton.click(); // → Pitch
     await prevButton.click(); // → Strategy
     await expect(page.getByLabel('recommended-price')).toHaveValue('$700,000');
@@ -727,7 +748,7 @@ test.describe('Seller Presentation — A6.1 resume-on-open', () => {
       },
       originalId,
     );
-    await expect(page.getByText('Step 1 of 5')).toBeVisible();
+    await expect(page.getByText('Step 1 of 6')).toBeVisible();
     // Property primitive is SHARED across instances, so the address
     // legitimately persists — only the per-instance SP draft resets.
     // Verify the comps-step shows the empty-state copy.
@@ -789,7 +810,7 @@ test.describe('Seller Presentation — A6.1 resume-on-open', () => {
     const newId = new URL(page.url()).searchParams.get('id');
     expect(newId).toBeTruthy();
     expect(newId).not.toBe(completedId);
-    await expect(page.getByText('Step 1 of 5')).toBeVisible();
+    await expect(page.getByText('Step 1 of 6')).toBeVisible();
   });
 });
 
@@ -919,6 +940,8 @@ test.describe('Seller Presentation — A7c wizard input round-trip', () => {
     await expect(page.getByTestId('step-pitch-counter')).toHaveText(
       '1 of 2 marked public',
     );
+    await nextButton.click(); // → Editorial (A7d, fully optional — skip)
+    await expect(page.getByTestId('step-editorial')).toBeVisible();
     await nextButton.click(); // → Review
 
     // ---- (4) Wait for the persisted record to carry every new field
@@ -973,6 +996,8 @@ test.describe('Seller Presentation — A7c wizard input round-trip', () => {
     await page.reload();
     await expect(page.getByTestId('step-review')).toBeVisible();
     const prev = page.getByTestId('wizard-prev');
+    await prev.click(); // → Editorial (A7d)
+    await expect(page.getByTestId('step-editorial')).toBeVisible();
     await prev.click(); // → Pitch
     await expect(page.getByTestId('step-pitch-title-0')).toHaveValue(
       'A photographer the magazines use.',
@@ -1017,6 +1042,8 @@ test.describe('Seller Presentation — A7c wizard input round-trip', () => {
     });
 
     const next = page.getByTestId('wizard-next');
+    // Property → Comps → Strategy → Pitch → Editorial (A7d) → Review.
+    await next.click();
     await next.click();
     await next.click();
     await next.click();
@@ -1266,5 +1293,365 @@ test.describe('Seller Presentation — A7c.6 Pitch default visibility', () => {
     await expect(page.getByTestId('step-pitch-counter')).toHaveText(
       '1 of 1 marked public',
     );
+  });
+});
+
+/**
+ * Seller Presentation — A7d editorial extras (the new optional step).
+ *
+ * Two scenarios:
+ *
+ *   1. ROUND-TRIP. Fill a representative subset of the editorial blocks
+ *      (one from every shape on the locked design: agentNote, video,
+ *      trackRecord figures + testimonial, reviews + outlink, areaStats
+ *      with a monthly entry, buyerQuote). Wait for the persisted
+ *      record to carry every new field, then reload. Walk back to the
+ *      editorial step and assert every value survived. Click Publish
+ *      (mocked) and assert the request body carries every editorial
+ *      field on the draft.
+ *
+ *   2. SKIP-ALL. Drive a clean wizard straight through the editorial
+ *      step without opening a single block, publish (mocked), and
+ *      assert the request body carries no editorial content on the
+ *      draft. The published page renderer hides each block on its
+ *      own absence-condition (proven structurally by the MINIMAL
+ *      fixture render spec); this test locks in the wire-level shape.
+ *
+ * No assertions about the locked-design page renderer here — A7b's
+ * render spec already proves graceful hide-when-empty for every block.
+ * This file owns only the wizard input + the publish wire.
+ */
+test.describe('Seller Presentation — A7d editorial extras', () => {
+  test('round-trip: every editorial block fills, persists, resumes, and reaches publish', async ({
+    page,
+  }) => {
+    await page.goto('/seller-presentation');
+    await expect(page.getByTestId('step-property')).toBeVisible();
+    await page.waitForURL(/\/seller-presentation\?id=workflow_[a-z0-9]+/);
+    const instanceId = new URL(page.url()).searchParams.get('id')!;
+
+    // Walk through Steps 1–4 with the minimum-required + drive into
+    // the new Step 5 (Editorial).
+    await page.getByTestId('step-property-address').fill('1742 Kenilworth Avenue');
+    await page.getByTestId('step-property-city').fill('Tremont');
+    await page.getByTestId('step-property-state').fill('OH');
+    await page.getByTestId('step-property-zip').fill('44113');
+    const nextButton = page.getByTestId('wizard-next');
+    await nextButton.click();
+    await page.getByTestId('step-comps-add').click();
+    await page.getByTestId('step-comps-address-0').fill('2218 W 14th Street');
+    await page.getByLabel('comp-1-sold-price').fill('648000');
+    await nextButton.click();
+    await page.getByLabel('recommended-price').fill('675000');
+    await nextButton.click();
+    await nextButton.click(); // skip pitch — covered elsewhere
+    await expect(page.getByTestId('step-editorial')).toBeVisible();
+
+    // (a) Personal note — agentNote.
+    await page.getByTestId('step-editorial-agentNote-add').click();
+    await page
+      .getByTestId('step-editorial-agent-note-input')
+      .fill("Here's exactly what I'd do to sell your home.");
+
+    // (b) Video — videoUrl + title + runtime + recordedOn (skip poster
+    //     here; the ImageUploadField is exercised end-to-end in the
+    //     hero-photo round-trip already).
+    await page.getByTestId('step-editorial-video-add').click();
+    await page
+      .getByTestId('step-editorial-video-url')
+      .fill('https://www.loom.com/share/abc123');
+    await page
+      .getByTestId('step-editorial-video-title')
+      .fill('A walk-through of your plan.');
+    await page.getByTestId('step-editorial-video-runtime').fill('2 min 14 sec');
+    await page
+      .getByTestId('step-editorial-video-recorded-on')
+      .fill('Recorded May 19');
+
+    // (c) Track record — one figure + a testimonial.
+    await page.getByTestId('step-editorial-trackRecord-add').click();
+    await page.getByTestId('step-editorial-figure-add').click();
+    await page
+      .getByTestId('step-editorial-figure-label-0')
+      .fill('Homes sold in Tremont');
+    await page.getByTestId('step-editorial-figure-value-0').fill('40');
+    await page
+      .getByTestId('step-editorial-figure-ctx-0')
+      .fill('Trailing 36 months');
+    await page
+      .getByTestId('step-editorial-testimonial-body')
+      .fill('She walked us through every offer in plain English.');
+    await page
+      .getByTestId('step-editorial-testimonial-attribution')
+      .fill('D. & K. Bauer');
+    await page
+      .getByTestId('step-editorial-testimonial-area-or-year')
+      .fill('Castle Avenue, 2025');
+
+    // (d) Reviews — one review + an outlink.
+    await page.getByTestId('step-editorial-reviews-add').click();
+    await page.getByTestId('step-editorial-review-add').click();
+    await page
+      .getByTestId('step-editorial-review-body-0')
+      .fill('Quiet, calm, prepared.');
+    await page.getByTestId('step-editorial-review-name-0').fill('A. Park');
+    await page.getByTestId('step-editorial-review-year-0').fill('2024');
+    await page
+      .getByTestId('step-editorial-review-street-0')
+      .fill('Professor Avenue');
+    await page
+      .getByTestId('step-editorial-outlink-label')
+      .fill('See all reviews on Zillow');
+    await page
+      .getByTestId('step-editorial-outlink-url')
+      .fill('https://www.zillow.com/profile/marisol');
+
+    // (e) Area stats — one median sale, one delta, one month entry.
+    await page.getByTestId('step-editorial-areaStats-add').click();
+    await page.getByTestId('step-editorial-area-median-sale').fill('$642k');
+    await page
+      .getByTestId('step-editorial-area-yoy')
+      .fill('+4.1% vs prior year');
+    await page.getByTestId('step-editorial-area-month-add').click();
+    await page
+      .getByTestId('step-editorial-area-month-label-0')
+      .fill("May '26");
+    await page
+      .getByTestId('step-editorial-area-month-value-0')
+      .fill('642000');
+
+    // (f) Buyer quote.
+    await page.getByTestId('step-editorial-buyerQuote-add').click();
+    await page
+      .getByTestId('step-editorial-quote-body')
+      .fill("A house like this gets chosen, quickly, by the right person.");
+    await page
+      .getByTestId('step-editorial-quote-source')
+      .fill("From a buyer's offer letter, April 2026");
+
+    // (Editorial photo is skipped — its upload path is the same shared
+    // <ImageUploadField> exercised on the hero in the A7c round-trip.)
+
+    // Advance to Review so currentStep persists past 'editorial'.
+    await nextButton.click();
+    await expect(page.getByTestId('step-review')).toBeVisible();
+
+    // ---- Wait for persistence before reload ----
+    await page.waitForFunction(
+      (id) => {
+        const raw = window.localStorage.getItem(`workflowInstance:${id}`);
+        if (!raw) return false;
+        try {
+          const parsed = JSON.parse(raw) as {
+            currentStep?: string;
+            draft?: {
+              agentNote?: string;
+              video?: { videoUrl?: string; title?: string };
+              trackRecord?: {
+                figures?: Array<{ label?: string; value?: string }>;
+                testimonial?: { body?: string; attributionShort?: string };
+              };
+              reviews?: Array<{ body?: string; attributionName?: string }>;
+              reviewsOutlink?: { label?: string; url?: string };
+              areaStats?: {
+                medianSale?: string;
+                monthlySeries?: Array<{ month?: string; medianPrice?: string }>;
+              };
+              buyerQuote?: { body?: string; source?: string };
+            };
+          };
+          const d = parsed.draft;
+          if (!d) return false;
+          return (
+            parsed.currentStep === 'review' &&
+            d.agentNote === "Here's exactly what I'd do to sell your home." &&
+            d.video?.videoUrl === 'https://www.loom.com/share/abc123' &&
+            d.video?.title === 'A walk-through of your plan.' &&
+            (d.trackRecord?.figures?.length ?? 0) === 1 &&
+            d.trackRecord?.figures?.[0]?.label === 'Homes sold in Tremont' &&
+            d.trackRecord?.figures?.[0]?.value === '40' &&
+            d.trackRecord?.testimonial?.body ===
+              'She walked us through every offer in plain English.' &&
+            (d.reviews?.length ?? 0) === 1 &&
+            d.reviews?.[0]?.body === 'Quiet, calm, prepared.' &&
+            d.reviewsOutlink?.label === 'See all reviews on Zillow' &&
+            d.areaStats?.medianSale === '$642k' &&
+            (d.areaStats?.monthlySeries?.length ?? 0) === 1 &&
+            d.areaStats?.monthlySeries?.[0]?.month === "May '26" &&
+            d.buyerQuote?.body ===
+              'A house like this gets chosen, quickly, by the right person.'
+          );
+        } catch {
+          return false;
+        }
+      },
+      instanceId,
+    );
+
+    // ---- Reload + walk back to Editorial; resume restores each value ----
+    await page.reload();
+    await expect(page.getByTestId('step-review')).toBeVisible();
+    await page.getByTestId('wizard-prev').click(); // → Editorial
+    await expect(page.getByTestId('step-editorial')).toBeVisible();
+
+    // Cards that had content open automatically on resume (the
+    // useEffect-based hydration in StepEditorial). Their inputs carry
+    // the persisted values.
+    await expect(page.getByTestId('step-editorial-agent-note-input')).toHaveValue(
+      "Here's exactly what I'd do to sell your home.",
+    );
+    await expect(page.getByTestId('step-editorial-video-url')).toHaveValue(
+      'https://www.loom.com/share/abc123',
+    );
+    await expect(page.getByTestId('step-editorial-figure-label-0')).toHaveValue(
+      'Homes sold in Tremont',
+    );
+    await expect(page.getByTestId('step-editorial-figure-value-0')).toHaveValue(
+      '40',
+    );
+    await expect(
+      page.getByTestId('step-editorial-testimonial-body'),
+    ).toHaveValue('She walked us through every offer in plain English.');
+    await expect(page.getByTestId('step-editorial-review-body-0')).toHaveValue(
+      'Quiet, calm, prepared.',
+    );
+    await expect(page.getByTestId('step-editorial-outlink-url')).toHaveValue(
+      'https://www.zillow.com/profile/marisol',
+    );
+    await expect(page.getByTestId('step-editorial-area-median-sale')).toHaveValue(
+      '$642k',
+    );
+    await expect(
+      page.getByTestId('step-editorial-area-month-label-0'),
+    ).toHaveValue("May '26");
+    await expect(page.getByTestId('step-editorial-quote-body')).toHaveValue(
+      "A house like this gets chosen, quickly, by the right person.",
+    );
+
+    // ---- Walk forward, mock publish, capture body ----
+    let publishBody: unknown;
+    await page.route('**/api/seller-presentation/publish', async (route) => {
+      try {
+        publishBody = route.request().postDataJSON();
+      } catch {
+        publishBody = null;
+      }
+      await route.fulfill({
+        status: 200,
+        contentType: 'application/json',
+        body: JSON.stringify({ ok: true, slug: 'a7d-roundtrip' }),
+      });
+    });
+
+    await page.getByTestId('wizard-next').click(); // → Review
+    await expect(page.getByTestId('step-review')).toBeVisible();
+    await expect(page.getByTestId('step-review-ready')).toBeVisible();
+    await page.getByTestId('step-review-publish').click();
+    await expect(page.getByTestId('step-review-published')).toBeVisible({
+      timeout: 10_000,
+    });
+
+    const body = publishBody as { draft?: Record<string, unknown> } | null;
+    expect(body).not.toBeNull();
+    const d = body!.draft as Record<string, unknown>;
+    expect(d.agentNote).toBe("Here's exactly what I'd do to sell your home.");
+    expect((d.video as { videoUrl?: string })?.videoUrl).toBe(
+      'https://www.loom.com/share/abc123',
+    );
+    const tr = d.trackRecord as {
+      figures?: Array<{ label?: string; value?: string }>;
+      testimonial?: { body?: string; attributionShort?: string };
+    };
+    expect(tr.figures?.[0]?.label).toBe('Homes sold in Tremont');
+    expect(tr.figures?.[0]?.value).toBe('40');
+    expect(tr.testimonial?.attributionShort).toBe('D. & K. Bauer');
+    expect((d.reviews as Array<{ body?: string }>)[0]?.body).toBe(
+      'Quiet, calm, prepared.',
+    );
+    expect((d.reviewsOutlink as { url?: string }).url).toBe(
+      'https://www.zillow.com/profile/marisol',
+    );
+    const stats = d.areaStats as {
+      medianSale?: string;
+      monthlySeries?: Array<{ month?: string; medianPrice?: string }>;
+    };
+    expect(stats.medianSale).toBe('$642k');
+    expect(stats.monthlySeries?.[0]?.month).toBe("May '26");
+    expect(stats.monthlySeries?.[0]?.medianPrice).toBe('642000');
+    expect((d.buyerQuote as { body?: string }).body).toBe(
+      'A house like this gets chosen, quickly, by the right person.',
+    );
+  });
+
+  test('skip-all: untouched editorial step publishes with no editorial fields on the draft', async ({
+    page,
+  }) => {
+    let publishBody: unknown;
+    await page.route('**/api/seller-presentation/publish', async (route) => {
+      try {
+        publishBody = route.request().postDataJSON();
+      } catch {
+        publishBody = null;
+      }
+      await route.fulfill({
+        status: 200,
+        contentType: 'application/json',
+        body: JSON.stringify({ ok: true, slug: 'a7d-skipall' }),
+      });
+    });
+
+    await page.goto('/seller-presentation');
+    await expect(page.getByTestId('step-property')).toBeVisible();
+    await page.getByTestId('step-property-address').fill('1234 Test Drive NE');
+    const nextButton = page.getByTestId('wizard-next');
+    await nextButton.click();
+    await page.getByTestId('step-comps-add').click();
+    await page.getByTestId('step-comps-address-0').fill('5678 Elm Ave NE');
+    await page.getByLabel('comp-1-sold-price').fill('685000');
+    await nextButton.click();
+    await page.getByLabel('recommended-price').fill('700000');
+    await nextButton.click();
+    await nextButton.click(); // through Pitch (untouched)
+
+    // Land on Editorial; every card is closed by default for a fresh
+    // draft because `sectionsWithContent(EMPTY_DRAFT)` returns nothing.
+    await expect(page.getByTestId('step-editorial')).toBeVisible();
+    for (const key of [
+      'agentNote',
+      'video',
+      'trackRecord',
+      'reviews',
+      'areaStats',
+      'buyerQuote',
+      'editorialPhoto',
+    ]) {
+      await expect(
+        page.getByTestId(`step-editorial-${key}-card`),
+      ).toHaveAttribute('data-state', 'closed');
+    }
+    await nextButton.click(); // straight through to Review
+
+    await expect(page.getByTestId('step-review')).toBeVisible();
+    await expect(page.getByTestId('step-review-ready')).toBeVisible();
+    await page.getByTestId('step-review-publish').click();
+    await expect(page.getByTestId('step-review-published')).toBeVisible({
+      timeout: 10_000,
+    });
+
+    const body = publishBody as { draft?: Record<string, unknown> } | null;
+    expect(body).not.toBeNull();
+    const d = body!.draft!;
+    // None of the editorial blocks reach the wire when the step was
+    // skipped. The renderer's hide-when-empty contracts depend on
+    // each of these being absent (or, for objects, undefined) — the
+    // MINIMAL fixture render spec covers the page-side proof.
+    expect(d.agentNote).toBeUndefined();
+    expect(d.video).toBeUndefined();
+    expect(d.trackRecord).toBeUndefined();
+    expect(d.reviews).toBeUndefined();
+    expect(d.reviewsOutlink).toBeUndefined();
+    expect(d.areaStats).toBeUndefined();
+    expect(d.buyerQuote).toBeUndefined();
+    expect(d.editorialPhotoUrl).toBeUndefined();
   });
 });
