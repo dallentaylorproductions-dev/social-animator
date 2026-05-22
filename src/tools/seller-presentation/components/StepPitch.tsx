@@ -1,5 +1,6 @@
 "use client";
 
+import { useEffect, useRef } from "react";
 import { generateId } from "@/lib/ids";
 import type {
   PitchPoint,
@@ -9,38 +10,69 @@ import type {
 import { AIPlugPoint } from "./AIPlugPoint";
 
 /**
- * Seller Presentation Step 4 — Pitch points (v1.47 / A5b → A7c).
+ * Seller Presentation Step 4 — Pitch points (v1.47 / A5b → A7c.4).
  *
- * The substrate's "agent controls what the client sees" rule
- * (§3.4, §4) made concrete. Each pitch point carries a per-point
- * `visibility: 'public' | 'private'` flag the agent toggles by
- * hand. The serializer projects `pitchPublicCards` as
- * `draft.pitchPoints.filter(p => p.visibility === 'public').map(p =>
- * ({ title, support }))` — the toggle here directly determines what
- * reaches the published web page.
+ * Substrate's "agent controls what the client sees" rule (§3.4, §4)
+ * lands as a per-point `visibility: 'public' | 'private'` toggle the
+ * serializer reads to decide what reaches the published page.
  *
- * A7c shape migration: input UX now captures `{ title, support }`
- * (matching the locked design's pitch-card markup) instead of A5b's
- * single `text` field. Older drafts with only `text` set still
- * round-trip cleanly because:
- *   - the serializer's title fallback (A7a) maps
- *     `point.title ?? point.text` into the public card's `title`;
- *   - this component shows the legacy `text` value in the Title
- *     input until the user edits, then writes to `title` and clears
- *     `text` on save (clean migration with no fragile parsing).
+ * A7c.4 — "guided + finite" pass on the input UX:
+ *   - Per-row example placeholders ROTATE (see PITCH_EXAMPLES) so the
+ *     agent reads them as inspiration, not a canned default. Cycled
+ *     by row index, wrapping past the list end.
+ *   - First mount seeds INITIAL_VISIBLE_ROWS empty points when the
+ *     draft has fewer, so the agent lands on a small finite set of
+ *     rows (no more "list to 14" obligation). The seed runs ONCE per
+ *     mount via `seededRef`, so explicit removals are respected. The
+ *     load-path `clampPitchPoint` drops content-less rows on reload,
+ *     keeping the persisted shape clean even if some seeded rows are
+ *     never filled.
+ *   - Strength signal (dots + one microcopy line) reads off filled
+ *     rows — neutral at 0, amber at 1–2, green from 3 (SWEET_SPOT
+ *     wording at 4+). Reassurance only — publishing with fewer or
+ *     more still works.
+ *   - At sweet spot, the "+ Add another" affordance switches to a
+ *     ghost style so the agent feels finished, not pushed.
+ *   - Soft cap (SOFT_CAP_ROWS) hides the add button when reached. A
+ *     draft loaded with more than the cap (legacy / power-user) is
+ *     never truncated — only adding more is blocked.
  *
- * Defaults to `private` on add — opt-in to publishing so a hasty
- * "save then publish" can't leak a point the agent intended for
- * their prep doc only.
+ * Tunable defaults (Dallen smokes; adjust here): INITIAL_VISIBLE_ROWS,
+ * SOFT_CAP_ROWS, AMBER_THRESHOLD, GREEN_THRESHOLD.
  *
- * Lane C seam: `<AIPlugPoint type="copy-suggestion" />` at the top
- * renders null today; Lane C swaps in the copy-suggestion proposer
- * per the contract on `SELLER_PRESENTATION_AI_PLUG_POINTS[2]`.
+ * Lane C seam unchanged: <AIPlugPoint type="copy-suggestion" /> still
+ * sits at the top per SELLER_PRESENTATION_AI_PLUG_POINTS[2].
+ *
+ * Data-model invariants preserved: PitchPoint shape, the public/
+ * private toggle, and the serializer's allowlist are untouched.
  */
 
 interface StepPitchProps {
   draft: SellerPresentationDraft;
   setDraft: (next: SellerPresentationDraft) => void;
+}
+
+const INITIAL_VISIBLE_ROWS = 3;
+const SOFT_CAP_ROWS = 6;
+const AMBER_THRESHOLD = 1; // filled >= 1 → amber until GREEN_THRESHOLD
+const GREEN_THRESHOLD = 3; // filled >= 3 → green
+const SWEET_SPOT = 4; // copy mentions "4 strong points is plenty"
+
+const PITCH_EXAMPLES = [
+  "Chef's kitchen made for hosting",
+  "Walk to the lake in five minutes",
+  "Quiet street, top-rated schools",
+  "Sun-filled primary suite",
+  "Brand-new roof and HVAC",
+  "Two-car garage plus workshop",
+  "Move-in ready, nothing to do",
+  "Backyard made for summer nights",
+  "Minutes to downtown and transit",
+  "Rare double lot with privacy",
+] as const;
+
+function exampleForIndex(idx: number): string {
+  return PITCH_EXAMPLES[idx % PITCH_EXAMPLES.length];
 }
 
 const inputCls =
@@ -56,7 +88,47 @@ function newPitchPoint(): PitchPoint {
   };
 }
 
+function hasContent(point: PitchPoint): boolean {
+  const title = (point.title ?? point.text ?? "").trim();
+  return title.length > 0;
+}
+
+type StrengthLevel = "neutral" | "amber" | "green";
+
+function strengthLevel(filled: number): StrengthLevel {
+  if (filled <= 0) return "neutral";
+  if (filled < GREEN_THRESHOLD) return "amber";
+  return "green";
+}
+
+function strengthMessage(filled: number): string {
+  if (filled <= 0) return "Add 2 to 4 selling points.";
+  if (filled < GREEN_THRESHOLD) return "A couple more makes it stronger.";
+  return `Looks great. ${SWEET_SPOT} strong points is plenty.`;
+}
+
 export function StepPitch({ draft, setDraft }: StepPitchProps) {
+  // Seed initial empty rows ONCE per mount when the draft is short.
+  // `clampPitchPoint` drops empty rows on reload, so this won't bloat
+  // the persisted draft; it just hands the agent a finite starting
+  // canvas instead of a single empty row.
+  const seededRef = useRef(false);
+  useEffect(() => {
+    if (seededRef.current) return;
+    seededRef.current = true;
+    if (draft.pitchPoints.length < INITIAL_VISIBLE_ROWS) {
+      const need = INITIAL_VISIBLE_ROWS - draft.pitchPoints.length;
+      const additions = Array.from({ length: need }, newPitchPoint);
+      setDraft({
+        ...draft,
+        pitchPoints: [...draft.pitchPoints, ...additions],
+      });
+    }
+    // Intentionally run once on mount only — explicit removals after
+    // mount should not trigger a reseed.
+    // eslint-disable-next-line react-hooks/exhaustive-deps
+  }, []);
+
   const updatePoint = (id: string, patch: Partial<PitchPoint>) => {
     const next = draft.pitchPoints.map((p) =>
       p.id === id ? { ...p, ...patch } : p,
@@ -75,9 +147,13 @@ export function StepPitch({ draft, setDraft }: StepPitchProps) {
     });
   };
 
+  const filledCount = draft.pitchPoints.filter(hasContent).length;
   const publicCount = draft.pitchPoints.filter(
-    (p) => p.visibility === "public",
+    (p) => p.visibility === "public" && hasContent(p),
   ).length;
+  const level = strengthLevel(filledCount);
+  const atSweetSpot = filledCount >= GREEN_THRESHOLD;
+  const atSoftCap = draft.pitchPoints.length >= SOFT_CAP_ROWS;
 
   return (
     <div className="space-y-6" data-testid="step-pitch">
@@ -91,12 +167,12 @@ export function StepPitch({ draft, setDraft }: StepPitchProps) {
 
       <AIPlugPoint type="copy-suggestion" />
 
-      {draft.pitchPoints.length === 0 && (
-        <p className="text-sm italic text-gray-400">
-          No pitch points yet. Add at least one. Even private ones
-          structure your prep.
-        </p>
-      )}
+      <StrengthMeter
+        filled={filledCount}
+        cap={SOFT_CAP_ROWS}
+        level={level}
+        message={strengthMessage(filledCount)}
+      />
 
       <div className="space-y-3">
         {draft.pitchPoints.map((point, idx) => (
@@ -104,28 +180,101 @@ export function StepPitch({ draft, setDraft }: StepPitchProps) {
             key={point.id}
             index={idx}
             point={point}
+            example={exampleForIndex(idx)}
             onUpdate={(patch) => updatePoint(point.id, patch)}
             onRemove={() => removePoint(point.id)}
           />
         ))}
       </div>
 
-      <div className="flex items-center justify-between">
-        <button
-          type="button"
-          onClick={addPoint}
-          data-testid="step-pitch-add"
-          className="rounded border border-mint px-4 py-2 text-sm text-mint hover:bg-mint/10"
-        >
-          + Add pitch point
-        </button>
+      <div className="flex items-center justify-between gap-3">
+        {atSoftCap ? (
+          <span
+            className="text-xs text-neutral-500"
+            data-testid="step-pitch-cap-reached"
+          >
+            You&apos;ve added the most points we recommend.
+          </span>
+        ) : (
+          <button
+            type="button"
+            onClick={addPoint}
+            data-testid="step-pitch-add"
+            data-emphasis={atSweetSpot ? "ghost" : "primary"}
+            className={
+              atSweetSpot
+                ? "rounded px-3 py-1.5 text-xs text-neutral-500 hover:text-text-primary"
+                : "rounded border border-mint px-4 py-2 text-sm text-mint hover:bg-mint/10"
+            }
+          >
+            {atSweetSpot
+              ? "+ Add another (optional)"
+              : "+ Add a selling point"}
+          </button>
+        )}
         <p
           className="text-xs text-neutral-500"
           data-testid="step-pitch-counter"
         >
-          {publicCount} of {draft.pitchPoints.length} marked public
+          {publicCount} of {filledCount} marked public
         </p>
       </div>
+    </div>
+  );
+}
+
+interface StrengthMeterProps {
+  filled: number;
+  cap: number;
+  level: StrengthLevel;
+  message: string;
+}
+
+function StrengthMeter({ filled, cap, level, message }: StrengthMeterProps) {
+  const litColor =
+    level === "green"
+      ? "bg-mint"
+      : level === "amber"
+        ? "bg-amber-400"
+        : "bg-neutral-700";
+  const textColor =
+    level === "green"
+      ? "text-mint"
+      : level === "amber"
+        ? "text-amber-400"
+        : "text-neutral-400";
+
+  return (
+    <div
+      className="space-y-1.5"
+      data-testid="step-pitch-strength"
+      data-level={level}
+      data-filled={filled}
+    >
+      <div
+        className="flex items-center gap-1.5"
+        role="meter"
+        aria-valuemin={0}
+        aria-valuemax={cap}
+        aria-valuenow={filled}
+        aria-label="Selling points strength"
+      >
+        {Array.from({ length: cap }, (_, i) => (
+          <span
+            key={i}
+            className={`h-1.5 w-6 rounded-full transition-colors ${
+              i < filled ? litColor : "bg-neutral-800"
+            }`}
+            aria-hidden
+          />
+        ))}
+      </div>
+      <p
+        className={`text-xs ${textColor}`}
+        data-testid="step-pitch-strength-message"
+      >
+        {message}
+      </p>
     </div>
   );
 }
@@ -133,6 +282,7 @@ export function StepPitch({ draft, setDraft }: StepPitchProps) {
 interface PitchPointCardProps {
   index: number;
   point: PitchPoint;
+  example: string;
   onUpdate: (patch: Partial<PitchPoint>) => void;
   onRemove: () => void;
 }
@@ -140,6 +290,7 @@ interface PitchPointCardProps {
 function PitchPointCard({
   index,
   point,
+  example,
   onUpdate,
   onRemove,
 }: PitchPointCardProps) {
@@ -152,9 +303,6 @@ function PitchPointCard({
   const titleDisplay = point.title ?? point.text ?? "";
   const onTitleChange = (value: string) => {
     const patch: Partial<PitchPoint> = { title: value };
-    // Clear the legacy `text` field on first edit so the migration
-    // completes — the serializer's fallback only kicks in when
-    // `title` is unset.
     if (point.text !== undefined) patch.text = undefined;
     onUpdate(patch);
   };
@@ -187,7 +335,7 @@ function PitchPointCard({
           className={`${inputCls} mt-1`}
           value={titleDisplay}
           onChange={(e) => onTitleChange(e.target.value)}
-          placeholder="e.g. Chef's kitchen, built for hosting"
+          placeholder={`e.g. ${example}`}
           data-testid={`step-pitch-title-${index}`}
         />
       </label>

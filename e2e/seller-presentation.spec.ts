@@ -196,13 +196,14 @@ test.describe('Seller Presentation — A5b per-step content', () => {
     await nextButton.click();
 
     // ---------- Step 4: Pitch ----------
-    // A7c migrated the input UX from a single `text` field to
-    // `{title, support}` per the locked design. The testids changed
-    // accordingly; this test follows the new contract while the
-    // serializer's title-fallback (A7a) keeps older drafts working.
+    // A7c.4 seeds INITIAL_VISIBLE_ROWS (3) empty pitch points on first
+    // mount of the step, so the agent lands on a finite starting
+    // canvas. No `step-pitch-add` clicks needed for this scenario —
+    // we fill two of the seeded rows directly. The counter denominator
+    // now reads filled-row count, so "1 of 2" still describes "1 of
+    // the 2 rows with content is public" (the third seeded row stays
+    // empty and is dropped on reload by clampPitchPoint).
     await expect(page.getByTestId('step-pitch')).toBeVisible();
-    await page.getByTestId('step-pitch-add').click();
-    await page.getByTestId('step-pitch-add').click();
     await page
       .getByTestId('step-pitch-title-0')
       .fill('Premium staging + pro photography included.');
@@ -251,7 +252,9 @@ test.describe('Seller Presentation — A5b per-step content', () => {
             parsed.currentStep === 'review' &&
             parsed.draft?.recommendedPrice === '$700,000' &&
             (parsed.draft?.comps?.length ?? 0) === 1 &&
-            (parsed.draft?.pitchPoints?.length ?? 0) === 2 &&
+            // A7c.4: 2 filled rows + 1 empty seeded row → length 3.
+            // The empty row is dropped by clampPitchPoint on reload.
+            (parsed.draft?.pitchPoints?.length ?? 0) === 3 &&
             parsed.draft?.pitchPoints?.[0]?.visibility === 'public' &&
             parsed.draft?.pricingStrategyId === 'strategic-quick-sale' &&
             parsed.draft?.confidence === 'high'
@@ -742,9 +745,9 @@ test.describe('Seller Presentation — A7c wizard input round-trip', () => {
     await nextButton.click(); // → Pitch
 
     // ---- (3) Wizard Step 4: pitch with title + support ----
+    // A7c.4 seeds 3 empty rows on mount — fill the first two directly.
+    // The third seeded-but-empty row is dropped on reload.
     await expect(page.getByTestId('step-pitch')).toBeVisible();
-    await page.getByTestId('step-pitch-add').click();
-    await page.getByTestId('step-pitch-add').click();
     await page
       .getByTestId('step-pitch-title-0')
       .fill('A photographer the magazines use.');
@@ -797,7 +800,9 @@ test.describe('Seller Presentation — A7c wizard input round-trip', () => {
             d.propertyZip === '44113' &&
             d.heroPhotoUrl === 'https://example.com/hero.jpg' &&
             d.preparedFor === 'the Halloran family' &&
-            (d.pitchPoints?.length ?? 0) === 2 &&
+            // A7c.4: 2 filled + 1 empty seeded row = 3 persisted; the
+            // empty row drops out on reload via clampPitchPoint.
+            (d.pitchPoints?.length ?? 0) === 3 &&
             d.pitchPoints?.[0]?.title === 'A photographer the magazines use.' &&
             d.pitchPoints?.[0]?.visibility === 'public' &&
             typeof d.pitchPoints?.[0]?.support === 'string'
@@ -882,10 +887,16 @@ test.describe('Seller Presentation — A7c wizard input round-trip', () => {
       support?: string;
       visibility?: string;
     }>;
-    expect(pitchPoints).toHaveLength(2);
-    expect(pitchPoints[0].title).toBe('A photographer the magazines use.');
-    expect(pitchPoints[0].visibility).toBe('public');
-    expect(typeof pitchPoints[0].support).toBe('string');
+    // A7c.4 seeds 3 starting rows on mount. Two get filled here; the
+    // third stays empty on the wire (the server's clampDraft drops it,
+    // and the public payload filters by `visibility === 'public'` AND
+    // by projectPitchCard's content check — so /h/[slug] never sees
+    // the empty card). The body asserts on the FILLED public point.
+    expect(pitchPoints.length).toBeGreaterThanOrEqual(2);
+    const firstPublic = pitchPoints.find((p) => p.visibility === 'public');
+    expect(firstPublic).toBeDefined();
+    expect(firstPublic!.title).toBe('A photographer the magazines use.');
+    expect(typeof firstPublic!.support).toBe('string');
 
     expect(body!.agentContact).toBeDefined();
     expect(body!.agentContact!.name).toBe('Marisol Reyes');
@@ -897,5 +908,136 @@ test.describe('Seller Presentation — A7c wizard input round-trip', () => {
     expect(typeof body!.agentContact!.bioShort).toBe('string');
     expect(body!.agentContact!.yearsInArea).toBe('Eleven.');
     expect(typeof body!.agentContact!.ctaReassurance).toBe('string');
+  });
+});
+
+/**
+ * Seller Presentation — A7c.4 Pitch step guidance.
+ *
+ * Two distinct things to lock in:
+ *
+ *   (1) Per-row example placeholders ROTATE so the agent reads them
+ *       as inspiration, not a canned default. Asserted by checking
+ *       the first three rows carry different `placeholder` attributes.
+ *
+ *   (2) The strength signal — dots + one microcopy line — reads off
+ *       filled rows: 0 → neutral, 1–2 → amber, ≥3 → green. The
+ *       message text shifts at each threshold. Reassurance only —
+ *       no publish gating, so this spec stays focused on the meter
+ *       UI without touching wire/persistence behavior (covered by
+ *       the round-trip tests above).
+ *
+ * Both rely on the seed-on-mount behavior: landing on Step 4 with an
+ * empty draft puts 3 rows on screen immediately, no clicks needed.
+ */
+test.describe('Seller Presentation — A7c.4 Pitch step guidance', () => {
+  test('per-row placeholders rotate; strength meter transitions neutral → amber → green', async ({
+    page,
+  }) => {
+    await page.goto('/seller-presentation');
+    await expect(page.getByTestId('step-property')).toBeVisible();
+    await page.waitForURL(/\/seller-presentation\?id=workflow_[a-z0-9]+/);
+
+    // Walk to Step 4. Step 1 needs a saved propertyId before Next
+    // unlocks; the other steps are gate-free for traversal.
+    await page.getByTestId('step-property-address').fill('1234 Test Drive NE');
+    await page.getByTestId('step-property-city').fill('Tacoma, WA');
+    await expect(page.getByTestId('step-property-saved-hint')).toBeVisible();
+    const nextButton = page.getByTestId('wizard-next');
+    await expect(nextButton).toBeEnabled();
+    await nextButton.click(); // → Comps
+    await nextButton.click(); // → Strategy
+    await nextButton.click(); // → Pitch
+
+    await expect(page.getByTestId('step-pitch')).toBeVisible();
+
+    // (1) Three rows are seeded on mount (no clicks needed).
+    await expect(page.getByTestId('step-pitch-card-0')).toBeVisible();
+    await expect(page.getByTestId('step-pitch-card-1')).toBeVisible();
+    await expect(page.getByTestId('step-pitch-card-2')).toBeVisible();
+
+    // (1) Each row's title placeholder is DIFFERENT — varied by index.
+    const placeholder0 = await page
+      .getByTestId('step-pitch-title-0')
+      .getAttribute('placeholder');
+    const placeholder1 = await page
+      .getByTestId('step-pitch-title-1')
+      .getAttribute('placeholder');
+    const placeholder2 = await page
+      .getByTestId('step-pitch-title-2')
+      .getAttribute('placeholder');
+    expect(placeholder0).toBeTruthy();
+    expect(placeholder1).toBeTruthy();
+    expect(placeholder2).toBeTruthy();
+    expect(placeholder0).not.toBe(placeholder1);
+    expect(placeholder1).not.toBe(placeholder2);
+    expect(placeholder0).not.toBe(placeholder2);
+    // The placeholders are prefixed "e.g. " — the example body lives
+    // after that, and the convention from PITCH_EXAMPLES is < ~32
+    // chars so it fits on a phone.
+    for (const p of [placeholder0!, placeholder1!, placeholder2!]) {
+      expect(p.startsWith('e.g. ')).toBe(true);
+      // Generous upper bound — guards against an accidentally
+      // overlong example slipping in.
+      expect(p.length).toBeLessThanOrEqual(48);
+    }
+
+    // (2) Strength meter starts at "neutral" with 0 filled rows.
+    const meter = page.getByTestId('step-pitch-strength');
+    await expect(meter).toHaveAttribute('data-level', 'neutral');
+    await expect(meter).toHaveAttribute('data-filled', '0');
+    await expect(page.getByTestId('step-pitch-strength-message')).toHaveText(
+      'Add 2 to 4 selling points.',
+    );
+
+    // Fill row 0 → 1 filled → amber.
+    await page.getByTestId('step-pitch-title-0').fill('Chef-grade kitchen');
+    await expect(meter).toHaveAttribute('data-level', 'amber');
+    await expect(meter).toHaveAttribute('data-filled', '1');
+    await expect(page.getByTestId('step-pitch-strength-message')).toHaveText(
+      'A couple more makes it stronger.',
+    );
+
+    // Fill row 1 → 2 filled → still amber.
+    await page.getByTestId('step-pitch-title-1').fill('Walk-to-everything');
+    await expect(meter).toHaveAttribute('data-level', 'amber');
+    await expect(meter).toHaveAttribute('data-filled', '2');
+
+    // Fill row 2 → 3 filled → green (sweet-spot wording, no scolding).
+    await page.getByTestId('step-pitch-title-2').fill('Move-in ready');
+    await expect(meter).toHaveAttribute('data-level', 'green');
+    await expect(meter).toHaveAttribute('data-filled', '3');
+    await expect(page.getByTestId('step-pitch-strength-message')).toHaveText(
+      'Looks great. 4 strong points is plenty.',
+    );
+
+    // Add button de-emphasizes at the sweet spot (still present, but
+    // styled as a ghost affordance). The test reads the data-emphasis
+    // attribute the component sets so styling can evolve without
+    // breaking the assertion.
+    await expect(page.getByTestId('step-pitch-add')).toHaveAttribute(
+      'data-emphasis',
+      'ghost',
+    );
+
+    // Add a 4th row → still green; meter widens, message stays.
+    await page.getByTestId('step-pitch-add').click();
+    await page.getByTestId('step-pitch-title-3').fill('Top-rated schools');
+    await expect(meter).toHaveAttribute('data-level', 'green');
+    await expect(meter).toHaveAttribute('data-filled', '4');
+
+    // Counter denominator reflects FILLED rows, not total slots —
+    // none marked public yet, all 4 filled.
+    await expect(page.getByTestId('step-pitch-counter')).toHaveText(
+      '0 of 4 marked public',
+    );
+
+    // Soft cap: adding rows up to the cap hides the add control and
+    // surfaces the "you've added the most" microcopy. Two more clicks
+    // (we already have 4 rows on screen) push to 6.
+    await page.getByTestId('step-pitch-add').click(); // 5
+    await page.getByTestId('step-pitch-add').click(); // 6
+    await expect(page.getByTestId('step-pitch-add')).toHaveCount(0);
+    await expect(page.getByTestId('step-pitch-cap-reached')).toBeVisible();
   });
 });

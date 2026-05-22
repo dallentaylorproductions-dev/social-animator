@@ -97,11 +97,21 @@ export function StepReview({ draft, goToStep }: StepReviewProps) {
     ctaReassurance: brand.agentCtaReassurance,
   };
 
+  // A7c.4: StepPitch seeds INITIAL_VISIBLE_ROWS empty rows on mount
+  // so the agent lands on a finite canvas — those rows persist with
+  // default `visibility: 'private'`, but they have NO content and
+  // shouldn't be counted in the Review summary's public/private
+  // breakdown (and shouldn't appear in any downstream public payload,
+  // which is already guarded by projectPitchCard's content check).
+  const hasContent = (p: (typeof draft.pitchPoints)[number]) => {
+    const title = (p.title ?? p.text ?? "").trim();
+    return title.length > 0;
+  };
   const publicPitchPoints = draft.pitchPoints.filter(
-    (p) => p.visibility === "public",
+    (p) => p.visibility === "public" && hasContent(p),
   );
   const privatePitchPoints = draft.pitchPoints.filter(
-    (p) => p.visibility === "private",
+    (p) => p.visibility === "private" && hasContent(p),
   );
 
   async function handlePublish() {
@@ -252,7 +262,7 @@ export function StepReview({ draft, goToStep }: StepReviewProps) {
         <SummaryRow label="Comps" value={`${draft.comps.length} provided`} />
         <SummaryRow
           label="Pitch points"
-          value={`${draft.pitchPoints.length} total · ${publicPitchPoints.length} 🌐 public · ${privatePitchPoints.length} 🔒 private`}
+          value={`${publicPitchPoints.length + privatePitchPoints.length} total · ${publicPitchPoints.length} 🌐 public · ${privatePitchPoints.length} 🔒 private`}
         />
       </section>
 
