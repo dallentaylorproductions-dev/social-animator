@@ -989,7 +989,12 @@ test.describe('Seller Presentation — A7c wizard input round-trip', () => {
     await expect(page.getByTestId('step-property-city')).toHaveValue('Tremont');
     await expect(page.getByTestId('step-property-state')).toHaveValue('OH');
     await expect(page.getByTestId('step-property-zip')).toHaveValue('44113');
-    await expect(page.getByTestId('step-property-hero-url')).toHaveValue(
+    // A7c.7: the paste-URL fallback unmounts once a value is set
+    // (post-upload URL readout is suppressed). On reload, the value
+    // is rehydrated and the preview takes over — the persisted URL
+    // is asserted on the preview's src instead.
+    await expect(page.getByTestId('step-property-hero-preview')).toHaveAttribute(
+      'src',
       'https://example.com/hero.jpg',
     );
     await expect(page.getByTestId('step-property-prepared-for')).toHaveValue(

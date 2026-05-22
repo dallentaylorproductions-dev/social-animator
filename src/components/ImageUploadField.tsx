@@ -170,14 +170,22 @@ export function ImageUploadField({
         </button>
       )}
 
-      <input
-        type="url"
-        value={value}
-        onChange={(e) => onChange(e.target.value)}
-        placeholder={urlPlaceholder}
-        className={`${inputCls} mt-2`}
-        data-testid={tid("url")}
-      />
+      {/* Paste-URL fallback — only when no image is set. Hidden once a
+          photo is uploaded so the raw hosted URL is never surfaced to
+          the agent (the URL stays in state via `value` and is used
+          internally; only the visible readout is suppressed). Agents
+          with a Zillow / FMLS / Dropbox link still see this affordance
+          before uploading. */}
+      {!value && (
+        <input
+          type="url"
+          value={value}
+          onChange={(e) => onChange(e.target.value)}
+          placeholder={urlPlaceholder}
+          className={`${inputCls} mt-2`}
+          data-testid={tid("url")}
+        />
+      )}
 
       {error && (
         <p

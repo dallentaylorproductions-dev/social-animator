@@ -349,4 +349,70 @@ test.describe('Seller Presentation — A7b premium page render', () => {
     await expect(quote).toBeVisible();
     await expect(page.getByTestId('sep-editorial-photo')).toHaveCount(0);
   });
+
+  test('A7c.7 — all comp rows align identically, regardless of rationale length (drop-cap float is contained)', async ({
+    browser,
+  }) => {
+    // Dallen's A7c.6 mobile smoke caught comp #1 indented relative to
+    // comps #2/#3 in the "Why this price" list. Root cause: the
+    // rationale paragraph uses `.sec-body.drop-cap::first-letter
+    // { float: left }` to render a ~58px-tall drop-cap. When the
+    // rationale text is short (1–2 lines), the float extends BELOW
+    // the paragraph's box. Without a BFC on the paragraph, the float
+    // bleeds into the next sibling (.comps) and shortens the first
+    // row's line boxes — visible as comp #1 indented right while
+    // rows 2/3 (below the float's bottom) sit at the correct left
+    // edge.
+    //
+    // The FULL fixture has a ~430-char rationale that's long enough
+    // to fully contain the float, so the bug doesn't manifest there
+    // by default. We trigger the exact failing shape by shrinking the
+    // rationale to a single short line at runtime, then assert that
+    // EVERY comp row shares the same x-coordinate (within sub-pixel
+    // tolerance). Without the fix, comp #1's x would be larger than
+    // comps #2/#3 by ≈ floatWidth+padding. With the fix
+    // (`display: flow-root` on `.sec-body.drop-cap`), the float is
+    // sealed inside the paragraph so siblings start cleanly below.
+    const context = await browser.newContext({
+      viewport: { width: 390, height: 844 },
+    });
+    const page = await context.newPage();
+    try {
+      await page.goto('/seller-presentation-preview?fixture=full');
+      await expect(page.getByTestId('sep-why-price')).toBeVisible();
+
+      // Force the bug-triggering shape: a 1-line rationale. The
+      // ::first-letter rule recomputes from the new textContent on
+      // the next style pass.
+      await page.evaluate(() => {
+        const p = document.querySelector(
+          '.sep-presentation .sec-body.drop-cap',
+        );
+        if (p) p.textContent = 'A short rationale.';
+      });
+
+      const compBoxes = await Promise.all([
+        page.getByTestId('sep-comp-0').boundingBox(),
+        page.getByTestId('sep-comp-1').boundingBox(),
+        page.getByTestId('sep-comp-2').boundingBox(),
+      ]);
+      for (const b of compBoxes) expect(b).not.toBeNull();
+
+      // All rows align at the same x — drop-cap doesn't bleed.
+      const x0 = compBoxes[0]!.x;
+      expect(Math.abs(compBoxes[1]!.x - x0)).toBeLessThanOrEqual(1);
+      expect(Math.abs(compBoxes[2]!.x - x0)).toBeLessThanOrEqual(1);
+
+      // Defense in depth: the rationale paragraph is the BFC for the
+      // float. Asserting its computed `display: flow-root` locks the
+      // structural fix in place (a future regression to `block` would
+      // re-introduce the indent on short rationales).
+      const display = await page
+        .locator('.sep-presentation .sec-body.drop-cap')
+        .evaluate((el) => window.getComputedStyle(el).display);
+      expect(display).toBe('flow-root');
+    } finally {
+      await context.close();
+    }
+  });
 });

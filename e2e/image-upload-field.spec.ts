@@ -86,10 +86,14 @@ test.describe('ImageUploadField — upload flow (A7c.2)', () => {
     await expect(preview).toBeVisible({ timeout: 10_000 });
     await expect(preview).toHaveAttribute('src', MOCK_URL);
 
-    // The URL-fallback input is synced to the same hosted URL.
-    await expect(page.getByTestId('step-property-hero-url')).toHaveValue(
-      MOCK_URL,
-    );
+    // A7c.7: after a successful upload the raw hosted URL must NOT
+    // be surfaced to the agent. Dallen's phone smoke caught the
+    // post-upload readout confusing agents (it looked like an input
+    // they were supposed to fill out). The paste-URL fallback is
+    // still allowed before upload — only its post-upload readout is
+    // suppressed. The stored URL stays in state and round-trips into
+    // localStorage (asserted below).
+    await expect(page.getByTestId('step-property-hero-url')).toHaveCount(0);
 
     // The route saw a JPEG body and the seller-presentation folder.
     expect(uploadedContentType).toBe('image/jpeg');
@@ -151,6 +155,10 @@ test.describe('ImageUploadField — upload flow (A7c.2)', () => {
     const preview = page.getByTestId('brand-headshot-preview');
     await expect(preview).toBeVisible({ timeout: 10_000 });
     await expect(preview).toHaveAttribute('src', HEADSHOT_URL);
+
+    // A7c.7: the post-upload URL readout is suppressed on the
+    // headshot field too — same shared ImageUploadField, same rule.
+    await expect(page.getByTestId('brand-headshot-url')).toHaveCount(0);
 
     const stored = await page.evaluate(() => {
       const raw = window.localStorage.getItem('socanim_brand_settings');

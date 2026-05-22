@@ -521,6 +521,19 @@
 .sep-presentation .sec-body + .sec-body {
   margin-top: 14px;
 }
+/* The drop-cap floats its ::first-letter left so the paragraph text
+   wraps around it (locked-design behavior). Without containment, a
+   short rationale (1–2 lines) leaves the ~58px-tall float extending
+   BELOW the paragraph's box; the next sibling block (.comps) then
+   has its first row's line boxes shortened by the still-active float
+   — visible as the FIRST comp row indented vs. row 2/3 on /h/[slug].
+   `display: flow-root` makes the paragraph establish its own BFC so
+   the float is sealed inside the rationale, regardless of how short
+   the text is. Every subsequent sibling starts cleanly at the left
+   edge — fixes the comp-row alignment for any number of comps. */
+.sep-presentation .sec-body.drop-cap {
+  display: flow-root;
+}
 .sep-presentation .sec-body.drop-cap::first-letter {
   font-family: var(--sep-display);
   font-size: 64px;
