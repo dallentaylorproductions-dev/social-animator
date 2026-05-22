@@ -419,6 +419,48 @@ test.describe('Seller Presentation — A5b per-step content', () => {
     await expect(button).toContainText(/coming soon/i);
     await expect(page.getByTestId('step-review-download-error')).toHaveCount(0);
   });
+
+  test('A7c.3: Copy URL button confirms with "Copied!" then reverts', async ({
+    page,
+  }) => {
+    // A7c.3 — Dallen's smoke surfaced that the copy-link button gave
+    // no feedback, so agents weren't sure the copy worked. The button
+    // now swaps label to "Copied!" with a check icon for ~2 seconds
+    // and announces it to screen readers (aria-live="polite"). The
+    // clipboard call itself is best-effort; this test asserts the
+    // VISIBLE state machine, since headless clipboard permissions are
+    // fiddly and the user-visible affordance is what matters.
+    const MOCK_SLUG = 'copyconfirm';
+    await page.route('**/api/seller-presentation/publish', async (route) => {
+      await route.fulfill({
+        status: 200,
+        contentType: 'application/json',
+        body: JSON.stringify({ ok: true, slug: MOCK_SLUG }),
+      });
+    });
+
+    await fillToReview(page);
+    await page.getByTestId('step-review-publish').click();
+    await expect(page.getByTestId('step-review-published')).toBeVisible({
+      timeout: 10_000,
+    });
+
+    const copyUrl = page.getByTestId('step-review-copy-url');
+    await expect(copyUrl).toHaveText('Copy URL');
+    await expect(copyUrl).toHaveAttribute('aria-live', 'polite');
+
+    await copyUrl.click();
+    await expect(copyUrl).toContainText('Copied!');
+
+    // Reverts back to the default label after the 2s window.
+    await expect(copyUrl).toHaveText('Copy URL', { timeout: 4000 });
+
+    // Same affordance on the sample-text copy button.
+    const copySample = page.getByTestId('step-review-copy-sample');
+    await expect(copySample).toHaveText('Copy sample text');
+    await copySample.click();
+    await expect(copySample).toContainText('Copied!');
+  });
 });
 
 test.describe('Seller Presentation — A6.1 resume-on-open', () => {

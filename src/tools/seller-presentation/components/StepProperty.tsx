@@ -139,8 +139,8 @@ export function StepProperty({ draft, setDraft }: StepPropertyProps) {
       <header>
         <h2 className="text-lg font-medium">The home</h2>
         <p className="mt-1 text-xs text-gray-500">
-          These fields are your shared listing profile — edits sync across
-          every Studio skill that uses the same property.
+          The home you&apos;re presenting. This sets the address and the
+          headline photo buyers see first.
         </p>
       </header>
 

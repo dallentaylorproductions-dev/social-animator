@@ -74,9 +74,7 @@ export function StepComps({ draft, setDraft }: StepCompsProps) {
       <header>
         <h2 className="text-lg font-medium">Comparable sales</h2>
         <p className="mt-1 text-xs text-gray-500">
-          Add up to {MAX_COMPS} comps. Address + Sold price are required;
-          everything else is optional. Notes stay on your prep doc — they
-          aren&apos;t published to the seller page.
+          Recent nearby sales. These power the price story buyers see.
         </p>
       </header>
 
@@ -87,7 +85,7 @@ export function StepComps({ draft, setDraft }: StepCompsProps) {
 
       {draft.comps.length === 0 && (
         <p className="text-sm italic text-gray-400">
-          No comps yet. Add at least one — the published page needs comps to
+          No comps yet. Add at least one. The published page needs comps to
           justify the recommended price.
         </p>
       )}
@@ -275,7 +273,7 @@ function CompCard({ comp, index, onUpdate, onRemove }: CompCardProps) {
         <span className="text-xs uppercase tracking-wider text-gray-500">
           Notes
           <span className="ml-2 text-[10px] normal-case tracking-normal text-neutral-500">
-            🔒 private — stays on your prep doc, never on the seller page
+            🔒 private. Stays on your prep doc, never on the seller page.
           </span>
         </span>
         <textarea

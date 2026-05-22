@@ -282,7 +282,7 @@ export default function SellerPresentationPage() {
             href="/dashboard"
             className="inline-flex items-center text-sm text-neutral-400 transition-colors hover:text-mint"
           >
-            Done — back to dashboard →
+            Done. Back to dashboard →
           </a>
         </div>
       )}

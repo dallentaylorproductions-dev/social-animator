@@ -1653,11 +1653,15 @@
 
 .sep-presentation .reveal {
   opacity: 0;
-  transition: opacity 720ms var(--r-ease);
-  will-change: opacity;
+  transform: translateY(16px);
+  transition:
+    opacity 600ms ease-out,
+    transform 600ms ease-out;
+  will-change: opacity, transform;
 }
 .sep-presentation .reveal.in {
   opacity: 1;
+  transform: translateY(0);
 }
 
 .sep-presentation .agent-photo .verify {

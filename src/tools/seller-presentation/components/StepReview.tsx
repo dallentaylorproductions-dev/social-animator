@@ -1,6 +1,6 @@
 "use client";
 
-import { useState } from "react";
+import { useEffect, useRef, useState } from "react";
 import { useBrandSettings } from "@/lib/brand";
 import {
   validateForExport,
@@ -132,7 +132,7 @@ export function StepReview({ draft, goToStep }: StepReviewProps) {
         message:
           err instanceof Error
             ? err.message
-            : "Publish failed — the backend may not be deployed yet (A6).",
+            : "Publish failed. The backend may not be deployed yet (A6).",
       });
     }
   }
@@ -179,7 +179,7 @@ export function StepReview({ draft, goToStep }: StepReviewProps) {
         throw err instanceof Error
           ? err
           : new Error(
-              "Prep PDF renderer not deployed yet — A7 wires the react-pdf module.",
+              "Prep PDF renderer not deployed yet. A7 wires the react-pdf module.",
             );
       })) as {
         downloadSellerPresentationPrepPdf: (
@@ -202,8 +202,8 @@ export function StepReview({ draft, goToStep }: StepReviewProps) {
       <header>
         <h2 className="text-lg font-medium">Review</h2>
         <p className="mt-1 text-xs text-gray-500">
-          Check what you have, then publish the seller-facing page and
-          download your private prep doc.
+          Check everything, then publish to get a shareable link for your
+          client.
         </p>
       </header>
 
@@ -294,10 +294,10 @@ export function StepReview({ draft, goToStep }: StepReviewProps) {
             onClick={handleDownloadPrep}
             disabled
             data-testid="step-review-download"
-            aria-label="Prep PDF — coming soon (A7e)"
+            aria-label="Prep PDF (coming soon, A7e)"
             className="self-start rounded border border-neutral-700 px-5 py-2.5 text-sm font-medium text-neutral-500 disabled:cursor-not-allowed"
           >
-            Prep PDF — coming soon
+            Prep PDF (coming soon)
           </button>
           {typeof exportState === "object" && "error" in exportState && (
             <p
@@ -330,7 +330,7 @@ function PublishSection({
     const origin =
       typeof window !== "undefined" ? window.location.origin : "";
     const url = `${origin}/h/${state.slug}`;
-    const sample = `Hey — here's the listing presentation for ${propertyAddress || "the home"}: ${url}`;
+    const sample = `Hey, here's the listing presentation for ${propertyAddress || "the home"}: ${url}`;
     return (
       <div
         className="space-y-3 rounded border border-mint/40 bg-mint/5 p-4"
@@ -341,13 +341,12 @@ function PublishSection({
           <code className="flex-1 break-all rounded border border-neutral-700 bg-neutral-900 px-3 py-2 text-xs text-text-primary">
             {url}
           </code>
-          <button
-            type="button"
-            onClick={() => navigator.clipboard?.writeText(url)}
+          <CopyButton
+            value={url}
+            label="Copy URL"
+            testId="step-review-copy-url"
             className="rounded border border-neutral-700 px-3 py-2 text-xs text-text-primary hover:bg-neutral-800"
-          >
-            Copy URL
-          </button>
+          />
         </div>
         <div>
           <p className="mt-2 text-[11px] uppercase tracking-wider text-gray-500">
@@ -356,13 +355,12 @@ function PublishSection({
           <p className="mt-1 text-xs italic leading-relaxed text-gray-300">
             {sample}
           </p>
-          <button
-            type="button"
-            onClick={() => navigator.clipboard?.writeText(sample)}
+          <CopyButton
+            value={sample}
+            label="Copy sample text"
+            testId="step-review-copy-sample"
             className="mt-2 rounded border border-neutral-700 px-3 py-1.5 text-[11px] text-text-primary hover:bg-neutral-800"
-          >
-            Copy sample text
-          </button>
+          />
         </div>
         <div className="flex gap-3 pt-1">
           <button
@@ -474,5 +472,75 @@ function SummaryRow({ label, value }: { label: string; value: string }) {
       </span>
       <span className="flex-1">{value}</span>
     </div>
+  );
+}
+
+/**
+ * Copy-to-clipboard button with a 2-second "Copied!" confirmation.
+ * Inline label swap + check icon for sighted users; aria-live="polite"
+ * announces the change for screen readers. The clipboard call is
+ * best-effort — if the API is unavailable we still flip the visible
+ * state so the agent gets the same affordance.
+ */
+function CopyButton({
+  value,
+  label,
+  testId,
+  className,
+}: {
+  value: string;
+  label: string;
+  testId?: string;
+  className?: string;
+}) {
+  const [copied, setCopied] = useState(false);
+  const timerRef = useRef<ReturnType<typeof setTimeout> | null>(null);
+
+  useEffect(() => {
+    return () => {
+      if (timerRef.current !== null) clearTimeout(timerRef.current);
+    };
+  }, []);
+
+  const handleClick = () => {
+    try {
+      void navigator.clipboard?.writeText(value);
+    } catch {
+      // best-effort
+    }
+    setCopied(true);
+    if (timerRef.current !== null) clearTimeout(timerRef.current);
+    timerRef.current = setTimeout(() => setCopied(false), 2000);
+  };
+
+  return (
+    <button
+      type="button"
+      onClick={handleClick}
+      aria-live="polite"
+      data-testid={testId}
+      className={className}
+    >
+      {copied ? (
+        <span className="inline-flex items-center gap-1">
+          <svg
+            viewBox="0 0 24 24"
+            width="12"
+            height="12"
+            fill="none"
+            stroke="currentColor"
+            strokeWidth="2.4"
+            strokeLinecap="round"
+            strokeLinejoin="round"
+            aria-hidden="true"
+          >
+            <path d="M5 12l4 4 10-10" />
+          </svg>
+          Copied!
+        </span>
+      ) : (
+        label
+      )}
+    </button>
   );
 }

@@ -49,17 +49,17 @@ const CONFIDENCE_OPTIONS: ReadonlyArray<{
   {
     id: "high",
     label: "High",
-    blurb: "Tight comp set, ≤5% spread, recent — narrow defensible range.",
+    blurb: "Tight comp set, ≤5% spread, recent. Narrow defensible range.",
   },
   {
     id: "medium",
     label: "Medium",
-    blurb: "Mixed comps or sparse recent activity — moderate range.",
+    blurb: "Mixed comps or sparse recent activity. Moderate range.",
   },
   {
     id: "low",
     label: "Low",
-    blurb: "Thin comp set or outliers — wider range to absorb uncertainty.",
+    blurb: "Thin comp set or outliers. Wider range to absorb uncertainty.",
   },
 ];
 
@@ -74,7 +74,8 @@ export function StepStrategy({ draft, setDraft }: StepStrategyProps) {
       <header>
         <h2 className="text-lg font-medium">Pricing &amp; strategy</h2>
         <p className="mt-1 text-xs text-gray-500">
-          Two halves: what the seller sees vs. what stays on your prep doc.
+          Set the price you&apos;ll recommend, and the one-line reason
+          buyers will see.
         </p>
       </header>
 
@@ -84,7 +85,7 @@ export function StepStrategy({ draft, setDraft }: StepStrategyProps) {
         data-testid="step-strategy-public"
       >
         <h3 className="flex items-center gap-2 text-sm font-medium text-mint">
-          <span aria-hidden>🌐</span> Public — appears on the seller&apos;s page
+          <span aria-hidden>🌐</span> Public (appears on the seller&apos;s page)
         </h3>
 
         <label className="block">
@@ -110,12 +111,12 @@ export function StepStrategy({ draft, setDraft }: StepStrategyProps) {
             onChange={(e) =>
               update("priceRationale", e.target.value || undefined)
             }
-            placeholder="Two-three sentences the seller will read explaining the recommended price."
+            placeholder="Three recent sales nearby anchor this number."
             data-testid="step-strategy-rationale"
           />
           <span className="mt-1 block text-[11px] text-neutral-500">
-            This text shows on the published page — keep it agent-voice, not
-            internal reasoning.
+            This text shows on the published page. Keep it agent-voice,
+            not internal reasoning.
           </span>
         </label>
       </section>
@@ -126,7 +127,7 @@ export function StepStrategy({ draft, setDraft }: StepStrategyProps) {
         data-testid="step-strategy-private"
       >
         <h3 className="flex items-center gap-2 text-sm font-medium text-neutral-300">
-          <span aria-hidden>🔒</span> Private — your prep doc only
+          <span aria-hidden>🔒</span> Private (your prep doc only)
         </h3>
 
         <fieldset className="space-y-3">

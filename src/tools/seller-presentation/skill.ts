@@ -33,7 +33,7 @@ export const SELLER_PRESENTATION_SKILL: CallableSkill = {
   id: "seller-presentation",
   name: "Seller Presentation",
   purpose:
-    "Build a listing presentation for a seller appointment — agent prep + premium seller-facing page.",
+    "Build a listing presentation for a seller appointment. Agent prep plus a premium seller-facing page.",
   category: "Seller pitch",
   inputs: {
     required: [

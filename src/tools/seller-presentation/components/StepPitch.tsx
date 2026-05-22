@@ -84,10 +84,8 @@ export function StepPitch({ draft, setDraft }: StepPitchProps) {
       <header>
         <h2 className="text-lg font-medium">Your pitch</h2>
         <p className="mt-1 text-xs text-gray-500">
-          Selling-points (2-4). Each has a short title + a supporting
-          sentence. Toggle each point Public (appears on the seller page)
-          or Private (your prep doc only). Defaults to private — you
-          publish what you decide to publish.
+          2 to 4 things that make this home stand out. These become the
+          selling points on the buyer&apos;s page.
         </p>
       </header>
 
@@ -95,7 +93,7 @@ export function StepPitch({ draft, setDraft }: StepPitchProps) {
 
       {draft.pitchPoints.length === 0 && (
         <p className="text-sm italic text-gray-400">
-          No pitch points yet. Add at least one — even private ones
+          No pitch points yet. Add at least one. Even private ones
           structure your prep.
         </p>
       )}
@@ -189,7 +187,7 @@ function PitchPointCard({
           className={`${inputCls} mt-1`}
           value={titleDisplay}
           onChange={(e) => onTitleChange(e.target.value)}
-          placeholder="A short headline (e.g. 'A photographer the magazines use.')"
+          placeholder="e.g. Chef's kitchen, built for hosting"
           data-testid={`step-pitch-title-${index}`}
         />
       </label>
