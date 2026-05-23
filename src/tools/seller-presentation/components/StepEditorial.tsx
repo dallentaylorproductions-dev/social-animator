@@ -257,7 +257,7 @@ function VideoEditor({ draft, setDraft }: StepEditorialProps) {
         }}
         folder="seller-presentation-video"
         testIdPrefix="step-editorial-video"
-        helpText="Up to 90 seconds, 75 MB. MP4, MOV, or WebM."
+        helpText="Up to 90 seconds, 250 MB. MP4, MOV, or WebM."
       />
       <label className="block">
         <span className="text-[10px] uppercase tracking-[0.15em] text-neutral-500">

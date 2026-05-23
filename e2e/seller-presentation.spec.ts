@@ -1321,48 +1321,140 @@ test.describe('Seller Presentation — A7d editorial extras', () => {
   test('round-trip: surviving editorial blocks fill, persist, resume, and reach publish', async ({
     page,
   }) => {
-    // A7d.3: the video field is now a camera-roll upload (no free-
-    // text URL input). The round-trip test still exercises the
-    // video block — it just drives it through the upload pipeline
-    // with the route + the <video> metadata-load short-circuited:
-    //   - /api/upload-video → mocked, returns a known hosted URL.
-    //   - HTMLVideoElement.src setter → after the real assignment,
-    //     stamps duration + fires loadedmetadata so the field's
-    //     duration-cap check passes without a real MP4 container.
+    // A7d.3 → A7d.3.1: the video field is now a camera-roll upload
+    // that pushes the file BROWSER → Vercel Blob directly (bypassing
+    // the Function's ~4.5 MB request-body cap). The round-trip test
+    // still drives the field end-to-end, with three layers
+    // short-circuited so no real Blob endpoint is touched:
+    //
+    //   1. HTMLVideoElement.src setter → after the real assignment,
+    //      stamps duration + fires loadedmetadata so the field's
+    //      duration-cap check passes without a real MP4 container.
+    //   2. globalThis.fetch override → intercepts both calls the
+    //      `@vercel/blob/client` SDK makes during upload():
+    //         - POST /api/upload-video (token handshake) returns a
+    //           well-shaped `clientToken`.
+    //         - POST to the Blob API URL (file body) returns a
+    //           PutBlobResult with our MOCK_VIDEO_URL.
+    //      Without the fetch override the SDK's real upload would
+    //      fail (no real BLOB_READ_WRITE_TOKEN in test), which would
+    //      abort the field BEFORE onChange fires and the localStorage
+    //      assertion would never be reachable.
     const MOCK_VIDEO_URL = 'https://blob.example.com/video/mock-walkthrough.mp4';
-    await page.addInitScript(() => {
-      // Stub HTMLVideoElement.src so the VideoUploadField's hidden
-      // duration probe resolves with a known duration instead of
-      // actually trying to decode the fake buffer (which would fire
-      // `error` before `loadedmetadata`, rejecting the probe and
-      // aborting the upload). Only stubs DETACHED video elements
-      // (the probe's element has no parent yet) so any in-document
-      // <video> on the seller page is unaffected.
-      const stubStore = new WeakMap<HTMLVideoElement, string>();
-      Object.defineProperty(HTMLVideoElement.prototype, 'src', {
-        configurable: true,
-        get(this: HTMLVideoElement) {
-          return stubStore.get(this) ?? '';
-        },
-        set(this: HTMLVideoElement, value: string) {
-          stubStore.set(this, value);
-          Object.defineProperty(this, 'duration', {
-            configurable: true,
-            value: 14,
-          });
-          queueMicrotask(() =>
-            this.dispatchEvent(new Event('loadedmetadata')),
-          );
-        },
-      });
-    });
-    await page.route('**/api/upload-video', async (route) => {
-      await route.fulfill({
-        status: 200,
-        contentType: 'application/json',
-        body: JSON.stringify({ ok: true, url: MOCK_VIDEO_URL }),
-      });
-    });
+    await page.addInitScript(
+      ({ MOCK_VIDEO_URL }) => {
+        // Duration probe stub — only mutates DETACHED <video>
+        // elements (the field's probe element has no parent yet) so
+        // an in-document <video> on the seller page is unaffected.
+        const stubStore = new WeakMap<HTMLVideoElement, string>();
+        Object.defineProperty(HTMLVideoElement.prototype, 'src', {
+          configurable: true,
+          get(this: HTMLVideoElement) {
+            return stubStore.get(this) ?? '';
+          },
+          set(this: HTMLVideoElement, value: string) {
+            stubStore.set(this, value);
+            Object.defineProperty(this, 'duration', {
+              configurable: true,
+              value: 14,
+            });
+            queueMicrotask(() =>
+              this.dispatchEvent(new Event('loadedmetadata')),
+            );
+          },
+        });
+
+        // SDK call interceptor — sits in front of every fetch the
+        // page makes, but only returns canned responses for the two
+        // call shapes the @vercel/blob/client upload() flow uses.
+        // Everything else (auth, persistence, etc.) falls through to
+        // the real fetch.
+        const origFetch = globalThis.fetch.bind(globalThis);
+        globalThis.fetch = async (
+          input: RequestInfo | URL,
+          init?: RequestInit,
+        ): Promise<Response> => {
+          const url =
+            typeof input === 'string'
+              ? input
+              : input instanceof URL
+                ? input.href
+                : input.url;
+          // Token handshake + upload-completed both POST to the
+          // route. Branch on the body's discriminator.
+          if (
+            url.includes('/api/upload-video') &&
+            (init?.method || '').toUpperCase() === 'POST'
+          ) {
+            const bodyStr =
+              typeof init?.body === 'string' ? init.body : '';
+            try {
+              const parsed = JSON.parse(bodyStr) as { type?: string };
+              if (parsed.type === 'blob.generate-client-token') {
+                return new Response(
+                  JSON.stringify({
+                    type: 'blob.generate-client-token',
+                    // Token format expected by the SDK is split on
+                    // "_" with index 3 being the storeId. The SDK
+                    // never validates the signature client-side — it
+                    // just decomposes the string to find the storeId
+                    // and forwards the rest as a Bearer header.
+                    clientToken:
+                      'vercel_blob_client_storeFakeE2E_fakeSignature',
+                  }),
+                  {
+                    status: 200,
+                    headers: { 'content-type': 'application/json' },
+                  },
+                );
+              }
+              if (parsed.type === 'blob.upload-completed') {
+                return new Response(
+                  JSON.stringify({
+                    type: 'blob.upload-completed',
+                    response: 'ok',
+                  }),
+                  {
+                    status: 200,
+                    headers: { 'content-type': 'application/json' },
+                  },
+                );
+              }
+            } catch {
+              /* falls through to real fetch */
+            }
+          }
+
+          // Actual file upload — the SDK posts to the Blob API URL
+          // (defaultVercelBlobApiUrl = "https://vercel.com/api/blob"
+          // unless NEXT_PUBLIC_VERCEL_BLOB_API_URL overrides it).
+          // Return a PutBlobResult shape that resolves upload() with
+          // our mock URL.
+          if (
+            url.startsWith('https://vercel.com/api/blob') ||
+            url.includes('blob.vercel-storage.com')
+          ) {
+            return new Response(
+              JSON.stringify({
+                url: MOCK_VIDEO_URL,
+                downloadUrl: MOCK_VIDEO_URL,
+                pathname: 'seller-presentation-video/mock.mp4',
+                contentType: 'video/mp4',
+                contentDisposition:
+                  'attachment; filename="mock.mp4"',
+              }),
+              {
+                status: 200,
+                headers: { 'content-type': 'application/json' },
+              },
+            );
+          }
+
+          return origFetch(input, init);
+        };
+      },
+      { MOCK_VIDEO_URL },
+    );
 
     await page.goto('/seller-presentation');
     await expect(page.getByTestId('step-property')).toBeVisible();

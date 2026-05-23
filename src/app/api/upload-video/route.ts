@@ -3,56 +3,91 @@ import { auth } from "@/lib/auth";
 import { getMediaStorage } from "@/lib/media-storage";
 
 /**
- * POST /api/upload-video (v1.47 / A7d.3).
+ * POST /api/upload-video (v1.47 / A7d.3.1 — client-direct).
  *
- * Camera-roll → hosted video URL for the Seller Presentation
- * walk-through. Auth-gated, MIME-allowlisted, hard size-capped.
- * Writes through the media-storage adapter
- * (`src/lib/media-storage/`) so the Vercel-Blob → Cloudflare-R2 /
- * Stream swap is a single drop-in replacement — no caller changes.
+ * Walk-through video upload handshake. The browser uses
+ * `@vercel/blob/client`'s `upload()` to push the file STRAIGHT to
+ * Vercel Blob; this route's only job is to mint the short-lived
+ * client token that authorizes that upload, bound to a folder + MIME
+ * allowlist + size cap.
  *
- * Hard caps (mirror VideoUploadField's client-side caps; the route
- * is the backstop):
- *   - MIME: video/mp4, video/quicktime (.mov), video/webm
- *   - Body: 75 MiB (margin-safe per the v1.47 ratio: SEP pages are
- *     1:1, so per-file size × views is the cost; 75 MiB at 1-view
- *     average dominates and is the budget Dallen greenlit)
+ * --- Why client-direct (vs. POSTing the file through here) ---
  *
- * Body (multipart/form-data):
- *   file       — the video File (camera-roll capture)
- *   folder?    — optional subfolder, [a-z0-9_-]+ (default "uploads")
+ * Vercel Functions cap incoming request bodies at ~4.5 MB. The
+ * previous server-receive shape (A7d.3) sent the video as a multipart
+ * body to this route, which 413'd every real phone clip (a 7-second
+ * iPhone video already exceeds 4.5 MB; a 60-second one is 80–200 MB).
+ * Client-direct uploads skip the Function entirely for the file
+ * bytes, so the only ceiling is the token's own `maximumSizeInBytes`
+ * (the new 250 MB cap below).
  *
- * Response shape mirrors /api/upload-image so the wizard treats
- * both routes interchangeably client-side.
+ * --- Auth ---
+ *
+ * Mirrors /api/upload-image: a logged-in agent only. An unauthed
+ * request gets 401 BEFORE a token is minted — no token leaks to
+ * anonymous callers.
+ *
+ * --- Storage-adapter seam ---
+ *
+ * The actual handshake is delegated to `media-storage/index.ts` so a
+ * future Cloudflare implementation (Stream direct-upload URL / R2
+ * presigned PUT) drops in behind the same route without touching the
+ * field or the wizard. See `media-storage/types.ts` for shape.
  *
  * --- Test-mode hooks (E2E only, never in production) ---
+ *
  * Under NODE_ENV !== "production" && E2E_TESTING === "1" the route
- * honors three narrow opt-in headers so route-level Playwright
- * specs can exercise post-auth paths without a real session:
- *   - x-e2e-bypass: 1           — synthesizes a fake authed email so
+ * honors three narrow opt-in headers so route-level Playwright specs
+ * can exercise post-auth paths without a real session:
+ *   - x-e2e-bypass: 1         — synthesizes a fake authed email so
  *     the auth gate passes. WITHOUT this header the route still
  *     performs the real auth() check, so the 401 contract stays
  *     testable from the same E2E run.
- *   - x-e2e-force-no-token: 1   — pretend BLOB_READ_WRITE_TOKEN is
+ *   - x-e2e-force-no-token: 1 — pretend BLOB_READ_WRITE_TOKEN is
  *     missing so the 503 branch is testable on a dev box that has
  *     a real token.
- *   - x-e2e-simulate: 1         — short-circuit a successful upload
- *     and return a fake hosted URL without touching the adapter, so
- *     the success branch is testable without writing to real Blob.
+ *   - x-e2e-simulate: 1       — short-circuit a successful token
+ *     issuance and return a fake `clientToken` without touching the
+ *     adapter, so the success branch is testable without a real
+ *     BLOB_READ_WRITE_TOKEN. The browser SDK contract path is what
+ *     gets exercised here — actual byte uploads to Blob are out of
+ *     scope for unit/route tests and covered by the real-deploy
+ *     smoke (see Session Handoff).
  * The NODE_ENV gate makes the headers inert in any production build
  * even if E2E_TESTING ever leaked into a prod env.
  */
 export const runtime = "nodejs";
 
-const ALLOWED_TYPES = new Set([
+/**
+ * Server-enforced cap on the issued token's `maximumSizeInBytes`.
+ * The client pre-checks against the same value before invoking
+ * upload(); this constant is the abuse backstop. Real phone videos
+ * (60–90 s, 1080p) typically land 80–200 MB unmodified — 250 MB
+ * gives comfortable headroom without inviting multi-GB abuse.
+ *
+ * If this needs adjusting later, update the matching constant in
+ * src/components/VideoUploadField.tsx so the client + server caps
+ * stay aligned.
+ */
+export const MAX_VIDEO_BYTES = 250 * 1024 * 1024;
+
+const ALLOWED_TYPES = [
   "video/mp4",
   "video/quicktime",
   "video/webm",
+] as const;
+
+/**
+ * Folders the issued token is permitted to write into. Matches the
+ * `folder` prop StepEditorial passes to the field. Adding a new
+ * upload surface (e.g. a buyer-side video) means adding its folder
+ * name here; without an entry, the adapter will reject the
+ * handshake with a 4xx.
+ */
+const ALLOWED_FOLDERS = new Set<string>([
+  "uploads",
+  "seller-presentation-video",
 ]);
-
-export const MAX_VIDEO_BYTES = 75 * 1024 * 1024;
-
-const FOLDER_RE = /^[a-z0-9_-]+$/;
 
 function isE2EBypassActive(): boolean {
   return (
@@ -69,6 +104,8 @@ export async function POST(req: Request) {
   const e2eSimulate = e2e && req.headers.get("x-e2e-simulate") === "1";
 
   // --- Auth ---
+  // Performed BEFORE body parsing so an unauthed request fails fast
+  // and doesn't leak any signal about what the handshake expects.
   let email: string | null | undefined;
   if (e2eAuthBypass) {
     email = "e2e@test";
@@ -84,60 +121,43 @@ export async function POST(req: Request) {
   }
 
   // --- Body ---
-  // Parse + validate the request BEFORE checking storage config, so a
-  // malformed request gets a precise 4xx instead of a generic 503
-  // that hides what was actually wrong. The 503 still wins when the
-  // request is well-formed but the env can't fulfill it.
-  let form: FormData;
+  // The browser SDK posts JSON (a `blob.generate-client-token` event
+  // before upload, or a `blob.upload-completed` event after). Bad
+  // JSON is a 400; the adapter validates the actual shape.
+  let body: unknown;
   try {
-    form = await req.formData();
+    body = await req.json();
   } catch {
     return NextResponse.json(
-      { ok: false, error: "Expected multipart/form-data" },
+      { ok: false, error: "Expected JSON body" },
       { status: 400, headers: { "Cache-Control": "no-store" } },
     );
   }
 
-  const file = form.get("file");
-  if (!(file instanceof File)) {
-    return NextResponse.json(
-      { ok: false, error: "No file in request" },
-      { status: 400, headers: { "Cache-Control": "no-store" } },
-    );
-  }
-
-  if (!ALLOWED_TYPES.has(file.type)) {
-    return NextResponse.json(
-      { ok: false, error: `Unsupported video type: ${file.type || "unknown"}` },
-      { status: 415, headers: { "Cache-Control": "no-store" } },
-    );
-  }
-
-  if (file.size > MAX_VIDEO_BYTES) {
-    return NextResponse.json(
-      {
-        ok: false,
-        error: `Video too large (${file.size} bytes). Maximum ${MAX_VIDEO_BYTES} bytes.`,
-      },
-      { status: 413, headers: { "Cache-Control": "no-store" } },
-    );
-  }
-
-  const folderRaw = form.get("folder");
-  const folder =
-    typeof folderRaw === "string" && FOLDER_RE.test(folderRaw)
-      ? folderRaw
-      : "uploads";
-
-  // --- Test-only simulated upload (E2E hosted-URL success path) ---
+  // --- Test-only simulated handshake ---
   // Runs BEFORE the storage-configured check because simulate mode
   // never touches the adapter — it has to be reachable on dev boxes
-  // that don't have BLOB_READ_WRITE_TOKEN set.
+  // that don't have BLOB_READ_WRITE_TOKEN set. Mirrors the SDK
+  // response shape so the field treats the response identically.
   if (e2eSimulate) {
-    const ext = extensionForType(file.type);
-    const url = `https://blob.example.com/${folder}/e2e-${Date.now()}.${ext}`;
+    const eventType =
+      typeof body === "object" &&
+      body !== null &&
+      "type" in body &&
+      typeof (body as { type: unknown }).type === "string"
+        ? (body as { type: string }).type
+        : "blob.generate-client-token";
+    if (eventType === "blob.upload-completed") {
+      return NextResponse.json(
+        { type: "blob.upload-completed", response: "ok" },
+        { headers: { "Cache-Control": "no-store" } },
+      );
+    }
     return NextResponse.json(
-      { ok: true, url },
+      {
+        type: "blob.generate-client-token",
+        clientToken: "e2e-simulated-token",
+      },
       { headers: { "Cache-Control": "no-store" } },
     );
   }
@@ -155,38 +175,24 @@ export async function POST(req: Request) {
     );
   }
 
-  // --- Real upload ---
+  // --- Delegate handshake to the adapter ---
   try {
-    const ext = extensionForType(file.type);
-    const { url } = await storage.upload({
-      file,
-      folder,
+    const result = await storage.handleClientUploadRequest({
+      request: req,
+      body,
       kind: "video",
-      contentType: file.type,
-      extension: ext,
+      allowedFolders: ALLOWED_FOLDERS,
+      allowedContentTypes: ALLOWED_TYPES,
+      maximumSizeInBytes: MAX_VIDEO_BYTES,
     });
-    return NextResponse.json(
-      { ok: true, url },
-      { headers: { "Cache-Control": "no-store" } },
-    );
+    return NextResponse.json(result, {
+      headers: { "Cache-Control": "no-store" },
+    });
   } catch (err) {
-    const message = err instanceof Error ? err.message : "Upload failed";
+    const message = err instanceof Error ? err.message : "Handshake failed";
     return NextResponse.json(
       { ok: false, error: message },
-      { status: 502, headers: { "Cache-Control": "no-store" } },
+      { status: 400, headers: { "Cache-Control": "no-store" } },
     );
-  }
-}
-
-function extensionForType(type: string): string {
-  switch (type) {
-    case "video/mp4":
-      return "mp4";
-    case "video/quicktime":
-      return "mov";
-    case "video/webm":
-      return "webm";
-    default:
-      return "bin";
   }
 }

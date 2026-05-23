@@ -1,28 +1,32 @@
 import { test, expect } from '@playwright/test';
 
 /**
- * Seller Presentation — walk-through video upload (v1.47 / A7d.3).
+ * Seller Presentation — walk-through video upload
+ * (v1.47 / A7d.3 → A7d.3.1).
  *
- * Pins the camera-roll → /api/upload-video → inline-playback chain
- * for the walk-through video added in Lane A / A7d.3.
+ * A7d.3.1 fix: the video upload no longer POSTs the file through the
+ * Function (which 413'd at Vercel's ~4.5 MB request-body limit on
+ * every real phone clip). Instead the browser uses
+ * `@vercel/blob/client`'s `upload()` to push the file STRAIGHT to
+ * Vercel Blob; this route is the small token handshake endpoint.
  *
  * Three concentric layers covered:
  *
- *   1. ROUTE — direct POSTs to /api/upload-video assert the
- *      contract: auth gate, MIME allowlist, server-side size cap,
- *      503 when storage is unconfigured, hosted-URL response shape.
- *      Uses the route's E2E opt-in headers (gated by NODE_ENV !==
- *      "production" && E2E_TESTING === "1") so the post-auth paths
- *      are reachable without a real session. The 401 path
- *      deliberately omits the bypass header so the production
- *      contract stays asserted.
+ *   1. ROUTE — direct POSTs to /api/upload-video assert the new
+ *      handshake contract: auth gate (401 without bypass), 503 when
+ *      storage is unconfigured, 200 + `clientToken` shape when authed.
+ *      The route no longer sees the file bytes, so old MIME/size
+ *      route-level checks moved into the issued token's constraints
+ *      (allowedContentTypes + maximumSizeInBytes) — those are
+ *      defense-in-depth at Vercel Blob, not enforced at this route.
+ *      The real-deploy smoke catches the platform-level path
+ *      (handoff explicitly calls this out).
  *
- *   2. WIZARD UI — the editorial step shows the new
- *      VideoUploadField with no paste-URL surface; the thumbnail
- *      field is camera-roll-only (its paste-URL input is REMOVED,
- *      not just hidden); the "recorded on" input is a native date
- *      picker; the "video thumbnail" rename has landed everywhere
- *      user-facing.
+ *   2. WIZARD UI — the editorial step shows the VideoUploadField with
+ *      no paste-URL surface; the thumbnail field is camera-roll-only
+ *      (its paste-URL input is REMOVED, not just hidden); the
+ *      "recorded on" input is a native date picker; the "video
+ *      thumbnail" rename has landed everywhere user-facing.
  *
  *   3. SELLER PAGE — the renderer emits an inline <video controls
  *      playsInline preload="metadata" poster> instead of a
@@ -32,53 +36,28 @@ import { test, expect } from '@playwright/test';
 
 const ROUTE = '/api/upload-video';
 
-function fakeFile(bytes: number, mimeType: string): Buffer {
-  // Content doesn't have to be a valid container — the route's MIME +
-  // size checks fire before any decoding would. The byte count is
-  // what matters for the size-cap assertion.
-  return Buffer.alloc(bytes, 0);
+function tokenRequestBody(
+  pathname = 'seller-presentation-video/test.mp4',
+): string {
+  // The shape `@vercel/blob/client`'s `upload()` POSTs to the
+  // handleUploadUrl when it wants a client token. Mirrors the
+  // GenerateClientTokenEvent shape from the SDK's protocol.
+  return JSON.stringify({
+    type: 'blob.generate-client-token',
+    payload: {
+      pathname,
+      multipart: true,
+      clientPayload: null,
+    },
+  });
 }
 
-function multipart(
-  bytes: Buffer,
-  mimeType: string,
-  filename: string,
-  folder?: string,
-): { body: Buffer; contentType: string } {
-  const boundary = '----vidtest' + Math.random().toString(36).slice(2);
-  const lines: Buffer[] = [];
-  const push = (s: string) => lines.push(Buffer.from(s, 'utf8'));
-  push(`--${boundary}\r\n`);
-  push(
-    `Content-Disposition: form-data; name="file"; filename="${filename}"\r\n`,
-  );
-  push(`Content-Type: ${mimeType}\r\n\r\n`);
-  lines.push(bytes);
-  push(`\r\n`);
-  if (folder) {
-    push(`--${boundary}\r\n`);
-    push(`Content-Disposition: form-data; name="folder"\r\n\r\n`);
-    push(folder);
-    push(`\r\n`);
-  }
-  push(`--${boundary}--\r\n`);
-  return {
-    body: Buffer.concat(lines),
-    contentType: `multipart/form-data; boundary=${boundary}`,
-  };
-}
-
-test.describe('Seller Presentation — A7d.3 walk-through video', () => {
-  test.describe('Route: /api/upload-video', () => {
+test.describe('Seller Presentation — A7d.3.1 walk-through video', () => {
+  test.describe('Route: /api/upload-video (client-direct handshake)', () => {
     test('401 without auth (no E2E bypass header)', async ({ request }) => {
-      const { body, contentType } = multipart(
-        fakeFile(1024, 'video/mp4'),
-        'video/mp4',
-        'tiny.mp4',
-      );
       const res = await request.post(ROUTE, {
-        headers: { 'content-type': contentType },
-        data: body,
+        headers: { 'content-type': 'application/json' },
+        data: tokenRequestBody(),
       });
       // The route's real auth() returns no session in the dev server,
       // so the contract path (no bypass header → 401) executes.
@@ -87,57 +66,16 @@ test.describe('Seller Presentation — A7d.3 walk-through video', () => {
       expect(json.ok).toBe(false);
     });
 
-    test('415 on disallowed MIME type', async ({ request }) => {
-      const { body, contentType } = multipart(
-        fakeFile(1024, 'application/octet-stream'),
-        'application/octet-stream',
-        'not-a-video.bin',
-      );
-      const res = await request.post(ROUTE, {
-        headers: {
-          'content-type': contentType,
-          'x-e2e-bypass': '1',
-        },
-        data: body,
-      });
-      expect(res.status()).toBe(415);
-    });
-
-    test('413 when body exceeds the server-side size cap', async ({
-      request,
-    }) => {
-      // 76 MiB — one MiB over the 75 MiB cap declared on the route.
-      const oversized = fakeFile(76 * 1024 * 1024, 'video/mp4');
-      const { body, contentType } = multipart(
-        oversized,
-        'video/mp4',
-        'big.mp4',
-      );
-      const res = await request.post(ROUTE, {
-        headers: {
-          'content-type': contentType,
-          'x-e2e-bypass': '1',
-        },
-        data: body,
-      });
-      expect(res.status()).toBe(413);
-    });
-
     test('503 when the storage adapter is not configured', async ({
       request,
     }) => {
-      const { body, contentType } = multipart(
-        fakeFile(1024, 'video/mp4'),
-        'video/mp4',
-        'tiny.mp4',
-      );
       const res = await request.post(ROUTE, {
         headers: {
-          'content-type': contentType,
+          'content-type': 'application/json',
           'x-e2e-bypass': '1',
           'x-e2e-force-no-token': '1',
         },
-        data: body,
+        data: tokenRequestBody(),
       });
       expect(res.status()).toBe(503);
       const json = (await res.json()) as { ok: boolean; error: string };
@@ -145,30 +83,58 @@ test.describe('Seller Presentation — A7d.3 walk-through video', () => {
       expect(json.error).toMatch(/BLOB_READ_WRITE_TOKEN/);
     });
 
-    test('200 returns a hosted URL (not a data: URL)', async ({ request }) => {
-      const { body, contentType } = multipart(
-        fakeFile(2048, 'video/mp4'),
-        'video/mp4',
-        'tiny.mp4',
-        'seller-presentation-video',
-      );
+    test('200 returns a generate-client-token response when authed (simulate)', async ({
+      request,
+    }) => {
       const res = await request.post(ROUTE, {
         headers: {
-          'content-type': contentType,
+          'content-type': 'application/json',
           'x-e2e-bypass': '1',
           'x-e2e-simulate': '1',
         },
-        data: body,
+        data: tokenRequestBody(),
       });
       expect(res.status()).toBe(200);
-      const json = (await res.json()) as { ok: boolean; url: string };
-      expect(json.ok).toBe(true);
-      // The persisted value MUST be a real hosted URL. A regression
-      // back to a data-URL pattern (the kind the old pre-A7c.2 photo
-      // pipeline produced) would bloat KV + every consumer page; this
-      // assertion makes that fail loud.
-      expect(json.url).toMatch(/^https?:\/\//);
-      expect(json.url.startsWith('data:')).toBe(false);
+      const json = (await res.json()) as {
+        type: string;
+        clientToken: string;
+      };
+      // The handshake's success shape MUST match the SDK protocol —
+      // the browser's upload() checks for this exact discriminator.
+      expect(json.type).toBe('blob.generate-client-token');
+      expect(typeof json.clientToken).toBe('string');
+      expect(json.clientToken.length).toBeGreaterThan(0);
+    });
+
+    test('200 acknowledges upload-completed events when authed (simulate)', async ({
+      request,
+    }) => {
+      // The SDK posts a second event AFTER the browser-direct upload
+      // finishes; the route must ack it with the right shape so the
+      // SDK's promise resolves cleanly.
+      const res = await request.post(ROUTE, {
+        headers: {
+          'content-type': 'application/json',
+          'x-e2e-bypass': '1',
+          'x-e2e-simulate': '1',
+        },
+        data: JSON.stringify({
+          type: 'blob.upload-completed',
+          payload: {
+            blob: {
+              url: 'https://blob.example.com/seller-presentation-video/x.mp4',
+              pathname: 'seller-presentation-video/x.mp4',
+              contentType: 'video/mp4',
+              contentDisposition: 'attachment',
+            },
+            tokenPayload: null,
+          },
+        }),
+      });
+      expect(res.status()).toBe(200);
+      const json = (await res.json()) as { type: string; response: string };
+      expect(json.type).toBe('blob.upload-completed');
+      expect(json.response).toBe('ok');
     });
   });
 
@@ -205,7 +171,7 @@ test.describe('Seller Presentation — A7d.3 walk-through video', () => {
       // Open the walk-through video card.
       await page.getByTestId('step-editorial-video-add').click();
 
-      // The new VideoUploadField is present; the old free-text
+      // The VideoUploadField is present; the old free-text
       // "Video link" URL input is GONE.
       await expect(page.getByTestId('step-editorial-video-upload')).toBeVisible();
       await expect(page.getByTestId('step-editorial-video-url')).toHaveCount(0);
