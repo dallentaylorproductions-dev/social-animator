@@ -492,22 +492,30 @@ function AreaStatsEditor({ draft, setDraft }: StepEditorialProps) {
   // ---- Monthly chart editor ----
   // Local UI state for the chart input (latest month + how many months to
   // show + a price map keyed by friendly label). Initialized SSR-safely
-  // from the persisted draft + seeded with the current month + a 6-month
-  // default so the editor never renders empty on first open.
+  // and hydrated from either the persisted draft or the device clock on
+  // mount.
   //
-  // SSR-safe pattern (Substrate §9): start with a stable initial value
-  // (DEFAULT_MONTHLY_COUNT around the current month, no persisted prices)
-  // so server + first client render match, then hydrate from the draft in
-  // a useEffect.
+  // SSR-safe pattern (Substrate §9): the initial render uses an EMPTY
+  // anchor so the server and the first client paint match exactly. The
+  // device-clock default is applied in a useEffect — `new Date()` inside
+  // useState would diverge between server-time and client-time and
+  // trigger React #418 the moment they fall on either side of a month
+  // boundary. A7d.6 fix: anchor MUST come from the device clock so the
+  // "Latest month" self-updates as the calendar turns over.
   const persistedSeries: AreaStatsMonthly[] = stats.monthlySeries ?? [];
   const [editor, setEditor] = useState<AreaMonthlyEditorState>(() => ({
-    latestMonth: currentMonthYYYYMM(),
+    latestMonth: "",
     count: DEFAULT_MONTHLY_COUNT,
     prices: {},
   }));
   useEffect(() => {
     if (persistedSeries.length > 0) {
       setEditor(deriveMonthlyEditorState(persistedSeries));
+    } else {
+      // No persisted series → seed with the actual current month from
+      // the device clock. Trailing labels back-fill from this anchor
+      // (the A7d.4 auto-label logic is untouched).
+      setEditor((prev) => ({ ...prev, latestMonth: currentMonthYYYYMM() }));
     }
     // Run only on mount; subsequent draft edits originate FROM this editor,
     // so re-deriving on every persisted-series change would echo back and

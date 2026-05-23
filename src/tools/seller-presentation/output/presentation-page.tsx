@@ -363,21 +363,23 @@ function ReviewsSection({ payload }: { payload: PublicPayload }) {
   // commonly configure only the Zillow link and skip typed quotes).
   if (reviews.length === 0 && !outlink) return null;
 
+  // A7d.6 — detect the friendly source name from the outlink URL so the
+  // CTA wording adapts ("…on Google", "…on Realtor.com") instead of
+  // hardcoding Zillow. Source = null → clean generic fallback with no
+  // raw domain in the copy. Render-time only — the payload contract
+  // (label + url) is unchanged.
+  const sourceName = outlink ? detectReviewsSource(outlink.url) : null;
+  const agentFirst = (payload.agent?.name ?? "").trim().split(/\s+/)[0];
+  const cardCopy = reviewsCardCopy(agentFirst, sourceName);
+  const seeAllCopy = seeAllReviewsCopy(sourceName);
+
   if (reviews.length === 0 && outlink) {
-    // Standalone outlink CTA: a calm, on-brand trust card. No
-    // "From families like yours" lead-in — that copy reads broken
-    // without quotes beneath it. The agent's first name (best-effort
-    // parse off `agent.name`) personalizes the CTA without exposing
-    // the full attributed name unnecessarily.
-    const agentFirst = (payload.agent?.name ?? "").trim().split(/\s+/)[0];
-    const ctaCopy = agentFirst
-      ? `Read ${agentFirst}'s reviews on Zillow`
-      : "Read past-client reviews on Zillow";
     return (
       <section
         className="reviews reviews--outlink-only"
         data-testid="sep-reviews"
         data-variant="outlink-only"
+        data-reviews-source={sourceName ?? "generic"}
       >
         <div className="sec-label reveal">
           <span className="num">04</span>
@@ -391,15 +393,19 @@ function ReviewsSection({ payload }: { payload: PublicPayload }) {
           rel="noopener noreferrer"
           data-testid="sep-reviews-outlink-cta"
         >
-          <span className="reviews-outlink-card-copy">{ctaCopy}</span>
-          <span className="reviews-outlink-card-meta">{outlink.label}</span>
+          <span className="reviews-outlink-card-copy">{cardCopy}</span>
+          <span className="reviews-outlink-card-meta">{seeAllCopy}</span>
         </a>
       </section>
     );
   }
 
   return (
-    <section className="reviews" data-testid="sep-reviews">
+    <section
+      className="reviews"
+      data-testid="sep-reviews"
+      data-reviews-source={sourceName ?? "generic"}
+    >
       <div className="sec-label reveal">
         <span className="num">04</span>
         <span className="lbl" />
@@ -442,11 +448,83 @@ function ReviewsSection({ payload }: { payload: PublicPayload }) {
           target="_blank"
           rel="noopener noreferrer"
         >
-          {outlink.label}
+          {seeAllCopy}
         </a>
       )}
     </section>
   );
+}
+
+/**
+ * A7d.6 — small, extensible map from outlink hostname to the friendly
+ * source name the CTA copy uses. Hostnames are lowercased and stripped
+ * of a leading `www.` before lookup. An unknown host returns null so
+ * the renderer falls back to source-free copy (it must never expose a
+ * raw domain in the visible CTA).
+ *
+ * Add a new source by appending one entry — the regex form supports
+ * the common multi-TLD cases (google.* / fb.com aliases / maps.google.*)
+ * without bloating the table.
+ */
+const REVIEWS_SOURCE_PATTERNS: { match: RegExp; label: string }[] = [
+  { match: /(^|\.)zillow\.com$/, label: "Zillow" },
+  { match: /(^|\.)google\.[a-z.]+$/, label: "Google" },
+  { match: /(^|\.)maps\.google\.[a-z.]+$/, label: "Google" },
+  { match: /^g\.page$/, label: "Google" },
+  { match: /^goo\.gl$/, label: "Google" },
+  { match: /(^|\.)realtor\.com$/, label: "Realtor.com" },
+  { match: /(^|\.)yelp\.com$/, label: "Yelp" },
+  { match: /(^|\.)facebook\.com$/, label: "Facebook" },
+  { match: /(^|\.)fb\.com$/, label: "Facebook" },
+  { match: /(^|\.)redfin\.com$/, label: "Redfin" },
+  { match: /(^|\.)homes\.com$/, label: "Homes.com" },
+];
+
+export function detectReviewsSource(url: string | undefined): string | null {
+  if (!url || typeof url !== "string") return null;
+  let host: string;
+  try {
+    host = new URL(url).hostname.toLowerCase();
+  } catch {
+    // Bare-host strings (no protocol) — best-effort parse.
+    const trimmed = url.trim().toLowerCase();
+    const m = /^(?:https?:\/\/)?([^/?#]+)/.exec(trimmed);
+    host = m ? m[1] : "";
+  }
+  if (!host) return null;
+  if (host.startsWith("www.")) host = host.slice(4);
+  for (const { match, label } of REVIEWS_SOURCE_PATTERNS) {
+    if (match.test(host)) return label;
+  }
+  return null;
+}
+
+/**
+ * A7d.6 — outlink-only CTA copy. Names the detected source when known,
+ * personalizes with the agent's first name when present, and degrades
+ * to a calm nameless / source-free fallback otherwise. NEVER renders a
+ * literal `{{token}}` — the agent name comes from `payload.agent.name`
+ * and is substituted directly (no template engine).
+ */
+export function reviewsCardCopy(
+  agentFirst: string | undefined,
+  sourceName: string | null,
+): string {
+  const name = agentFirst?.trim();
+  if (name && sourceName) return `Read ${name}'s reviews on ${sourceName}`;
+  if (name && !sourceName) return `Read ${name}'s reviews`;
+  if (!name && sourceName) return `Read these reviews on ${sourceName}`;
+  return "Read past-client reviews";
+}
+
+/**
+ * A7d.6 — "see all" link copy used for both the full-block underlined
+ * link and the outlink-only card's meta line. The trailing arrow is
+ * supplied by CSS (.reviews-outlink::after / .reviews-outlink-card-meta
+ * ::after), so the string itself stays arrow-free.
+ */
+export function seeAllReviewsCopy(sourceName: string | null): string {
+  return sourceName ? `See all reviews on ${sourceName}` : "See all reviews";
 }
 
 // =====================================================================
@@ -644,6 +722,21 @@ function AreaChart({
   // Clamp the recommended-line y to a visible band (don't render off-canvas).
   const recLineY = Math.max(20, Math.min(recommendedY, Y_BOTTOM - 4));
 
+  // A7d.6 — adaptive placement for the recommended-line annotation. The
+  // "RECOMMENDED" caption + the price tag sat at fixed left/right ends
+  // of the dashed line. Real data shapes routinely pushed the polyline,
+  // the current-value glow, or the upper-right callout block on top of
+  // the price tag (Dallen smoke 2026-05-23). placeRecAnnotation derives
+  // collision-safe positions for both labels for any data shape.
+  const recPlacement = placeRecAnnotation(
+    points,
+    recLineY,
+    current,
+    X0,
+    X1,
+    Y_BOTTOM,
+  );
+
   return (
     <div className="chart-wrap reveal">
       <div className="chart-head">
@@ -676,14 +769,19 @@ function AreaChart({
               y1={recLineY}
               y2={recLineY}
             />
-            <text className="rec-tag-text" x={X0} y={recLineY - 9}>
+            <text
+              className="rec-tag-text"
+              x={recPlacement.labelX}
+              y={recPlacement.labelY}
+              textAnchor={recPlacement.labelAnchor}
+            >
               Recommended
             </text>
             <text
               className="rec-tag-num"
-              x={X1}
-              y={recLineY - 7}
-              textAnchor="end"
+              x={recPlacement.numX}
+              y={recPlacement.numY}
+              textAnchor={recPlacement.numAnchor}
             >
               {formatCompact(recommendedNumeric ?? max)}
             </text>
@@ -772,6 +870,235 @@ function AreaChart({
       </svg>
     </div>
   );
+}
+
+/**
+ * A7d.6 — placement output for the recommended-line annotation. The
+ * "RECOMMENDED" caption and the price tag share a horizontal line but
+ * each gets its own (x, y, anchor) so the price (visually dominant)
+ * can flip sides independently of the caption.
+ */
+export interface RecAnnotationPlacement {
+  labelX: number;
+  labelY: number;
+  labelAnchor: "start" | "end";
+  numX: number;
+  numY: number;
+  numAnchor: "start" | "end";
+  /** Which side of the dashed line the labels landed on. */
+  side: "above" | "below";
+  /** Which horizontal edge the price tag landed on. */
+  numEdge: "left" | "right";
+}
+
+/**
+ * Linear-interpolate the polyline y at a given x. Returns `fallback`
+ * for an empty point list. Used to detect collisions between the
+ * data polyline and the recommended-line annotation labels.
+ */
+export function polylineYAtX(
+  pts: { x: number; y: number }[],
+  x: number,
+  fallback: number,
+): number {
+  if (pts.length === 0) return fallback;
+  if (x <= pts[0].x) return pts[0].y;
+  if (x >= pts[pts.length - 1].x) return pts[pts.length - 1].y;
+  for (let i = 1; i < pts.length; i++) {
+    if (x <= pts[i].x) {
+      const x0 = pts[i - 1].x;
+      const x1 = pts[i].x;
+      const y0 = pts[i - 1].y;
+      const y1 = pts[i].y;
+      const t = (x - x0) / (x1 - x0);
+      return y0 + (y1 - y0) * t;
+    }
+  }
+  return pts[pts.length - 1].y;
+}
+
+/**
+ * Return the [xStart, xEnd] horizontal band a label occupies given its
+ * anchor x and visual width. SVG textAnchor "end" extends the bbox to
+ * the LEFT of the anchor; "start" extends to the right.
+ */
+function bandFor(
+  anchorX: number,
+  anchor: "start" | "end",
+  width: number,
+): [number, number] {
+  return anchor === "end"
+    ? [anchorX - width, anchorX]
+    : [anchorX, anchorX + width];
+}
+
+/**
+ * Sample the polyline across [xStart, xEnd] and return [yMin, yMax].
+ * Step size 2 svg-units catches diagonal crossings through a label
+ * band that a single-point probe at the anchor x would miss.
+ */
+function polylineYRange(
+  points: { x: number; y: number }[],
+  [xStart, xEnd]: [number, number],
+  fallback: number,
+): [number, number] {
+  const STEP = 2;
+  let yMin = Number.POSITIVE_INFINITY;
+  let yMax = Number.NEGATIVE_INFINITY;
+  for (let x = xStart; x <= xEnd; x += STEP) {
+    const y = polylineYAtX(points, x, fallback);
+    if (y < yMin) yMin = y;
+    if (y > yMax) yMax = y;
+  }
+  if (!Number.isFinite(yMin) || !Number.isFinite(yMax)) {
+    return [fallback, fallback];
+  }
+  return [yMin, yMax];
+}
+
+/** Closed-interval overlap test for two [min, max] y-ranges. */
+function yRangesOverlap(
+  a: [number, number],
+  b: [number, number],
+): boolean {
+  return !(a[1] < b[0] || b[1] < a[0]);
+}
+
+/**
+ * A7d.6 — derive collision-safe positions for the recommended-line
+ * label + price tag. The original render pinned them at fixed left/
+ * right ends of the dashed line; real data shapes (rising into the
+ * upper-right callout, recommended ≈ current, recommended below all
+ * points) routinely buried them under the polyline, the current-value
+ * marker glow, or the callout block. This function picks the side
+ * (above/below the dashed line) and the edge (left/right) where both
+ * labels clear the polyline, the current-value callout, and the y-axis
+ * gutter — for ANY data shape — without redesigning the chart.
+ *
+ * Geometry overview (SVG y grows downward):
+ *   - viewBox 400 × 234, plot band y ∈ [104, 184]
+ *   - x-axis ticks at y ≈ 204
+ *   - upper-right current-value callout occupies roughly the rect
+ *     [X1 − 120, X1] × [25, 95] (callout-sub at y=52, callout-text at
+ *     y=86 with the cap-height extending above)
+ *   - y-axis labels live at x ≈ 4, so any label anchored at X0 stays
+ *     in the clear (X0 = 40 is well past them)
+ */
+export function placeRecAnnotation(
+  points: { x: number; y: number }[],
+  recLineY: number,
+  current: { x: number; y: number },
+  X0: number,
+  X1: number,
+  Y_BOTTOM: number,
+): RecAnnotationPlacement {
+  const MIN_GAP = 10;
+  // Vertical offsets from the dashed line (baseline of the SVG <text>).
+  // The above-side keeps the locked-design "label sits on its line"
+  // look (rec-tag-text was at recLineY−9, rec-tag-num at recLineY−7).
+  // The below-side bumps the baseline far enough that the rec-tag-num
+  // glyphs (cap-height ~16) clear the dashed line and the polyline.
+  const ABOVE_LABEL_OFFSET = 9;
+  const ABOVE_NUM_OFFSET = 7;
+  const BELOW_LABEL_OFFSET = 20;
+  const BELOW_NUM_OFFSET = 22;
+
+  // Approximate label heights for collision boxes. rec-tag-text is
+  // 8px small caps; rec-tag-num is 16px display type — so the num band
+  // is the taller of the two and dominates the collision check.
+  const NUM_LABEL_HEIGHT = 18;
+  const VIEWBOX_TOP_PAD = 14;
+  // x-tick labels live at y≈204 (cap-height extends to y≈198). Below-
+  // side placement must keep its rect bottom above that line.
+  const VIEWBOX_BOTTOM_PAD = 196;
+
+  // Upper-right current-value callout — fixed in the locked design at
+  // x=X1 (anchor end), y ∈ [25, 95]. The rec-tag-num at X1 collides
+  // when recLineY sits inside (or just above) that band.
+  const CALLOUT_ZONE_X_LEFT = X1 - 120;
+  const CALLOUT_ZONE_Y_BOTTOM = 100;
+
+  // 1. Pick the EDGE for the price tag. Default right; move to left if
+  //    the rec line cuts through the upper-right callout zone OR the
+  //    current-value marker glow at the right end. The small caps
+  //    "RECOMMENDED" caption goes to the opposite edge.
+  const recCrossesCalloutZone = recLineY <= CALLOUT_ZONE_Y_BOTTOM + MIN_GAP;
+  const recCrowdsCurrentMarker =
+    Math.abs(recLineY - current.y) < 18 && current.x >= CALLOUT_ZONE_X_LEFT;
+  const swap = recCrossesCalloutZone || recCrowdsCurrentMarker;
+
+  const numX = swap ? X0 : X1;
+  const numAnchor: "start" | "end" = swap ? "start" : "end";
+  const labelX = swap ? X1 : X0;
+  const labelAnchor: "start" | "end" = swap ? "end" : "start";
+  const numEdge: "left" | "right" = swap ? "left" : "right";
+
+  // 2. Pick the SIDE (above vs below the dashed line). Sample the
+  //    polyline's y range across each label's FULL x-band — a single-
+  //    point probe at the anchor x misses a diagonal crossing through
+  //    the label (e.g. a flat series with a single spike between two
+  //    sample points still slips a band collision past a point probe).
+  //    Label-rect widths come from the rendered font: rec-tag-num is
+  //    16px display type, so ~70 svg-units covers the widest realistic
+  //    "$685k" / "$1.2m"; rec-tag-text is small caps at ~62 svg-units.
+  const NUM_LABEL_WIDTH = 70;
+  const LABEL_LABEL_WIDTH = 62;
+  const numBandX = bandFor(numX, numAnchor, NUM_LABEL_WIDTH);
+  const labelBandX = bandFor(labelX, labelAnchor, LABEL_LABEL_WIDTH);
+  const polyOverNum = polylineYRange(points, numBandX, Y_BOTTOM);
+  const polyOverLabel = polylineYRange(points, labelBandX, Y_BOTTOM);
+
+  // Bands match the actual label-rect geometry plus a small symmetric
+  // buffer so the polyline can't kiss the label edges either side.
+  const aboveBandTop = recLineY - ABOVE_NUM_OFFSET - NUM_LABEL_HEIGHT;
+  const aboveBandBottom = recLineY - MIN_GAP / 2;
+  const belowBandTop = recLineY + MIN_GAP / 2;
+  const belowBandBottom = recLineY + BELOW_NUM_OFFSET + 2;
+
+  const collidesAbove =
+    yRangesOverlap(polyOverNum, [aboveBandTop, aboveBandBottom]) ||
+    yRangesOverlap(polyOverLabel, [aboveBandTop, aboveBandBottom]);
+  const collidesBelow =
+    yRangesOverlap(polyOverNum, [belowBandTop, belowBandBottom]) ||
+    yRangesOverlap(polyOverLabel, [belowBandTop, belowBandBottom]);
+
+  const noRoomAbove = aboveBandTop < VIEWBOX_TOP_PAD;
+  const noRoomBelow = belowBandBottom > VIEWBOX_BOTTOM_PAD;
+
+  let side: "above" | "below";
+  if (noRoomAbove) side = "below";
+  else if (noRoomBelow) side = "above";
+  else if (collidesAbove && !collidesBelow) side = "below";
+  else if (collidesBelow && !collidesAbove) side = "above";
+  else {
+    // Both sides clear (or both collide) — pick the side opposite the
+    // polyline's centroid. Polyline mostly below the rec line → above
+    // is safer; mostly above → below is safer.
+    const polyCentroid =
+      (polyOverNum[0] + polyOverNum[1] + polyOverLabel[0] + polyOverLabel[1]) /
+      4;
+    side = polyCentroid >= recLineY ? "above" : "below";
+  }
+
+  const labelY =
+    side === "above"
+      ? recLineY - ABOVE_LABEL_OFFSET
+      : recLineY + BELOW_LABEL_OFFSET;
+  const numY =
+    side === "above"
+      ? recLineY - ABOVE_NUM_OFFSET
+      : recLineY + BELOW_NUM_OFFSET;
+
+  return {
+    labelX,
+    labelY,
+    labelAnchor,
+    numX,
+    numY,
+    numAnchor,
+    side,
+    numEdge,
+  };
 }
 
 /** Parse a price string like "$642,000" or "642000" into a number. */
