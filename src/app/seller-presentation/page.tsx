@@ -165,6 +165,23 @@ export default function SellerPresentationPage() {
     saveInstance(instance);
   }, [instance]);
 
+  // A7c.9 — reset window scroll to the top on every step transition so
+  // the new step opens with its first field in view. Without this, a
+  // long previous step (Comps, in particular) carries its scroll
+  // position over and the next step opens scrolled to the bottom — on
+  // mobile this hid the Strategy step's recommended-price + rationale
+  // fields above the fold, so an agent moving quickly never saw them.
+  // Runs after React commits the new step's DOM. Instant jump
+  // (behavior:'auto') is reduced-motion-safe and avoids smooth-scroll
+  // jitter on iOS WebKit. The wizard renders directly under <body> with
+  // no inner scroll container, so resetting the window is sufficient
+  // here — if a future layout wraps it in a scroll region, reset that
+  // container's scrollTop as well.
+  useEffect(() => {
+    if (typeof window === "undefined") return;
+    window.scrollTo({ top: 0, left: 0, behavior: "auto" });
+  }, [currentStep]);
+
   const setDraft = (next: SellerPresentationDraft) => {
     setInstance((prev) => (prev ? { ...prev, draft: next } : prev));
   };
