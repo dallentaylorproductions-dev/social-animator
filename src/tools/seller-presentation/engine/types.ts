@@ -1,5 +1,5 @@
 /**
- * Seller Presentation — engine types (v1.47 / A5a-A7d.1)
+ * Seller Presentation — engine types (v1.47 / A5a-A7d.2)
  *
  * Per-skill draft for the converged WorkflowInstance shape. The
  * storage layer (src/skills/workflow-instance-storage.ts) treats
@@ -11,6 +11,14 @@
  * carry those keys — `clampDraft` builds a fresh object from the
  * allowed field set, so any unknown/removed keys are silently dropped
  * on read. Old drafts continue to load + publish.
+ *
+ * A7d.2 relocation: `reviews` + `reviewsOutlink` moved off the draft
+ * onto brand Settings (agent-constant). They stay defined on the
+ * shared `Review` / `ReviewsOutlink` types because the public payload
+ * + renderer still consume them; the projector just reads them from
+ * the publish route's `brandReviews` arg instead of the draft. Legacy
+ * drafts that still carry `reviews` / `reviewsOutlink` keys load
+ * cleanly — `clampDraft` drops them on read.
  *
  * `Comp` is re-imported from the SIR engine — the substrate-shape
  * Comp (carrying `source` + `fieldConfidence` for Lane C's photo-to-
@@ -147,10 +155,6 @@ export interface SellerPresentationDraft {
   preparedFor?: string;
   /** Hero-area video card; slot only in v1.47. */
   video?: PresentationVideo;
-  /** Manual/curated reviews. */
-  reviews?: Review[];
-  /** Link-out to an external reviews aggregator. */
-  reviewsOutlink?: ReviewsOutlink;
   /** Agent-entered area snapshot; no auto-sourcing in v1.47. */
   areaStats?: AreaStats;
 
@@ -236,29 +240,6 @@ function clampPresentationVideo(raw: unknown): PresentationVideo | undefined {
   return hasAny ? video : undefined;
 }
 
-function clampReview(raw: unknown): Review | null {
-  if (!raw || typeof raw !== "object") return null;
-  const r = raw as Record<string, unknown>;
-  if (typeof r.body !== "string" || typeof r.attributionName !== "string") {
-    return null;
-  }
-  return {
-    body: r.body,
-    attributionName: r.attributionName,
-    attributionYear:
-      typeof r.attributionYear === "string" ? r.attributionYear : undefined,
-    attributionStreet:
-      typeof r.attributionStreet === "string" ? r.attributionStreet : undefined,
-  };
-}
-
-function clampReviewsOutlink(raw: unknown): ReviewsOutlink | undefined {
-  if (!raw || typeof raw !== "object") return undefined;
-  const r = raw as Record<string, unknown>;
-  if (typeof r.label !== "string" || typeof r.url !== "string") return undefined;
-  return { label: r.label, url: r.url };
-}
-
 function clampAreaStatsMonthly(raw: unknown): AreaStatsMonthly | null {
   if (!raw || typeof raw !== "object") return null;
   const r = raw as Record<string, unknown>;
@@ -324,10 +305,6 @@ export function clampDraft(
     asks: clampStringArray(raw.asks, 10),
     preparedFor: clampString(raw.preparedFor),
     video: clampPresentationVideo(raw.video),
-    reviews: Array.isArray(raw.reviews)
-      ? raw.reviews.map(clampReview).filter((r): r is Review => r !== null)
-      : undefined,
-    reviewsOutlink: clampReviewsOutlink(raw.reviewsOutlink),
     areaStats: clampAreaStats(raw.areaStats),
     agentAreasServed: clampString(raw.agentAreasServed),
     agentPhotoUrl: clampString(raw.agentPhotoUrl),

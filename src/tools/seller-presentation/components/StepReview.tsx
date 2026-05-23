@@ -103,6 +103,15 @@ export function StepReview({ draft, goToStep }: StepReviewProps) {
     ctaReassurance: brand.agentCtaReassurance,
   };
 
+  // A7d.2 — curated reviews + the "see all on Zillow" outlink also live
+  // in Settings (agent-constant). Forwarded as a separate payload field
+  // so the projector emits them at the top level (`payload.reviews` +
+  // `payload.reviewsOutlink`), not inside `payload.agent`.
+  const brandReviews = {
+    reviews: brand.agentReviews,
+    reviewsOutlinkUrl: brand.reviewsOutlinkUrl,
+  };
+
   // A7c.4: StepPitch seeds INITIAL_VISIBLE_ROWS empty rows on mount
   // so the agent lands on a finite canvas — those rows persist with
   // default `visibility: 'private'`, but they have NO content and
@@ -127,7 +136,7 @@ export function StepReview({ draft, goToStep }: StepReviewProps) {
       const res = await fetch("/api/seller-presentation/publish", {
         method: "POST",
         headers: { "Content-Type": "application/json" },
-        body: JSON.stringify({ draft, agentContact }),
+        body: JSON.stringify({ draft, agentContact, brandReviews }),
       });
       const body = (await res.json().catch(() => ({}))) as {
         ok?: boolean;

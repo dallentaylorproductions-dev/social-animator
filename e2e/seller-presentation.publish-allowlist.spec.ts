@@ -1,13 +1,14 @@
 import { test, expect } from '@playwright/test';
 
 /**
- * Seller Presentation — public-payload allowlist proof (v1.47 / A6 + A7a + A7d.1).
+ * Seller Presentation — public-payload allowlist proof (v1.47 / A6 + A7a + A7d.1 + A7d.2).
  *
  * The privacy boundary made code. The publish route calls
- * `toPublicPayload(draft, agentContact)` and passes ONLY the result
- * to `publishHandout`. This spec constructs a maximally-populated
- * draft with SENTINEL strings in every private slot and asserts none
- * of them survive serialization.
+ * `toPublicPayload(draft, agentContact, brandReviews)` and passes
+ * ONLY the result to `publishHandout`. This spec constructs a
+ * maximally-populated draft + brand-reviews record with SENTINEL
+ * strings in every private slot and asserts none of them survive
+ * serialization.
  *
  * A7d.1 subtraction: `editorialPhotoUrl`, `agentNote`, `trackRecord`,
  * and `buyerQuote` were removed from the draft + serializer. This
@@ -16,12 +17,20 @@ import { test, expect } from '@playwright/test';
  * guarantee is exactly the same shape as the existing private-field
  * proofs.
  *
+ * A7d.2 relocation: `reviews` + `reviewsOutlink` now come from the
+ * publish route's `brandReviews` arg (sourced from BrandSettings).
+ * Legacy drafts may still carry `reviews` / `reviewsOutlink` keys —
+ * the projector ignores them. This spec verifies both directions:
+ * Settings-sourced reviews ROUND-TRIP, draft-borne reviews DROP, and
+ * tampered settings records don't leak non-allowlisted keys.
+ *
  * Pure-Node test — no browser, no HTTP. Privacy doesn't ride on routing.
  */
 
 import {
   toPublicPayload,
   type AgentBranding,
+  type BrandReviewsInput,
 } from '../src/tools/seller-presentation/output/public-payload';
 import type { SellerPresentationDraft } from '../src/tools/seller-presentation/engine/types';
 
@@ -52,8 +61,21 @@ const S = {
   videoTitle: 'PUBLIC_SENTINEL_VIDEO_TITLE',
   videoRuntime: '2:14',
   videoRecordedOn: '2026-05-12',
-  reviewBody: 'PUBLIC_SENTINEL_REVIEW_BODY',
+  // A7d.2 — Settings-sourced reviews + outlink (the values that
+  // SHOULD round-trip). Pass via the publish route's brandReviews arg.
+  brandReviewBody: 'PUBLIC_SENTINEL_BRAND_REVIEW_BODY',
+  brandReviewName: 'PUBLIC_SENTINEL_BRAND_REVIEW_NAME',
   reviewsOutlinkUrl: 'https://example.com/PUBLIC_SENTINEL_OUTLINK',
+  // A7d.2 — draft-borne reviews / outlink (must NOT survive — the
+  // projector reads from brandReviews only). Old persisted drafts
+  // could still smuggle these through; the spec proves they drop.
+  draftReviewBody: 'REMOVED_SENTINEL_DRAFT_REVIEW_BODY',
+  draftReviewOutlinkLabel: 'REMOVED_SENTINEL_DRAFT_OUTLINK_LABEL',
+  draftReviewOutlinkUrl: 'https://example.com/REMOVED_SENTINEL_DRAFT_OUTLINK',
+  // A7d.2 — non-allowlisted brand-settings keys. A tampered Settings
+  // record could ride extra fields into the publish body; the
+  // projector's field-by-field reads must drop them.
+  brandSettingsRogueKey: 'PRIVATE_SENTINEL_BRAND_SETTINGS_ROGUE',
   areaStatsMedianSale: 'PUBLIC_SENTINEL_MEDIAN_SALE',
   areaStatsMonth: 'PUBLIC_SENTINEL_MONTH',
   pitchCardTitle: 'PUBLIC_SENTINEL_CARD_TITLE',
@@ -148,17 +170,20 @@ function maxedDraft(): SellerPresentationDraft {
       runtime: S.videoRuntime,
       recordedOn: S.videoRecordedOn,
     },
+    // A7d.2 — these draft-level reviews/outlink are LEGACY (old drafts
+    // pre-relocation). The projector must IGNORE them entirely; the
+    // assertions below prove neither value survives serialization.
     reviews: [
       {
-        body: S.reviewBody,
+        body: S.draftReviewBody,
         attributionName: 'A. Customer',
         attributionYear: '2025',
         attributionStreet: 'NE 17th',
       },
     ],
     reviewsOutlink: {
-      label: 'See all reviews on Zillow →',
-      url: S.reviewsOutlinkUrl,
+      label: S.draftReviewOutlinkLabel,
+      url: S.draftReviewOutlinkUrl,
     },
     areaStats: {
       medianSale: S.areaStatsMedianSale,
@@ -244,10 +269,32 @@ const FIXTURE_AGENT_CONTACT: AgentBranding = {
   licenseNumber: 'WA-12345',
 };
 
+// A7d.2 — Settings-sourced brand reviews payload. Carries the values
+// that SHOULD round-trip into payload.reviews + payload.reviewsOutlink.
+// Casts include a rogue key so the spec can prove field-by-field
+// projection drops anything not on the allowlist.
+const FIXTURE_BRAND_REVIEWS: BrandReviewsInput & Record<string, unknown> = {
+  reviews: [
+    {
+      body: S.brandReviewBody,
+      attributionName: S.brandReviewName,
+      attributionYear: '2025',
+      attributionStreet: 'NE 17th',
+    },
+  ],
+  reviewsOutlinkUrl: S.reviewsOutlinkUrl,
+  // Rogue settings key — would leak if the projector spread the input.
+  rogueSettingsKey: S.brandSettingsRogueKey,
+};
+
 test.describe('toPublicPayload — privacy allowlist (R-1 proof)', () => {
   test('public fields survive verbatim (A6 flat + A7a grouped)', () => {
     const draft = maxedDraft();
-    const payload = toPublicPayload(draft, FIXTURE_AGENT_CONTACT);
+    const payload = toPublicPayload(
+      draft,
+      FIXTURE_AGENT_CONTACT,
+      FIXTURE_BRAND_REVIEWS,
+    );
 
     // ---- A6 flat fields (unchanged) ----
     expect(payload.propertyAddress).toBe('1234 Test Drive NE');
@@ -291,9 +338,17 @@ test.describe('toPublicPayload — privacy allowlist (R-1 proof)', () => {
       { title: S.pitchCardTitle, support: S.pitchCardSupport },
     ]);
 
+    // A7d.2 — reviews + outlink come from brandReviews (Settings),
+    // not from the draft. The brand-sourced sentinel survives; the
+    // draft-borne sentinel is proven absent in the dedicated test
+    // below.
     expect(payload.reviews).toHaveLength(1);
-    expect(payload.reviews?.[0].body).toBe(S.reviewBody);
+    expect(payload.reviews?.[0].body).toBe(S.brandReviewBody);
+    expect(payload.reviews?.[0].attributionName).toBe(S.brandReviewName);
     expect(payload.reviewsOutlink?.url).toBe(S.reviewsOutlinkUrl);
+    // Label is fixed (not editable in Settings) — projector emits the
+    // canonical "See all reviews on Zillow" string.
+    expect(payload.reviewsOutlink?.label).toBe('See all reviews on Zillow');
 
     expect(payload.areaStats?.medianSale).toBe(S.areaStatsMedianSale);
     expect(payload.areaStats?.monthlySeries).toHaveLength(2);
@@ -307,7 +362,11 @@ test.describe('toPublicPayload — privacy allowlist (R-1 proof)', () => {
     // prove the serializer drops them even when present. Both the
     // value sentinels AND the key names must be absent from the JSON.
     const draft = maxedDraft();
-    const payload = toPublicPayload(draft, FIXTURE_AGENT_CONTACT) as unknown as Record<string, unknown>;
+    const payload = toPublicPayload(
+      draft,
+      FIXTURE_AGENT_CONTACT,
+      FIXTURE_BRAND_REVIEWS,
+    ) as unknown as Record<string, unknown>;
     const serialized = JSON.stringify(payload);
 
     for (const removedSentinel of [
@@ -331,9 +390,97 @@ test.describe('toPublicPayload — privacy allowlist (R-1 proof)', () => {
     }
   });
 
-  test('NO private TOP-LEVEL field appears in the JSON-stringified payload', () => {
+  test('A7d.2 — reviews + outlink come from brandReviews (Settings), draft-borne values drop', () => {
+    // Legacy drafts may still ride `reviews` / `reviewsOutlink` keys
+    // even though the wizard's editorial step no longer captures them.
+    // The projector must IGNORE the draft copies entirely and emit ONLY
+    // the brand-reviews values.
+    const draft = maxedDraft();
+    const payload = toPublicPayload(
+      draft,
+      FIXTURE_AGENT_CONTACT,
+      FIXTURE_BRAND_REVIEWS,
+    );
+    const serialized = JSON.stringify(payload);
+
+    // Settings-sourced (the brand values) — should round-trip.
+    expect(serialized).toContain(S.brandReviewBody);
+    expect(serialized).toContain(S.reviewsOutlinkUrl);
+
+    // Draft-borne (legacy) — must drop.
+    expect(serialized).not.toContain(S.draftReviewBody);
+    expect(serialized).not.toContain(S.draftReviewOutlinkLabel);
+    expect(serialized).not.toContain(S.draftReviewOutlinkUrl);
+
+    // Tampered settings record carries an extra key (`rogueSettingsKey`).
+    // The projector's field-by-field reads must never let it through.
+    expect(serialized).not.toContain(S.brandSettingsRogueKey);
+    expect(serialized).not.toContain('"rogueSettingsKey":');
+
+    // Positive: payload.reviews holds the brand-sourced row only.
+    expect(payload.reviews).toHaveLength(1);
+    expect(payload.reviews?.[0].body).toBe(S.brandReviewBody);
+    expect(payload.reviewsOutlink?.url).toBe(S.reviewsOutlinkUrl);
+  });
+
+  test('A7d.2 — no brandReviews arg → reviews/outlink absent from payload', () => {
+    // When the agent hasn't filled in any reviews in Settings yet, the
+    // publish route still calls toPublicPayload (with brandReviews
+    // omitted or empty). The reviews block must hide cleanly.
     const draft = maxedDraft();
     const payload = toPublicPayload(draft, FIXTURE_AGENT_CONTACT);
+    const serialized = JSON.stringify(payload);
+
+    expect(payload.reviews).toBeUndefined();
+    expect(payload.reviewsOutlink).toBeUndefined();
+    expect(serialized).not.toContain('"reviews":');
+    expect(serialized).not.toContain('"reviewsOutlink":');
+
+    // Legacy draft-level reviews must STILL be dropped even with no
+    // brandReviews override (no fallback to draft).
+    expect(serialized).not.toContain(S.draftReviewBody);
+  });
+
+  test('A7d.2 — empty brandReviews list emits no reviews block', () => {
+    const draft = maxedDraft();
+    const payload = toPublicPayload(draft, FIXTURE_AGENT_CONTACT, {
+      reviews: [],
+      reviewsOutlinkUrl: '',
+    });
+
+    // No reviews + empty outlink URL → both blocks absent (the
+    // renderer hides them based on undefined).
+    expect(payload.reviews).toBeUndefined();
+    expect(payload.reviewsOutlink).toBeUndefined();
+  });
+
+  test('A7d.2 — incomplete review row (missing body or attribution) drops on projection', () => {
+    const draft = maxedDraft();
+    const payload = toPublicPayload(draft, FIXTURE_AGENT_CONTACT, {
+      reviews: [
+        // Missing attributionName — drop.
+        { body: 'Body only' } as unknown as { body: string; attributionName: string },
+        // Missing body — drop.
+        { attributionName: 'Name only' } as unknown as { body: string; attributionName: string },
+        // Whitespace-only body — drop.
+        { body: '   ', attributionName: 'A. Customer' },
+        // The one valid row.
+        { body: 'Real review.', attributionName: 'A. Customer' },
+      ],
+      reviewsOutlinkUrl: 'https://example.com/profile',
+    });
+
+    expect(payload.reviews).toHaveLength(1);
+    expect(payload.reviews?.[0].body).toBe('Real review.');
+  });
+
+  test('NO private TOP-LEVEL field appears in the JSON-stringified payload', () => {
+    const draft = maxedDraft();
+    const payload = toPublicPayload(
+      draft,
+      FIXTURE_AGENT_CONTACT,
+      FIXTURE_BRAND_REVIEWS,
+    );
     const serialized = JSON.stringify(payload);
 
     // Sentinel value strings — these are the unambiguous leak signals.
@@ -378,7 +525,11 @@ test.describe('toPublicPayload — privacy allowlist (R-1 proof)', () => {
 
   test('NO private PER-COMP field appears in any comp', () => {
     const draft = maxedDraft();
-    const payload = toPublicPayload(draft, FIXTURE_AGENT_CONTACT);
+    const payload = toPublicPayload(
+      draft,
+      FIXTURE_AGENT_CONTACT,
+      FIXTURE_BRAND_REVIEWS,
+    );
 
     // Sentinel comp-notes content (both comps in the fixture) — full
     // payload string match is fine here because compNotes / compSource
@@ -413,7 +564,11 @@ test.describe('toPublicPayload — privacy allowlist (R-1 proof)', () => {
 
   test('A7a — every emitted comp has keys subset of {address, soldPrice, soldDate, sqft}', () => {
     const draft = maxedDraft();
-    const payload = toPublicPayload(draft, FIXTURE_AGENT_CONTACT);
+    const payload = toPublicPayload(
+      draft,
+      FIXTURE_AGENT_CONTACT,
+      FIXTURE_BRAND_REVIEWS,
+    );
     // JSON round-trip so Object.keys reflects ONLY the keys that
     // actually serialize (undefined values are dropped).
     const json = JSON.parse(JSON.stringify(payload)) as {
@@ -458,7 +613,11 @@ test.describe('toPublicPayload — privacy allowlist (R-1 proof)', () => {
       negotiationNotes: S.negotiationNotes,
       teamOnlyStat: S.teamOnlyStat,
     } as AgentBranding & Record<string, unknown>;
-    const payload = toPublicPayload(draft, rougeAgentContact);
+    const payload = toPublicPayload(
+      draft,
+      rougeAgentContact,
+      FIXTURE_BRAND_REVIEWS,
+    );
     const json = JSON.parse(JSON.stringify(payload)) as {
       agent: Record<string, unknown>;
       agentBranding: Record<string, unknown>;
@@ -488,7 +647,11 @@ test.describe('toPublicPayload — privacy allowlist (R-1 proof)', () => {
     // TEXT must not leak via any other field — e.g., a future bug
     // where someone joined all pitch-point texts into a summary line.
     const draft = maxedDraft();
-    const payload = toPublicPayload(draft, FIXTURE_AGENT_CONTACT);
+    const payload = toPublicPayload(
+      draft,
+      FIXTURE_AGENT_CONTACT,
+      FIXTURE_BRAND_REVIEWS,
+    );
     const serialized = JSON.stringify(payload);
 
     expect(serialized).not.toContain(S.privatePitchPoint);

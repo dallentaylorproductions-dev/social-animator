@@ -1,7 +1,7 @@
 import type { PublicPayload } from "../public-payload";
 
 /**
- * Hand-populated sample payloads for the consumer page (v1.47 / A7b).
+ * Hand-populated sample payloads for the consumer page (v1.47 / A7b + A7d.2).
  *
  * Two variants:
  *   - FULL_PAYLOAD     — every locked-design block populated; lets
@@ -11,6 +11,13 @@ import type { PublicPayload } from "../public-payload";
  *   - MINIMAL_PAYLOAD  — only required fields; proves every optional
  *                        block hides gracefully (no half-populated
  *                        objects, no empty holes).
+ *
+ * A7d.2 note: `reviews` + `reviewsOutlink` are still emitted here as
+ * top-level payload fields (that's where the renderer reads them).
+ * In production the projector now sources them from BrandSettings
+ * (the publish route's `brandReviews` arg) rather than from the
+ * per-presentation draft — the fixture short-circuits that pipe by
+ * setting the projected output directly.
  *
  * Why fixtures instead of wizard input: A7c hasn't shipped wizard
  * capture UI for the new fields yet. The fixtures let the e2e
@@ -237,5 +244,8 @@ export const MINIMAL_PAYLOAD: PublicPayload = {
   // preparedFor, video, reviews, reviewsOutlink, areaStats — all
   // intentionally absent. The renderer must hide each block cleanly
   // with no empty holes. (A7d.1 removed agentNote, trackRecord,
-  // buyerQuote, and editorialPhotoUrl entirely.)
+  // buyerQuote, and editorialPhotoUrl entirely. A7d.2 relocated
+  // reviews + reviewsOutlink to Settings; the fixture still leaves
+  // them off the MINIMAL payload to prove the "no reviews in
+  // Settings → block hides cleanly" graceful state.)
 };

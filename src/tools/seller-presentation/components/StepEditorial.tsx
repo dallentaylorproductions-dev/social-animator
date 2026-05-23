@@ -6,17 +6,16 @@ import type {
   AreaStats,
   AreaStatsMonthly,
   PresentationVideo,
-  Review,
-  ReviewsOutlink,
   SellerPresentationDraft,
 } from "../engine/types";
 
 /**
- * Seller Presentation Step 5 — Editorial extras (v1.47 / A7d + A7d.1).
+ * Seller Presentation Step 5 — Editorial extras (v1.47 / A7d + A7d.1 + A7d.2).
  *
- * One fully OPTIONAL step. After A7d.1's subtraction the surviving
- * blocks are: walk-through video, reviews, and the area snapshot
- * (the chart). Each block is a skippable card.
+ * One fully OPTIONAL step. After A7d.2's relocation the surviving
+ * blocks are: walk-through video and the area snapshot (the chart).
+ * Reviews moved to brand Settings (agent-constant — entered once,
+ * shown on every seller page).
  *
  * SSR-safe (Substrate §9): `addedSections` initializes empty on
  * server + first client render, hydrates from the draft in a
@@ -30,9 +29,8 @@ interface StepEditorialProps {
 
 const inputCls =
   "w-full px-3 py-2 bg-neutral-900 border border-neutral-700 rounded text-sm focus:outline-none focus:border-mint";
-const textareaCls = `${inputCls} resize-y min-h-[80px]`;
 
-type SectionKey = "video" | "reviews" | "areaStats";
+type SectionKey = "video" | "areaStats";
 
 interface SectionDef {
   key: SectionKey;
@@ -52,13 +50,6 @@ const SECTIONS: SectionDef[] = [
     addLabel: "+ Add a video",
   },
   {
-    key: "reviews",
-    title: "Reviews",
-    purpose:
-      "A handful of reviews you'd hand a seller. Add as many or as few as you have.",
-    addLabel: "+ Add reviews",
-  },
-  {
     key: "areaStats",
     title: "Area snapshot",
     purpose:
@@ -66,37 +57,6 @@ const SECTIONS: SectionDef[] = [
     addLabel: "+ Add an area snapshot",
   },
 ];
-
-/** Rotating example placeholders for the reviews list. */
-const REVIEW_EXAMPLES: ReadonlyArray<{
-  body: string;
-  name: string;
-  year: string;
-  street: string;
-}> = [
-  {
-    body: "She walked us through every offer in plain English and never made us feel rushed.",
-    name: "D. & K. Bauer",
-    year: "2025",
-    street: "Castle Avenue",
-  },
-  {
-    body: "Quiet, calm, prepared. We had a clear plan from week one.",
-    name: "A. Park",
-    year: "2024",
-    street: "Professor Avenue",
-  },
-  {
-    body: "She turned what we thought would be a stressful summer into something almost easy.",
-    name: "E. & T. Chen",
-    year: "2023",
-    street: "W 14th",
-  },
-];
-
-function reviewExample(idx: number) {
-  return REVIEW_EXAMPLES[idx % REVIEW_EXAMPLES.length];
-}
 
 /**
  * Detect which sections the loaded draft already has content for.
@@ -107,9 +67,6 @@ function sectionsWithContent(draft: SellerPresentationDraft): SectionKey[] {
   const out: SectionKey[] = [];
   if (draft.video && Object.values(draft.video).some((v) => v?.trim())) {
     out.push("video");
-  }
-  if ((draft.reviews && draft.reviews.length > 0) || draft.reviewsOutlink) {
-    out.push("reviews");
   }
   if (
     draft.areaStats &&
@@ -159,9 +116,6 @@ export function StepEditorial({ draft, setDraft }: StepEditorialProps) {
       case "video":
         setDraft({ ...draft, video: undefined });
         break;
-      case "reviews":
-        setDraft({ ...draft, reviews: undefined, reviewsOutlink: undefined });
-        break;
       case "areaStats":
         setDraft({ ...draft, areaStats: undefined });
         break;
@@ -189,9 +143,6 @@ export function StepEditorial({ draft, setDraft }: StepEditorialProps) {
           >
             {s.key === "video" && (
               <VideoEditor draft={draft} setDraft={setDraft} />
-            )}
-            {s.key === "reviews" && (
-              <ReviewsEditor draft={draft} setDraft={setDraft} />
             )}
             {s.key === "areaStats" && (
               <AreaStatsEditor draft={draft} setDraft={setDraft} />
@@ -354,155 +305,6 @@ function VideoEditor({ draft, setDraft }: StepEditorialProps) {
         helpText="Optional. The still frame buyers see before the video plays."
         urlPlaceholder="…or paste a poster image URL"
       />
-    </>
-  );
-}
-
-// =====================================================================
-// REVIEWS
-// =====================================================================
-
-function ReviewsEditor({ draft, setDraft }: StepEditorialProps) {
-  const reviews: Review[] = draft.reviews ?? [];
-  const outlink: ReviewsOutlink | undefined = draft.reviewsOutlink;
-
-  const updateReviews = (next: Review[]) => {
-    setDraft({ ...draft, reviews: next.length ? next : undefined });
-  };
-
-  const addReview = () => {
-    updateReviews([...reviews, { body: "", attributionName: "" }]);
-  };
-
-  const updateReview = (idx: number, patch: Partial<Review>) => {
-    updateReviews(reviews.map((r, i) => (i === idx ? { ...r, ...patch } : r)));
-  };
-
-  const removeReview = (idx: number) => {
-    updateReviews(reviews.filter((_, i) => i !== idx));
-  };
-
-  const updateOutlink = (patch: Partial<ReviewsOutlink>) => {
-    const next: ReviewsOutlink = {
-      label: outlink?.label ?? "",
-      url: outlink?.url ?? "",
-      ...patch,
-    };
-    const hasContent = next.label.trim().length > 0 || next.url.trim().length > 0;
-    setDraft({ ...draft, reviewsOutlink: hasContent ? next : undefined });
-  };
-
-  return (
-    <>
-      <div className="space-y-3">
-        {reviews.length === 0 && (
-          <p className="text-xs text-neutral-500">
-            No reviews yet. Add one to start.
-          </p>
-        )}
-        {reviews.map((rev, idx) => {
-          const ex = reviewExample(idx);
-          return (
-            <div
-              key={idx}
-              className="space-y-2 rounded border border-neutral-800 bg-neutral-900/40 p-3"
-              data-testid={`step-editorial-review-${idx}`}
-            >
-              <div className="flex items-center justify-between">
-                <span className="text-[10px] uppercase tracking-wider text-neutral-500">
-                  Review {idx + 1}
-                </span>
-                <button
-                  type="button"
-                  onClick={() => removeReview(idx)}
-                  className="text-xs text-neutral-500 hover:text-red-400"
-                  data-testid={`step-editorial-review-remove-${idx}`}
-                >
-                  Remove
-                </button>
-              </div>
-              <textarea
-                className={textareaCls}
-                value={rev.body}
-                onChange={(e) => updateReview(idx, { body: e.target.value })}
-                placeholder={`e.g. ${ex.body}`}
-                data-testid={`step-editorial-review-body-${idx}`}
-              />
-              <div className="grid grid-cols-1 gap-3 sm:grid-cols-3">
-                <input
-                  type="text"
-                  className={inputCls}
-                  value={rev.attributionName}
-                  onChange={(e) =>
-                    updateReview(idx, { attributionName: e.target.value })
-                  }
-                  placeholder={`e.g. ${ex.name}`}
-                  data-testid={`step-editorial-review-name-${idx}`}
-                />
-                <input
-                  type="text"
-                  className={inputCls}
-                  value={rev.attributionYear ?? ""}
-                  onChange={(e) =>
-                    updateReview(idx, {
-                      attributionYear: e.target.value || undefined,
-                    })
-                  }
-                  placeholder={`e.g. ${ex.year}`}
-                  data-testid={`step-editorial-review-year-${idx}`}
-                />
-                <input
-                  type="text"
-                  className={inputCls}
-                  value={rev.attributionStreet ?? ""}
-                  onChange={(e) =>
-                    updateReview(idx, {
-                      attributionStreet: e.target.value || undefined,
-                    })
-                  }
-                  placeholder={`e.g. ${ex.street}`}
-                  data-testid={`step-editorial-review-street-${idx}`}
-                />
-              </div>
-            </div>
-          );
-        })}
-        <button
-          type="button"
-          onClick={addReview}
-          data-testid="step-editorial-review-add"
-          className="rounded border border-neutral-700 px-3 py-1.5 text-xs text-text-primary hover:bg-neutral-800"
-        >
-          + Add a review
-        </button>
-      </div>
-
-      <div className="space-y-2 border-t border-neutral-800 pt-3">
-        <div className="text-[10px] uppercase tracking-[0.15em] text-neutral-500">
-          Link out (optional)
-        </div>
-        <p className="text-xs text-neutral-500">
-          Send seekers to a page with all your reviews.
-        </p>
-        <div className="grid grid-cols-1 gap-3 sm:grid-cols-[1fr_2fr]">
-          <input
-            type="text"
-            className={inputCls}
-            value={outlink?.label ?? ""}
-            onChange={(e) => updateOutlink({ label: e.target.value })}
-            placeholder="See all reviews on Zillow"
-            data-testid="step-editorial-outlink-label"
-          />
-          <input
-            type="url"
-            className={inputCls}
-            value={outlink?.url ?? ""}
-            onChange={(e) => updateOutlink({ url: e.target.value })}
-            placeholder="https://www.zillow.com/profile/your-handle"
-            data-testid="step-editorial-outlink-url"
-          />
-        </div>
-      </div>
     </>
   );
 }

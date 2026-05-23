@@ -7,8 +7,16 @@ import {
   saveBrandSettings,
   extractPhoneDigits,
 } from "@/lib/brand";
+import type { Review } from "@/tools/seller-presentation/engine/types";
 import { PhoneInput } from "@/components/inputs";
 import { ImageUploadField } from "@/components/ImageUploadField";
+
+/**
+ * Soft cap on the curated reviews list. Six rows is enough to cover the
+ * "From families like yours" block on every published Seller Presentation
+ * without inviting agents to dump every Zillow testimonial into Settings.
+ */
+const MAX_REVIEWS = 6;
 
 /**
  * Brand profile form. All values persist to localStorage on every change —
@@ -228,10 +236,154 @@ export function BrandProfileForm() {
         </Field>
       </div>
 
+      {/* A7d.2 — curated reviews. Entered ONCE here; the wizard's
+          editorial step no longer captures per-presentation reviews.
+          Flows through the publish route's `brandReviews` payload to
+          the projector, which emits them as `payload.reviews` +
+          `payload.reviewsOutlink` (top-level), so every Seller
+          Presentation renders the "From families like yours" block
+          from this source. */}
+      <ReviewsSection
+        reviews={s.agentReviews ?? []}
+        outlinkUrl={s.reviewsOutlinkUrl ?? ""}
+        onReviewsChange={(next) =>
+          update("agentReviews", next.length ? next : undefined)
+        }
+        onOutlinkChange={(v) => update("reviewsOutlinkUrl", v || undefined)}
+      />
+
       <p className="text-[11px] text-neutral-600 leading-relaxed pt-4 border-t border-neutral-900">
         Saved automatically. Stored in your browser only. Never uploaded to
         any server.
       </p>
+    </div>
+  );
+}
+
+function ReviewsSection({
+  reviews,
+  outlinkUrl,
+  onReviewsChange,
+  onOutlinkChange,
+}: {
+  reviews: Review[];
+  outlinkUrl: string;
+  onReviewsChange: (next: Review[]) => void;
+  onOutlinkChange: (next: string) => void;
+}) {
+  const addReview = () => {
+    if (reviews.length >= MAX_REVIEWS) return;
+    onReviewsChange([...reviews, { body: "", attributionName: "" }]);
+  };
+  const updateReview = (idx: number, patch: Partial<Review>) => {
+    onReviewsChange(
+      reviews.map((r, i) => (i === idx ? { ...r, ...patch } : r)),
+    );
+  };
+  const removeReview = (idx: number) => {
+    onReviewsChange(reviews.filter((_, i) => i !== idx));
+  };
+
+  return (
+    <div className="space-y-4 border-t border-neutral-900 pt-6">
+      <h3 className="text-xs uppercase tracking-[0.18em] text-neutral-500">
+        Seller Presentation: reviews
+      </h3>
+      <p className="-mt-2 text-[11px] text-neutral-600 leading-relaxed">
+        Reviews you&apos;ve collected — entered once here, shown on every
+        seller page.
+      </p>
+
+      <div className="space-y-3">
+        {reviews.length === 0 && (
+          <p className="text-xs text-neutral-500">
+            No reviews yet. Add one to start.
+          </p>
+        )}
+        {reviews.map((rev, idx) => (
+          <div
+            key={idx}
+            className="space-y-2 rounded border border-neutral-800 bg-neutral-900/40 p-3"
+            data-testid={`brand-review-${idx}`}
+          >
+            <div className="flex items-center justify-between">
+              <span className="text-[10px] uppercase tracking-wider text-neutral-500">
+                Review {idx + 1}
+              </span>
+              <button
+                type="button"
+                onClick={() => removeReview(idx)}
+                className="text-xs text-neutral-500 hover:text-red-400"
+                data-testid={`brand-review-remove-${idx}`}
+              >
+                Remove
+              </button>
+            </div>
+            <textarea
+              value={rev.body}
+              onChange={(e) => updateReview(idx, { body: e.target.value })}
+              placeholder="She walked us through every offer in plain English and never made us feel rushed."
+              rows={3}
+              data-testid={`brand-review-body-${idx}`}
+              className="w-full bg-neutral-900 border border-neutral-800 rounded-md px-3 py-2 text-base lg:text-sm focus:outline-none focus:border-mint resize-y"
+            />
+            <div className="grid grid-cols-1 gap-2 sm:grid-cols-3">
+              <input
+                type="text"
+                value={rev.attributionName}
+                onChange={(e) =>
+                  updateReview(idx, { attributionName: e.target.value })
+                }
+                placeholder="The Halloran family"
+                data-testid={`brand-review-name-${idx}`}
+                className="w-full bg-neutral-900 border border-neutral-800 rounded-md px-3 py-2 text-base lg:text-sm focus:outline-none focus:border-mint"
+              />
+              <input
+                type="text"
+                value={rev.attributionYear ?? ""}
+                onChange={(e) =>
+                  updateReview(idx, {
+                    attributionYear: e.target.value || undefined,
+                  })
+                }
+                placeholder="2025"
+                data-testid={`brand-review-year-${idx}`}
+                className="w-full bg-neutral-900 border border-neutral-800 rounded-md px-3 py-2 text-base lg:text-sm focus:outline-none focus:border-mint"
+              />
+              <input
+                type="text"
+                value={rev.attributionStreet ?? ""}
+                onChange={(e) =>
+                  updateReview(idx, {
+                    attributionStreet: e.target.value || undefined,
+                  })
+                }
+                placeholder="Tremont"
+                data-testid={`brand-review-street-${idx}`}
+                className="w-full bg-neutral-900 border border-neutral-800 rounded-md px-3 py-2 text-base lg:text-sm focus:outline-none focus:border-mint"
+              />
+            </div>
+          </div>
+        ))}
+        {reviews.length < MAX_REVIEWS && (
+          <button
+            type="button"
+            onClick={addReview}
+            data-testid="brand-review-add"
+            className="rounded border border-neutral-700 px-3 py-1.5 text-xs text-text-primary hover:bg-neutral-800"
+          >
+            + Add a review
+          </button>
+        )}
+      </div>
+
+      <Field label="See all reviews on Zillow — link URL">
+        <TextInput
+          value={outlinkUrl}
+          onChange={onOutlinkChange}
+          placeholder="https://www.zillow.com/profile/your-handle"
+        />
+      </Field>
     </div>
   );
 }

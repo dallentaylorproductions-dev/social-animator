@@ -1356,25 +1356,11 @@ test.describe('Seller Presentation — A7d editorial extras', () => {
       .getByTestId('step-editorial-video-recorded-on')
       .fill('Recorded May 19');
 
-    // (b) Reviews — one review + an outlink.
-    await page.getByTestId('step-editorial-reviews-add').click();
-    await page.getByTestId('step-editorial-review-add').click();
-    await page
-      .getByTestId('step-editorial-review-body-0')
-      .fill('Quiet, calm, prepared.');
-    await page.getByTestId('step-editorial-review-name-0').fill('A. Park');
-    await page.getByTestId('step-editorial-review-year-0').fill('2024');
-    await page
-      .getByTestId('step-editorial-review-street-0')
-      .fill('Professor Avenue');
-    await page
-      .getByTestId('step-editorial-outlink-label')
-      .fill('See all reviews on Zillow');
-    await page
-      .getByTestId('step-editorial-outlink-url')
-      .fill('https://www.zillow.com/profile/marisol');
+    // A7d.2 — reviews relocated out of the editorial step into brand
+    // Settings. The reviews card no longer exists here; the
+    // editorial-step covers video + areaStats only.
 
-    // (c) Area stats — one median sale, one delta, one month entry.
+    // (b) Area stats — one median sale, one delta, one month entry.
     // The month entry is what feeds the neighborhood chart on the
     // published page.
     await page.getByTestId('step-editorial-areaStats-add').click();
@@ -1404,8 +1390,6 @@ test.describe('Seller Presentation — A7d editorial extras', () => {
             currentStep?: string;
             draft?: {
               video?: { videoUrl?: string; title?: string };
-              reviews?: Array<{ body?: string; attributionName?: string }>;
-              reviewsOutlink?: { label?: string; url?: string };
               areaStats?: {
                 medianSale?: string;
                 monthlySeries?: Array<{ month?: string; medianPrice?: string }>;
@@ -1418,9 +1402,6 @@ test.describe('Seller Presentation — A7d editorial extras', () => {
             parsed.currentStep === 'review' &&
             d.video?.videoUrl === 'https://www.loom.com/share/abc123' &&
             d.video?.title === 'A walk-through of your plan.' &&
-            (d.reviews?.length ?? 0) === 1 &&
-            d.reviews?.[0]?.body === 'Quiet, calm, prepared.' &&
-            d.reviewsOutlink?.label === 'See all reviews on Zillow' &&
             d.areaStats?.medianSale === '$642k' &&
             (d.areaStats?.monthlySeries?.length ?? 0) === 1 &&
             d.areaStats?.monthlySeries?.[0]?.month === "May '26"
@@ -1440,12 +1421,6 @@ test.describe('Seller Presentation — A7d editorial extras', () => {
 
     await expect(page.getByTestId('step-editorial-video-url')).toHaveValue(
       'https://www.loom.com/share/abc123',
-    );
-    await expect(page.getByTestId('step-editorial-review-body-0')).toHaveValue(
-      'Quiet, calm, prepared.',
-    );
-    await expect(page.getByTestId('step-editorial-outlink-url')).toHaveValue(
-      'https://www.zillow.com/profile/marisol',
     );
     await expect(page.getByTestId('step-editorial-area-median-sale')).toHaveValue(
       '$642k',
@@ -1483,12 +1458,6 @@ test.describe('Seller Presentation — A7d editorial extras', () => {
     expect((d.video as { videoUrl?: string })?.videoUrl).toBe(
       'https://www.loom.com/share/abc123',
     );
-    expect((d.reviews as Array<{ body?: string }>)[0]?.body).toBe(
-      'Quiet, calm, prepared.',
-    );
-    expect((d.reviewsOutlink as { url?: string }).url).toBe(
-      'https://www.zillow.com/profile/marisol',
-    );
     const stats = d.areaStats as {
       medianSale?: string;
       monthlySeries?: Array<{ month?: string; medianPrice?: string }>;
@@ -1503,6 +1472,12 @@ test.describe('Seller Presentation — A7d editorial extras', () => {
     expect(d.trackRecord).toBeUndefined();
     expect(d.buyerQuote).toBeUndefined();
     expect(d.editorialPhotoUrl).toBeUndefined();
+    // A7d.2 — reviews + outlink moved to Settings; the editorial step
+    // no longer captures them so the draft side of the publish body is
+    // clean. The wire still carries `brandReviews` (sourced separately
+    // from Settings) — covered by the dedicated A7d.2 spec.
+    expect(d.reviews).toBeUndefined();
+    expect(d.reviewsOutlink).toBeUndefined();
   });
 
   test('skip-all: untouched editorial step publishes with no editorial fields on the draft', async ({
@@ -1538,17 +1513,20 @@ test.describe('Seller Presentation — A7d editorial extras', () => {
     // Land on Editorial; every card is closed by default for a fresh
     // draft because `sectionsWithContent(EMPTY_DRAFT)` returns nothing.
     await expect(page.getByTestId('step-editorial')).toBeVisible();
-    for (const key of ['video', 'reviews', 'areaStats']) {
+    for (const key of ['video', 'areaStats']) {
       await expect(
         page.getByTestId(`step-editorial-${key}-card`),
       ).toHaveAttribute('data-state', 'closed');
     }
-    // A7d.1 removed cards must not exist in the DOM at all.
+    // A7d.1 + A7d.2 — removed/relocated cards must not exist in the
+    // DOM at all. Reviews moved to brand Settings (A7d.2); the others
+    // were subtracted entirely (A7d.1).
     for (const removedKey of [
       'agentNote',
       'trackRecord',
       'buyerQuote',
       'editorialPhoto',
+      'reviews',
     ]) {
       await expect(
         page.getByTestId(`step-editorial-${removedKey}-card`),
@@ -1577,5 +1555,183 @@ test.describe('Seller Presentation — A7d editorial extras', () => {
     expect(d.trackRecord).toBeUndefined();
     expect(d.buyerQuote).toBeUndefined();
     expect(d.editorialPhotoUrl).toBeUndefined();
+  });
+
+  test('A7d.2 — reviews entered in brand Settings flow into the publish body via brandReviews', async ({
+    page,
+  }) => {
+    // Seed brand Settings directly via localStorage so the test stays
+    // focused on the Settings → publish path (the Settings UI itself
+    // is covered by its own spec). One curated review + a Zillow
+    // outlink URL — both should round-trip through the publish body
+    // as `brandReviews`, NOT as draft fields.
+    await page.addInitScript(() => {
+      const settings = {
+        agentName: 'Marisol Reyes',
+        primaryColor: '#4ef2d9',
+        accentColor: '#ffffff',
+        backgroundColor: '',
+        contactEmail: 'marisol@example.com',
+        contactPhone: '2165550188',
+        licenseNumber: 'SAL.2018003412',
+        brokerage: 'Howard Hanna',
+        logoDataUrl: null,
+        agentReviews: [
+          {
+            body: 'She walked us through every offer in plain English.',
+            attributionName: 'The Halloran family',
+            attributionYear: '2025',
+            attributionStreet: 'Tremont',
+          },
+        ],
+        reviewsOutlinkUrl: 'https://www.zillow.com/profile/marisolreyes',
+      };
+      window.localStorage.setItem(
+        'socanim_brand_settings',
+        JSON.stringify(settings),
+      );
+    });
+
+    let publishBody: unknown;
+    await page.route('**/api/seller-presentation/publish', async (route) => {
+      try {
+        publishBody = route.request().postDataJSON();
+      } catch {
+        publishBody = null;
+      }
+      await route.fulfill({
+        status: 200,
+        contentType: 'application/json',
+        body: JSON.stringify({ ok: true, slug: 'a7d2-brand-reviews' }),
+      });
+    });
+
+    await page.goto('/seller-presentation');
+    await expect(page.getByTestId('step-property')).toBeVisible();
+    await page.getByTestId('step-property-address').fill('1742 Kenilworth Avenue');
+    const nextButton = page.getByTestId('wizard-next');
+    await nextButton.click();
+    await page.getByTestId('step-comps-add').click();
+    await page.getByTestId('step-comps-address-0').fill('2218 W 14th Street');
+    await page.getByLabel('comp-1-sold-price').fill('648000');
+    await nextButton.click();
+    await page.getByLabel('recommended-price').fill('675000');
+    await nextButton.click();
+    await nextButton.click(); // Pitch (untouched)
+    await expect(page.getByTestId('step-editorial')).toBeVisible();
+    await nextButton.click(); // Editorial (skip — reviews live in Settings now)
+
+    await expect(page.getByTestId('step-review')).toBeVisible();
+    await expect(page.getByTestId('step-review-ready')).toBeVisible();
+    await page.getByTestId('step-review-publish').click();
+    await expect(page.getByTestId('step-review-published')).toBeVisible({
+      timeout: 10_000,
+    });
+
+    const body = publishBody as {
+      draft?: Record<string, unknown>;
+      brandReviews?: {
+        reviews?: Array<{
+          body?: string;
+          attributionName?: string;
+        }>;
+        reviewsOutlinkUrl?: string;
+      };
+    } | null;
+    expect(body).not.toBeNull();
+
+    // The Settings-sourced reviews ride on `brandReviews`, not the
+    // draft. This is the wire-shape contract the publish route relies
+    // on to feed `toPublicPayload`'s third arg.
+    expect(body!.brandReviews).toBeDefined();
+    expect(body!.brandReviews?.reviews).toHaveLength(1);
+    expect(body!.brandReviews?.reviews?.[0]?.body).toBe(
+      'She walked us through every offer in plain English.',
+    );
+    expect(body!.brandReviews?.reviews?.[0]?.attributionName).toBe(
+      'The Halloran family',
+    );
+    expect(body!.brandReviews?.reviewsOutlinkUrl).toBe(
+      'https://www.zillow.com/profile/marisolreyes',
+    );
+
+    // Draft side stays clean — reviews + outlink no longer ride there.
+    expect(body!.draft?.reviews).toBeUndefined();
+    expect(body!.draft?.reviewsOutlink).toBeUndefined();
+  });
+
+  test('A7d.2 — no reviews in Settings → brandReviews carries no rows + the published page block hides', async ({
+    page,
+  }) => {
+    // Settings has the agent profile filled in, but agentReviews is
+    // empty / undefined. The publish body's brandReviews block must
+    // either be absent or carry no `reviews` array — the renderer
+    // then hides the "From families like yours" block cleanly.
+    await page.addInitScript(() => {
+      const settings = {
+        agentName: 'Marisol Reyes',
+        primaryColor: '#4ef2d9',
+        accentColor: '#ffffff',
+        backgroundColor: '',
+        contactEmail: '',
+        contactPhone: '',
+        licenseNumber: '',
+        brokerage: '',
+        logoDataUrl: null,
+        // No agentReviews, no reviewsOutlinkUrl.
+      };
+      window.localStorage.setItem(
+        'socanim_brand_settings',
+        JSON.stringify(settings),
+      );
+    });
+
+    let publishBody: unknown;
+    await page.route('**/api/seller-presentation/publish', async (route) => {
+      try {
+        publishBody = route.request().postDataJSON();
+      } catch {
+        publishBody = null;
+      }
+      await route.fulfill({
+        status: 200,
+        contentType: 'application/json',
+        body: JSON.stringify({ ok: true, slug: 'a7d2-no-reviews' }),
+      });
+    });
+
+    await page.goto('/seller-presentation');
+    await expect(page.getByTestId('step-property')).toBeVisible();
+    await page.getByTestId('step-property-address').fill('1234 Test Drive NE');
+    const nextButton = page.getByTestId('wizard-next');
+    await nextButton.click();
+    await page.getByTestId('step-comps-add').click();
+    await page.getByTestId('step-comps-address-0').fill('5678 Elm Ave NE');
+    await page.getByLabel('comp-1-sold-price').fill('685000');
+    await nextButton.click();
+    await page.getByLabel('recommended-price').fill('700000');
+    await nextButton.click();
+    await nextButton.click(); // pitch
+    await nextButton.click(); // editorial
+
+    await expect(page.getByTestId('step-review')).toBeVisible();
+    await page.getByTestId('step-review-publish').click();
+    await expect(page.getByTestId('step-review-published')).toBeVisible({
+      timeout: 10_000,
+    });
+
+    const body = publishBody as {
+      brandReviews?: { reviews?: unknown; reviewsOutlinkUrl?: string };
+    } | null;
+    expect(body).not.toBeNull();
+
+    // brandReviews is allowed to be present but with no rows + no
+    // outlink URL — same effect as the projector dropping the block.
+    const brandReviews = body!.brandReviews;
+    const hasReviewRows =
+      Array.isArray(brandReviews?.reviews) &&
+      (brandReviews!.reviews as unknown[]).length > 0;
+    expect(hasReviewRows).toBe(false);
+    expect(brandReviews?.reviewsOutlinkUrl ?? '').toBe('');
   });
 });

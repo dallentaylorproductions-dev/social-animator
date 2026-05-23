@@ -5,6 +5,7 @@ import { clampDraft } from "@/tools/seller-presentation/engine/types";
 import {
   toPublicPayload,
   type AgentBranding,
+  type BrandReviewsInput,
 } from "@/tools/seller-presentation/output/public-payload";
 
 /**
@@ -50,6 +51,13 @@ interface PublishPayload {
     email?: string;
     licenseNumber?: string;
   };
+  /**
+   * A7d.2 — agent-constant reviews + outlink URL sourced from
+   * BrandSettings. Permissive shape on the wire; the projector
+   * re-validates field-by-field, so anything outside the allowlist
+   * is dropped before reaching KV.
+   */
+  brandReviews?: unknown;
 }
 
 export async function POST(req: Request) {
@@ -92,11 +100,20 @@ export async function POST(req: Request) {
 
   const agentContact: AgentBranding = payload.agentContact ?? {};
 
+  // A7d.2 — `brandReviews` is wire-permissive (`unknown`). We forward
+  // it as-is; `toPublicPayload` projects each review row + the outlink
+  // URL field-by-field through its own clamping helpers, so any extra
+  // keys / wrong types in a tampered settings record never reach KV.
+  const brandReviews: BrandReviewsInput =
+    payload.brandReviews && typeof payload.brandReviews === "object"
+      ? (payload.brandReviews as BrandReviewsInput)
+      : {};
+
   // R-1 closed by construction: build the public-only payload and
   // pass ONLY it onward. The raw draft (with pricingStrategyId,
   // confidence, comp notes, private pitch points, etc.) is dropped
   // here and never sees the persistence path.
-  const publicPayload = toPublicPayload(draft, agentContact);
+  const publicPayload = toPublicPayload(draft, agentContact, brandReviews);
 
   try {
     const result = await publishHandout({

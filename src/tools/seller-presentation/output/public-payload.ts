@@ -1,5 +1,5 @@
 /**
- * Public-payload serializer (Substrate §3.4, §4, v1.47 / A6 + A7a + A7d.1).
+ * Public-payload serializer (Substrate §3.4, §4, v1.47 / A6 + A7a + A7d.1 + A7d.2).
  *
  * The privacy boundary for the Seller Presentation made code. The
  * publish route calls `toPublicPayload` and passes ONLY the returned
@@ -10,6 +10,13 @@
  * and `buyerQuote` were removed from the draft, payload, and renderer.
  * The serializer no longer emits them; the boundary clamper drops them
  * even if a hand-edited KV record carried them in.
+ *
+ * A7d.2 relocation: curated reviews + the "see all on Zillow" outlink
+ * are sourced from brand Settings via the new `brandReviews` arg —
+ * NOT from the draft. The projector ignores any `reviews` /
+ * `reviewsOutlink` keys still riding on a legacy draft (clampDraft
+ * already drops them from the type), so old persisted instances
+ * publish cleanly without leaking per-presentation content.
  *
  * Allowlist guarantee (proven by e2e/seller-presentation.publish-allowlist.spec.ts):
  * private fields stay private because every field is built by explicit
@@ -59,6 +66,27 @@ export interface AgentBranding {
   yearsInArea?: string;
   ctaReassurance?: string;
 }
+
+/**
+ * A7d.2 — brand-sourced reviews payload. Same provenance as
+ * `AgentBranding`: read from BrandSettings, forwarded by the publish
+ * route, projected field-by-field into the public payload. Kept as a
+ * distinct input shape (instead of bolted onto AgentBranding) so the
+ * agent block in the output payload stays scalar — reviews land at the
+ * top level (`payload.reviews` + `payload.reviewsOutlink`) where the
+ * renderer already reads them.
+ */
+export interface BrandReviewsInput {
+  reviews?: Review[];
+  reviewsOutlinkUrl?: string;
+}
+
+/**
+ * A7d.2 — fixed label for the reviews outlink. Settings only collects
+ * the URL; the renderer pairs it with this label to keep the seller
+ * page copy on-brand and consistent across agents.
+ */
+export const REVIEWS_OUTLINK_LABEL = "See all reviews on Zillow";
 
 /**
  * Public projection of a comp. A7a trims the PUBLIC emit to exactly
@@ -189,20 +217,41 @@ function projectPresentationVideo(
   };
 }
 
-function projectReview(r: Review): Review {
+function projectReview(r: unknown): Review | null {
+  if (!r || typeof r !== "object") return null;
+  const rec = r as Record<string, unknown>;
+  const body = typeof rec.body === "string" ? rec.body : "";
+  const attributionName =
+    typeof rec.attributionName === "string" ? rec.attributionName : "";
+  if (!body.trim() || !attributionName.trim()) return null;
   return {
-    body: r.body,
-    attributionName: r.attributionName,
-    attributionYear: r.attributionYear,
-    attributionStreet: r.attributionStreet,
+    body,
+    attributionName,
+    attributionYear:
+      typeof rec.attributionYear === "string" && rec.attributionYear.length > 0
+        ? rec.attributionYear
+        : undefined,
+    attributionStreet:
+      typeof rec.attributionStreet === "string" &&
+      rec.attributionStreet.length > 0
+        ? rec.attributionStreet
+        : undefined,
   };
 }
 
-function projectReviewsOutlink(
-  o: ReviewsOutlink | undefined,
+/**
+ * A7d.2 — build the outlink object from a single URL string. The label
+ * is fixed (REVIEWS_OUTLINK_LABEL) so Settings only needs the URL.
+ * Returns undefined when the URL is empty / non-string so the renderer
+ * hides the outlink anchor cleanly.
+ */
+function projectBrandReviewsOutlink(
+  url: string | undefined,
 ): ReviewsOutlink | undefined {
-  if (!o) return undefined;
-  return { label: o.label, url: o.url };
+  if (typeof url !== "string") return undefined;
+  const trimmed = url.trim();
+  if (!trimmed) return undefined;
+  return { label: REVIEWS_OUTLINK_LABEL, url: trimmed };
 }
 
 function projectAreaStats(s: AreaStats | undefined): AreaStats | undefined {
@@ -240,8 +289,14 @@ function projectAgent(agent: AgentBranding): AgentBranding {
 
 /**
  * Build the public payload from a raw draft + the agent's contact
- * card. Pure — same draft + agentContact in always produces the
- * same payload out.
+ * card + the agent's curated reviews. Pure — same inputs always
+ * produce the same payload out.
+ *
+ * `brandReviews` is the A7d.2 input that carries the agent-constant
+ * reviews + outlink URL sourced from BrandSettings (the wizard no
+ * longer captures these per-presentation). The projector reads them
+ * from this arg ONLY — any `reviews` / `reviewsOutlink` keys riding
+ * on a legacy draft are ignored.
  *
  * The publish route MAY merge per-presentation agent overrides
  * (draft.agentAreasServed etc.) into the incoming `agentContact`
@@ -251,6 +306,7 @@ function projectAgent(agent: AgentBranding): AgentBranding {
 export function toPublicPayload(
   draft: SellerPresentationDraft,
   agentContact: AgentBranding,
+  brandReviews: BrandReviewsInput = {},
 ): PublicPayload {
   const propertyAddress = draft.propertyAddress ?? "";
   const recommendedPrice = draft.recommendedPrice ?? "";
@@ -263,6 +319,18 @@ export function toPublicPayload(
     .filter((c): c is PublicPitchCard => c !== null);
   const publicTitleStrings = publicCards.map((c) => c.title);
   const agent = projectAgent(agentContact);
+
+  // A7d.2 — reviews + outlink come from BrandSettings, not the draft.
+  // Project field-by-field (no spread) so a tampered settings record
+  // with extra nested keys can't leak through the boundary.
+  const projectedReviews = Array.isArray(brandReviews.reviews)
+    ? brandReviews.reviews
+        .map(projectReview)
+        .filter((r): r is Review => r !== null)
+    : undefined;
+  const projectedOutlink = projectBrandReviewsOutlink(
+    brandReviews.reviewsOutlinkUrl,
+  );
 
   return {
     // ---- A6 flat fields ----
@@ -291,8 +359,8 @@ export function toPublicPayload(
       comps: publicComps,
     },
     pitchPublicCards: publicCards,
-    reviews: draft.reviews?.map(projectReview),
-    reviewsOutlink: projectReviewsOutlink(draft.reviewsOutlink),
+    reviews: projectedReviews && projectedReviews.length ? projectedReviews : undefined,
+    reviewsOutlink: projectedOutlink,
     areaStats: projectAreaStats(draft.areaStats),
     agent,
   };
