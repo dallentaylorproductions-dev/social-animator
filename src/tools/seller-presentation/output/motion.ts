@@ -3,7 +3,7 @@
 import { useEffect } from "react";
 
 /**
- * Seller Presentation — CSS-first motion controller (v1.47 / A7b + A7c.8).
+ * Seller Presentation — CSS-first motion controller (v1.47 / A7b + A7c.8.1).
  *
  * One small client island wired up alongside the server-rendered
  * consumer page. Adds an `.in` class to every `.reveal`, `.chart`,
@@ -23,18 +23,23 @@ import { useEffect } from "react";
  * also has belt-and-suspenders `@media (prefers-reduced-motion)`
  * rules that null all motion-related properties.
  *
- * A7c.8 — recommended-price count-up. A second tiny observer watches
- * the `.price[data-price-countup]` element. When the price scrolls
- * into view (one-shot), it runs an rAF count-up that rises from
- * 10^(digits-1) to the true `data-price-final` value over
- * PRICE_COUNTUP_MS with an ease-out cubic curve. The digit groups
- * inside `[data-price-digits]` are re-rendered each frame; the brick
- * "$" outside the digits span is never touched. The start floor is
- * chosen so the digit COUNT never changes mid-climb — that's what
- * keeps the price line from jumping width during the animation
- * (paired with CSS `tabular-nums` on the price for sub-digit width
- * stability). Reduced-motion short-circuits the entire enhancement;
- * the SSR markup already renders the true price.
+ * A7c.8 / A7c.8.1 — recommended-price count-up. A second tiny
+ * observer watches the `.price[data-price-countup]` element. When the
+ * price scrolls into view (one-shot), it runs an rAF count-up that
+ * rises from ~90% of the `data-price-final` value to the true final
+ * over PRICE_COUNTUP_MS with an ease-out quart curve — a quick,
+ * graceful settle rather than a long sweep through hundreds of
+ * thousands. The start is clamped to 10^(digits-1) so the digit COUNT
+ * never changes mid-climb (paired with CSS `tabular-nums` for
+ * sub-digit width stability, this guarantees zero layout shift during
+ * the animation). Each frame writes a SINGLE text node into
+ * `[data-price-digits]` via textContent — no per-frame child-span
+ * restructuring, which was the visible stutter source in A7c.8. The
+ * final at-rest state restores the SSR-shaped grouped markup once so
+ * commas pick up the muted `.sep` color and the final HTML is
+ * byte-identical to the SSR render. The brick "$" outside the digits
+ * span is never touched. Reduced-motion short-circuits the entire
+ * enhancement; the SSR markup already renders the true price.
  *
  * Share button: the hero's `[data-share]` button (rendered by
  * presentation-page.tsx) wires up to `navigator.share()` when
@@ -43,16 +48,38 @@ import { useEffect } from "react";
  * button gives no error toast on this surface).
  */
 
-// ---- A7c.8 count-up tunables ---------------------------------------------
-// Duration of the price count-up in ms. Brief on purpose — long enough
-// to register as a designed moment, short enough to not feel slow.
-const PRICE_COUNTUP_MS = 1600;
-// ease-out cubic — fast start, gentle deceleration into the rest value.
-const easeOutCubic = (t: number) => 1 - Math.pow(1 - t, 3);
+// ---- A7c.8.1 count-up tunables -------------------------------------------
+// Duration of the price count-up in ms. A7c.8 shipped 1600ms which read
+// as too long on mobile; this shortens to ~1s for a quick, confident
+// settle rather than a drawn-out tally.
+const PRICE_COUNTUP_MS = 1000;
+// Start the climb close to the final value so the eye reads a graceful
+// final approach, not a long sweep through hundreds of thousands. A7c.8
+// shipped a full 10^(digits-1) sweep ($100,000 → $675,000) which blurred
+// and dragged. Clamped below to keep the digit count stable.
+const PRICE_COUNTUP_START_FRACTION = 0.9;
+// ease-out quart — stronger deceleration than cubic; settles softly
+// onto the final number rather than stopping abruptly.
+const easeOutQuart = (t: number) => 1 - Math.pow(1 - t, 4);
+
+/** "675000" → "675,000" — plain text with comma grouping. The per-frame
+ *  tick writes this as a single text node into `[data-price-digits]`,
+ *  which is the cheapest possible DOM mutation (no child elements
+ *  created/destroyed → no layout thrash from rebuilding the digit-group
+ *  span tree every frame). This is the A7c.8.1 stutter fix. */
+function formatPriceGroupsText(n: number): string {
+  const s = Math.max(0, Math.floor(n)).toString();
+  const groups: string[] = [];
+  for (let i = s.length; i > 0; i -= 3) {
+    groups.unshift(s.slice(Math.max(0, i - 3), i));
+  }
+  return groups.join(",");
+}
 
 /** "675000" → "<span>675</span><span><span class=\"sep\">,</span>000</span>".
- *  Mirrors the SSR PriceDisplay group structure exactly so the final
- *  animated state is byte-identical to the SSR markup. */
+ *  Mirrors the SSR PriceDisplay group structure exactly. Used ONCE at
+ *  animation end to restore the at-rest markup so commas pick up the
+ *  muted `.sep` color and the final HTML is byte-identical to SSR. */
 function formatPriceGroupsHTML(n: number): string {
   const s = Math.max(0, Math.floor(n)).toString();
   const groups: string[] = [];
@@ -75,14 +102,17 @@ function startPriceCountup(priceEl: HTMLElement): void {
   const finalValue = finalRaw ? parseInt(finalRaw, 10) : NaN;
   if (!digitsEl || !Number.isFinite(finalValue) || finalValue <= 0) return;
 
-  // Start at 10^(digits-1) so the digit COUNT stays constant during
-  // the climb (no layout shift mid-animation). E.g. final 675,000 →
-  // start 100,000; final 1,200,000 → start 1,000,000.
+  // Keep the digit COUNT constant across the climb — that's what stops
+  // the price line from jumping width mid-animation. Clamp the desired
+  // ~90% start so its digit count never falls below the final's. E.g.
+  // final 675,000 → start max(100,000, 607,500) = 607,500 (6 digits).
   const digitCount = Math.floor(finalValue).toString().length;
-  const startValue = Math.pow(10, digitCount - 1);
+  const startFloor = Math.pow(10, digitCount - 1);
+  const desiredStart = Math.floor(finalValue * PRICE_COUNTUP_START_FRACTION);
+  const startValue = Math.max(startFloor, desiredStart);
   if (startValue >= finalValue) {
-    // Round numbers (e.g. exactly $100,000) collapse to zero range —
-    // leave SSR digits in place.
+    // Zero-range case (round number like exactly $100,000, or the
+    // fraction landed on the final) — leave SSR digits in place.
     priceEl.dataset.priceCounted = "1";
     return;
   }
@@ -97,14 +127,17 @@ function startPriceCountup(priceEl: HTMLElement): void {
     const elapsed = now - t0;
     const t = Math.min(1, elapsed / PRICE_COUNTUP_MS);
     if (t >= 1) {
-      // Lock to the canonical integer at rest so the final HTML is
-      // byte-identical to the SSR markup the digits were rendered
-      // from. No rounding drift, no off-by-one.
+      // Restore the SSR-shaped grouped markup once at rest so commas
+      // get the muted `.sep` color and the final HTML is byte-identical
+      // to SSR. One innerHTML write here is fine — the per-frame
+      // restructuring during the climb is what caused the stutter.
       digitsEl.innerHTML = formatPriceGroupsHTML(finalValue);
       return;
     }
-    const v = startValue + (finalValue - startValue) * easeOutCubic(t);
-    digitsEl.innerHTML = formatPriceGroupsHTML(v);
+    const v = startValue + (finalValue - startValue) * easeOutQuart(t);
+    // Single text-node write per frame — no child-element churn, so
+    // layout/paint stay on the fast path and the climb reads as smooth.
+    digitsEl.textContent = formatPriceGroupsText(v);
     requestAnimationFrame(tick);
   };
   requestAnimationFrame(tick);
