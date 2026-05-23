@@ -249,3 +249,21 @@ export const MINIMAL_PAYLOAD: PublicPayload = {
   // them off the MINIMAL payload to prove the "no reviews in
   // Settings → block hides cleanly" graceful state.)
 };
+
+/**
+ * A7d.5 — outlink-only payload variant. An agent who has set the Zillow
+ * reviews link in Settings but has not typed any reviews. The reviews
+ * block must render the compact standalone CTA card (no
+ * "From families like yours" lead-in, no empty quote rows).
+ *
+ * Mirrors MINIMAL_PAYLOAD except for the reviewsOutlink presence — keeps
+ * the rest of the editorial surface minimal so the render proof isolates
+ * the reviews-block variant.
+ */
+export const OUTLINK_ONLY_PAYLOAD: PublicPayload = {
+  ...MINIMAL_PAYLOAD,
+  reviewsOutlink: {
+    label: "See all reviews on Zillow",
+    url: "https://www.zillow.com/profile/aarontest",
+  },
+};

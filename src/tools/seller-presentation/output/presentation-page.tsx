@@ -23,8 +23,9 @@ import "./presentation-page.css";
  *
  * Graceful states for the optional blocks that survived:
  *   - video null         → video block hidden entirely
- *   - reviews null/empty → reviews block hidden entirely
- *   - reviewsOutlink null → outlink hidden (block still shows)
+ *   - reviews null/empty AND outlink null → reviews block hidden entirely
+ *   - reviews populated, outlink null → full block, no trailing CTA link
+ *   - reviews null/empty, outlink set → compact outlink-only CTA (A7d.5)
  *   - areaStats null     → "snapshot coming soon" treatment
  *   - agent.photoUrl null → monogram well in same dimensions
  */
@@ -354,7 +355,48 @@ function PitchSection({ payload }: { payload: PublicPayload }) {
 
 function ReviewsSection({ payload }: { payload: PublicPayload }) {
   const reviews = payload.reviews ?? [];
-  if (reviews.length === 0) return null;
+  const outlink = payload.reviewsOutlink;
+
+  // Block hides only when BOTH are empty. With typed reviews, render
+  // the full editorial block; with no typed reviews but an outlink set,
+  // render the compact CTA-only variant (Dallen smoke 2026-05-23 — agents
+  // commonly configure only the Zillow link and skip typed quotes).
+  if (reviews.length === 0 && !outlink) return null;
+
+  if (reviews.length === 0 && outlink) {
+    // Standalone outlink CTA: a calm, on-brand trust card. No
+    // "From families like yours" lead-in — that copy reads broken
+    // without quotes beneath it. The agent's first name (best-effort
+    // parse off `agent.name`) personalizes the CTA without exposing
+    // the full attributed name unnecessarily.
+    const agentFirst = (payload.agent?.name ?? "").trim().split(/\s+/)[0];
+    const ctaCopy = agentFirst
+      ? `Read ${agentFirst}'s reviews on Zillow`
+      : "Read past-client reviews on Zillow";
+    return (
+      <section
+        className="reviews reviews--outlink-only"
+        data-testid="sep-reviews"
+        data-variant="outlink-only"
+      >
+        <div className="sec-label reveal">
+          <span className="num">04</span>
+          <span className="lbl" />
+          <span className="name">In their words</span>
+        </div>
+        <a
+          className="reviews-outlink-card reveal"
+          href={outlink.url}
+          target="_blank"
+          rel="noopener noreferrer"
+          data-testid="sep-reviews-outlink-cta"
+        >
+          <span className="reviews-outlink-card-copy">{ctaCopy}</span>
+          <span className="reviews-outlink-card-meta">{outlink.label}</span>
+        </a>
+      </section>
+    );
+  }
 
   return (
     <section className="reviews" data-testid="sep-reviews">
@@ -393,14 +435,14 @@ function ReviewsSection({ payload }: { payload: PublicPayload }) {
         ))}
       </div>
 
-      {payload.reviewsOutlink && (
+      {outlink && (
         <a
           className="reviews-outlink reveal"
-          href={payload.reviewsOutlink.url}
+          href={outlink.url}
           target="_blank"
           rel="noopener noreferrer"
         >
-          {payload.reviewsOutlink.label}
+          {outlink.label}
         </a>
       )}
     </section>

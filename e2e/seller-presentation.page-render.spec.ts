@@ -134,6 +134,36 @@ test.describe('Seller Presentation — A7b premium page render', () => {
     await expect(area).toContainText('A market snapshot is on the way.');
   });
 
+  test('A7d.5 — outlink-only fixture renders compact CTA + hides "From families like yours"', async ({
+    page,
+  }) => {
+    // Dallen smoke 2026-05-23: an agent who fills ONLY the Zillow
+    // reviews link in Settings (no typed reviews) used to get NO
+    // reviews block at all — the renderer hid the whole section. A7d.5
+    // promotes the outlink to a standalone CTA so the trust signal
+    // still lands.
+    await page.goto('/seller-presentation-preview?fixture=outlink-only');
+
+    // The reviews section IS present (variant = outlink-only).
+    const reviews = page.getByTestId('sep-reviews');
+    await expect(reviews).toBeVisible();
+    await expect(reviews).toHaveAttribute('data-variant', 'outlink-only');
+
+    // The standalone CTA card is the entry point — and it points at
+    // the configured Zillow URL.
+    const cta = page.getByTestId('sep-reviews-outlink-cta');
+    await expect(cta).toBeVisible();
+    await expect(cta).toHaveAttribute('target', '_blank');
+    const href = await cta.getAttribute('href');
+    expect(href).toContain('zillow.com');
+
+    // The full reviews block's lead-in headline must NOT render —
+    // that copy reads broken without typed quotes beneath it.
+    await expect(reviews).not.toContainText('From families');
+    // No empty quote rows either.
+    await expect(page.locator('.sep-presentation .review')).toHaveCount(0);
+  });
+
   test('caption-card preserves legibility independent of the hero photo', async ({
     page,
   }) => {

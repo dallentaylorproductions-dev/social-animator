@@ -101,9 +101,61 @@ export function VideoUploadField({
   const fileRef = useRef<HTMLInputElement>(null);
   const [uploading, setUploading] = useState(false);
   const [error, setError] = useState<string | null>(null);
+  // A7d.5 — upload-progress percentage. `null` means "in-flight but no
+  // progress event yet" (handshake before the byte stream starts) →
+  // render the bar in indeterminate mode. A number 0–100 → determinate
+  // bar + label. Reset to null on every fresh upload attempt.
+  const [progressPct, setProgressPct] = useState<number | null>(null);
 
   const tid = (suffix: string) =>
     testIdPrefix ? `${testIdPrefix}-${suffix}` : undefined;
+
+  // A7d.5 — visible upload-progress indicator. Determinate when the
+  // SDK has reported at least one percentage event, indeterminate
+  // before that (handshake / first chunk). Reduced-motion-safe: no
+  // sweeping animation — the bar fills cleanly, and the indeterminate
+  // state uses a static striped fill instead of a moving marquee.
+  const progressLabel =
+    progressPct === null
+      ? "Uploading…"
+      : `Uploading… ${Math.round(progressPct)}%`;
+  const progressBar = uploading ? (
+    <div
+      className="mt-2"
+      role="status"
+      aria-live="polite"
+      data-testid={tid("progress")}
+    >
+      <div
+        className="h-1 w-full overflow-hidden rounded bg-neutral-800"
+        aria-hidden="true"
+      >
+        <div
+          className={
+            progressPct === null
+              ? "h-full w-1/3 bg-mint/70"
+              : "h-full bg-mint transition-[width] duration-150 ease-linear"
+          }
+          style={
+            progressPct === null
+              ? undefined
+              : { width: `${Math.max(0, Math.min(100, progressPct))}%` }
+          }
+          data-testid={tid("progress-fill")}
+          data-progress-mode={progressPct === null ? "indeterminate" : "determinate"}
+          data-progress-pct={
+            progressPct === null ? "" : String(Math.round(progressPct))
+          }
+        />
+      </div>
+      <p
+        className="mt-1 text-[10px] uppercase tracking-[0.15em] text-neutral-500"
+        data-testid={tid("progress-label")}
+      >
+        {progressLabel}
+      </p>
+    </div>
+  ) : null;
 
   const handleFile = async (file: File) => {
     setError(null);
@@ -156,6 +208,7 @@ export function VideoUploadField({
     }
 
     setUploading(true);
+    setProgressPct(null);
     try {
       // Browser → Vercel Blob direct upload (A7d.3.1).
       //
@@ -173,6 +226,13 @@ export function VideoUploadField({
       // real upload still benefits, but above the size used by
       // route-level / round-trip E2E fixtures so those exercise the
       // simpler PUT path.
+      //
+      // A7d.5 — `onUploadProgress` is fired by @vercel/blob 2.4.0
+      // throughout the byte stream (both single-PUT and multipart
+      // paths). The handshake POST that precedes it does NOT fire the
+      // callback, so the bar starts indeterminate until the first
+      // event lands; once a percentage arrives it switches to
+      // determinate so the agent sees concrete movement.
       const ext = extensionForType(file.type);
       const folderSegment = folder ?? "uploads";
       const pathname = `${folderSegment}/${Date.now()}.${ext}`;
@@ -182,6 +242,15 @@ export function VideoUploadField({
         handleUploadUrl: "/api/upload-video",
         contentType: file.type,
         multipart: file.size > MULTIPART_THRESHOLD,
+        onUploadProgress: (e) => {
+          if (typeof e?.percentage === "number" && Number.isFinite(e.percentage)) {
+            // Clamp into [0, 100] — the SDK normally stays in range
+            // but a slightly-over-100 final tick has been seen in the
+            // multipart path.
+            const pct = Math.max(0, Math.min(100, e.percentage));
+            setProgressPct(pct);
+          }
+        },
       });
       if (!result.url || !/^https?:\/\//.test(result.url)) {
         throw new Error("Upload did not return a hosted URL");
@@ -194,6 +263,7 @@ export function VideoUploadField({
       setError(err instanceof Error ? err.message : "Upload failed");
     } finally {
       setUploading(false);
+      setProgressPct(null);
       if (fileRef.current) fileRef.current.value = "";
     }
   };
@@ -248,19 +318,23 @@ export function VideoUploadField({
               Remove
             </button>
           </div>
+          {progressBar}
         </div>
       ) : (
-        <button
-          type="button"
-          disabled={uploading}
-          onClick={() => fileRef.current?.click()}
-          className="block w-full bg-neutral-900 border border-dashed border-neutral-700 hover:border-mint rounded-md px-3 py-6 text-xs text-neutral-400 hover:text-neutral-200 transition text-center disabled:opacity-60"
-          data-testid={tid("upload")}
-        >
-          {uploading
-            ? "Uploading…"
-            : "Choose a video from your camera roll"}
-        </button>
+        <>
+          <button
+            type="button"
+            disabled={uploading}
+            onClick={() => fileRef.current?.click()}
+            className="block w-full bg-neutral-900 border border-dashed border-neutral-700 hover:border-mint rounded-md px-3 py-6 text-xs text-neutral-400 hover:text-neutral-200 transition text-center disabled:opacity-60"
+            data-testid={tid("upload")}
+          >
+            {uploading
+              ? "Uploading…"
+              : "Choose a video from your camera roll"}
+          </button>
+          {progressBar}
+        </>
       )}
 
       {error && (

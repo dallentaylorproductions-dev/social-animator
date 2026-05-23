@@ -1,4 +1,6 @@
 import { test, expect } from '@playwright/test';
+import { readFileSync } from 'node:fs';
+import { resolve } from 'node:path';
 
 /**
  * Seller Presentation — walk-through video upload
@@ -221,6 +223,70 @@ test.describe('Seller Presentation — A7d.3.1 walk-through video', () => {
       await page.goto('/seller-presentation-preview?fixture=minimal');
       await expect(page.getByTestId('seller-presentation-public')).toBeVisible();
       await expect(page.getByTestId('sep-video')).toHaveCount(0);
+    });
+  });
+
+  /*
+   * A7d.5 — visible upload progress.
+   *
+   * Dallen smoke 2026-05-22: real phone clips uploaded successfully
+   * (A7d.3.1 fix) but the wait felt stalled — no UI signal advanced
+   * while bytes streamed. A7d.5 wires `onUploadProgress` from
+   * @vercel/blob/client 2.4.0 to a visible determinate progress bar
+   * (indeterminate until the first event lands), and disables the
+   * Add/Replace control mid-upload so a double-submit can't race the
+   * SDK's token handshake.
+   *
+   * No-browser-upload e2e test — the inline-upload e2e path would
+   * need both a valid decodable MP4 fixture AND a stub of the
+   * Vercel-Blob PUT endpoint to drive the bar deterministically.
+   * Until that fixture exists, this spec proves the wiring on the
+   * component contract directly (source grep) — the same shape as
+   * other A7d wiring proofs in this suite where browser-level
+   * exercise isn't tractable.
+   */
+  test.describe('Wiring — onUploadProgress + progress UI', () => {
+    test('VideoUploadField passes onUploadProgress to @vercel/blob/client and renders a progress bar', () => {
+      const src = readFileSync(
+        resolve(process.cwd(), 'src/components/VideoUploadField.tsx'),
+        'utf8',
+      );
+
+      // 1) The SDK's progress callback is wired into the upload() options.
+      expect(src).toMatch(/onUploadProgress\s*:/);
+      // The callback reads `percentage` off the event (per the
+      // @vercel/blob 2.4.0 UploadProgressEvent shape).
+      expect(src).toMatch(/\.percentage/);
+
+      // 2) A determinate progress UI lives in the render tree.
+      expect(src).toContain('data-testid={tid("progress")}');
+      expect(src).toContain('data-testid={tid("progress-fill")}');
+      // Indeterminate fallback is present (so the bar shows even
+      // before the first onUploadProgress event lands).
+      expect(src).toMatch(/data-progress-mode=/);
+
+      // 3) The Replace + Remove controls are disabled mid-upload so
+      //    an agent can't double-submit (already true pre-A7d.5, but
+      //    assert it here to lock the contract).
+      expect(src).toMatch(/disabled=\{uploading\}/);
+
+      // 4) Progress state is reset on completion AND failure (the
+      //    `finally` block scrubs both `uploading` and `progressPct`).
+      expect(src).toMatch(/setProgressPct\(null\)/);
+    });
+
+    test('Installed @vercel/blob version supports onUploadProgress (UploadProgressEvent shipped in 2.x)', () => {
+      // Lock in the SDK version we tested against. If a future bump
+      // changes the callback shape, this test fails fast (rather
+      // than the bar silently going dead in production).
+      const pkg = JSON.parse(
+        readFileSync(resolve(process.cwd(), 'package.json'), 'utf8'),
+      ) as { dependencies?: Record<string, string> };
+      const blobVersion = pkg.dependencies?.['@vercel/blob'];
+      expect(blobVersion).toBeTruthy();
+      // The shape we depend on shipped in 2.x. Allow ^2.x (the
+      // semver range in package.json).
+      expect(blobVersion).toMatch(/^[\^~]?2\./);
     });
   });
 });

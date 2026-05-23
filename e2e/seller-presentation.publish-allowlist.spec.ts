@@ -454,6 +454,34 @@ test.describe('toPublicPayload — privacy allowlist (R-1 proof)', () => {
     expect(payload.reviewsOutlink).toBeUndefined();
   });
 
+  test('A7d.5 — outlink-only Settings (no typed reviews) carries the outlink through to the payload', () => {
+    // Dallen smoke 2026-05-23: agents commonly configure ONLY the
+    // Zillow link in Settings (no typed reviews). The projector must
+    // still emit `reviewsOutlink` so the renderer can show the
+    // standalone CTA — and `reviews` must stay undefined so the
+    // renderer doesn't try to map over an empty array.
+    const draft = maxedDraft();
+    const payload = toPublicPayload(draft, FIXTURE_AGENT_CONTACT, {
+      // reviews intentionally omitted (the brand-Settings shape allows it)
+      reviewsOutlinkUrl: 'https://www.zillow.com/profile/aaron-only-outlink',
+    });
+
+    expect(payload.reviews).toBeUndefined();
+    expect(payload.reviewsOutlink).toBeDefined();
+    expect(payload.reviewsOutlink?.url).toBe(
+      'https://www.zillow.com/profile/aaron-only-outlink',
+    );
+    expect(payload.reviewsOutlink?.label).toBe('See all reviews on Zillow');
+
+    // No leak: the outlink-only payload must NOT smuggle private draft
+    // fields through (the standalone-outlink path uses the same
+    // projection rails, but assert it explicitly so a future refactor
+    // can't quietly weaken the boundary).
+    const serialized = JSON.stringify(payload);
+    expect(serialized).not.toContain(S.pricingStrategyId);
+    expect(serialized).not.toContain(S.preAppointmentNotes);
+  });
+
   test('A7d.2 — incomplete review row (missing body or attribution) drops on projection', () => {
     const draft = maxedDraft();
     const payload = toPublicPayload(draft, FIXTURE_AGENT_CONTACT, {

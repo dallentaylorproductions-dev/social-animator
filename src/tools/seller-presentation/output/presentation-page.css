@@ -783,6 +783,53 @@
   font-size: 14px;
 }
 
+/* A7d.5 — outlink-only variant: no typed reviews, just the Zillow CTA.
+   Compact, calm card (1:1 trust note, not a banner). Pads less than the
+   full reviews block so the editorial rhythm stays even when the page is
+   shorter overall. */
+.sep-presentation .reviews--outlink-only {
+  padding: 44px var(--sep-gutter) 40px;
+}
+.sep-presentation .reviews-outlink-card {
+  margin-top: 18px;
+  display: flex;
+  flex-direction: column;
+  gap: 6px;
+  padding: 22px 24px;
+  border: 1px solid var(--paper-line);
+  border-radius: 4px;
+  background: var(--paper);
+  text-decoration: none;
+  color: var(--ink);
+  transition: border-color var(--ease) 180ms, transform var(--ease) 180ms;
+  max-width: 38ch;
+}
+.sep-presentation .reviews-outlink-card:hover {
+  border-color: var(--brick);
+}
+.sep-presentation .reviews-outlink-card-copy {
+  font-family: var(--sep-display);
+  font-size: 19px;
+  line-height: 1.3;
+  letter-spacing: -0.005em;
+  color: var(--ink);
+}
+.sep-presentation .reviews-outlink-card-meta {
+  font-family: var(--sep-mono);
+  font-size: 10px;
+  letter-spacing: 0.16em;
+  text-transform: uppercase;
+  color: var(--ink-faint);
+  display: inline-flex;
+  align-items: center;
+  gap: 8px;
+}
+.sep-presentation .reviews-outlink-card-meta::after {
+  content: "→";
+  color: var(--brick);
+  font-size: 12px;
+}
+
 /* =====================================================================
    AREA STATS + CHART
    ===================================================================== */

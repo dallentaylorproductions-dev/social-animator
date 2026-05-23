@@ -4,6 +4,7 @@ import { SellerPresentationPage } from "@/tools/seller-presentation/output/prese
 import {
   FULL_PAYLOAD,
   MINIMAL_PAYLOAD,
+  OUTLINK_ONLY_PAYLOAD,
 } from "@/tools/seller-presentation/output/__fixtures__/sample-payload";
 
 /**
@@ -37,14 +38,26 @@ interface PageProps {
 
 export default async function SellerPresentationPreview({ searchParams }: PageProps) {
   const { fixture } = await searchParams;
-  const variant = fixture === "minimal" ? "minimal" : fixture === "full" ? "full" : null;
+  const variant =
+    fixture === "minimal"
+      ? "minimal"
+      : fixture === "full"
+        ? "full"
+        : fixture === "outlink-only"
+          ? "outlink-only"
+          : null;
   if (!variant) {
     // No (or unknown) fixture → 404. Forces explicit `?fixture=…`
     // so an accidental link doesn't render a default page.
     notFound();
   }
 
-  const payload = variant === "minimal" ? MINIMAL_PAYLOAD : FULL_PAYLOAD;
+  const payload =
+    variant === "minimal"
+      ? MINIMAL_PAYLOAD
+      : variant === "outlink-only"
+        ? OUTLINK_ONLY_PAYLOAD
+        : FULL_PAYLOAD;
 
   // Wrap the fixture payload in a HandoutRecord so the renderer's
   // contract matches the production /h/[slug] path exactly. The
