@@ -1,8 +1,11 @@
 "use client";
 
-import { useEffect, useState } from "react";
+import { useEffect, useMemo, useState } from "react";
 import { ImageUploadField } from "@/components/ImageUploadField";
 import { VideoUploadField } from "@/components/VideoUploadField";
+import { CurrencyInput } from "@/components/inputs/CurrencyInput";
+import { NumberInput } from "@/components/inputs/NumberInput";
+import { PercentInput } from "@/components/inputs/PercentInput";
 import type {
   AreaStats,
   AreaStatsMonthly,
@@ -54,7 +57,7 @@ const SECTIONS: SectionDef[] = [
     key: "areaStats",
     title: "Area snapshot",
     purpose:
-      "Stats for the seller's neighborhood. Each field is optional; leave any you don't have.",
+      "Builds the animated neighborhood chart + stats block on the seller's page. Each field is optional — fill what you have.",
     addLabel: "+ Add an area snapshot",
   },
 ];
@@ -336,6 +339,143 @@ function formatRuntime(totalSeconds: number): string {
 // =====================================================================
 
 const MAX_MONTHLY = 12;
+const DEFAULT_MONTHLY_COUNT = 6;
+
+const MONTH_SHORT_NAMES = [
+  "Jan",
+  "Feb",
+  "Mar",
+  "Apr",
+  "May",
+  "Jun",
+  "Jul",
+  "Aug",
+  "Sep",
+  "Oct",
+  "Nov",
+  "Dec",
+] as const;
+
+/** Today's month in the native <input type="month"> "YYYY-MM" format. */
+function currentMonthYYYYMM(): string {
+  const d = new Date();
+  return `${d.getFullYear()}-${String(d.getMonth() + 1).padStart(2, "0")}`;
+}
+
+/** "2026-05" → "May '26"; falls back to the input if unparseable. */
+function formatMonthLabel(yyyyMm: string): string {
+  const match = /^(\d{4})-(\d{2})$/.exec(yyyyMm);
+  if (!match) return yyyyMm;
+  const year = parseInt(match[1], 10);
+  const monthIdx = parseInt(match[2], 10) - 1;
+  if (
+    !Number.isFinite(year) ||
+    monthIdx < 0 ||
+    monthIdx >= MONTH_SHORT_NAMES.length
+  ) {
+    return yyyyMm;
+  }
+  return `${MONTH_SHORT_NAMES[monthIdx]} '${String(year).slice(-2)}`;
+}
+
+/**
+ * Best-effort parse of a free-text month label like "May '26", "May 2026",
+ * "may 26", or "2026-05" back into "YYYY-MM". Returns null if no recognized
+ * form. Used to recover a "latest month" anchor from a persisted draft
+ * (including older drafts written by the free-text editor pre-A7d.4).
+ */
+function parseMonthLabel(label: string): string | null {
+  if (!label) return null;
+  const isoMatch = /^(\d{4})-(\d{1,2})$/.exec(label.trim());
+  if (isoMatch) {
+    const y = parseInt(isoMatch[1], 10);
+    const m = parseInt(isoMatch[2], 10);
+    if (m >= 1 && m <= 12) {
+      return `${y}-${String(m).padStart(2, "0")}`;
+    }
+  }
+  const wordMatch = /^([A-Za-z]{3,})\s*'?(\d{2,4})$/.exec(label.trim());
+  if (!wordMatch) return null;
+  const monthName = wordMatch[1].toLowerCase().slice(0, 3);
+  const monthIdx = MONTH_SHORT_NAMES.findIndex(
+    (n) => n.toLowerCase() === monthName,
+  );
+  if (monthIdx < 0) return null;
+  let year = parseInt(wordMatch[2], 10);
+  if (!Number.isFinite(year)) return null;
+  if (year < 100) year += 2000;
+  return `${year}-${String(monthIdx + 1).padStart(2, "0")}`;
+}
+
+/**
+ * Generate a chronological list of "YYYY-MM" strings ending at `latestYyyyMm`
+ * and going back `count` months (inclusive). Result is oldest-first so the
+ * chart's left-to-right reading matches the array order.
+ */
+function monthsEndingAt(latestYyyyMm: string, count: number): string[] {
+  const match = /^(\d{4})-(\d{2})$/.exec(latestYyyyMm);
+  if (!match) return [];
+  const year = parseInt(match[1], 10);
+  const monthIdx = parseInt(match[2], 10) - 1;
+  if (
+    !Number.isFinite(year) ||
+    monthIdx < 0 ||
+    monthIdx >= 12 ||
+    count < 1
+  ) {
+    return [];
+  }
+  const out: string[] = [];
+  for (let i = count - 1; i >= 0; i--) {
+    const d = new Date(year, monthIdx - i, 1);
+    out.push(
+      `${d.getFullYear()}-${String(d.getMonth() + 1).padStart(2, "0")}`,
+    );
+  }
+  return out;
+}
+
+interface AreaMonthlyEditorState {
+  latestMonth: string;
+  count: number;
+  /** Map from auto-generated label (e.g. "May '26") to the typed price. */
+  prices: Record<string, string>;
+}
+
+/**
+ * Derive the editor state from the persisted series. Picks the most-recent
+ * recognizable month as the anchor, defaults the count to the persisted
+ * length (clamped), and seeds the price map from the persisted entries.
+ * Legacy entries whose label can't be parsed keep their prices recorded
+ * (so they re-appear if the auto-generated labels happen to match).
+ */
+function deriveMonthlyEditorState(
+  persisted: AreaStatsMonthly[],
+): AreaMonthlyEditorState {
+  const prices: Record<string, string> = {};
+  for (const row of persisted) {
+    if (row.month) prices[row.month] = row.medianPrice;
+  }
+  // Find the freshest parseable month in the persisted series. Series is
+  // typically oldest-first, so we scan from the tail for the latest one.
+  let latest: string | null = null;
+  for (let i = persisted.length - 1; i >= 0; i--) {
+    const parsed = parseMonthLabel(persisted[i].month);
+    if (parsed) {
+      latest = parsed;
+      break;
+    }
+  }
+  const count = Math.max(
+    1,
+    Math.min(MAX_MONTHLY, persisted.length || DEFAULT_MONTHLY_COUNT),
+  );
+  return {
+    latestMonth: latest ?? currentMonthYYYYMM(),
+    count,
+    prices,
+  };
+}
 
 function AreaStatsEditor({ draft, setDraft }: StepEditorialProps) {
   const stats: AreaStats = draft.areaStats ?? {};
@@ -349,72 +489,129 @@ function AreaStatsEditor({ draft, setDraft }: StepEditorialProps) {
     setDraft({ ...draft, areaStats: hasAny ? next : undefined });
   };
 
-  const series: AreaStatsMonthly[] = stats.monthlySeries ?? [];
+  // ---- Monthly chart editor ----
+  // Local UI state for the chart input (latest month + how many months to
+  // show + a price map keyed by friendly label). Initialized SSR-safely
+  // from the persisted draft + seeded with the current month + a 6-month
+  // default so the editor never renders empty on first open.
+  //
+  // SSR-safe pattern (Substrate §9): start with a stable initial value
+  // (DEFAULT_MONTHLY_COUNT around the current month, no persisted prices)
+  // so server + first client render match, then hydrate from the draft in
+  // a useEffect.
+  const persistedSeries: AreaStatsMonthly[] = stats.monthlySeries ?? [];
+  const [editor, setEditor] = useState<AreaMonthlyEditorState>(() => ({
+    latestMonth: currentMonthYYYYMM(),
+    count: DEFAULT_MONTHLY_COUNT,
+    prices: {},
+  }));
+  useEffect(() => {
+    if (persistedSeries.length > 0) {
+      setEditor(deriveMonthlyEditorState(persistedSeries));
+    }
+    // Run only on mount; subsequent draft edits originate FROM this editor,
+    // so re-deriving on every persisted-series change would echo back and
+    // overwrite the user's latest typing.
+    // eslint-disable-next-line react-hooks/exhaustive-deps
+  }, []);
 
-  const updateSeries = (next: AreaStatsMonthly[]) => {
-    update({ monthlySeries: next.length ? next : undefined });
+  const labels = useMemo(
+    () =>
+      monthsEndingAt(editor.latestMonth, editor.count).map((iso) => ({
+        iso,
+        display: formatMonthLabel(iso),
+      })),
+    [editor.latestMonth, editor.count],
+  );
+
+  /**
+   * Persist the chart series. We only write rows whose price is non-empty
+   * so a half-filled editor doesn't push empty entries into the chart
+   * (the renderer's parsePriceToNumber returns null for those, but they
+   * would still pollute the x-axis tick positions).
+   */
+  const persistSeries = (
+    nextLabels: { iso: string; display: string }[],
+    nextPrices: Record<string, string>,
+  ) => {
+    const rows: AreaStatsMonthly[] = nextLabels
+      .map(({ display }) => ({
+        month: display,
+        medianPrice: nextPrices[display] ?? "",
+      }))
+      .filter((row) => row.medianPrice.trim().length > 0);
+    update({ monthlySeries: rows.length ? rows : undefined });
   };
 
-  const updateMonth = (idx: number, patch: Partial<AreaStatsMonthly>) => {
-    updateSeries(series.map((m, i) => (i === idx ? { ...m, ...patch } : m)));
+  const setLatestMonth = (next: string) => {
+    const safe = next || currentMonthYYYYMM();
+    const nextLabels = monthsEndingAt(safe, editor.count).map((iso) => ({
+      iso,
+      display: formatMonthLabel(iso),
+    }));
+    setEditor((prev) => ({ ...prev, latestMonth: safe }));
+    persistSeries(nextLabels, editor.prices);
   };
 
-  const addMonth = () => {
-    if (series.length >= MAX_MONTHLY) return;
-    updateSeries([...series, { month: "", medianPrice: "" }]);
+  const setCount = (next: number) => {
+    const safe = Math.max(1, Math.min(MAX_MONTHLY, Math.round(next)));
+    const nextLabels = monthsEndingAt(editor.latestMonth, safe).map((iso) => ({
+      iso,
+      display: formatMonthLabel(iso),
+    }));
+    setEditor((prev) => ({ ...prev, count: safe }));
+    persistSeries(nextLabels, editor.prices);
   };
 
-  const removeMonth = (idx: number) => {
-    updateSeries(series.filter((_, i) => i !== idx));
+  const setPriceFor = (label: string, price: string) => {
+    const nextPrices = { ...editor.prices, [label]: price };
+    setEditor((prev) => ({ ...prev, prices: nextPrices }));
+    persistSeries(labels, nextPrices);
   };
 
   return (
     <>
+      {/* Discovery framing — make the chart payoff unmistakable so the
+          agent realizes this section is what populates the animated
+          neighborhood chart on the published page. */}
+      <AreaChartHint />
+
       <div className="grid grid-cols-1 gap-3 sm:grid-cols-2">
         <label className="block">
           <span className="text-[10px] uppercase tracking-[0.15em] text-neutral-500">
             Median sale price
           </span>
-          <input
-            type="text"
+          <CurrencyInput
             className={`${inputCls} mt-1`}
             value={stats.medianSale ?? ""}
-            onChange={(e) =>
-              update({ medianSale: e.target.value || undefined })
-            }
-            placeholder="$642k"
-            data-testid="step-editorial-area-median-sale"
+            onChange={(v) => update({ medianSale: v || undefined })}
+            placeholder="$642,000"
+            aria-label="area-median-sale"
           />
         </label>
         <label className="block">
           <span className="text-[10px] uppercase tracking-[0.15em] text-neutral-500">
             Year-over-year change
           </span>
-          <input
-            type="text"
+          <PercentInput
             className={`${inputCls} mt-1`}
             value={stats.medianSaleDeltaYoy ?? ""}
-            onChange={(e) =>
-              update({ medianSaleDeltaYoy: e.target.value || undefined })
-            }
-            placeholder="+4.1% vs prior year"
-            data-testid="step-editorial-area-yoy"
+            onChange={(v) => update({ medianSaleDeltaYoy: v || undefined })}
+            placeholder="+4.6%"
+            signed
+            aria-label="area-yoy"
           />
         </label>
         <label className="block">
           <span className="text-[10px] uppercase tracking-[0.15em] text-neutral-500">
             Days on market
           </span>
-          <input
-            type="text"
-            inputMode="numeric"
+          <NumberInput
             className={`${inputCls} mt-1`}
             value={stats.daysOnMarket ?? ""}
-            onChange={(e) =>
-              update({ daysOnMarket: e.target.value || undefined })
-            }
+            onChange={(v) => update({ daysOnMarket: v || undefined })}
             placeholder="14"
-            data-testid="step-editorial-area-dom"
+            aria-label="area-dom"
           />
         </label>
         <label className="block">
@@ -436,99 +633,135 @@ function AreaStatsEditor({ draft, setDraft }: StepEditorialProps) {
           <span className="text-[10px] uppercase tracking-[0.15em] text-neutral-500">
             Closings in last 90 days
           </span>
-          <input
-            type="text"
-            inputMode="numeric"
+          <NumberInput
             className={`${inputCls} mt-1`}
             value={stats.closings90d ?? ""}
-            onChange={(e) =>
-              update({ closings90d: e.target.value || undefined })
-            }
+            onChange={(v) => update({ closings90d: v || undefined })}
             placeholder="38"
-            data-testid="step-editorial-area-closings"
+            aria-label="area-closings"
           />
         </label>
         <label className="block">
           <span className="text-[10px] uppercase tracking-[0.15em] text-neutral-500">
             List-to-sale ratio
           </span>
-          <input
-            type="text"
+          <PercentInput
             className={`${inputCls} mt-1`}
             value={stats.listToSaleRatio ?? ""}
-            onChange={(e) =>
-              update({ listToSaleRatio: e.target.value || undefined })
-            }
+            onChange={(v) => update({ listToSaleRatio: v || undefined })}
             placeholder="101%"
-            data-testid="step-editorial-area-ratio"
+            aria-label="area-ratio"
           />
         </label>
       </div>
 
-      <div className="space-y-2 border-t border-neutral-800 pt-3">
+      <div
+        className="space-y-3 border-t border-neutral-800 pt-3"
+        data-testid="step-editorial-area-monthly"
+      >
         <div className="text-[10px] uppercase tracking-[0.15em] text-neutral-500">
-          Median price by month (up to {MAX_MONTHLY})
+          Median price by month
         </div>
         <p className="text-xs text-neutral-500">
-          Drives the chart on the page. Add as many months as you have. The
-          chart shows whatever you give it.
+          We label the months automatically. Pick the latest month + how many
+          months of history you have, then fill in the prices you know.
         </p>
-        {series.length === 0 && (
-          <p className="text-xs italic text-neutral-500">
-            No months yet. Add one to start.
-          </p>
-        )}
-        {series.length > 0 && (
-          <div className="space-y-2">
-            {series.map((m, idx) => (
+
+        <div className="grid grid-cols-1 gap-3 sm:grid-cols-2">
+          <label className="block">
+            <span className="text-[10px] uppercase tracking-[0.15em] text-neutral-500">
+              Latest month
+            </span>
+            <input
+              type="month"
+              className={`${inputCls} mt-1`}
+              value={editor.latestMonth}
+              onChange={(e) => setLatestMonth(e.target.value)}
+              data-testid="step-editorial-area-latest-month"
+            />
+          </label>
+          <label className="block">
+            <span className="text-[10px] uppercase tracking-[0.15em] text-neutral-500">
+              Months of history (1–{MAX_MONTHLY})
+            </span>
+            <input
+              type="number"
+              min={1}
+              max={MAX_MONTHLY}
+              inputMode="numeric"
+              className={`${inputCls} mt-1`}
+              value={editor.count}
+              onChange={(e) => {
+                const parsed = parseInt(e.target.value, 10);
+                if (Number.isFinite(parsed)) setCount(parsed);
+              }}
+              data-testid="step-editorial-area-month-count"
+            />
+          </label>
+        </div>
+
+        <div className="space-y-2">
+          {labels.map(({ display }, idx) => (
+            <div
+              key={display}
+              className="grid grid-cols-[5.5rem_1fr] items-center gap-2"
+              data-testid={`step-editorial-area-month-${idx}`}
+            >
               <div
-                key={idx}
-                className="grid grid-cols-[1fr_1fr_auto] items-center gap-2"
-                data-testid={`step-editorial-area-month-${idx}`}
+                className="text-xs text-neutral-400"
+                data-testid={`step-editorial-area-month-label-${idx}`}
               >
-                <input
-                  type="text"
-                  className={inputCls}
-                  value={m.month}
-                  onChange={(e) => updateMonth(idx, { month: e.target.value })}
-                  placeholder="May '26"
-                  data-testid={`step-editorial-area-month-label-${idx}`}
-                />
-                <input
-                  type="text"
-                  inputMode="numeric"
-                  className={inputCls}
-                  value={m.medianPrice}
-                  onChange={(e) =>
-                    updateMonth(idx, { medianPrice: e.target.value })
-                  }
-                  placeholder="642000"
-                  data-testid={`step-editorial-area-month-value-${idx}`}
-                />
-                <button
-                  type="button"
-                  onClick={() => removeMonth(idx)}
-                  className="text-xs text-neutral-500 hover:text-red-400"
-                  data-testid={`step-editorial-area-month-remove-${idx}`}
-                >
-                  Remove
-                </button>
+                {display}
               </div>
-            ))}
-          </div>
-        )}
-        {series.length < MAX_MONTHLY && (
-          <button
-            type="button"
-            onClick={addMonth}
-            data-testid="step-editorial-area-month-add"
-            className="rounded border border-neutral-700 px-3 py-1.5 text-xs text-text-primary hover:bg-neutral-800"
-          >
-            + Add a month
-          </button>
-        )}
+              <CurrencyInput
+                className={inputCls}
+                value={editor.prices[display] ?? ""}
+                onChange={(v) => setPriceFor(display, v)}
+                placeholder="$642,000"
+                aria-label={`area-month-${idx}-price`}
+              />
+            </div>
+          ))}
+        </div>
       </div>
     </>
+  );
+}
+
+/**
+ * Inline hint that makes the Area-snapshot payoff visible inside the wizard.
+ * A tiny SVG of the line chart + one sentence of value framing — the
+ * static-discovery cure (the live-preview "Preview button" track is parked).
+ */
+function AreaChartHint() {
+  return (
+    <div
+      className="flex items-center gap-3 rounded border border-mint/30 bg-mint/5 px-3 py-2 text-xs text-mint"
+      data-testid="step-editorial-area-hint"
+    >
+      <svg
+        width="40"
+        height="22"
+        viewBox="0 0 40 22"
+        fill="none"
+        aria-hidden="true"
+        className="shrink-0"
+      >
+        <path
+          d="M2 18 L10 12 L18 14 L26 6 L34 9 L38 4"
+          stroke="currentColor"
+          strokeWidth="1.5"
+          strokeLinecap="round"
+          strokeLinejoin="round"
+          fill="none"
+        />
+        <circle cx="38" cy="4" r="2" fill="currentColor" />
+      </svg>
+      <span>
+        What you fill here becomes the animated neighborhood chart + stats
+        on the seller&apos;s page.
+      </span>
+    </div>
   );
 }
 

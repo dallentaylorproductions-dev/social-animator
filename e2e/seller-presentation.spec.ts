@@ -1513,17 +1513,40 @@ test.describe('Seller Presentation — A7d editorial extras', () => {
     // (b) Area stats — one median sale, one delta, one month entry.
     // The month entry is what feeds the neighborhood chart on the
     // published page.
+    //
+    // A7d.4: every Area-snapshot field now uses the formatted-input
+    // family (currency keypad + $ formatting, percent input with
+    // auto-% on blur, native month picker). The test drives the
+    // post-A7d.4 controls and asserts the post-format storage values.
     await page.getByTestId('step-editorial-areaStats-add').click();
-    await page.getByTestId('step-editorial-area-median-sale').fill('$642k');
+    // Median sale → CurrencyInput. Type raw digits; the component
+    // formats to "$642,000" on every keystroke.
+    // (Formatted inputs are reached by aria-label, matching the comps
+    // step pattern — they don't expose data-testid passthroughs.)
+    await page.getByLabel('area-median-sale').fill('642000');
+    // YoY → PercentInput (signed). Type "+4.6"; "%" appended on blur.
+    await page.getByLabel('area-yoy').fill('+4.6');
+    await page.getByLabel('area-yoy').blur();
+    // DOM → NumberInput (numeric keypad + commas on blur).
+    await page.getByLabel('area-dom').fill('14');
+    // DOM comparison stays as text — short usable example placeholder.
     await page
-      .getByTestId('step-editorial-area-yoy')
-      .fill('+4.1% vs prior year');
-    await page.getByTestId('step-editorial-area-month-add').click();
+      .getByTestId('step-editorial-area-dom-comp')
+      .fill('vs Tremont avg 21');
+    // Closings → NumberInput.
+    await page.getByLabel('area-closings').fill('38');
+    // List-to-sale ratio → PercentInput.
+    await page.getByLabel('area-ratio').fill('101');
+    await page.getByLabel('area-ratio').blur();
+    // Month chart input — A7d.4 redesign: native month picker for the
+    // anchor + count stepper for how many months back, auto-generated
+    // labels, one CurrencyInput per row. Agent only enters prices.
     await page
-      .getByTestId('step-editorial-area-month-label-0')
-      .fill("May '26");
+      .getByTestId('step-editorial-area-latest-month')
+      .fill('2026-05');
+    await page.getByTestId('step-editorial-area-month-count').fill('1');
     await page
-      .getByTestId('step-editorial-area-month-value-0')
+      .getByLabel('area-month-0-price')
       .fill('642000');
 
     // Advance to Review so currentStep persists past 'editorial'.
@@ -1561,7 +1584,10 @@ test.describe('Seller Presentation — A7d editorial extras', () => {
             // duration → "0:14" via the new formatter.
             d.video?.runtime === '0:14' &&
             d.video?.recordedOn === '2026-05-19' &&
-            d.areaStats?.medianSale === '$642k' &&
+            // A7d.4: CurrencyInput formats "642000" → "$642,000",
+            // PercentInput's blur appends "%" → "+4.6%", and the
+            // auto-month editor labels "2026-05" as "May '26".
+            d.areaStats?.medianSale === '$642,000' &&
             (d.areaStats?.monthlySeries?.length ?? 0) === 1 &&
             d.areaStats?.monthlySeries?.[0]?.month === "May '26"
           );
@@ -1584,12 +1610,15 @@ test.describe('Seller Presentation — A7d editorial extras', () => {
     await expect(
       page.getByTestId('step-editorial-video-preview'),
     ).toHaveAttribute('src', MOCK_VIDEO_URL);
-    await expect(page.getByTestId('step-editorial-area-median-sale')).toHaveValue(
-      '$642k',
+    // A7d.4: CurrencyInput restores from the persisted "$642,000".
+    await expect(page.getByLabel('area-median-sale')).toHaveValue(
+      '$642,000',
     );
+    // The month editor derives the latest-month + count from the persisted
+    // series. Row 0's label (a non-input <div>) reads back "May '26".
     await expect(
       page.getByTestId('step-editorial-area-month-label-0'),
-    ).toHaveValue("May '26");
+    ).toHaveText("May '26");
 
     // ---- Walk forward, mock publish, capture body ----
     let publishBody: unknown;
@@ -1620,11 +1649,39 @@ test.describe('Seller Presentation — A7d editorial extras', () => {
     expect((d.video as { videoUrl?: string })?.videoUrl).toBe(MOCK_VIDEO_URL);
     const stats = d.areaStats as {
       medianSale?: string;
+      medianSaleDeltaYoy?: string;
+      daysOnMarket?: string;
+      daysOnMarketZipAvg?: string;
+      closings90d?: string;
+      listToSaleRatio?: string;
       monthlySeries?: Array<{ month?: string; medianPrice?: string }>;
     };
-    expect(stats.medianSale).toBe('$642k');
+    // A7d.4: every Area-snapshot field now stores its post-format value
+    // (currency keypad → $-formatted, percent input → trailing %, number
+    // input → comma-grouped).
+    expect(stats.medianSale).toBe('$642,000');
+    expect(stats.medianSaleDeltaYoy).toBe('+4.6%');
+    expect(stats.daysOnMarket).toBe('14');
+    expect(stats.daysOnMarketZipAvg).toBe('vs Tremont avg 21');
+    expect(stats.closings90d).toBe('38');
+    expect(stats.listToSaleRatio).toBe('101%');
     expect(stats.monthlySeries?.[0]?.month).toBe("May '26");
-    expect(stats.monthlySeries?.[0]?.medianPrice).toBe('642000');
+    expect(stats.monthlySeries?.[0]?.medianPrice).toBe('$642,000');
+
+    // A7d.4 — chart-data-shape regression guard. The neighborhood chart
+    // on the published page consumes `monthlySeries: [{month, medianPrice}]`
+    // and parses prices via parsePriceToNumber (which accepts "$642,000",
+    // "$642k", and bare "642000"). Confirm every published entry is
+    // chart-compatible: a non-empty month label + a numerically parseable
+    // medianPrice. If the input layer ever drifts off this contract the
+    // chart silently degrades to a flat line, so we lock the shape here.
+    for (const entry of stats.monthlySeries ?? []) {
+      expect(entry.month?.trim().length ?? 0).toBeGreaterThan(0);
+      const numeric = Number(
+        (entry.medianPrice ?? '').replace(/[^0-9.]/g, ''),
+      );
+      expect(Number.isFinite(numeric) && numeric > 0).toBe(true);
+    }
 
     // A7d.1 removed fields must NOT appear on the wire — even when the
     // wizard never offered an input. Locks the subtraction in place.
