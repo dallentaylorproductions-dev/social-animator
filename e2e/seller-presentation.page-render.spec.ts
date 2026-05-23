@@ -46,9 +46,6 @@ test.describe('Seller Presentation — A7b premium page render', () => {
       'For the Halloran family',
     );
 
-    // Personal note (optional, populated in full fixture).
-    await expect(page.getByTestId('sep-personal-note')).toBeVisible();
-
     // Price panel hero number.
     const price = page.getByTestId('sep-price-panel');
     await expect(price).toBeVisible();
@@ -70,10 +67,6 @@ test.describe('Seller Presentation — A7b premium page render', () => {
       await expect(page.getByTestId(`sep-pp-${i}`)).toBeVisible();
     }
 
-    // Track record (dark chapter) + testimonial.
-    await expect(page.getByTestId('sep-track')).toBeVisible();
-    await expect(page.getByTestId('sep-testimonial')).toBeVisible();
-
     // Reviews + outlink.
     await expect(page.getByTestId('sep-reviews')).toBeVisible();
     const outlink = page.getByRole('link', {
@@ -85,10 +78,14 @@ test.describe('Seller Presentation — A7b premium page render', () => {
     const area = page.getByTestId('sep-area');
     await expect(area).toBeVisible();
     await expect(area).not.toHaveClass(/area--empty/);
-
-    // Buyer quote (dark inset panel) + editorial photo band above it (A7b.1).
-    await expect(page.getByTestId('sep-buyer-quote')).toBeVisible();
-    await expect(page.getByTestId('sep-editorial-photo')).toBeVisible();
+    // A7d.1 chart-from-fixture proof: the chart's <svg.chart> renders
+    // with at least one point and the 12 ticks the FULL fixture seeds.
+    // The real-publish proof lives in seller-presentation.chart-real-publish.spec.ts.
+    const chartSvg = page.locator('.sep-presentation .chart-wrap svg.chart');
+    await expect(chartSvg).toBeVisible();
+    await expect(
+      chartSvg.locator('path.line-stroke'),
+    ).toHaveCount(1);
 
     // Agent (dark chapter) — name + CTA.
     const agent = page.getByTestId('sep-agent');
@@ -111,15 +108,17 @@ test.describe('Seller Presentation — A7b premium page render', () => {
     await expect(page.getByTestId('sep-agent')).toBeVisible();
 
     // Every OPTIONAL block must be absent — no half-populated objects,
-    // no empty holes.
+    // no empty holes. (A7d.1: personal-note / track / testimonial /
+    // buyer-quote / editorial-photo were removed entirely — they
+    // can't render under any payload.)
     for (const testid of [
       'sep-prepared-for',
-      'sep-personal-note',
       'sep-video',
       'sep-pitch',
+      'sep-reviews',
+      'sep-personal-note',
       'sep-track',
       'sep-testimonial',
-      'sep-reviews',
       'sep-buyer-quote',
       'sep-editorial-photo',
     ]) {
@@ -166,14 +165,14 @@ test.describe('Seller Presentation — A7b premium page render', () => {
     try {
       await page.goto('/seller-presentation-preview?fixture=full');
 
-      // The track-record dark chapter sits well below the fold and
-      // would normally be opacity:0 until the IntersectionObserver
-      // fires. Under reduced-motion, the CSS @media rule pins it to
-      // opacity:1 immediately. Assert directly via getComputedStyle.
-      const trackOpacity = await page
-        .locator('.sep-presentation .track .sec-title')
+      // The pitch chapter sits well below the fold and would normally
+      // be opacity:0 until the IntersectionObserver fires. Under
+      // reduced-motion, the CSS @media rule pins it to opacity:1
+      // immediately. Assert directly via getComputedStyle.
+      const pitchOpacity = await page
+        .locator('.sep-presentation .pitch .sec-title')
         .evaluate((el) => window.getComputedStyle(el).opacity);
-      expect(Number(trackOpacity)).toBe(1);
+      expect(Number(pitchOpacity)).toBe(1);
 
       const compOpacity = await page
         .locator('.sep-presentation .comp')
@@ -244,28 +243,6 @@ test.describe('Seller Presentation — A7b premium page render', () => {
     ).toBe(true);
   });
 
-  test('A7b.1 — editorial photo band reserves height and renders above the buyer-quote panel', async ({
-    page,
-  }) => {
-    await page.goto('/seller-presentation-preview?fixture=full');
-    const band = page.getByTestId('sep-editorial-photo');
-    await expect(band).toBeVisible();
-
-    // The band reserves a non-zero height via CSS regardless of
-    // image load state (height: 280px + min-height: 280px fallback).
-    const bandBox = await band.boundingBox();
-    expect(bandBox).not.toBeNull();
-    expect(bandBox!.height).toBeGreaterThanOrEqual(260);
-
-    // Visual lead-in ordering: the band sits ABOVE the quote panel
-    // (its top edge is higher in the page flow). bounding box `y` is
-    // increasing-downwards in Playwright's coordinate system.
-    const quote = page.locator('.sep-presentation .quote-panel');
-    const quoteBox = await quote.boundingBox();
-    expect(quoteBox).not.toBeNull();
-    expect(bandBox!.y).toBeLessThan(quoteBox!.y);
-  });
-
   test('A7b.2 — content sections inset by the gutter token at mobile width (~390px)', async ({
     browser,
   }) => {
@@ -284,16 +261,15 @@ test.describe('Seller Presentation — A7b premium page render', () => {
       await page.goto('/seller-presentation-preview?fixture=full');
       await expect(page.getByTestId('seller-presentation-public')).toBeVisible();
 
-      // Section headings ride the gutter — sampling the four most
-      // structurally distinct sections covers paper / dark / paper
-      // / dark cycles. Each heading's bounding-rect left edge should
-      // sit at >= ~28px from the viewport's left edge (just under
-      // the 30px token gives the assertion a tolerance for sub-px
-      // rendering).
+      // Section headings ride the gutter — sampling the three most
+      // structurally distinct sections (paper / paper / dark) covers
+      // the surviving chapter cycle. Each heading's bounding-rect
+      // left edge should sit at >= ~28px from the viewport's left
+      // edge (just under the 30px token gives the assertion a
+      // tolerance for sub-px rendering).
       const targets = [
         page.locator('.sep-presentation .price-panel .lbl'),
         page.locator('.sep-presentation .pitch .sec-title'),
-        page.locator('.sep-presentation .track .sec-title'),
         page.locator('.sep-presentation .agent .sec-title'),
       ];
       for (const t of targets) {
@@ -303,70 +279,15 @@ test.describe('Seller Presentation — A7b premium page render', () => {
       }
 
       // Full-bleed backgrounds still reach both edges — the dark
-      // track chapter's section box spans full viewport width.
-      const track = page.locator('.sep-presentation .track');
-      const trackBox = await track.boundingBox();
-      expect(trackBox).not.toBeNull();
-      expect(trackBox!.x).toBeLessThanOrEqual(0.5);
-      expect(trackBox!.width).toBeGreaterThanOrEqual(389);
+      // agent chapter's section box spans full viewport width.
+      const agent = page.locator('.sep-presentation .agent');
+      const agentBox = await agent.boundingBox();
+      expect(agentBox).not.toBeNull();
+      expect(agentBox!.x).toBeLessThanOrEqual(0.5);
+      expect(agentBox!.width).toBeGreaterThanOrEqual(389);
     } finally {
       await context.close();
     }
-  });
-
-  test('A7b.2 — editorial band hides entirely when editorialPhotoUrl is absent (quote panel solo)', async ({
-    page,
-  }) => {
-    // Covers the case A7b.1's MINIMAL test couldn't: a draft with
-    // buyerQuote PRESENT but editorialPhotoUrl ABSENT (the A5b/A6-
-    // era shape). The A7b.2 CSS dropped the editorial band's
-    // fallback color + min-height so an empty band can't render as
-    // a flat colored block; the renderer's conditional then hides
-    // the .editorial-photo div entirely.
-    //
-    // We drive this from the FULL preview, then patch the rendered
-    // DOM via page.evaluate to simulate the renderer's "no editorial
-    // photo" branch. That's tractable here because the assertion is
-    // about the page TREE shape (not a runtime flag) — removing the
-    // .editorial-photo node mirrors what the renderer would produce
-    // for a draft without the field. (A dedicated 3rd fixture would
-    // be heavier than necessary for a single assertion.)
-    await page.goto('/seller-presentation-preview?fixture=full');
-    await expect(page.getByTestId('sep-buyer-quote')).toBeVisible();
-    await expect(page.getByTestId('sep-editorial-photo')).toBeVisible();
-
-    // A7d render gate. React 18's hydration attaches `__reactFiber$…`
-    // and `__reactProps$…` properties to the hydrated root DOM node;
-    // probing for that property proves the client tree is wired BEFORE
-    // we mutate the DOM by hand. Without this gate, a slow-suite
-    // hydration could lag the page.evaluate below and React's
-    // reconciliation pass would re-insert the removed node, flaking
-    // the toHaveCount(0) assertion under full-suite load. Checking
-    // the SSR root (the .sep-presentation main element) is independent
-    // of scroll position — the IntersectionObserver-based motion
-    // island's effects sit BELOW the fold and can't be used as a
-    // hydration gate on a tall page.
-    await page.waitForFunction(() => {
-      const root = document.querySelector('.sep-presentation');
-      if (!root) return false;
-      return Object.keys(root).some(
-        (k) => k.startsWith('__reactFiber$') || k.startsWith('__reactProps$'),
-      );
-    });
-
-    await page.evaluate(() => {
-      document
-        .querySelector('[data-testid="sep-editorial-photo"]')
-        ?.remove();
-    });
-
-    // After removal: the quote panel still renders solo (A7b's
-    // behavior preserved) — proves the band is purely additive and
-    // not load-bearing for the quote's render.
-    await expect(page.getByTestId('sep-buyer-quote')).toBeVisible();
-    const quote = page.locator('.sep-presentation .quote-panel');
-    await expect(quote).toBeVisible();
-    await expect(page.getByTestId('sep-editorial-photo')).toHaveCount(0);
   });
 
   test('A7c.8 — SSR markup carries the true recommended price (count-up is enhancement-only)', async ({

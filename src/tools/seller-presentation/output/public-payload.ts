@@ -1,75 +1,29 @@
 /**
- * Public-payload serializer (Substrate §3.4, §4, v1.47 / A6 + A7a).
+ * Public-payload serializer (Substrate §3.4, §4, v1.47 / A6 + A7a + A7d.1).
  *
  * The privacy boundary for the Seller Presentation made code. The
  * publish route calls `toPublicPayload` and passes ONLY the returned
  * object to `publishHandout`; the raw `SellerPresentationDraft`
- * NEVER reaches KV. This closes Risk R-1 (the OH Prep publish path
- * spreads the full draft into KV — see audit §3) by construction:
- * a private field can't leak if it doesn't enter the persistence
- * path.
+ * NEVER reaches KV.
  *
- * A7a extends the contract to the locked premium-design surface
- * area. The payload now carries TWO co-existing shapes:
- *
- *   • A6 flat fields — propertyAddress / propertyCity /
- *     recommendedPrice / priceRationale / comps[] / agentBranding /
- *     pitchPublicPoints[]. The A6 functional renderer
- *     (src/tools/seller-presentation/output/presentation-page.tsx)
- *     reads these unchanged. After A7a's comp-shape trim some old
- *     comp sub-fields (daysOnMarket, saleToListPercent, distanceMiles,
- *     squareFeet) are no longer populated; the A6 renderer's `&&`
- *     conditionals just don't render them. The functional page is
- *     in its bridge state until A7b replaces it.
- *
- *   • A7a grouped fields — property{…} / preparedFor / agentNote /
- *     video / whyPrice{publicRationale, comps} / pitchPublicCards /
- *     trackRecord / reviews / reviewsOutlink / areaStats /
- *     buyerQuote / agent{…}. The A7b premium renderer consumes these.
- *     Grouping mirrors the locked-design data spec verbatim
- *     (camelCase, but otherwise key-for-key).
+ * A7d.1 subtraction: `editorialPhotoUrl`, `agentNote`, `trackRecord`,
+ * and `buyerQuote` were removed from the draft, payload, and renderer.
+ * The serializer no longer emits them; the boundary clamper drops them
+ * even if a hand-edited KV record carried them in.
  *
  * Allowlist guarantee (proven by e2e/seller-presentation.publish-allowlist.spec.ts):
- * the SAME public source fields are enumerated TWICE (flat + grouped).
- * No private field can leak through either shape, because both shapes
- * are built field-by-field from explicit projections — never
- * spread the draft.
- *
- * Explicitly NEVER allowlisted (proven by the spec):
- *   - draft.pricingStrategyId, draft.confidence
- *   - draft.preAppointmentNotes, draft.commitments, draft.asks
- *   - draft.themeId, draft.clientId
- *   - comps[].notes / source / fieldConfidence
- *   - comps[].daysOnMarket / saleToListPercent / distanceMiles /
- *     squareFeet — A7a's locked design dropped these from public emit;
- *     the field NAMES survive on `PublicComp` as deprecated optional
- *     keys ONLY so the A6 renderer continues to type-check. The
- *     serializer never sets them. The spec proves no comp ever
- *     carries them in the JSON output.
- *   - any pitch point with visibility !== 'public'
- *
- * Construction style: build the result object explicitly, field by
- * field. Never spread the draft. The TypeScript compiler is the
- * first line of defense — `PublicPayload`'s grouped sections type
- * each emitted field; the spec is the second.
- *
- * Pure function — no I/O, no React, no `window`. Lives outside the
- * "use client" graph so the publish route can import it server-side
- * without dragging react-pdf or any browser-only dep.
+ * private fields stay private because every field is built by explicit
+ * projection — never a spread.
  */
 
 import type {
   AreaStats,
   AreaStatsMonthly,
-  BuyerQuote,
   Comp,
   PresentationVideo,
   Review,
   ReviewsOutlink,
   SellerPresentationDraft,
-  TrackRecord,
-  TrackRecordFigure,
-  TrackRecordTestimonial,
 } from "../engine/types";
 
 // Re-export the public-safe locked-design types so consumers
@@ -79,13 +33,9 @@ import type {
 export type {
   AreaStats,
   AreaStatsMonthly,
-  BuyerQuote,
   PresentationVideo,
   Review,
   ReviewsOutlink,
-  TrackRecord,
-  TrackRecordFigure,
-  TrackRecordTestimonial,
 };
 
 /**
@@ -174,22 +124,12 @@ export interface PublicPayload {
   // ---- A7a locked-design grouped fields ----
   property: PublicProperty;
   preparedFor?: string;
-  agentNote?: string;
-  /**
-   * A7b.1 — editorial photo band rendered ABOVE the dark buyer-quote
-   * panel as a visual lead-in. Public-safe, agent-entered; distinct
-   * from `property.heroPhotoUrl`. Optional → renderer hides the band
-   * when absent. Wizard capture lands in A7c.
-   */
-  editorialPhotoUrl?: string;
   video?: PresentationVideo;
   whyPrice: PublicWhyPrice;
   pitchPublicCards: PublicPitchCard[];
-  trackRecord?: TrackRecord;
   reviews?: Review[];
   reviewsOutlink?: ReviewsOutlink;
   areaStats?: AreaStats;
-  buyerQuote?: BuyerQuote;
   /** Same projection as `agentBranding` — the locked-design renderer reads `agent`. */
   agent: AgentBranding;
 }
@@ -249,30 +189,6 @@ function projectPresentationVideo(
   };
 }
 
-function projectTrackRecordFigure(f: TrackRecordFigure): TrackRecordFigure {
-  return { label: f.label, value: f.value, ctx: f.ctx };
-}
-
-function projectTrackRecordTestimonial(
-  t: TrackRecordTestimonial | undefined,
-): TrackRecordTestimonial | undefined {
-  if (!t) return undefined;
-  return {
-    body: t.body,
-    attributionShort: t.attributionShort,
-    areaOrYear: t.areaOrYear,
-  };
-}
-
-function projectTrackRecord(
-  tr: TrackRecord | undefined,
-): TrackRecord | undefined {
-  if (!tr) return undefined;
-  const figures = tr.figures?.map(projectTrackRecordFigure);
-  const testimonial = projectTrackRecordTestimonial(tr.testimonial);
-  return { figures, testimonial };
-}
-
 function projectReview(r: Review): Review {
   return {
     body: r.body,
@@ -303,13 +219,6 @@ function projectAreaStats(s: AreaStats | undefined): AreaStats | undefined {
       medianPrice: m.medianPrice,
     })),
   };
-}
-
-function projectBuyerQuote(
-  q: BuyerQuote | undefined,
-): BuyerQuote | undefined {
-  if (!q) return undefined;
-  return { body: q.body, source: q.source };
 }
 
 function projectAgent(agent: AgentBranding): AgentBranding {
@@ -376,19 +285,15 @@ export function toPublicPayload(
       rationaleShort: priceRationale,
     },
     preparedFor: draft.preparedFor,
-    agentNote: draft.agentNote,
-    editorialPhotoUrl: draft.editorialPhotoUrl,
     video: projectPresentationVideo(draft.video),
     whyPrice: {
       publicRationale: priceRationale ?? "",
       comps: publicComps,
     },
     pitchPublicCards: publicCards,
-    trackRecord: projectTrackRecord(draft.trackRecord),
     reviews: draft.reviews?.map(projectReview),
     reviewsOutlink: projectReviewsOutlink(draft.reviewsOutlink),
     areaStats: projectAreaStats(draft.areaStats),
-    buyerQuote: projectBuyerQuote(draft.buyerQuote),
     agent,
   };
 }
@@ -443,9 +348,6 @@ export function clampPublicPayload(raw: unknown): PublicPayload {
       rationaleShort: priceRationale,
     }),
     preparedFor: typeof r.preparedFor === "string" ? r.preparedFor : undefined,
-    editorialPhotoUrl:
-      typeof r.editorialPhotoUrl === "string" ? r.editorialPhotoUrl : undefined,
-    agentNote: typeof r.agentNote === "string" ? r.agentNote : undefined,
     video: clampPresentationVideo(r.video),
     whyPrice: clampPublicWhyPrice(r.whyPrice, {
       publicRationale: priceRationale ?? "",
@@ -456,13 +358,11 @@ export function clampPublicPayload(raw: unknown): PublicPayload {
           .map(clampPublicPitchCard)
           .filter((c): c is PublicPitchCard => c !== null)
       : [],
-    trackRecord: clampTrackRecord(r.trackRecord),
     reviews: Array.isArray(r.reviews)
       ? r.reviews.map(clampReview).filter((rev): rev is Review => rev !== null)
       : undefined,
     reviewsOutlink: clampReviewsOutlink(r.reviewsOutlink),
     areaStats: clampAreaStats(r.areaStats),
-    buyerQuote: clampBuyerQuote(r.buyerQuote),
     agent,
   };
 }
@@ -583,46 +483,6 @@ function clampPresentationVideo(raw: unknown): PresentationVideo | undefined {
   return Object.values(video).some((v) => v !== undefined) ? video : undefined;
 }
 
-function clampTrackRecord(raw: unknown): TrackRecord | undefined {
-  if (!raw || typeof raw !== "object") return undefined;
-  const r = raw as Record<string, unknown>;
-  const figures = Array.isArray(r.figures)
-    ? r.figures
-        .map(clampTrackRecordFigure)
-        .filter((f): f is TrackRecordFigure => f !== null)
-        .slice(0, 3)
-    : undefined;
-  const testimonial = clampTrackRecordTestimonial(r.testimonial);
-  if (!figures?.length && !testimonial) return undefined;
-  return { figures, testimonial };
-}
-
-function clampTrackRecordFigure(raw: unknown): TrackRecordFigure | null {
-  if (!raw || typeof raw !== "object") return null;
-  const r = raw as Record<string, unknown>;
-  if (typeof r.label !== "string" || typeof r.value !== "string") return null;
-  return {
-    label: r.label,
-    value: r.value,
-    ctx: typeof r.ctx === "string" ? r.ctx : undefined,
-  };
-}
-
-function clampTrackRecordTestimonial(
-  raw: unknown,
-): TrackRecordTestimonial | undefined {
-  if (!raw || typeof raw !== "object") return undefined;
-  const r = raw as Record<string, unknown>;
-  if (typeof r.body !== "string" || typeof r.attributionShort !== "string") {
-    return undefined;
-  }
-  return {
-    body: r.body,
-    attributionShort: r.attributionShort,
-    areaOrYear: typeof r.areaOrYear === "string" ? r.areaOrYear : undefined,
-  };
-}
-
 function clampReview(raw: unknown): Review | null {
   if (!raw || typeof raw !== "object") return null;
   const r = raw as Record<string, unknown>;
@@ -682,13 +542,4 @@ function clampAreaStatsMonthly(raw: unknown): AreaStatsMonthly | null {
     return null;
   }
   return { month: r.month, medianPrice: r.medianPrice };
-}
-
-function clampBuyerQuote(raw: unknown): BuyerQuote | undefined {
-  if (!raw || typeof raw !== "object") return undefined;
-  const r = raw as Record<string, unknown>;
-  if (typeof r.body !== "string" || typeof r.source !== "string") {
-    return undefined;
-  }
-  return { body: r.body, source: r.source };
 }

@@ -84,16 +84,6 @@ export const FULL_PAYLOAD: PublicPayload = {
       "A price the market will meet quickly — and one that gives the right buyer room to fall in love.",
   },
   preparedFor: "the Halloran family",
-  agentNote:
-    "Here's exactly what I'd do to sell your home — and why I'm so confident in the number.",
-  // A7b.2: a photo-like inline SVG so the editorial band reads as
-  // editorial photography (warm gradient + soft horizon + vignette)
-  // rather than the flat tan swatch the A7b.1 placeholder produced.
-  // Still self-contained (no network dependency for tests + smoke).
-  // Wizard capture (A7c) will replace this with the agent's real
-  // editorial photo URL.
-  editorialPhotoUrl:
-    "data:image/svg+xml;utf8,<svg xmlns='http://www.w3.org/2000/svg' viewBox='0 0 800 280' preserveAspectRatio='xMidYMid slice'><defs><linearGradient id='sky' x1='0' y1='0' x2='0' y2='1'><stop offset='0%25' stop-color='%23d8c2a3'/><stop offset='35%25' stop-color='%23c4ad8a'/><stop offset='62%25' stop-color='%239b805e'/><stop offset='100%25' stop-color='%235c4d3a'/></linearGradient><radialGradient id='vig' cx='0.5' cy='0.5' r='0.75'><stop offset='55%25' stop-color='rgba(0,0,0,0)'/><stop offset='100%25' stop-color='rgba(20,12,4,0.38)'/></radialGradient></defs><rect width='800' height='280' fill='url(%23sky)'/><rect x='0' y='196' width='800' height='1' fill='rgba(35,25,15,0.22)'/><rect width='800' height='280' fill='url(%23vig)'/></svg>",
   video: {
     posterUrl: undefined,
     videoUrl: "https://example.com/marisol-note.mp4",
@@ -147,30 +137,6 @@ export const FULL_PAYLOAD: PublicPayload = {
         "Offers reviewed face-to-face, not over text. You'll see every term, in plain English, before we respond.",
     },
   ],
-  trackRecord: {
-    figures: [
-      {
-        label: "Homes sold in Tremont",
-        value: "40",
-        ctx: "Closed by Marisol · trailing 36 months",
-      },
-      {
-        label: "Average days on market",
-        value: "11 days",
-        ctx: "Her listings, vs. 21 days area-wide.",
-      },
-      {
-        label: "List-to-sale ratio",
-        value: "102%",
-        ctx: "How close her listings close to ask price.",
-      },
-    ],
-    testimonial: {
-      body: "She walked us through every offer in plain English and never once made us feel rushed. We closed at $24k over ask and still felt like the decision was ours.",
-      attributionShort: "D. & K. Bauer",
-      areaOrYear: "Sold on Castle Avenue, 2025",
-    },
-  },
   reviews: [
     {
       body: "Marisol made us feel like the only clients she had. She knew the neighborhood cold and was honest with us about which offers to take seriously and which to pass on.",
@@ -216,10 +182,6 @@ export const FULL_PAYLOAD: PublicPayload = {
       { month: "Apr '26", medianPrice: "640000" },
       { month: "May '26", medianPrice: "642000" },
     ],
-  },
-  buyerQuote: {
-    body: "A house like this doesn't sit on the market — it gets chosen, quickly, by the right person.",
-    source: "From a buyer's offer letter · April 2026",
   },
   agent: {
     name: "Marisol Reyes",
@@ -272,7 +234,8 @@ export const MINIMAL_PAYLOAD: PublicPayload = {
     name: "Aaron Test",
     brokerage: "Test Realty",
   },
-  // preparedFor, agentNote, video, trackRecord, reviews,
-  // reviewsOutlink, areaStats, buyerQuote — all intentionally absent.
-  // The renderer must hide each block cleanly with no empty holes.
+  // preparedFor, video, reviews, reviewsOutlink, areaStats — all
+  // intentionally absent. The renderer must hide each block cleanly
+  // with no empty holes. (A7d.1 removed agentNote, trackRecord,
+  // buyerQuote, and editorialPhotoUrl entirely.)
 };

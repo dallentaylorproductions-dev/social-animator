@@ -10,42 +10,23 @@ import { PresentationPageMotion } from "./motion";
 import "./presentation-page.css";
 
 /**
- * Seller Presentation — premium consumer-facing page (v1.47 / A7b).
+ * Seller Presentation — premium consumer-facing page (v1.47 / A7b + A7d.1).
  *
  * Server-rendered React component consumed by /h/[slug]/page.tsx
- * when handout.type === 'seller-presentation'. Replaces A6's
- * functional bridge page with the LOCKED premium design
- * (docs/design/seller-presentation-locked-design.reference.html),
- * natively re-implemented over A7a's grouped PublicPayload.
+ * when handout.type === 'seller-presentation'. Reads `handout.data`
+ * via `clampPublicPayload` (defense-at-boundary) so unknown KV keys
+ * are dropped before the renderer touches them.
  *
- * Privacy posture (unchanged from A6): the renderer reads from
- * `handout.data` as a `PublicPayload` via `clampPublicPayload` —
- * defense-at-boundary keeps rogue KV keys out, and the typed view
- * doesn't expose any private field even if one were injected. The
- * raw SellerPresentationDraft never reaches this file.
+ * A7d.1 subtraction: the personal-note, track-record, buyer-quote,
+ * and editorial-photo sections were removed entirely (Dallen's
+ * 2026-05-22 smoke). What remains is the tighter editorial spine.
  *
- * Motion is CSS-first (presentation-page.css) + one tiny client
- * island (motion.ts) that adds .in when sections enter view. No JS
- * animation library. `prefers-reduced-motion` short-circuits the
- * observer + null all motion-related CSS properties.
- *
- * Graceful states (every contracted in the locked design):
- *   - agentNote absent          → personal-note band hidden
- *   - video null                → video block hidden entirely
- *   - trackRecord null          → entire track section hidden
- *     - figures empty/undefined → that sub-block hides individually
- *     - testimonial null        → testimonial sub-block hides
- *   - reviews null/empty        → reviews block hidden entirely
- *   - reviewsOutlink null       → outlink hidden (block still shows)
- *   - areaStats null            → "snapshot coming soon" treatment
- *   - agent.photoUrl null       → monogram well in same dimensions
- *   - buyerQuote null           → quote panel hidden entirely
- *
- * Editorial photo band (A7b.1): the locked design's `.editorial-pair`
- * includes an editorial photo ABOVE the dark buyer-quote panel as a
- * visual lead-in — a different image than the hero. Renders when
- * `payload.editorialPhotoUrl` is present; hides when absent (quote
- * panel renders solo). Wizard capture for the field lands in A7c.
+ * Graceful states for the optional blocks that survived:
+ *   - video null         → video block hidden entirely
+ *   - reviews null/empty → reviews block hidden entirely
+ *   - reviewsOutlink null → outlink hidden (block still shows)
+ *   - areaStats null     → "snapshot coming soon" treatment
+ *   - agent.photoUrl null → monogram well in same dimensions
  */
 
 export function SellerPresentationPage({
@@ -60,15 +41,12 @@ export function SellerPresentationPage({
       <article className="page" data-screen-label="Seller Presentation">
         <Hero payload={payload} />
         <CaptionCard payload={payload} />
-        <PersonalNote payload={payload} />
         <PricePanel payload={payload} />
         <VideoBlock payload={payload} />
         <WhyPriceSection payload={payload} />
         <PitchSection payload={payload} />
-        <TrackRecordSection payload={payload} />
         <ReviewsSection payload={payload} />
         <AreaSection payload={payload} />
-        <BuyerQuoteSection payload={payload} />
         <AgentSection payload={payload} />
         <EndMark />
         <Foot payload={payload} />
@@ -148,27 +126,6 @@ function CaptionCard({ payload }: { payload: PublicPayload }) {
         {locationLine && <div className="city">{locationLine}</div>}
       </div>
     </div>
-  );
-}
-
-// =====================================================================
-// PERSONAL NOTE (optional)
-// =====================================================================
-
-function PersonalNote({ payload }: { payload: PublicPayload }) {
-  const note = payload.agentNote?.trim();
-  if (!note) return null;
-  const agentFirstName = payload.agent.name?.trim().split(/\s+/)[0];
-  const fromLabel = agentFirstName
-    ? `${agentFirstName}'s note for you`
-    : "A note for you";
-
-  return (
-    <section className="personal-note" data-testid="sep-personal-note">
-      <div className="from">{fromLabel}</div>
-      <p className="pn-body">{note}</p>
-      {agentFirstName && <div className="sig">{agentFirstName}</div>}
-    </section>
   );
 }
 
@@ -382,85 +339,6 @@ function PitchSection({ payload }: { payload: PublicPayload }) {
 }
 
 // =====================================================================
-// TRACK RECORD (optional)
-// =====================================================================
-
-function TrackRecordSection({ payload }: { payload: PublicPayload }) {
-  const tr = payload.trackRecord;
-  if (!tr) return null;
-  const figures = tr.figures ?? [];
-  const testimonial = tr.testimonial;
-  // Defense in depth — if both sub-blocks are empty, hide the chapter.
-  if (figures.length === 0 && !testimonial) return null;
-
-  return (
-    <section className="track" data-testid="sep-track">
-      <div className="sec-label reveal">
-        <span className="num">04</span>
-        <span className="lbl" />
-        <span className="name">A track record</span>
-      </div>
-      <h2 className="sec-title reveal">
-        Years <em>here.</em>
-      </h2>
-      <p className="sec-body reveal">
-        A short list of numbers I keep, so the claims above aren&apos;t just
-        words.
-      </p>
-
-      {figures.length > 0 && (
-        <div className="track-figures">
-          {figures.map((f, i) => (
-            <div className="tf reveal" key={i}>
-              <div className="v">
-                <FigureValue value={f.value} />
-              </div>
-              <div className="l">
-                <strong>{f.label}</strong>
-                {f.ctx && <small>{f.ctx}</small>}
-              </div>
-            </div>
-          ))}
-        </div>
-      )}
-
-      {testimonial && (
-        <div className="testimonial reveal" data-testid="sep-testimonial">
-          <div className="rule" />
-          <div>
-            <p className="ts-body">&ldquo;{testimonial.body}&rdquo;</p>
-            <div className="att">
-              <span className="nm">{testimonial.attributionShort}</span>
-              {testimonial.areaOrYear && (
-                <span>· {testimonial.areaOrYear}</span>
-              )}
-            </div>
-          </div>
-        </div>
-      )}
-    </section>
-  );
-}
-
-/**
- * Split a figure value like "11 days" or "102%" into the locked
- * design's "big number + small italic suffix" treatment. Bare
- * numbers render as-is.
- */
-function FigureValue({ value }: { value: string }) {
-  const raw = (value ?? "").trim();
-  const match = raw.match(/^([\d,.]+)(\s*\S.*)?$/);
-  if (!match) return <>{raw}</>;
-  const [, n, tail] = match;
-  return (
-    <>
-      {n}
-      {tail && <em>&nbsp;{tail.trim()}</em>}
-    </>
-  );
-}
-
-// =====================================================================
 // REVIEWS (optional)
 // =====================================================================
 
@@ -471,7 +349,7 @@ function ReviewsSection({ payload }: { payload: PublicPayload }) {
   return (
     <section className="reviews" data-testid="sep-reviews">
       <div className="sec-label reveal">
-        <span className="num">05</span>
+        <span className="num">04</span>
         <span className="lbl" />
         <span className="name">In their words</span>
       </div>
@@ -535,7 +413,7 @@ function AreaSection({ payload }: { payload: PublicPayload }) {
     >
       <div className="area-head">
         <div className="sec-label reveal" style={{ marginBottom: 0 }}>
-          <span className="num">06</span>
+          <span className="num">05</span>
           <span className="lbl" />
           <span className="name">Recent area sales</span>
         </div>
@@ -875,41 +753,6 @@ function formatCompact(n: number): string {
 }
 
 // =====================================================================
-// BUYER QUOTE (optional)
-// =====================================================================
-
-function BuyerQuoteSection({ payload }: { payload: PublicPayload }) {
-  const q = payload.buyerQuote;
-  if (!q) return null;
-  const editorialPhoto = payload.editorialPhotoUrl?.trim();
-  return (
-    <section className="editorial-pair" data-testid="sep-buyer-quote">
-      {/* A7b.1: the editorial photo band lands above the dark quote
-          panel as a visual lead-in. Hides cleanly when editorialPhotoUrl
-          is absent (quote panel renders solo, A7b's behavior). Height
-          is reserved by CSS regardless of image load state. */}
-      {editorialPhoto && (
-        <div
-          className="editorial-photo"
-          aria-hidden="true"
-          data-testid="sep-editorial-photo"
-          style={{
-            backgroundImage: `url("${editorialPhoto.replace(/"/g, '\\"')}")`,
-          }}
-        />
-      )}
-      <div className="quote-panel">
-        <span className="qmark" aria-hidden="true">
-          &ldquo;
-        </span>
-        <p className="quote-body">{q.body}</p>
-        <div className="quote-att">{q.source}</div>
-      </div>
-    </section>
-  );
-}
-
-// =====================================================================
 // AGENT — DARK CHAPTER
 // =====================================================================
 
@@ -927,7 +770,7 @@ function AgentSection({ payload }: { payload: PublicPayload }) {
   return (
     <section className="agent" data-testid="sep-agent">
       <div className="sec-label reveal">
-        <span className="num">07</span>
+        <span className="num">06</span>
         <span className="lbl" />
         <span className="name">Your agent</span>
       </div>

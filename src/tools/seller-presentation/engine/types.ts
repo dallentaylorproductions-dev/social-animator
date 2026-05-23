@@ -1,24 +1,16 @@
 /**
- * Seller Presentation — engine types (v1.47 / A5a-A7a)
+ * Seller Presentation — engine types (v1.47 / A5a-A7d.1)
  *
  * Per-skill draft for the converged WorkflowInstance shape. The
  * storage layer (src/skills/workflow-instance-storage.ts) treats
  * `draft` as opaque; this module owns its structure.
  *
- * Lineage:
- *   A5a — initial draft type with Step 1 (Property) fields live.
- *   A5b — Step 2-5 fields populated (comps, strategy, pitch, review).
- *   A6  — public-payload serializer carries (propertyAddress,
- *         recommendedPrice, priceRationale, comps[], agentBranding,
- *         pitchPublicPoints) only. Privacy boundary proven by test.
- *   A7a — locked-design extensions land: property city/state/zip +
- *         hero photo; agentNote + preparedFor personalization;
- *         video slot; comps add soldDate + sqft (and the public
- *         emit trims to ONLY {address, soldPrice, soldDate, sqft});
- *         pitchPoints gain title + support (text kept as legacy);
- *         new optional blocks (trackRecord, reviews, reviewsOutlink,
- *         areaStats, buyerQuote); agent block extends.
- *         All A7a fields are OPTIONAL; existing drafts stay valid.
+ * A7d.1 subtraction: `editorialPhotoUrl`, `agentNote`, `trackRecord`
+ * (figures + testimonial), and `buyerQuote` were removed from the
+ * draft, serializer, and renderer. Persisted older drafts may still
+ * carry those keys — `clampDraft` builds a fresh object from the
+ * allowed field set, so any unknown/removed keys are silently dropped
+ * on read. Old drafts continue to load + publish.
  *
  * `Comp` is re-imported from the SIR engine — the substrate-shape
  * Comp (carrying `source` + `fieldConfidence` for Lane C's photo-to-
@@ -71,39 +63,6 @@ export interface PresentationVideo {
   recordedOn?: string;
 }
 
-/** A single editorial figure in the agent's published track record. */
-export interface TrackRecordFigure {
-  /** Short eyebrow (e.g. "Homes sold"). */
-  label: string;
-  /** Value (e.g. "84"). */
-  value: string;
-  /** Optional context line (e.g. "in the last 24 months"). */
-  ctx?: string;
-}
-
-/** Past-seller testimonial in the track-record block. */
-export interface TrackRecordTestimonial {
-  body: string;
-  /** Short attribution (e.g. "M.S."). */
-  attributionShort: string;
-  /** Optional area-or-year sub-line ("Tacoma, 2025"). */
-  areaOrYear?: string;
-}
-
-/**
- * Track record. EDITORIAL — figures the agent has CHOSEN to publish.
- * Strictly distinct from the private `teamOnlyStats` family
- * (negotiationNotes etc.) — track-record figures are public-safe by
- * construction (the agent typed them into the wizard knowing they'd
- * show on the seller's page).
- */
-export interface TrackRecord {
-  /** 0–3 editorial figures. Page hides cleanly when absent or empty. */
-  figures?: TrackRecordFigure[];
-  /** Optional past-seller testimonial paired with the figures. */
-  testimonial?: TrackRecordTestimonial;
-}
-
 /** A single review surfaced in the reviews section. Manual/curated only — no scrape. */
 export interface Review {
   body: string;
@@ -142,12 +101,6 @@ export interface AreaStats {
   monthlySeries?: AreaStatsMonthly[];
 }
 
-/** Editorial pull-quote ABOUT THE HOME (e.g. from a buyer or agent peer). */
-export interface BuyerQuote {
-  body: string;
-  source: string;
-}
-
 export interface SellerPresentationDraft {
   // ---- Step 1: Property (A5a LIVE; A7a extensions) ----
   /**
@@ -165,14 +118,6 @@ export interface SellerPresentationDraft {
   propertyZip?: string;
   /** A7a — hero photo (data URL or external URL). Nullable → renderer falls back to monogram. */
   heroPhotoUrl?: string;
-  /**
-   * A7b.1 — editorial photo band (renderer puts it ABOVE the dark
-   * buyer-quote panel as a visual lead-in). Public-safe, agent-
-   * entered; intentionally distinct from heroPhotoUrl (the design
-   * wants a different image here). Nullable → renderer hides the
-   * band entirely when absent (quote panel renders solo).
-   */
-  editorialPhotoUrl?: string;
 
   // ---- Step 3 (A5b): Pricing & strategy ----
   recommendedPrice?: string;
@@ -200,20 +145,14 @@ export interface SellerPresentationDraft {
    * agent can override / clear it. Page hides personalization when absent.
    */
   preparedFor?: string;
-  /** Italic personal sentence rendered near the top of the seller page. */
-  agentNote?: string;
   /** Hero-area video card; slot only in v1.47. */
   video?: PresentationVideo;
-  /** Editorial track-record (figures + testimonial), agent-published. */
-  trackRecord?: TrackRecord;
   /** Manual/curated reviews. */
   reviews?: Review[];
   /** Link-out to an external reviews aggregator. */
   reviewsOutlink?: ReviewsOutlink;
   /** Agent-entered area snapshot; no auto-sourcing in v1.47. */
   areaStats?: AreaStats;
-  /** Editorial pull-quote about the home. */
-  buyerQuote?: BuyerQuote;
 
   // ---- A7a: agent extensions captured per-presentation ----
   // These DON'T currently live on BrandSettings; the wizard A7b/A7c
@@ -297,46 +236,6 @@ function clampPresentationVideo(raw: unknown): PresentationVideo | undefined {
   return hasAny ? video : undefined;
 }
 
-function clampTrackRecordFigure(raw: unknown): TrackRecordFigure | null {
-  if (!raw || typeof raw !== "object") return null;
-  const r = raw as Record<string, unknown>;
-  if (typeof r.label !== "string" || typeof r.value !== "string") return null;
-  return {
-    label: r.label,
-    value: r.value,
-    ctx: typeof r.ctx === "string" ? r.ctx : undefined,
-  };
-}
-
-function clampTrackRecordTestimonial(
-  raw: unknown,
-): TrackRecordTestimonial | undefined {
-  if (!raw || typeof raw !== "object") return undefined;
-  const r = raw as Record<string, unknown>;
-  if (typeof r.body !== "string" || typeof r.attributionShort !== "string") {
-    return undefined;
-  }
-  return {
-    body: r.body,
-    attributionShort: r.attributionShort,
-    areaOrYear: typeof r.areaOrYear === "string" ? r.areaOrYear : undefined,
-  };
-}
-
-function clampTrackRecord(raw: unknown): TrackRecord | undefined {
-  if (!raw || typeof raw !== "object") return undefined;
-  const r = raw as Record<string, unknown>;
-  const figures = Array.isArray(r.figures)
-    ? r.figures
-        .map(clampTrackRecordFigure)
-        .filter((f): f is TrackRecordFigure => f !== null)
-        .slice(0, 3)
-    : undefined;
-  const testimonial = clampTrackRecordTestimonial(r.testimonial);
-  if (!figures?.length && !testimonial) return undefined;
-  return { figures, testimonial };
-}
-
 function clampReview(raw: unknown): Review | null {
   if (!raw || typeof raw !== "object") return null;
   const r = raw as Record<string, unknown>;
@@ -391,13 +290,6 @@ function clampAreaStats(raw: unknown): AreaStats | undefined {
   return hasAny ? stats : undefined;
 }
 
-function clampBuyerQuote(raw: unknown): BuyerQuote | undefined {
-  if (!raw || typeof raw !== "object") return undefined;
-  const r = raw as Record<string, unknown>;
-  if (typeof r.body !== "string" || typeof r.source !== "string") return undefined;
-  return { body: r.body, source: r.source };
-}
-
 /**
  * Normalize a draft from any historical shape. Defense-at-boundary
  * mirror of SIR's clampDraft pattern: types stay strict; the helper
@@ -415,7 +307,6 @@ export function clampDraft(
     propertyState: clampString(raw.propertyState),
     propertyZip: clampString(raw.propertyZip),
     heroPhotoUrl: clampString(raw.heroPhotoUrl),
-    editorialPhotoUrl: clampString(raw.editorialPhotoUrl),
     recommendedPrice: clampString(raw.recommendedPrice),
     priceRationale: clampString(raw.priceRationale),
     pricingStrategyId: clampString(raw.pricingStrategyId),
@@ -432,15 +323,12 @@ export function clampDraft(
     commitments: clampStringArray(raw.commitments, 10),
     asks: clampStringArray(raw.asks, 10),
     preparedFor: clampString(raw.preparedFor),
-    agentNote: clampString(raw.agentNote),
     video: clampPresentationVideo(raw.video),
-    trackRecord: clampTrackRecord(raw.trackRecord),
     reviews: Array.isArray(raw.reviews)
       ? raw.reviews.map(clampReview).filter((r): r is Review => r !== null)
       : undefined,
     reviewsOutlink: clampReviewsOutlink(raw.reviewsOutlink),
     areaStats: clampAreaStats(raw.areaStats),
-    buyerQuote: clampBuyerQuote(raw.buyerQuote),
     agentAreasServed: clampString(raw.agentAreasServed),
     agentPhotoUrl: clampString(raw.agentPhotoUrl),
     agentBioShort: clampString(raw.agentBioShort),

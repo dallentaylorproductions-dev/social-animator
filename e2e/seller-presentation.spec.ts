@@ -1297,32 +1297,28 @@ test.describe('Seller Presentation — A7c.6 Pitch default visibility', () => {
 });
 
 /**
- * Seller Presentation — A7d editorial extras (the new optional step).
+ * Seller Presentation — A7d editorial extras (the optional step, after
+ * A7d.1's subtraction).
  *
- * Two scenarios:
+ * A7d.1 removed agentNote, trackRecord, buyerQuote, and editorialPhoto
+ * from the wizard entirely. What remains is video, reviews, and the
+ * area-stats snapshot (the chart). The two scenarios here mirror the
+ * surviving surface:
  *
- *   1. ROUND-TRIP. Fill a representative subset of the editorial blocks
- *      (one from every shape on the locked design: agentNote, video,
- *      trackRecord figures + testimonial, reviews + outlink, areaStats
- *      with a monthly entry, buyerQuote). Wait for the persisted
- *      record to carry every new field, then reload. Walk back to the
- *      editorial step and assert every value survived. Click Publish
- *      (mocked) and assert the request body carries every editorial
- *      field on the draft.
+ *   1. ROUND-TRIP. Fill video + reviews + areaStats (incl. a monthly
+ *      series entry). Wait for persistence, reload, walk back to the
+ *      editorial step, confirm values restored. Publish (mocked) and
+ *      assert the wire carries each surviving field.
  *
- *   2. SKIP-ALL. Drive a clean wizard straight through the editorial
- *      step without opening a single block, publish (mocked), and
- *      assert the request body carries no editorial content on the
- *      draft. The published page renderer hides each block on its
- *      own absence-condition (proven structurally by the MINIMAL
- *      fixture render spec); this test locks in the wire-level shape.
+ *   2. SKIP-ALL. Walk straight through the editorial step untouched,
+ *      publish (mocked), and assert no editorial content on the wire.
  *
- * No assertions about the locked-design page renderer here — A7b's
- * render spec already proves graceful hide-when-empty for every block.
- * This file owns only the wizard input + the publish wire.
+ * No assertions about the consumer-page renderer here — A7b's render
+ * spec covers hide-when-empty for every block. This file owns only the
+ * wizard input + the publish wire.
  */
 test.describe('Seller Presentation — A7d editorial extras', () => {
-  test('round-trip: every editorial block fills, persists, resumes, and reaches publish', async ({
+  test('round-trip: surviving editorial blocks fill, persist, resume, and reach publish', async ({
     page,
   }) => {
     await page.goto('/seller-presentation');
@@ -1331,7 +1327,7 @@ test.describe('Seller Presentation — A7d editorial extras', () => {
     const instanceId = new URL(page.url()).searchParams.get('id')!;
 
     // Walk through Steps 1–4 with the minimum-required + drive into
-    // the new Step 5 (Editorial).
+    // the editorial step.
     await page.getByTestId('step-property-address').fill('1742 Kenilworth Avenue');
     await page.getByTestId('step-property-city').fill('Tremont');
     await page.getByTestId('step-property-state').fill('OH');
@@ -1347,15 +1343,7 @@ test.describe('Seller Presentation — A7d editorial extras', () => {
     await nextButton.click(); // skip pitch — covered elsewhere
     await expect(page.getByTestId('step-editorial')).toBeVisible();
 
-    // (a) Personal note — agentNote.
-    await page.getByTestId('step-editorial-agentNote-add').click();
-    await page
-      .getByTestId('step-editorial-agent-note-input')
-      .fill("Here's exactly what I'd do to sell your home.");
-
-    // (b) Video — videoUrl + title + runtime + recordedOn (skip poster
-    //     here; the ImageUploadField is exercised end-to-end in the
-    //     hero-photo round-trip already).
+    // (a) Video — videoUrl + title + runtime + recordedOn.
     await page.getByTestId('step-editorial-video-add').click();
     await page
       .getByTestId('step-editorial-video-url')
@@ -1368,27 +1356,7 @@ test.describe('Seller Presentation — A7d editorial extras', () => {
       .getByTestId('step-editorial-video-recorded-on')
       .fill('Recorded May 19');
 
-    // (c) Track record — one figure + a testimonial.
-    await page.getByTestId('step-editorial-trackRecord-add').click();
-    await page.getByTestId('step-editorial-figure-add').click();
-    await page
-      .getByTestId('step-editorial-figure-label-0')
-      .fill('Homes sold in Tremont');
-    await page.getByTestId('step-editorial-figure-value-0').fill('40');
-    await page
-      .getByTestId('step-editorial-figure-ctx-0')
-      .fill('Trailing 36 months');
-    await page
-      .getByTestId('step-editorial-testimonial-body')
-      .fill('She walked us through every offer in plain English.');
-    await page
-      .getByTestId('step-editorial-testimonial-attribution')
-      .fill('D. & K. Bauer');
-    await page
-      .getByTestId('step-editorial-testimonial-area-or-year')
-      .fill('Castle Avenue, 2025');
-
-    // (d) Reviews — one review + an outlink.
+    // (b) Reviews — one review + an outlink.
     await page.getByTestId('step-editorial-reviews-add').click();
     await page.getByTestId('step-editorial-review-add').click();
     await page
@@ -1406,7 +1374,9 @@ test.describe('Seller Presentation — A7d editorial extras', () => {
       .getByTestId('step-editorial-outlink-url')
       .fill('https://www.zillow.com/profile/marisol');
 
-    // (e) Area stats — one median sale, one delta, one month entry.
+    // (c) Area stats — one median sale, one delta, one month entry.
+    // The month entry is what feeds the neighborhood chart on the
+    // published page.
     await page.getByTestId('step-editorial-areaStats-add').click();
     await page.getByTestId('step-editorial-area-median-sale').fill('$642k');
     await page
@@ -1419,18 +1389,6 @@ test.describe('Seller Presentation — A7d editorial extras', () => {
     await page
       .getByTestId('step-editorial-area-month-value-0')
       .fill('642000');
-
-    // (f) Buyer quote.
-    await page.getByTestId('step-editorial-buyerQuote-add').click();
-    await page
-      .getByTestId('step-editorial-quote-body')
-      .fill("A house like this gets chosen, quickly, by the right person.");
-    await page
-      .getByTestId('step-editorial-quote-source')
-      .fill("From a buyer's offer letter, April 2026");
-
-    // (Editorial photo is skipped — its upload path is the same shared
-    // <ImageUploadField> exercised on the hero in the A7c round-trip.)
 
     // Advance to Review so currentStep persists past 'editorial'.
     await nextButton.click();
@@ -1445,41 +1403,27 @@ test.describe('Seller Presentation — A7d editorial extras', () => {
           const parsed = JSON.parse(raw) as {
             currentStep?: string;
             draft?: {
-              agentNote?: string;
               video?: { videoUrl?: string; title?: string };
-              trackRecord?: {
-                figures?: Array<{ label?: string; value?: string }>;
-                testimonial?: { body?: string; attributionShort?: string };
-              };
               reviews?: Array<{ body?: string; attributionName?: string }>;
               reviewsOutlink?: { label?: string; url?: string };
               areaStats?: {
                 medianSale?: string;
                 monthlySeries?: Array<{ month?: string; medianPrice?: string }>;
               };
-              buyerQuote?: { body?: string; source?: string };
             };
           };
           const d = parsed.draft;
           if (!d) return false;
           return (
             parsed.currentStep === 'review' &&
-            d.agentNote === "Here's exactly what I'd do to sell your home." &&
             d.video?.videoUrl === 'https://www.loom.com/share/abc123' &&
             d.video?.title === 'A walk-through of your plan.' &&
-            (d.trackRecord?.figures?.length ?? 0) === 1 &&
-            d.trackRecord?.figures?.[0]?.label === 'Homes sold in Tremont' &&
-            d.trackRecord?.figures?.[0]?.value === '40' &&
-            d.trackRecord?.testimonial?.body ===
-              'She walked us through every offer in plain English.' &&
             (d.reviews?.length ?? 0) === 1 &&
             d.reviews?.[0]?.body === 'Quiet, calm, prepared.' &&
             d.reviewsOutlink?.label === 'See all reviews on Zillow' &&
             d.areaStats?.medianSale === '$642k' &&
             (d.areaStats?.monthlySeries?.length ?? 0) === 1 &&
-            d.areaStats?.monthlySeries?.[0]?.month === "May '26" &&
-            d.buyerQuote?.body ===
-              'A house like this gets chosen, quickly, by the right person.'
+            d.areaStats?.monthlySeries?.[0]?.month === "May '26"
           );
         } catch {
           return false;
@@ -1494,24 +1438,9 @@ test.describe('Seller Presentation — A7d editorial extras', () => {
     await page.getByTestId('wizard-prev').click(); // → Editorial
     await expect(page.getByTestId('step-editorial')).toBeVisible();
 
-    // Cards that had content open automatically on resume (the
-    // useEffect-based hydration in StepEditorial). Their inputs carry
-    // the persisted values.
-    await expect(page.getByTestId('step-editorial-agent-note-input')).toHaveValue(
-      "Here's exactly what I'd do to sell your home.",
-    );
     await expect(page.getByTestId('step-editorial-video-url')).toHaveValue(
       'https://www.loom.com/share/abc123',
     );
-    await expect(page.getByTestId('step-editorial-figure-label-0')).toHaveValue(
-      'Homes sold in Tremont',
-    );
-    await expect(page.getByTestId('step-editorial-figure-value-0')).toHaveValue(
-      '40',
-    );
-    await expect(
-      page.getByTestId('step-editorial-testimonial-body'),
-    ).toHaveValue('She walked us through every offer in plain English.');
     await expect(page.getByTestId('step-editorial-review-body-0')).toHaveValue(
       'Quiet, calm, prepared.',
     );
@@ -1524,9 +1453,6 @@ test.describe('Seller Presentation — A7d editorial extras', () => {
     await expect(
       page.getByTestId('step-editorial-area-month-label-0'),
     ).toHaveValue("May '26");
-    await expect(page.getByTestId('step-editorial-quote-body')).toHaveValue(
-      "A house like this gets chosen, quickly, by the right person.",
-    );
 
     // ---- Walk forward, mock publish, capture body ----
     let publishBody: unknown;
@@ -1554,17 +1480,9 @@ test.describe('Seller Presentation — A7d editorial extras', () => {
     const body = publishBody as { draft?: Record<string, unknown> } | null;
     expect(body).not.toBeNull();
     const d = body!.draft as Record<string, unknown>;
-    expect(d.agentNote).toBe("Here's exactly what I'd do to sell your home.");
     expect((d.video as { videoUrl?: string })?.videoUrl).toBe(
       'https://www.loom.com/share/abc123',
     );
-    const tr = d.trackRecord as {
-      figures?: Array<{ label?: string; value?: string }>;
-      testimonial?: { body?: string; attributionShort?: string };
-    };
-    expect(tr.figures?.[0]?.label).toBe('Homes sold in Tremont');
-    expect(tr.figures?.[0]?.value).toBe('40');
-    expect(tr.testimonial?.attributionShort).toBe('D. & K. Bauer');
     expect((d.reviews as Array<{ body?: string }>)[0]?.body).toBe(
       'Quiet, calm, prepared.',
     );
@@ -1578,9 +1496,13 @@ test.describe('Seller Presentation — A7d editorial extras', () => {
     expect(stats.medianSale).toBe('$642k');
     expect(stats.monthlySeries?.[0]?.month).toBe("May '26");
     expect(stats.monthlySeries?.[0]?.medianPrice).toBe('642000');
-    expect((d.buyerQuote as { body?: string }).body).toBe(
-      'A house like this gets chosen, quickly, by the right person.',
-    );
+
+    // A7d.1 removed fields must NOT appear on the wire — even when the
+    // wizard never offered an input. Locks the subtraction in place.
+    expect(d.agentNote).toBeUndefined();
+    expect(d.trackRecord).toBeUndefined();
+    expect(d.buyerQuote).toBeUndefined();
+    expect(d.editorialPhotoUrl).toBeUndefined();
   });
 
   test('skip-all: untouched editorial step publishes with no editorial fields on the draft', async ({
@@ -1616,18 +1538,21 @@ test.describe('Seller Presentation — A7d editorial extras', () => {
     // Land on Editorial; every card is closed by default for a fresh
     // draft because `sectionsWithContent(EMPTY_DRAFT)` returns nothing.
     await expect(page.getByTestId('step-editorial')).toBeVisible();
-    for (const key of [
+    for (const key of ['video', 'reviews', 'areaStats']) {
+      await expect(
+        page.getByTestId(`step-editorial-${key}-card`),
+      ).toHaveAttribute('data-state', 'closed');
+    }
+    // A7d.1 removed cards must not exist in the DOM at all.
+    for (const removedKey of [
       'agentNote',
-      'video',
       'trackRecord',
-      'reviews',
-      'areaStats',
       'buyerQuote',
       'editorialPhoto',
     ]) {
       await expect(
-        page.getByTestId(`step-editorial-${key}-card`),
-      ).toHaveAttribute('data-state', 'closed');
+        page.getByTestId(`step-editorial-${removedKey}-card`),
+      ).toHaveCount(0);
     }
     await nextButton.click(); // straight through to Review
 
@@ -1641,16 +1566,15 @@ test.describe('Seller Presentation — A7d editorial extras', () => {
     const body = publishBody as { draft?: Record<string, unknown> } | null;
     expect(body).not.toBeNull();
     const d = body!.draft!;
-    // None of the editorial blocks reach the wire when the step was
-    // skipped. The renderer's hide-when-empty contracts depend on
-    // each of these being absent (or, for objects, undefined) — the
-    // MINIMAL fixture render spec covers the page-side proof.
-    expect(d.agentNote).toBeUndefined();
+    // None of the surviving editorial blocks reach the wire when the
+    // step was skipped.
     expect(d.video).toBeUndefined();
-    expect(d.trackRecord).toBeUndefined();
     expect(d.reviews).toBeUndefined();
     expect(d.reviewsOutlink).toBeUndefined();
     expect(d.areaStats).toBeUndefined();
+    // A7d.1 removed fields are absent by construction.
+    expect(d.agentNote).toBeUndefined();
+    expect(d.trackRecord).toBeUndefined();
     expect(d.buyerQuote).toBeUndefined();
     expect(d.editorialPhotoUrl).toBeUndefined();
   });

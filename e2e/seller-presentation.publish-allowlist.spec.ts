@@ -1,46 +1,22 @@
 import { test, expect } from '@playwright/test';
 
 /**
- * Seller Presentation — public-payload allowlist proof (v1.47 / A6 + A7a).
+ * Seller Presentation — public-payload allowlist proof (v1.47 / A6 + A7a + A7d.1).
  *
- * The privacy boundary made code. The publish route at
- * src/app/api/seller-presentation/publish/route.ts calls
+ * The privacy boundary made code. The publish route calls
  * `toPublicPayload(draft, agentContact)` and passes ONLY the result
- * to `publishHandout`. This spec asserts that no private field —
- * named explicitly in the audit §6 table — survives that
- * serialization, by constructing a maximally-populated draft with
- * SENTINEL strings in every private slot and checking that
- * `JSON.stringify(toPublicPayload(...))` contains none of them.
+ * to `publishHandout`. This spec constructs a maximally-populated
+ * draft with SENTINEL strings in every private slot and asserts none
+ * of them survive serialization.
  *
- * A7a extension: the locked-design surface area added new public-safe
- * fields (preparedFor, agentNote, video, trackRecord, reviews,
- * reviewsOutlink, areaStats, buyerQuote, pitchPublicCards, grouped
- * property/whyPrice/agent), trimmed comps to a 4-key set, and changed
- * pitch points to {title, support}. The privacy invariants stay
- * identical; what changed are the MINIMIZATION assertions:
- *   - every emitted comp's keys are a subset of {address, soldPrice,
- *     soldDate, sqft};
- *   - the agent block contains no key outside the public agent
- *     allowlist;
- *   - each optional block (video / trackRecord / reviews /
- *     reviewsOutlink / areaStats / buyerQuote / preparedFor /
- *     agentNote) is OMITTED from the JSON when unset, not partially
- *     emitted.
+ * A7d.1 subtraction: `editorialPhotoUrl`, `agentNote`, `trackRecord`,
+ * and `buyerQuote` were removed from the draft + serializer. This
+ * spec now asserts they are NOT emitted (even if an old persisted
+ * draft tries to smuggle them through). The drop-on-projection
+ * guarantee is exactly the same shape as the existing private-field
+ * proofs.
  *
- * Why sentinel strings: stringifying the payload and `expect.not.toContain`
- * against a literal value is the loudest possible assertion. If a
- * future serializer edit accidentally allowed a private key through,
- * the sentinel makes the leak unmissable.
- *
- * Pure-Node test — no browser, no HTTP, no localStorage shim needed.
- * Follows the static-import convention from
- * e2e/lib-data-primitives.spec.ts (Playwright transpiles static
- * .ts imports; dynamic `await import('.ts')` falls through to Node's
- * raw loader and fails).
- *
- * This spec is INTENTIONALLY independent of the wire format (no fetch,
- * no /h/[slug] render). The privacy proof must NOT depend on a route
- * being deployed; it tests the function that closes R-1 directly.
+ * Pure-Node test — no browser, no HTTP. Privacy doesn't ride on routing.
  */
 
 import {
@@ -68,8 +44,6 @@ const S = {
 
   // ---- A7a public-safe sentinels (positive round-trip checks) ----
   preparedFor: 'the PUBLIC_SENTINEL_FAMILY family',
-  agentNote: 'PUBLIC_SENTINEL_AGENT_NOTE_BODY',
-  editorialPhotoUrl: 'https://example.com/PUBLIC_SENTINEL_EDITORIAL.jpg',
   propertyState: 'WA',
   propertyZip: '98404',
   heroPhotoUrl: 'data:image/png;base64,PUBLIC_SENTINEL_HERO',
@@ -78,13 +52,10 @@ const S = {
   videoTitle: 'PUBLIC_SENTINEL_VIDEO_TITLE',
   videoRuntime: '2:14',
   videoRecordedOn: '2026-05-12',
-  trackFigureValue: 'PUBLIC_SENTINEL_FIG_VALUE',
-  trackTestimonialBody: 'PUBLIC_SENTINEL_TESTIMONIAL_BODY',
   reviewBody: 'PUBLIC_SENTINEL_REVIEW_BODY',
   reviewsOutlinkUrl: 'https://example.com/PUBLIC_SENTINEL_OUTLINK',
   areaStatsMedianSale: 'PUBLIC_SENTINEL_MEDIAN_SALE',
   areaStatsMonth: 'PUBLIC_SENTINEL_MONTH',
-  buyerQuoteBody: 'PUBLIC_SENTINEL_BUYER_QUOTE',
   pitchCardTitle: 'PUBLIC_SENTINEL_CARD_TITLE',
   pitchCardSupport: 'PUBLIC_SENTINEL_CARD_SUPPORT',
   agentAreasServed: 'PUBLIC_SENTINEL_AREAS_SERVED',
@@ -92,6 +63,16 @@ const S = {
   agentBioShort: 'PUBLIC_SENTINEL_AGENT_BIO',
   agentYearsInArea: 'PUBLIC_SENTINEL_YEARS',
   agentCtaReassurance: 'PUBLIC_SENTINEL_CTA_REASSURANCE',
+
+  // ---- A7d.1 removed-field sentinels: editorialPhotoUrl, agentNote,
+  //       trackRecord, and buyerQuote were cut. Old persisted drafts
+  //       may still carry them; the serializer must DROP them silently.
+  //       The sentinels prove the drop holds on round-trip.
+  removedAgentNote: 'REMOVED_SENTINEL_AGENT_NOTE_BODY',
+  removedEditorialPhotoUrl: 'https://example.com/REMOVED_SENTINEL_EDITORIAL.jpg',
+  removedTrackFigureValue: 'REMOVED_SENTINEL_FIG_VALUE',
+  removedTrackTestimonialBody: 'REMOVED_SENTINEL_TESTIMONIAL_BODY',
+  removedBuyerQuoteBody: 'REMOVED_SENTINEL_BUYER_QUOTE',
 
   // ---- A7a forbidden-key sentinels (private fields that don't yet
   // exist on the draft type but MUST never appear in payload if
@@ -121,7 +102,14 @@ const ALLOWED_AGENT_KEYS = new Set([
 ]);
 
 function maxedDraft(): SellerPresentationDraft {
-  return {
+  // A7d.1: the keys agentNote / editorialPhotoUrl / trackRecord /
+  // buyerQuote are REMOVED from SellerPresentationDraft. The spec
+  // still injects them via a cast so we can prove the serializer
+  // drops them even if an older persisted draft (or hand-tampered
+  // KV record) tries to smuggle them through. The cast-through-
+  // `unknown` is the conventional TS escape hatch for "this object
+  // is intentionally wider than the declared type."
+  const draft = {
     // ---- Public-safe fields (these SHOULD survive) ----
     propertyId: 'property_test_id',
     propertyAddress: '1234 Test Drive NE',
@@ -134,25 +122,31 @@ function maxedDraft(): SellerPresentationDraft {
       'Priced 2% under market median to drive multiple offers in the first 10 days.',
 
     preparedFor: S.preparedFor,
-    agentNote: S.agentNote,
-    editorialPhotoUrl: S.editorialPhotoUrl,
+    // ---- A7d.1 removed fields — must DROP on projection ----
+    agentNote: S.removedAgentNote,
+    editorialPhotoUrl: S.removedEditorialPhotoUrl,
+    trackRecord: {
+      figures: [
+        {
+          label: 'Homes sold',
+          value: S.removedTrackFigureValue,
+          ctx: 'last 24 months',
+        },
+        { label: 'Avg days', value: '11' },
+      ],
+      testimonial: {
+        body: S.removedTrackTestimonialBody,
+        attributionShort: 'M.S.',
+        areaOrYear: 'Tacoma, 2025',
+      },
+    },
+    buyerQuote: { body: S.removedBuyerQuoteBody, source: 'A buyer who toured' },
     video: {
       posterUrl: S.videoPoster,
       videoUrl: S.videoUrl,
       title: S.videoTitle,
       runtime: S.videoRuntime,
       recordedOn: S.videoRecordedOn,
-    },
-    trackRecord: {
-      figures: [
-        { label: 'Homes sold', value: S.trackFigureValue, ctx: 'last 24 months' },
-        { label: 'Avg days', value: '11' },
-      ],
-      testimonial: {
-        body: S.trackTestimonialBody,
-        attributionShort: 'M.S.',
-        areaOrYear: 'Tacoma, 2025',
-      },
     },
     reviews: [
       {
@@ -178,7 +172,6 @@ function maxedDraft(): SellerPresentationDraft {
         { month: 'Apr', medianPrice: '$675,000' },
       ],
     },
-    buyerQuote: { body: S.buyerQuoteBody, source: 'A buyer who toured' },
     agentAreasServed: S.agentAreasServed,
     agentPhotoUrl: S.agentPhotoUrl,
     agentBioShort: S.agentBioShort,
@@ -240,6 +233,7 @@ function maxedDraft(): SellerPresentationDraft {
       },
     ],
   };
+  return draft as unknown as SellerPresentationDraft;
 }
 
 const FIXTURE_AGENT_CONTACT: AgentBranding = {
@@ -284,8 +278,6 @@ test.describe('toPublicPayload — privacy allowlist (R-1 proof)', () => {
     expect(payload.property.rationaleShort).toContain('drive multiple offers');
 
     expect(payload.preparedFor).toBe(S.preparedFor);
-    expect(payload.agentNote).toBe(S.agentNote);
-    expect(payload.editorialPhotoUrl).toBe(S.editorialPhotoUrl);
 
     expect(payload.video).toBeDefined();
     expect(payload.video?.videoUrl).toBe(S.videoUrl);
@@ -299,10 +291,6 @@ test.describe('toPublicPayload — privacy allowlist (R-1 proof)', () => {
       { title: S.pitchCardTitle, support: S.pitchCardSupport },
     ]);
 
-    expect(payload.trackRecord?.figures).toHaveLength(2);
-    expect(payload.trackRecord?.figures?.[0].value).toBe(S.trackFigureValue);
-    expect(payload.trackRecord?.testimonial?.body).toBe(S.trackTestimonialBody);
-
     expect(payload.reviews).toHaveLength(1);
     expect(payload.reviews?.[0].body).toBe(S.reviewBody);
     expect(payload.reviewsOutlink?.url).toBe(S.reviewsOutlinkUrl);
@@ -311,9 +299,36 @@ test.describe('toPublicPayload — privacy allowlist (R-1 proof)', () => {
     expect(payload.areaStats?.monthlySeries).toHaveLength(2);
     expect(payload.areaStats?.monthlySeries?.[0].month).toBe(S.areaStatsMonth);
 
-    expect(payload.buyerQuote?.body).toBe(S.buyerQuoteBody);
-
     expect(payload.agent.name).toBe('Aaron Test');
+  });
+
+  test('A7d.1 — removed fields (agentNote / editorialPhotoUrl / trackRecord / buyerQuote) DROP on serialization', () => {
+    // The maxedDraft injects these keys via a cast so the spec can
+    // prove the serializer drops them even when present. Both the
+    // value sentinels AND the key names must be absent from the JSON.
+    const draft = maxedDraft();
+    const payload = toPublicPayload(draft, FIXTURE_AGENT_CONTACT) as unknown as Record<string, unknown>;
+    const serialized = JSON.stringify(payload);
+
+    for (const removedSentinel of [
+      S.removedAgentNote,
+      S.removedEditorialPhotoUrl,
+      S.removedTrackFigureValue,
+      S.removedTrackTestimonialBody,
+      S.removedBuyerQuoteBody,
+    ]) {
+      expect(serialized).not.toContain(removedSentinel);
+    }
+
+    for (const removedKey of [
+      'agentNote',
+      'editorialPhotoUrl',
+      'trackRecord',
+      'buyerQuote',
+    ]) {
+      expect(serialized).not.toContain(`"${removedKey}":`);
+      expect(payload[removedKey]).toBeUndefined();
+    }
   });
 
   test('NO private TOP-LEVEL field appears in the JSON-stringified payload', () => {
@@ -466,40 +481,6 @@ test.describe('toPublicPayload — privacy allowlist (R-1 proof)', () => {
     expect(payload.agent.ctaReassurance).toBe(S.agentCtaReassurance);
   });
 
-  test('A7a — trackRecord carries no teamOnlyStats / negotiation fields', () => {
-    // Try to smuggle a private-named field through trackRecord by
-    // passing a rogue figure with an unexpected key. The serializer's
-    // explicit `{label, value, ctx}` projection drops it.
-    const draft = maxedDraft();
-    const tampered = {
-      ...draft,
-      trackRecord: {
-        figures: [
-          {
-            label: 'Homes sold',
-            value: S.trackFigureValue,
-            ctx: 'last 24 months',
-            // @ts-expect-error — deliberately rogue to verify projection drops it.
-            negotiationNotes: S.negotiationNotes,
-            // @ts-expect-error — deliberately rogue.
-            teamOnlyStat: S.teamOnlyStat,
-          },
-        ],
-        testimonial: {
-          body: S.trackTestimonialBody,
-          attributionShort: 'M.S.',
-        },
-      },
-    } as SellerPresentationDraft;
-
-    const payload = toPublicPayload(tampered, FIXTURE_AGENT_CONTACT);
-    const serialized = JSON.stringify(payload);
-    expect(serialized).not.toContain(S.negotiationNotes);
-    expect(serialized).not.toContain(S.teamOnlyStat);
-    expect(serialized).not.toContain('"negotiationNotes":');
-    expect(serialized).not.toContain('"teamOnlyStat":');
-  });
-
   test('the private pitch point cannot be derived from any payload field', () => {
     // Belt-and-suspenders: the public projection of pitchPoints is
     // `pitchPublicPoints` (a string[] of TITLEs only) plus the
@@ -534,28 +515,20 @@ test.describe('toPublicPayload — privacy allowlist (R-1 proof)', () => {
     // Top-level optional blocks: each must be absent from the JSON.
     for (const optionalKey of [
       'video',
-      'trackRecord',
       'reviews',
       'reviewsOutlink',
       'areaStats',
-      'buyerQuote',
       'preparedFor',
-      'agentNote',
-      'editorialPhotoUrl',
     ]) {
       expect(serialized).not.toContain(`"${optionalKey}":`);
     }
 
     // Each TS-typed access returns undefined (no partial object).
     expect(payload.video).toBeUndefined();
-    expect(payload.trackRecord).toBeUndefined();
     expect(payload.reviews).toBeUndefined();
     expect(payload.reviewsOutlink).toBeUndefined();
     expect(payload.areaStats).toBeUndefined();
-    expect(payload.buyerQuote).toBeUndefined();
     expect(payload.preparedFor).toBeUndefined();
-    expect(payload.agentNote).toBeUndefined();
-    expect(payload.editorialPhotoUrl).toBeUndefined();
 
     // Required grouped blocks still emit with sane defaults.
     expect(payload.property.address).toBe('');

@@ -5,55 +5,22 @@ import { ImageUploadField } from "@/components/ImageUploadField";
 import type {
   AreaStats,
   AreaStatsMonthly,
-  BuyerQuote,
   PresentationVideo,
   Review,
   ReviewsOutlink,
   SellerPresentationDraft,
-  TrackRecord,
-  TrackRecordFigure,
-  TrackRecordTestimonial,
 } from "../engine/types";
 
 /**
- * Seller Presentation Step 5 — Editorial extras (v1.47 / A7d).
+ * Seller Presentation Step 5 — Editorial extras (v1.47 / A7d + A7d.1).
  *
- * One fully OPTIONAL step capturing every block the locked-design
- * renderer + serializer already handle (A7a/A7b): agentNote, video,
- * trackRecord, reviews, areaStats, buyerQuote, editorialPhotoUrl.
- *
- * Each block is a skippable card. When the agent hasn't added it,
- * a single "+ Add …" button shows. Clicking opens the inline editor
- * for that block. "Remove this section" clears the block's draft
- * fields and collapses the card back to the add affordance.
- *
- * Why no required fields, no gating, and no soft caps: the renderer
- * hides every block individually when its source data is absent
- * (see presentation-page.tsx's per-section null returns). Skipping
- * the whole step still publishes a tight page (the MINIMAL fixture
- * proves this in e2e/seller-presentation.page-render.spec.ts).
- *
- * Photos reuse the shared <ImageUploadField> (A7c.2): camera-roll
- * picker → client downscale → Vercel Blob → hosted URL stored on
- * the draft. No new upload infra. Video.videoUrl is a URL-only
- * input — real video hosting is a deferred Pro-tier follow-on.
- *
- * Copy rules carried from A7c.x:
- *   - Placeholders are short, real, in-window examples (not format
- *     descriptions).
- *   - Repeatable rows cycle a curated example set per index.
- *   - No em-dashes in any user-facing string.
- *   - One purpose line per card, written for a non-expert agent.
+ * One fully OPTIONAL step. After A7d.1's subtraction the surviving
+ * blocks are: walk-through video, reviews, and the area snapshot
+ * (the chart). Each block is a skippable card.
  *
  * SSR-safe (Substrate §9): `addedSections` initializes empty on
  * server + first client render, hydrates from the draft in a
- * useEffect post-mount. Without this, a section that was added on
- * a prior session would render unmounted on the server and remount
- * after hydration — a hydration-mismatch flake.
- *
- * No serializer / renderer changes — A7a/A7b already consume every
- * field captured here. The single source of truth for what reaches
- * /h/[slug] stays `toPublicPayload` in ../output/public-payload.ts.
+ * useEffect post-mount.
  */
 
 interface StepEditorialProps {
@@ -65,14 +32,7 @@ const inputCls =
   "w-full px-3 py-2 bg-neutral-900 border border-neutral-700 rounded text-sm focus:outline-none focus:border-mint";
 const textareaCls = `${inputCls} resize-y min-h-[80px]`;
 
-type SectionKey =
-  | "agentNote"
-  | "video"
-  | "trackRecord"
-  | "reviews"
-  | "areaStats"
-  | "buyerQuote"
-  | "editorialPhoto";
+type SectionKey = "video" | "reviews" | "areaStats";
 
 interface SectionDef {
   key: SectionKey;
@@ -85,25 +45,11 @@ interface SectionDef {
 
 const SECTIONS: SectionDef[] = [
   {
-    key: "agentNote",
-    title: "Personal note",
-    purpose:
-      "One sentence from you, in your own voice, at the top of the page.",
-    addLabel: "+ Add a personal note",
-  },
-  {
     key: "video",
     title: "Walk-through video",
     purpose:
       "A short video of you walking the seller through the plan. Hosted elsewhere; paste the link.",
     addLabel: "+ Add a video",
-  },
-  {
-    key: "trackRecord",
-    title: "Track record",
-    purpose:
-      "Up to three figures from your sales, and one testimonial. The card hides if you leave it empty.",
-    addLabel: "+ Add your track record",
   },
   {
     key: "reviews",
@@ -118,20 +64,6 @@ const SECTIONS: SectionDef[] = [
     purpose:
       "Stats for the seller's neighborhood. Each field is optional; leave any you don't have.",
     addLabel: "+ Add an area snapshot",
-  },
-  {
-    key: "buyerQuote",
-    title: "Pull-quote about the home",
-    purpose:
-      "A line from a buyer, peer, or your own writing that captures how this home reads.",
-    addLabel: "+ Add a pull-quote",
-  },
-  {
-    key: "editorialPhoto",
-    title: "Editorial photo",
-    purpose:
-      "A second, warm photo that sets the tone above the pull-quote. Different from the hero.",
-    addLabel: "+ Add an editorial photo",
   },
 ];
 
@@ -162,23 +94,8 @@ const REVIEW_EXAMPLES: ReadonlyArray<{
   },
 ];
 
-/** Rotating example placeholders for track-record figures. */
-const FIGURE_EXAMPLES: ReadonlyArray<{
-  label: string;
-  value: string;
-  ctx: string;
-}> = [
-  { label: "Homes sold in Tremont", value: "40", ctx: "Trailing 36 months" },
-  { label: "Average days on market", value: "11 days", ctx: "Area average is 21" },
-  { label: "List-to-sale ratio", value: "102%", ctx: "How close listings close to ask" },
-];
-
 function reviewExample(idx: number) {
   return REVIEW_EXAMPLES[idx % REVIEW_EXAMPLES.length];
-}
-
-function figureExample(idx: number) {
-  return FIGURE_EXAMPLES[idx % FIGURE_EXAMPLES.length];
 }
 
 /**
@@ -188,16 +105,8 @@ function figureExample(idx: number) {
  */
 function sectionsWithContent(draft: SellerPresentationDraft): SectionKey[] {
   const out: SectionKey[] = [];
-  if (draft.agentNote?.trim()) out.push("agentNote");
   if (draft.video && Object.values(draft.video).some((v) => v?.trim())) {
     out.push("video");
-  }
-  if (
-    draft.trackRecord &&
-    ((draft.trackRecord.figures && draft.trackRecord.figures.length > 0) ||
-      draft.trackRecord.testimonial)
-  ) {
-    out.push("trackRecord");
   }
   if ((draft.reviews && draft.reviews.length > 0) || draft.reviewsOutlink) {
     out.push("reviews");
@@ -210,8 +119,6 @@ function sectionsWithContent(draft: SellerPresentationDraft): SectionKey[] {
   ) {
     out.push("areaStats");
   }
-  if (draft.buyerQuote) out.push("buyerQuote");
-  if (draft.editorialPhotoUrl?.trim()) out.push("editorialPhoto");
   return out;
 }
 
@@ -249,26 +156,14 @@ export function StepEditorial({ draft, setDraft }: StepEditorialProps) {
     });
     // Clear the draft fields so the published page hides the block.
     switch (k) {
-      case "agentNote":
-        setDraft({ ...draft, agentNote: undefined });
-        break;
       case "video":
         setDraft({ ...draft, video: undefined });
-        break;
-      case "trackRecord":
-        setDraft({ ...draft, trackRecord: undefined });
         break;
       case "reviews":
         setDraft({ ...draft, reviews: undefined, reviewsOutlink: undefined });
         break;
       case "areaStats":
         setDraft({ ...draft, areaStats: undefined });
-        break;
-      case "buyerQuote":
-        setDraft({ ...draft, buyerQuote: undefined });
-        break;
-      case "editorialPhoto":
-        setDraft({ ...draft, editorialPhotoUrl: undefined });
         break;
     }
   };
@@ -292,26 +187,14 @@ export function StepEditorial({ draft, setDraft }: StepEditorialProps) {
             onAdd={() => openSection(s.key)}
             onRemove={() => closeSection(s.key)}
           >
-            {s.key === "agentNote" && (
-              <AgentNoteEditor draft={draft} setDraft={setDraft} />
-            )}
             {s.key === "video" && (
               <VideoEditor draft={draft} setDraft={setDraft} />
-            )}
-            {s.key === "trackRecord" && (
-              <TrackRecordEditor draft={draft} setDraft={setDraft} />
             )}
             {s.key === "reviews" && (
               <ReviewsEditor draft={draft} setDraft={setDraft} />
             )}
             {s.key === "areaStats" && (
               <AreaStatsEditor draft={draft} setDraft={setDraft} />
-            )}
-            {s.key === "buyerQuote" && (
-              <BuyerQuoteEditor draft={draft} setDraft={setDraft} />
-            )}
-            {s.key === "editorialPhoto" && (
-              <EditorialPhotoEditor draft={draft} setDraft={setDraft} />
             )}
           </SectionCard>
         ))}
@@ -378,29 +261,6 @@ function SectionCard({ def, open, onAdd, onRemove, children }: SectionCardProps)
       </div>
       <div className="space-y-3">{children}</div>
     </div>
-  );
-}
-
-// =====================================================================
-// AGENT NOTE
-// =====================================================================
-
-function AgentNoteEditor({ draft, setDraft }: StepEditorialProps) {
-  return (
-    <label className="block">
-      <span className="text-[10px] uppercase tracking-[0.15em] text-neutral-500">
-        Your note
-      </span>
-      <textarea
-        className={`${textareaCls} mt-1`}
-        value={draft.agentNote ?? ""}
-        onChange={(e) =>
-          setDraft({ ...draft, agentNote: e.target.value || undefined })
-        }
-        placeholder="Here's exactly what I'd do to sell your home, and why I'm so confident in the number."
-        data-testid="step-editorial-agent-note-input"
-      />
-    </label>
   );
 }
 
@@ -494,174 +354,6 @@ function VideoEditor({ draft, setDraft }: StepEditorialProps) {
         helpText="Optional. The still frame buyers see before the video plays."
         urlPlaceholder="…or paste a poster image URL"
       />
-    </>
-  );
-}
-
-// =====================================================================
-// TRACK RECORD
-// =====================================================================
-
-const MAX_FIGURES = 3;
-
-function TrackRecordEditor({ draft, setDraft }: StepEditorialProps) {
-  const tr: TrackRecord = draft.trackRecord ?? {};
-
-  const updateTrackRecord = (next: TrackRecord) => {
-    const hasFigures = (next.figures?.length ?? 0) > 0;
-    const hasTestimonial = Boolean(next.testimonial);
-    setDraft({
-      ...draft,
-      trackRecord: hasFigures || hasTestimonial ? next : undefined,
-    });
-  };
-
-  const figures: TrackRecordFigure[] = tr.figures ?? [];
-
-  const updateFigure = (idx: number, patch: Partial<TrackRecordFigure>) => {
-    const nextFigures = figures.map((f, i) =>
-      i === idx ? { ...f, ...patch } : f,
-    );
-    updateTrackRecord({ ...tr, figures: nextFigures });
-  };
-
-  const addFigure = () => {
-    if (figures.length >= MAX_FIGURES) return;
-    updateTrackRecord({
-      ...tr,
-      figures: [...figures, { label: "", value: "" }],
-    });
-  };
-
-  const removeFigure = (idx: number) => {
-    const nextFigures = figures.filter((_, i) => i !== idx);
-    updateTrackRecord({
-      ...tr,
-      figures: nextFigures.length ? nextFigures : undefined,
-    });
-  };
-
-  const t: TrackRecordTestimonial = tr.testimonial ?? {
-    body: "",
-    attributionShort: "",
-  };
-  const updateTestimonial = (patch: Partial<TrackRecordTestimonial>) => {
-    const next: TrackRecordTestimonial = { ...t, ...patch };
-    const hasContent =
-      next.body.trim().length > 0 || next.attributionShort.trim().length > 0;
-    updateTrackRecord({
-      ...tr,
-      testimonial: hasContent ? next : undefined,
-    });
-  };
-
-  return (
-    <>
-      <div className="space-y-3">
-        <div className="text-[10px] uppercase tracking-[0.15em] text-neutral-500">
-          Figures (up to {MAX_FIGURES})
-        </div>
-        {figures.length === 0 && (
-          <p className="text-xs text-neutral-500">
-            No figures yet. Add one to start.
-          </p>
-        )}
-        {figures.map((fig, idx) => {
-          const ex = figureExample(idx);
-          return (
-            <div
-              key={idx}
-              className="space-y-2 rounded border border-neutral-800 bg-neutral-900/40 p-3"
-              data-testid={`step-editorial-figure-${idx}`}
-            >
-              <div className="flex items-center justify-between">
-                <span className="text-[10px] uppercase tracking-wider text-neutral-500">
-                  Figure {idx + 1}
-                </span>
-                <button
-                  type="button"
-                  onClick={() => removeFigure(idx)}
-                  className="text-xs text-neutral-500 hover:text-red-400"
-                  data-testid={`step-editorial-figure-remove-${idx}`}
-                >
-                  Remove
-                </button>
-              </div>
-              <input
-                type="text"
-                className={inputCls}
-                value={fig.label}
-                onChange={(e) => updateFigure(idx, { label: e.target.value })}
-                placeholder={`e.g. ${ex.label}`}
-                data-testid={`step-editorial-figure-label-${idx}`}
-              />
-              <input
-                type="text"
-                className={inputCls}
-                value={fig.value}
-                onChange={(e) => updateFigure(idx, { value: e.target.value })}
-                placeholder={`e.g. ${ex.value}`}
-                data-testid={`step-editorial-figure-value-${idx}`}
-              />
-              <input
-                type="text"
-                className={inputCls}
-                value={fig.ctx ?? ""}
-                onChange={(e) =>
-                  updateFigure(idx, { ctx: e.target.value || undefined })
-                }
-                placeholder={`e.g. ${ex.ctx}`}
-                data-testid={`step-editorial-figure-ctx-${idx}`}
-              />
-            </div>
-          );
-        })}
-        {figures.length < MAX_FIGURES && (
-          <button
-            type="button"
-            onClick={addFigure}
-            data-testid="step-editorial-figure-add"
-            className="rounded border border-neutral-700 px-3 py-1.5 text-xs text-text-primary hover:bg-neutral-800"
-          >
-            + Add a figure
-          </button>
-        )}
-      </div>
-
-      <div className="space-y-2">
-        <div className="text-[10px] uppercase tracking-[0.15em] text-neutral-500">
-          Testimonial (optional)
-        </div>
-        <textarea
-          className={textareaCls}
-          value={t.body}
-          onChange={(e) => updateTestimonial({ body: e.target.value })}
-          placeholder="She walked us through every offer in plain English and we closed at $24k over ask."
-          data-testid="step-editorial-testimonial-body"
-        />
-        <div className="grid grid-cols-1 gap-3 sm:grid-cols-2">
-          <input
-            type="text"
-            className={inputCls}
-            value={t.attributionShort}
-            onChange={(e) =>
-              updateTestimonial({ attributionShort: e.target.value })
-            }
-            placeholder="D. & K. Bauer"
-            data-testid="step-editorial-testimonial-attribution"
-          />
-          <input
-            type="text"
-            className={inputCls}
-            value={t.areaOrYear ?? ""}
-            onChange={(e) =>
-              updateTestimonial({ areaOrYear: e.target.value || undefined })
-            }
-            placeholder="Sold on Castle Avenue, 2025"
-            data-testid="step-editorial-testimonial-area-or-year"
-          />
-        </div>
-      </div>
     </>
   );
 }
@@ -1013,71 +705,6 @@ function AreaStatsEditor({ draft, setDraft }: StepEditorialProps) {
         )}
       </div>
     </>
-  );
-}
-
-// =====================================================================
-// BUYER QUOTE
-// =====================================================================
-
-function BuyerQuoteEditor({ draft, setDraft }: StepEditorialProps) {
-  const q: BuyerQuote = draft.buyerQuote ?? { body: "", source: "" };
-  const update = (patch: Partial<BuyerQuote>) => {
-    const next: BuyerQuote = { ...q, ...patch };
-    const hasContent =
-      next.body.trim().length > 0 || next.source.trim().length > 0;
-    setDraft({ ...draft, buyerQuote: hasContent ? next : undefined });
-  };
-
-  return (
-    <>
-      <label className="block">
-        <span className="text-[10px] uppercase tracking-[0.15em] text-neutral-500">
-          Quote
-        </span>
-        <textarea
-          className={`${textareaCls} mt-1`}
-          value={q.body}
-          onChange={(e) => update({ body: e.target.value })}
-          placeholder="A house like this doesn't sit on the market. It gets chosen, quickly, by the right person."
-          data-testid="step-editorial-quote-body"
-        />
-      </label>
-      <label className="block">
-        <span className="text-[10px] uppercase tracking-[0.15em] text-neutral-500">
-          Source
-        </span>
-        <input
-          type="text"
-          className={`${inputCls} mt-1`}
-          value={q.source}
-          onChange={(e) => update({ source: e.target.value })}
-          placeholder="From a buyer's offer letter, April 2026"
-          data-testid="step-editorial-quote-source"
-        />
-      </label>
-    </>
-  );
-}
-
-// =====================================================================
-// EDITORIAL PHOTO
-// =====================================================================
-
-function EditorialPhotoEditor({ draft, setDraft }: StepEditorialProps) {
-  return (
-    <ImageUploadField
-      label="Editorial photo"
-      value={draft.editorialPhotoUrl ?? ""}
-      onChange={(url) =>
-        setDraft({ ...draft, editorialPhotoUrl: url || undefined })
-      }
-      previewAspect="aspect-[16/7]"
-      folder="seller-presentation/editorial"
-      testIdPrefix="step-editorial-photo"
-      helpText="A wide, warm image. Lifestyle works better than another listing shot."
-      urlPlaceholder="…or paste an image URL"
-    />
   );
 }
 
