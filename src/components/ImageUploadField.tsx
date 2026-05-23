@@ -50,6 +50,14 @@ interface ImageUploadFieldProps {
   testIdPrefix?: string;
   /** Optional placeholder for the "paste URL" fallback. */
   urlPlaceholder?: string;
+  /**
+   * Camera-roll-only mode (A7d.3). When true, the "…or paste an
+   * image URL" input is removed entirely (not hidden) — the agent's
+   * only path is the picker. Used for the video thumbnail field
+   * where the upstream brief explicitly removes the paste-URL
+   * affordance.
+   */
+  disablePasteUrl?: boolean;
 }
 
 const MAX_EDGE = 1600;
@@ -64,6 +72,7 @@ export function ImageUploadField({
   folder,
   testIdPrefix,
   urlPlaceholder = "…or paste an image URL",
+  disablePasteUrl = false,
 }: ImageUploadFieldProps) {
   const fileRef = useRef<HTMLInputElement>(null);
   const [uploading, setUploading] = useState(false);
@@ -170,13 +179,15 @@ export function ImageUploadField({
         </button>
       )}
 
-      {/* Paste-URL fallback — only when no image is set. Hidden once a
-          photo is uploaded so the raw hosted URL is never surfaced to
-          the agent (the URL stays in state via `value` and is used
-          internally; only the visible readout is suppressed). Agents
-          with a Zillow / FMLS / Dropbox link still see this affordance
-          before uploading. */}
-      {!value && (
+      {/* Paste-URL fallback — only when no image is set, and only
+          when this field allows it. Hidden once a photo is uploaded
+          so the raw hosted URL is never surfaced to the agent (the
+          URL stays in state via `value` and is used internally; only
+          the visible readout is suppressed). Agents with a Zillow /
+          FMLS / Dropbox link still see this affordance before
+          uploading — UNLESS `disablePasteUrl` removes it entirely
+          (A7d.3: thumbnail is camera-roll-only). */}
+      {!value && !disablePasteUrl && (
         <input
           type="url"
           value={value}

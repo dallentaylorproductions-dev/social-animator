@@ -2,6 +2,7 @@
 
 import { useEffect, useState } from "react";
 import { ImageUploadField } from "@/components/ImageUploadField";
+import { VideoUploadField } from "@/components/VideoUploadField";
 import type {
   AreaStats,
   AreaStatsMonthly,
@@ -46,7 +47,7 @@ const SECTIONS: SectionDef[] = [
     key: "video",
     title: "Walk-through video",
     purpose:
-      "A short video of you walking the seller through the plan. Hosted elsewhere; paste the link.",
+      "A short video of you walking the seller through the plan. Upload from your phone — plays inline on the page.",
     addLabel: "+ Add a video",
   },
   {
@@ -232,24 +233,32 @@ function VideoEditor({ draft, setDraft }: StepEditorialProps) {
 
   return (
     <>
-      <label className="block">
-        <span className="text-[10px] uppercase tracking-[0.15em] text-neutral-500">
-          Video link
-        </span>
-        <input
-          type="url"
-          className={`${inputCls} mt-1`}
-          value={v.videoUrl ?? ""}
-          onChange={(e) =>
-            setVideo({ videoUrl: e.target.value || undefined })
+      {/* A7d.3: camera-roll upload (no paste-URL). Plays inline on
+          the seller page via <video controls playsInline>. */}
+      <VideoUploadField
+        label="Walk-through video"
+        value={v.videoUrl ?? ""}
+        onChange={(url, durationSeconds) => {
+          // Apply both edits in a SINGLE setVideo call. Two
+          // separate setVideo calls would race — both read draft
+          // .video captured at render time, so the second one
+          // would clobber the first (this regressed once when
+          // onChange + onDuration were split props).
+          const patch: Partial<PresentationVideo> = {
+            videoUrl: url || undefined,
+          };
+          if (
+            durationSeconds !== undefined &&
+            Number.isFinite(durationSeconds)
+          ) {
+            patch.runtime = formatRuntime(durationSeconds);
           }
-          placeholder="https://www.loom.com/share/your-walk-through"
-          data-testid="step-editorial-video-url"
-        />
-        <span className="mt-1 block text-[11px] text-neutral-500">
-          Loom, YouTube, Vimeo, or any host you already use.
-        </span>
-      </label>
+          setVideo(patch);
+        }}
+        folder="seller-presentation-video"
+        testIdPrefix="step-editorial-video"
+        helpText="Up to 90 seconds, 75 MB. MP4, MOV, or WebM."
+      />
       <label className="block">
         <span className="text-[10px] uppercase tracking-[0.15em] text-neutral-500">
           Title
@@ -275,38 +284,51 @@ function VideoEditor({ draft, setDraft }: StepEditorialProps) {
             onChange={(e) =>
               setVideo({ runtime: e.target.value || undefined })
             }
-            placeholder="2 min 14 sec"
+            placeholder="0:14"
             data-testid="step-editorial-video-runtime"
           />
+          <span className="mt-1 block text-[11px] text-neutral-500">
+            Filled automatically from the video.
+          </span>
         </label>
         <label className="block">
           <span className="text-[10px] uppercase tracking-[0.15em] text-neutral-500">
             Recorded on
           </span>
+          {/* A7d.3: native date picker (matches A7c.1 comps pattern).
+              Stored as ISO YYYY-MM-DD; the renderer displays verbatim. */}
           <input
-            type="text"
+            type="date"
             className={`${inputCls} mt-1`}
             value={v.recordedOn ?? ""}
             onChange={(e) =>
               setVideo({ recordedOn: e.target.value || undefined })
             }
-            placeholder="Recorded May 19"
             data-testid="step-editorial-video-recorded-on"
           />
         </label>
       </div>
+      {/* A7d.3: thumbnail = poster, camera-roll-only (no paste-URL). */}
       <ImageUploadField
-        label="Poster image"
+        label="Video thumbnail"
         value={v.posterUrl ?? ""}
         onChange={(url) => setVideo({ posterUrl: url || undefined })}
         previewAspect="aspect-video"
-        folder="seller-presentation/video-poster"
+        folder="seller-presentation-video-poster"
         testIdPrefix="step-editorial-video-poster"
-        helpText="Optional. The still frame buyers see before the video plays."
-        urlPlaceholder="…or paste a poster image URL"
+        helpText="The still frame buyers see before the video plays."
+        disablePasteUrl
       />
     </>
   );
+}
+
+/** Format a duration in seconds as mm:ss (e.g. 74 → "1:14"). */
+function formatRuntime(totalSeconds: number): string {
+  const safe = Math.max(0, Math.round(totalSeconds));
+  const m = Math.floor(safe / 60);
+  const s = safe % 60;
+  return `${m}:${s.toString().padStart(2, "0")}`;
 }
 
 // =====================================================================

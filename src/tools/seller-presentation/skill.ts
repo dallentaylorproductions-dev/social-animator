@@ -263,3 +263,23 @@ export const SELLER_PRESENTATION_EMITS_EVENTS: SellerPresentationEvent[] = [
   "workflow_completed",
   "page_published",
 ];
+
+// ---- Tier-gated features (declaration only; gating wires up in A7f) ----
+//
+// Same sibling-export discipline as SELLER_PRESENTATION_AI_PLUG_POINTS:
+// keep declarations off the shared `CallableSkill` shape until the
+// consumer exists. A7f wires the dashboard's preview-but-lock pattern
+// to read this list; today the features remain buildable on the
+// preview page (inert gating per A7d.3's brief). When billing /
+// availability resolution lands, A7f will consult these keys to
+// decide which sections to lock for base-tier viewers.
+
+export type SellerPresentationProFeature = "video-walkthrough";
+
+export const SELLER_PRESENTATION_PRO_FEATURES: SellerPresentationProFeature[] = [
+  // A7d.3: camera-roll walkthrough video + inline playback. Pro-tier
+  // because the storage + (future) Cloudflare Stream egress cost
+  // sits in the upgrade bundle. Base tier still sees the field on
+  // the preview page; A7f locks the upload + the block accordingly.
+  "video-walkthrough",
+];

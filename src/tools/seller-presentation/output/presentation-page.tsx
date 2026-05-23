@@ -218,30 +218,40 @@ function VideoBlock({ payload }: { payload: PublicPayload }) {
       <h2 className="sec-title reveal">
         Two <em>minutes,</em> on your home.
       </h2>
-      <a
-        href={v.videoUrl}
-        target="_blank"
-        rel="noopener noreferrer"
-        className="video-poster reveal"
-        aria-label={v.title ?? "Play the agent's note"}
-        style={
-          v.posterUrl
-            ? {
-                backgroundImage: `url("${v.posterUrl.replace(/"/g, '\\"')}")`,
-              }
-            : undefined
-        }
-      >
-        <span className="play" aria-hidden="true" />
-        <span className="meta">
-          {v.title && <span className="ttl">{v.title}</span>}
-          {(v.runtime || v.recordedOn) && (
-            <span className="runtime">
-              {[v.runtime, v.recordedOn].filter(Boolean).join(" · ")}
-            </span>
-          )}
-        </span>
-      </a>
+      {/* A7d.3: inline playback.
+          - `playsInline` — required so iOS Safari doesn't force
+            fullscreen the moment the buyer hits play.
+          - `preload="metadata"` — fetch only the moov atom on page
+            load. The actual stream doesn't pull until play; protects
+            bandwidth for the 99% of visits that won't tap play.
+          - `poster={v.posterUrl}` — the thumbnail uploaded in the
+            wizard. Renders inside the same .video-poster geometry
+            (aspect-ratio 4/5 + min-height floor) so the block
+            doesn't collapse before the poster loads.
+          - `controls` — native browser chrome (play / scrub / mute).
+            Keeps the implementation framework-free and accessible. */}
+      <div className="video-poster reveal" data-testid="sep-video-player">
+        <video
+          className="video-player"
+          src={v.videoUrl}
+          poster={v.posterUrl}
+          controls
+          playsInline
+          preload="metadata"
+          aria-label={v.title ?? "Walk-through video"}
+          data-testid="sep-video-el"
+        />
+        {(v.title || v.runtime || v.recordedOn) && (
+          <span className="meta">
+            {v.title && <span className="ttl">{v.title}</span>}
+            {(v.runtime || v.recordedOn) && (
+              <span className="runtime">
+                {[v.runtime, v.recordedOn].filter(Boolean).join(" · ")}
+              </span>
+            )}
+          </span>
+        )}
+      </div>
     </section>
   );
 }

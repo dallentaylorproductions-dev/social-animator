@@ -506,13 +506,13 @@
   max-width: 14ch;
 }
 .sep-presentation .video-poster {
-  /* A7b.1 collapse fix: the renderer emits .video-poster as an
-     <a> (inline by default), so aspect-ratio + width:100% don't
-     apply and the box would collapse to 0 — letting the
-     absolutely-positioned .play + .meta children spill into
-     neighboring sections. `display: block` engages the box-model
-     math; min-height is a belt-and-suspenders floor in case the
-     aspect-ratio computation fails (very old browsers). */
+  /* A7b.1 collapse fix preserved: the wrapper still owns the
+     aspect-ratio + min-height floor so the box never collapses to
+     0 before the poster image loads (the inner native <video>
+     element fills the box on load). A7d.3 swaps the inner content
+     from a poster <a> to an actual <video controls playsInline>
+     for inline playback; geometry + scrim + dark fallback are
+     unchanged so existing layout tests stay green. */
   display: block;
   margin-top: 28px;
   position: relative;
@@ -520,70 +520,25 @@
   min-height: 380px;
   border-radius: var(--r-md);
   overflow: hidden;
-  /* Solid fallback surface so the poster is always a filled box,
-     even with no posterUrl. Deeper warm ink-2 reads as intentional
-     editorial when no image is set (vs the lighter #5e544a which
-     looked like a missing image). The background-image is applied
-     INLINE by the renderer only when video.posterUrl is present —
-     never as a broken/empty url(). */
+  /* Solid fallback surface so the box is always filled, even
+     before the poster loads or when no posterUrl is set. */
   background-color: var(--ink-2);
-  background-size: cover;
-  background-position: center 25%;
-  background-repeat: no-repeat;
   box-shadow: var(--shadow-card);
-  cursor: pointer;
-  transition: transform var(--ease) 220ms;
   border: none;
   padding: 0;
   width: 100%;
   color: inherit;
   text-align: left;
 }
-.sep-presentation .video-poster::before {
-  content: "";
-  position: absolute;
-  inset: 0;
-  background: linear-gradient(180deg, rgba(0, 0, 0, 0) 50%, rgba(20, 14, 8, 0.55) 100%);
-  pointer-events: none;
-}
-.sep-presentation .video-poster::after {
-  content: "";
-  position: absolute;
-  inset: 10px;
-  border: 1px solid rgba(255, 255, 255, 0.18);
-  pointer-events: none;
-  border-radius: 4px;
-}
-.sep-presentation .video-poster:hover {
-  transform: translateY(-2px);
-}
-.sep-presentation .video-poster .play {
-  position: absolute;
-  top: 50%;
-  left: 50%;
-  transform: translate(-50%, -50%);
-  width: 64px;
-  height: 64px;
-  border-radius: 50%;
-  background: rgba(244, 239, 228, 0.92);
-  backdrop-filter: blur(6px);
-  border: 1px solid rgba(255, 255, 255, 0.4);
-  display: grid;
-  place-items: center;
-  transition: background var(--ease) 140ms, transform var(--ease) 140ms;
-}
-.sep-presentation .video-poster:hover .play {
-  background: #ffffff;
-  transform: translate(-50%, -50%) scale(1.04);
-}
-.sep-presentation .video-poster .play::before {
-  content: "";
-  width: 0;
-  height: 0;
-  border-left: 14px solid var(--ink);
-  border-top: 9px solid transparent;
-  border-bottom: 9px solid transparent;
-  margin-left: 4px;
+.sep-presentation .video-poster .video-player {
+  /* Native <video> fills the poster box. `object-fit: cover` keeps
+     vertical phone-shot videos looking intentional inside the
+     editorial 4/5 box; native controls render on top. */
+  display: block;
+  width: 100%;
+  height: 100%;
+  object-fit: cover;
+  background: var(--ink-2);
 }
 .sep-presentation .video-poster .meta {
   position: absolute;
@@ -592,6 +547,10 @@
   right: 22px;
   color: #fbf6ec;
   z-index: 2;
+  /* pointer-events: none — let clicks on the meta-overlay corner
+     reach the native video controls underneath. */
+  pointer-events: none;
+  text-shadow: 0 1px 1px rgba(0, 0, 0, 0.55), 0 2px 18px rgba(0, 0, 0, 0.45);
 }
 .sep-presentation .video-poster .meta .ttl {
   font-family: var(--sep-display);

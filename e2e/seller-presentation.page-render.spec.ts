@@ -198,19 +198,23 @@ test.describe('Seller Presentation — A7b premium page render', () => {
     page,
   }) => {
     // Dallen's A7b mobile smoke caught the video-poster collapsing
-    // to ~0 height — the absolutely-positioned .play + .meta children
-    // spilled out and overlapped the price-rationale above + the
-    // section title. Root cause: the renderer emits <a> for the
-    // poster (inline by default), so `aspect-ratio: 4/5` +
-    // `width: 100%` didn't apply. A7b.1 added `display: block` +
-    // `min-height: 380px` + a deeper warm fallback color. This spec
-    // asserts the box has real height AND that .play + .meta stay
-    // INSIDE the poster's bounding rect — the structural property
-    // that prevents the overlap.
+    // to ~0 height — the children spilled out and overlapped the
+    // price-rationale above + the section title. Root cause: the
+    // renderer emitted <a> for the poster (inline by default), so
+    // `aspect-ratio: 4/5` + `width: 100%` didn't apply. A7b.1 added
+    // `display: block` + `min-height: 380px` + a deeper warm
+    // fallback color. A7d.3 swaps the inner content from a poster
+    // link-out to a native <video controls playsInline> for inline
+    // playback; the wrapper still owns the geometry, so this spec
+    // asserts the box has real height AND that the inline <video>
+    // + any caption-meta children stay INSIDE the poster's
+    // bounding rect (the structural property that prevents the
+    // overlap regression).
     //
     // FULL fixture intentionally has `video.posterUrl: undefined`
-    // (the exact bug repro). The test runs against that path so the
-    // fix is validated against the same shape Dallen hit.
+    // (the exact A7b.1 bug repro). The test runs against that path
+    // so the fix is validated against the same shape Dallen hit,
+    // even with the A7d.3 inner-element swap.
     await page.goto('/seller-presentation-preview?fixture=full');
     const poster = page.locator('.sep-presentation .video-poster');
     await expect(poster).toBeVisible();
@@ -219,10 +223,11 @@ test.describe('Seller Presentation — A7b premium page render', () => {
     expect(posterBox).not.toBeNull();
     expect(posterBox!.height).toBeGreaterThanOrEqual(380);
 
-    const playBox = await poster.locator('.play').boundingBox();
-    const metaBox = await poster.locator('.meta').boundingBox();
-    expect(playBox).not.toBeNull();
-    expect(metaBox).not.toBeNull();
+    const videoBox = await poster.locator('.video-player').boundingBox();
+    expect(videoBox).not.toBeNull();
+    // The inline <video> should fill (or substantially fill) the
+    // poster box so the geometry is real, not just a min-height pad.
+    expect(videoBox!.height).toBeGreaterThanOrEqual(380);
 
     const within = (
       inner: { x: number; y: number; width: number; height: number },
@@ -234,13 +239,22 @@ test.describe('Seller Presentation — A7b premium page render', () => {
       inner.y + inner.height <= outer.y + outer.height + 0.5;
 
     expect(
-      within(playBox!, posterBox!),
-      'video-poster .play overflowed the poster bounding box',
+      within(videoBox!, posterBox!),
+      'video-poster .video-player overflowed the poster bounding box',
     ).toBe(true);
-    expect(
-      within(metaBox!, posterBox!),
-      'video-poster .meta overflowed the poster bounding box',
-    ).toBe(true);
+
+    // The caption-meta is optional (only renders when title/runtime/
+    // recordedOn is present), but the FULL fixture supplies them, so
+    // check the same containment rule.
+    const metaLocator = poster.locator('.meta');
+    if (await metaLocator.count()) {
+      const metaBox = await metaLocator.boundingBox();
+      expect(metaBox).not.toBeNull();
+      expect(
+        within(metaBox!, posterBox!),
+        'video-poster .meta overflowed the poster bounding box',
+      ).toBe(true);
+    }
   });
 
   test('A7b.2 — content sections inset by the gutter token at mobile width (~390px)', async ({
