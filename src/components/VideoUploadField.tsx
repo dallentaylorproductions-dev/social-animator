@@ -54,6 +54,31 @@ import { upload } from "@vercel/blob/client";
  *     back to the hosted URL after reload. Buyers ALWAYS see the
  *     hosted URL via the seller-page renderer; this swap only
  *     affects the wizard's preview surface during a live edit.
+ *
+ * A7d.8.4 — Two thumbnail-picker bugs Dallen hit on 2026-05-23:
+ *
+ *   1. WYSIWYG. "Use this frame" used to spin up a SEPARATE off-screen
+ *      <video> (captureFrameBlob), seek IT to scrubTime, and draw THAT
+ *      element to canvas. Two independent decoders can land on different
+ *      painted frames at the same timestamp (keyframe snapping, decode
+ *      timing, paint races), so the captured poster ≠ what the agent
+ *      saw in the preview. The commit path now draws the MAIN visible
+ *      <video> directly at its currentTime — same element, same frame.
+ *      The off-screen captureFrameBlob path is retained for the AUTO
+ *      first-frame (immediately post-upload, before the main video has
+ *      mounted; iOS-safe shape is unchanged).
+ *
+ *   2. NO RE-UPLOAD ON REVISIT. The scrubber used to gate on the local
+ *      `File` (objectURL) so it disappeared after the wizard remounted
+ *      — the only way back was a fresh upload, which re-stored the
+ *      large video file. The scrubber is now available whenever a
+ *      video exists (local in-session OR persisted hosted URL on
+ *      remount). The main <video> carries crossOrigin="anonymous" so
+ *      canvas.drawImage() on the hosted source is taint-free — Vercel
+ *      Blob's `access:"public"` objects serve Access-Control-Allow-
+ *      Origin:* + range requests (verified 2026-05-23). Re-picking a
+ *      thumbnail uploads only the small captured IMAGE; the video is
+ *      never re-uploaded.
  */
 
 interface VideoUploadFieldProps {
@@ -565,16 +590,26 @@ export function VideoUploadField({
     }
   };
 
-  // A7d.8 P2 — "Use this frame" action. Captures the current scrub
-  // position to a JPEG blob via the same canvas pipeline, then uploads
-  // through /api/upload-image so it lands as a hosted URL (NOT a
-  // data: URL — published-page payload-leanness rule).
+  // A7d.8.4 — "Use this frame" captures from the SAME <video> the agent
+  // is previewing, at its CURRENT painted frame. Before A7d.8.4 this
+  // path spun up a separate off-screen <video> seeked independently to
+  // scrubTime — two decoders can land on different frames at the same
+  // timestamp, so the captured poster could differ from what the agent
+  // saw in the preview window. WYSIWYG fix: draw the main element now.
+  //
+  // Hosted-source taint: when the local objectURL is gone (remount),
+  // the main video is sourced from the hosted Vercel Blob URL with
+  // crossOrigin="anonymous". Vercel Blob's public objects serve
+  // Access-Control-Allow-Origin:*, so canvas.drawImage()/toBlob() do
+  // not throw SecurityError. This is what lets the agent re-pick a
+  // thumbnail without re-uploading the video.
   const handleUseThisFrame = async () => {
-    if (!localObjectUrl || scrubTime === null) return;
+    const video = mainVideoRef.current;
+    if (!video || scrubTime === null) return;
     setError(null);
     setCapturingFrame(true);
     try {
-      const frame = await captureFrameBlob(localObjectUrl, scrubTime);
+      const frame = await captureFrameFromVideoElement(video);
       const posterUrl = await uploadCapturedFrame(
         frame,
         `${folder ?? "uploads"}-poster`,
@@ -637,10 +672,16 @@ export function VideoUploadField({
                 reload so the preview still works once the local File
                 is gone. Buyers always see the hosted URL via the
                 seller-page renderer; this swap only affects the
-                wizard's preview during a live edit. */}
+                wizard's preview during a live edit.
+                A7d.8.4 — crossOrigin="anonymous" so canvas.drawImage()
+                on the hosted-URL src is taint-free. Verified: Vercel
+                Blob public objects serve Access-Control-Allow-Origin:*.
+                The attribute is a no-op for the local blob: objectURL
+                (same-origin by construction). */}
             <video
               ref={mainVideoRef}
               src={localObjectUrl ?? value}
+              crossOrigin="anonymous"
               controls
               playsInline
               preload="metadata"
@@ -651,6 +692,9 @@ export function VideoUploadField({
                 // too — the pre-upload readVideoDuration() already
                 // wrote it from the File, this is a belt-and-braces
                 // refresh in case the upstream value differs slightly.
+                // On remount with NO local File, this is the ONLY
+                // source of duration (the pre-upload pass didn't run)
+                // — without it the scrubber would never appear.
                 const v = e.target as HTMLVideoElement;
                 if (Number.isFinite(v.duration) && v.duration > 0) {
                   setDuration(v.duration);
@@ -658,13 +702,15 @@ export function VideoUploadField({
               }}
             />
           </div>
-          {/* A7d.8 — Instagram-style scrubber. Visible only when the
-              local File is in memory (capture from hosted URL would
-              taint the canvas) AND the duration is known. After a
-              reload the scrubber hides cleanly and the previously-
-              captured auto / scrub poster URLs still display on the
-              seller page. */}
-          {localObjectUrl && duration && duration > 0 && onPosterChange && (
+          {/* A7d.8.4 — Instagram-style scrubber. Available whenever a
+              video exists (local File in-session OR persisted hosted
+              URL on revisit) and the duration is known. The hosted-URL
+              case requires crossOrigin="anonymous" on the main <video>
+              so canvas.drawImage() is taint-free — Vercel Blob serves
+              Access-Control-Allow-Origin:*, verified 2026-05-23.
+              Re-picking a thumbnail uploads only the small captured
+              IMAGE; the video is never re-uploaded. */}
+          {(localObjectUrl || value) && duration && duration > 0 && onPosterChange && (
             <div
               className="rounded border border-neutral-800 bg-neutral-900/40 p-3"
               data-testid={tid("scrubber")}
@@ -1101,6 +1147,116 @@ function captureFrameBlob(
     // decode into from the very first byte.
     document.body.appendChild(video);
     video.src = objectUrl;
+  });
+}
+
+/**
+ * A7d.8.4 — capture the CURRENTLY PAINTED frame from an existing
+ * <video> element to a JPEG Blob. Unlike captureFrameBlob this does
+ * NOT mount its own off-screen <video> + seek it independently — it
+ * draws the live element the agent is looking at, so the captured
+ * frame matches the preview byte-for-byte (the WYSIWYG fix).
+ *
+ * Taint discipline:
+ *   - In-session the main <video>'s src is the local blob: objectURL
+ *     (same-origin) so drawImage()/toBlob() are trivially safe.
+ *   - On remount the src is the hosted Vercel Blob URL. Because the
+ *     element has crossOrigin="anonymous" (set BEFORE src) and Blob
+ *     serves Access-Control-Allow-Origin:*, the response is treated
+ *     as CORS-clean → no taint.
+ *
+ * Painted-frame await: if a seek is in flight when "Use this frame"
+ * is tapped, the slider's coalescer may still be mid-decode. We wait
+ * for `seeking` to clear (with the FRAME_CAPTURE_TIMEOUT_MS hard
+ * cap), then await a real painted frame via requestVideoFrameCallback
+ * (or rAF fallback) so we don't read an empty back-buffer on iOS.
+ */
+function captureFrameFromVideoElement(
+  video: HTMLVideoElement,
+  timeoutMs: number = FRAME_CAPTURE_TIMEOUT_MS,
+): Promise<Blob> {
+  return new Promise((resolve, reject) => {
+    let settled = false;
+    let timeoutId: ReturnType<typeof setTimeout> | null = null;
+    const settle = (fn: () => void) => {
+      if (settled) return;
+      settled = true;
+      if (timeoutId !== null) {
+        clearTimeout(timeoutId);
+        timeoutId = null;
+      }
+      fn();
+    };
+    timeoutId = setTimeout(() => {
+      settle(() => reject(new Error("frame capture timed out")));
+    }, timeoutMs);
+
+    const draw = () => {
+      try {
+        const w = video.videoWidth;
+        const h = video.videoHeight;
+        if (!w || !h) {
+          settle(() => reject(new Error("video has no intrinsic size")));
+          return;
+        }
+        const MAX_EDGE = 1280;
+        const scale = Math.min(1, MAX_EDGE / Math.max(w, h));
+        const dw = Math.max(1, Math.round(w * scale));
+        const dh = Math.max(1, Math.round(h * scale));
+        const canvas = document.createElement("canvas");
+        canvas.width = dw;
+        canvas.height = dh;
+        const ctx = canvas.getContext("2d");
+        if (!ctx) {
+          settle(() => reject(new Error("canvas 2d unavailable")));
+          return;
+        }
+        ctx.drawImage(video, 0, 0, dw, dh);
+        canvas.toBlob(
+          (blob) => {
+            if (!blob) {
+              settle(() => reject(new Error("toBlob returned null")));
+              return;
+            }
+            settle(() => resolve(blob));
+          },
+          "image/jpeg",
+          0.85,
+        );
+      } catch (err) {
+        // Most likely SecurityError on a tainted canvas — surface it
+        // so the caller can show a real message instead of a hang.
+        settle(() =>
+          reject(err instanceof Error ? err : new Error("draw failed")),
+        );
+      }
+    };
+
+    const rvfc = (
+      video as HTMLVideoElement & {
+        requestVideoFrameCallback?: (cb: VideoFrameRequestCallback) => number;
+      }
+    ).requestVideoFrameCallback?.bind(video);
+    const awaitPaintedFrameThenDraw = () => {
+      if (rvfc) {
+        rvfc(() => requestAnimationFrame(draw));
+      } else {
+        requestAnimationFrame(draw);
+      }
+    };
+
+    if (video.seeking) {
+      // A coalesced seek is still in flight — wait for it to land.
+      // `once: true` keeps the listener short-lived; the timeout above
+      // covers the case where seeked never fires.
+      video.addEventListener(
+        "seeked",
+        () => awaitPaintedFrameThenDraw(),
+        { once: true },
+      );
+    } else {
+      awaitPaintedFrameThenDraw();
+    }
   });
 }
 

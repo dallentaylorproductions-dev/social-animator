@@ -601,20 +601,164 @@ test.describe('Seller Presentation — A7d.8 video poster', () => {
       expect(src).toMatch(/canvas\.toDataURL\(/);
       expect(src).toMatch(/non-hosted URL/);
       expect(src).toContain('/api/upload-image');
-      // Sanity: the "Use this frame" path goes via captureFrameBlob +
+      // Sanity: the "Use this frame" path goes via the main-video
+      // capture helper (A7d.8.4 — draw the previewed <video>) +
       // uploadCapturedFrame, NOT via the filmstrip data URL.
-      expect(src).toMatch(/captureFrameBlob\(localObjectUrl,\s*scrubTime\)/);
+      expect(src).toMatch(/captureFrameFromVideoElement\(\s*video\s*\)/);
+      expect(src).toMatch(/await\s+uploadCapturedFrame\(/);
     });
+  });
 
-    test('WYSIWYG — main-video preview and "Use this frame" share source + time', () => {
+  /*
+   * A7d.8.4 — two thumbnail-picker bugs from Dallen's 2026-05-23 smoke.
+   *
+   *   1) DISCREPANCY: the frame the agent picked in the scrubber didn't
+   *      match the poster on the published landing page. Root cause —
+   *      "Use this frame" captured from a SEPARATE off-screen <video>
+   *      seeked independently of the main preview, so two decoders
+   *      could land on different painted frames at the same timestamp.
+   *      Fix — draw the MAIN visible <video> element directly. Same
+   *      element, same currentTime, same painted bytes.
+   *
+   *   2) PICKER VANISHES → FORCES VIDEO RE-UPLOAD: after viewing the
+   *      landing page and returning to the editor, the scrubber was
+   *      gone because it gated on the in-memory `localObjectUrl`. Fix
+   *      — gate on (localObjectUrl OR persisted hosted URL) and mark
+   *      the main <video> as crossOrigin="anonymous" so the hosted-URL
+   *      canvas draw is taint-free (Vercel Blob serves CORS).
+   *
+   * Source-grep assertions in the same shape as A7d.8.1 / .8.3 — a
+   * full browser-driven exercise needs a real decodable MP4 fixture
+   * plus a CORS-clean stubbed hosted endpoint.
+   */
+  test.describe('A7d.8.4 — WYSIWYG + scrubber persists from hosted URL (no re-upload)', () => {
+    test('WYSIWYG — "Use this frame" captures from the MAIN previewed <video>, not an independent off-screen decode', () => {
       const src = readFileSync(FIELD, 'utf8');
 
-      // The main video's src is localObjectUrl (while available), the
-      // slider seeks it to scrubTime, and "Use this frame" captures
-      // from the SAME localObjectUrl at the SAME scrubTime. Same bytes,
-      // same timestamp → what the agent sees is what gets captured.
-      expect(src).toMatch(/src=\{localObjectUrl\s*\?\?\s*value\}/);
-      expect(src).toMatch(/captureFrameBlob\(localObjectUrl,\s*scrubTime\)/);
+      // 1) The commit path uses the new captureFrameFromVideoElement
+      //    helper, called with mainVideoRef.current (renamed `video`).
+      //    The OLD captureFrameBlob(localObjectUrl, scrubTime) shape
+      //    is GONE — pin its absence so a regression can't slip back.
+      expect(src).toMatch(/captureFrameFromVideoElement\(\s*video\s*\)/);
+      expect(src).not.toMatch(/captureFrameBlob\(localObjectUrl,\s*scrubTime\)/);
+
+      // 2) handleUseThisFrame reads mainVideoRef.current at the top.
+      //    The captured frame is therefore drawn from the SAME element
+      //    the slider just seeked — the agent's preview IS the bytes
+      //    that ship as the poster.
+      const fn = src.match(
+        /const\s+handleUseThisFrame\s*=\s*async\s*\(\s*\)\s*=>\s*\{[\s\S]*?\n\s*\};\s*\n/,
+      );
+      expect(fn).toBeTruthy();
+      expect(fn![0]).toMatch(/const\s+video\s*=\s*mainVideoRef\.current/);
+      expect(fn![0]).toMatch(/captureFrameFromVideoElement\(\s*video\s*\)/);
+      // Still routes the resulting blob through the hosted uploader.
+      expect(fn![0]).toMatch(/uploadCapturedFrame\(/);
+      // Auto first-frame (captureFrameBlob) is unaffected — it runs
+      // before the main video has mounted/decoded and intentionally
+      // uses its own off-screen pipeline.
+      expect(src).toMatch(/captureFrameBlob\(nextObjectUrl,\s*0\.1\)/);
+    });
+
+    test('captureFrameFromVideoElement draws the live element and is bounded by the same hard timeout', () => {
+      const src = readFileSync(FIELD, 'utf8');
+
+      const helperIdx = src.indexOf(
+        'function captureFrameFromVideoElement(',
+      );
+      expect(helperIdx).toBeGreaterThan(0);
+      // Slice to the START of the NEXT helper so the assertions only
+      // see this helper's body (the file also defines captureFrameBlob
+      // and extractFilmstripFrames, which DO mount their own
+      // off-screen <video>s and would false-positive a naive slice).
+      const nextHelperIdx = src.indexOf('function ', helperIdx + 10);
+      expect(nextHelperIdx).toBeGreaterThan(helperIdx);
+      const helperSrc = src.slice(helperIdx, nextHelperIdx);
+      // drawImage is called on the passed-in video element (the live
+      // main preview), NOT on a freshly-mounted off-screen one.
+      expect(helperSrc).toMatch(/ctx\.drawImage\(\s*video\s*,/);
+      expect(helperSrc).not.toMatch(/document\.body\.appendChild\(video\)/);
+      // Painted-frame await is the same iOS-safe pattern as A7d.8.1:
+      // requestVideoFrameCallback (preferred) → rAF → draw. We DO wait
+      // for an in-flight seek to settle before drawing so the slider's
+      // last-wins coalescer can't land a stale frame.
+      expect(helperSrc).toMatch(/requestVideoFrameCallback/);
+      expect(helperSrc).toMatch(/requestAnimationFrame\(draw\)/);
+      expect(helperSrc).toMatch(/video\.seeking/);
+      // Hard timeout converts any hang into a soft-fail (same shape +
+      // same message as captureFrameBlob, so the existing UI handling
+      // works unchanged).
+      expect(helperSrc).toMatch(/FRAME_CAPTURE_TIMEOUT_MS/);
+      expect(helperSrc).toMatch(/frame capture timed out/);
+      // canvas.toBlob output (image/jpeg) — matches the upload route.
+      expect(helperSrc).toMatch(/canvas\.toBlob\(/);
+      expect(helperSrc).toMatch(/image\/jpeg/);
+    });
+
+    test('scrubber appears on remount from the hosted URL alone — no local File required', () => {
+      const src = readFileSync(FIELD, 'utf8');
+
+      // Old gate: `localObjectUrl && duration && duration > 0 && …`
+      // — the scrubber vanished after the wizard remounted because
+      // localObjectUrl was reset to null.
+      // New gate: `(localObjectUrl || value) && duration && …` — the
+      // scrubber stays available whenever ANY video exists (local OR
+      // persisted hosted URL). Pin the new shape.
+      expect(src).toMatch(
+        /\(localObjectUrl\s*\|\|\s*value\)\s*&&\s*duration\s*&&\s*duration\s*>\s*0\s*&&\s*onPosterChange/,
+      );
+      // Belt-and-suspenders: the old single-arm gate is GONE so a
+      // refactor can't accidentally reintroduce the re-upload trap.
+      expect(src).not.toMatch(
+        /\{\s*localObjectUrl\s*&&\s*duration\s*&&\s*duration\s*>\s*0\s*&&\s*onPosterChange\s*&&/,
+      );
+    });
+
+    test('main <video> has crossOrigin="anonymous" so hosted-URL canvas capture is taint-free', () => {
+      const src = readFileSync(FIELD, 'utf8');
+
+      const mainVideoBlock = src.match(
+        /<video[\s\S]*?ref=\{mainVideoRef\}[\s\S]*?\/>/,
+      );
+      expect(mainVideoBlock).toBeTruthy();
+      // crossOrigin set as a literal string (not a JSX expression) so
+      // the attribute is present from the very first mount, before
+      // React assigns `src` — the GET that fetches the hosted Vercel
+      // Blob goes out as a CORS request. Local blob: objectURLs are
+      // unaffected (same-origin by construction).
+      expect(mainVideoBlock![0]).toMatch(/crossOrigin="anonymous"/);
+    });
+
+    test('re-thumbnailing on revisit uploads only the IMAGE — the video is never re-uploaded', () => {
+      const src = readFileSync(FIELD, 'utf8');
+
+      // The thumbnail commit path uses /api/upload-image (small frame
+      // bytes), NOT /api/upload-video. The video file is uploaded
+      // exactly once, by handleFile via the @vercel/blob client SDK.
+      const useFrameFn = src.match(
+        /const\s+handleUseThisFrame\s*=\s*async\s*\(\s*\)\s*=>\s*\{[\s\S]*?\n\s*\};\s*\n/,
+      );
+      expect(useFrameFn).toBeTruthy();
+      expect(useFrameFn![0]).not.toMatch(/upload-video/);
+      expect(useFrameFn![0]).not.toMatch(/@vercel\/blob\/client/);
+      expect(useFrameFn![0]).toMatch(/uploadCapturedFrame\(/);
+
+      // The uploadCapturedFrame helper itself targets /api/upload-image
+      // (auth-gated, size-capped) — the video upload route is reachable
+      // ONLY from the file-picker handleFile flow.
+      const uploadHelper = src.match(
+        /async\s+function\s+uploadCapturedFrame[\s\S]*?\n\}\s*\n/,
+      );
+      expect(uploadHelper).toBeTruthy();
+      expect(uploadHelper![0]).toContain('/api/upload-image');
+      expect(uploadHelper![0]).not.toMatch(/upload-video/);
+
+      // handleFile (the only path that runs upload() on the video) is
+      // ONLY invoked from the hidden <input type="file"> onChange —
+      // not from any thumbnail action.
+      expect(src).toMatch(
+        /void\s+handleFile\(file\)/,
+      );
     });
   });
 });
