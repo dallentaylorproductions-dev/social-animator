@@ -24,18 +24,11 @@ type StepId =
  *   - PDF module: open-house-prep/output/pdf-export →
  *                 seller-presentation/output/prep-pdf
  *
- * Neither backend exists in A5b — A6 builds the publish endpoint +
- * the public-payload serializer, A6/A7 build the PDF + web-page
- * renderers. Until then both buttons are wired but fail gracefully:
- *
- *   - Publish: fetch('/api/seller-presentation/publish') → 404 →
- *     parsed as a non-ok body → error state with the message.
- *   - Download prep PDF: dynamic-import('../output/prep-pdf') →
- *     ModuleNotFoundError → caught → error state.
- *
- * The OH Prep error-state UX (rounded red panel + "Try again" button)
- * absorbs both cases without crashing. A6 lights up Publish; A7 lights
- * up the PDF.
+ * A6 lit up Publish (fetch('/api/seller-presentation/publish')). A7e
+ * lit up the prep PDF (dynamic-import('../output/prep-pdf') →
+ * downloadSellerPresentationPrepPdf). The OH Prep error-state UX
+ * (rounded red panel + "Try again" button) absorbs failures in either
+ * path without crashing.
  *
  * Public-payload preview (A6 anchor): the summary block below shows
  * the agent-controlled public/private split — comp count, recommended
@@ -194,24 +187,7 @@ export function StepReview({ draft, goToStep }: StepReviewProps) {
     if (missing) return;
     setExportState("downloading");
     try {
-      // A7 ships ../output/prep-pdf with downloadSellerPresentationPrepPdf.
-      // Until then the dynamic import throws ModuleNotFoundError, which we
-      // catch and surface as a non-fatal error state. The @ts-expect-error
-      // is self-deleting: once A7 lands the file, the suppression becomes
-      // unused-and-erroring, forcing this branch to be cleaned up.
-      // @ts-expect-error A7 lands ../output/prep-pdf; remove this directive then.
-      const mod = (await import("../output/prep-pdf").catch((err: unknown) => {
-        throw err instanceof Error
-          ? err
-          : new Error(
-              "Prep PDF renderer not deployed yet. A7 wires the react-pdf module.",
-            );
-      })) as {
-        downloadSellerPresentationPrepPdf: (
-          d: SellerPresentationDraft,
-          a: typeof agentContact,
-        ) => Promise<void>;
-      };
+      const mod = await import("../output/prep-pdf");
       await mod.downloadSellerPresentationPrepPdf(draft, agentContact);
       setExportState("done");
       setTimeout(() => setExportState("idle"), 2000);
@@ -308,25 +284,23 @@ export function StepReview({ draft, goToStep }: StepReviewProps) {
         />
 
         <div className="flex flex-col gap-2">
-          {/* A7c.1: prep-PDF is disabled with a "coming soon" label
-              until A7e ships the renderer. Clicking can't happen
-              while disabled, so the dynamic-import to ../output/prep-pdf
-              never executes — the previous flow that surfaced a
-              "Cannot find module" error in Dallen's smoke is gone.
-              The handleDownloadPrep wiring + the @ts-expect-error
-              dynamic-import stay in the file for A7e to light up
-              (the directive will self-delete when prep-pdf.tsx
-              lands and the suppression goes unused). */}
           <button
             type="button"
             onClick={handleDownloadPrep}
-            disabled
+            disabled={Boolean(missing) || exportState === "downloading"}
             data-testid="step-review-download"
-            aria-label="Prep PDF (coming soon, A7e)"
-            className="self-start rounded border border-neutral-700 px-5 py-2.5 text-sm font-medium text-neutral-500 disabled:cursor-not-allowed"
+            className="self-start rounded border border-mint/40 bg-mint/5 px-5 py-2.5 text-sm font-medium text-mint hover:bg-mint/10 disabled:cursor-not-allowed disabled:opacity-40"
           >
-            Prep PDF (coming soon)
+            {exportState === "downloading"
+              ? "Preparing PDF…"
+              : exportState === "done"
+                ? "Downloaded ✓"
+                : "Download prep PDF (agent only)"}
           </button>
+          <p className="text-xs text-gray-500">
+            Private companion to the seller page. Includes your full strategy,
+            comp notes, and private talking points. Not shared with the client.
+          </p>
           {typeof exportState === "object" && "error" in exportState && (
             <p
               className="text-xs text-red-400"

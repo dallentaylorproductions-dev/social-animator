@@ -421,23 +421,21 @@ test.describe('Seller Presentation — A5b per-step content', () => {
     ).toBeVisible();
   });
 
-  test('StepReview prep-PDF button is DISABLED with "coming soon" copy until A7e ships', async ({
+  test('A7e — StepReview prep-PDF button is LIVE and enabled when the draft is complete', async ({
     page,
   }) => {
-    // A7c.1 replaced the previous "graceful-fail against absent PDF
-    // module" behavior. Dallen's mobile smoke caught the dynamic
-    // import path throwing "Cannot find module '../output/prep-pdf'"
-    // in the UI as an error panel, which read as broken rather than
-    // intentional. The button is now hard-disabled with "coming
-    // soon" copy until A7e lands the prep-PDF renderer — the
-    // dynamic import path stays in handleDownloadPrep for A7e to
-    // light up (its @ts-expect-error self-deletes when the file
-    // arrives), but no UI route exercises it.
+    // A7c.1 had this button hard-disabled with "coming soon" copy
+    // until A7e shipped the prep-PDF renderer. A7e lands
+    // ../output/prep-pdf, removes the disabled state, and gives the
+    // button its agent-only label. The download itself is a binary
+    // PDF blob — verifying the file content lives in the dedicated
+    // prep-pdf spec (e2e/seller-presentation.prep-pdf.spec.ts); here
+    // we only assert the UI state.
     await fillToReview(page);
     const button = page.getByTestId('step-review-download');
     await expect(button).toBeVisible();
-    await expect(button).toBeDisabled();
-    await expect(button).toContainText(/coming soon/i);
+    await expect(button).toBeEnabled();
+    await expect(button).toContainText(/download prep pdf/i);
     await expect(page.getByTestId('step-review-download-error')).toHaveCount(0);
   });
 
