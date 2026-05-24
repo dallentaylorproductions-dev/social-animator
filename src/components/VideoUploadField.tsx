@@ -676,12 +676,20 @@ export function VideoUploadField({
                 A7d.8.4 — crossOrigin="anonymous" so canvas.drawImage()
                 on the hosted-URL src is taint-free. Verified: Vercel
                 Blob public objects serve Access-Control-Allow-Origin:*.
-                The attribute is a no-op for the local blob: objectURL
-                (same-origin by construction). */}
+
+                A7d.8.5 — crossOrigin is CONDITIONAL. When sourcing
+                the local blob: objectURL (in-session, freshly uploaded)
+                we OMIT crossOrigin entirely — the attribute is a no-op
+                for same-origin blob: URLs in spec, but on iOS Safari
+                its presence has been seen to introduce a brief reload
+                / not-ready state when set on a `blob:` src, leaving
+                the video stuck `seeking=true` at "Use this frame" tap
+                time. Conditional spread sets it ONLY on the hosted-URL
+                path (revisit, where it's actually required). */}
             <video
               ref={mainVideoRef}
               src={localObjectUrl ?? value}
-              crossOrigin="anonymous"
+              {...(localObjectUrl ? {} : { crossOrigin: "anonymous" as const })}
               controls
               playsInline
               preload="metadata"
@@ -1086,23 +1094,30 @@ function captureFrameBlob(
       }
     };
 
-    // Prefer requestVideoFrameCallback when available — it fires on a
-    // genuinely PAINTED frame, sidestepping the iOS "seeked fired but
-    // the buffer is empty" race. Falls back to seeked + rAF slack.
+    // A7d.8.5 — race rVFC against the seeked event + rAF. Both arm at
+    // once; the first to fire calls `draw`, the loser bails on the
+    // `landed` flag. rVFC was previously the SOLE resolver when
+    // available, but on iOS Safari it can stay silent even after the
+    // seek presents a new frame (race with the play()→pause() decode-
+    // force prime above) — that left the auto first-frame capture
+    // hitting the 4 s timeout and the seller page rendering blank.
+    // The seeked + rAF path is the iOS-reliable primary; rVFC just
+    // lets capable browsers land a tick earlier.
     const rvfc = (
       video as HTMLVideoElement & {
         requestVideoFrameCallback?: (cb: VideoFrameRequestCallback) => number;
       }
     ).requestVideoFrameCallback?.bind(video);
+    let landed = false;
+    const landAndDraw = () => {
+      if (landed) return;
+      landed = true;
+      requestAnimationFrame(draw);
+    };
     const awaitPaintedFrame = () => {
+      video.addEventListener("seeked", () => landAndDraw(), { once: true });
       if (rvfc) {
-        rvfc(() => requestAnimationFrame(draw));
-      } else {
-        video.addEventListener(
-          "seeked",
-          () => requestAnimationFrame(draw),
-          { once: true },
-        );
+        rvfc(() => landAndDraw());
       }
     };
 
@@ -1160,16 +1175,37 @@ function captureFrameBlob(
  * Taint discipline:
  *   - In-session the main <video>'s src is the local blob: objectURL
  *     (same-origin) so drawImage()/toBlob() are trivially safe.
- *   - On remount the src is the hosted Vercel Blob URL. Because the
- *     element has crossOrigin="anonymous" (set BEFORE src) and Blob
- *     serves Access-Control-Allow-Origin:*, the response is treated
- *     as CORS-clean → no taint.
+ *   - On remount the src is the hosted Vercel Blob URL. The element
+ *     gets crossOrigin="anonymous" ONLY in that case (A7d.8.5 made
+ *     this conditional — see the JSX above). Vercel Blob serves
+ *     Access-Control-Allow-Origin:*, so the response is treated as
+ *     CORS-clean → no taint.
  *
- * Painted-frame await: if a seek is in flight when "Use this frame"
- * is tapped, the slider's coalescer may still be mid-decode. We wait
- * for `seeking` to clear (with the FRAME_CAPTURE_TIMEOUT_MS hard
- * cap), then await a real painted frame via requestVideoFrameCallback
- * (or rAF fallback) so we don't read an empty back-buffer on iOS.
+ * A7d.8.5 — rVFC is NOT the sole resolver. Dallen's 2026-05-23
+ * real-iPhone smoke: "Use this frame" timed out with
+ * "frame capture timed out" because the pre-A7d.8.5 path armed
+ * requestVideoFrameCallback to wait for a "painted frame" — but on
+ * iOS Safari rVFC only fires for a NEW frame presented during
+ * playback or right after a seek paints. For a PAUSED, already-
+ * settled, static frame (the exact state when the agent taps "Use
+ * this frame"), rVFC NEVER fires. The wait hit the 4 s timeout,
+ * `handleUseThisFrame` caught the reject, and no poster ever landed.
+ *
+ * The reliable path: the frame is ALREADY on screen — the agent is
+ * staring at it — so a single rAF (giving the browser a paint tick)
+ * is sufficient to capture it. Two rAFs to be paranoid about the
+ * frame being committed to the compositor pipeline on slow devices.
+ * rVFC is wired as an OPTIONAL accelerator raced against rAF: first
+ * one to fire calls `draw`, the loser is ignored. This means iOS
+ * (rVFC silent) lands via rAF; Chromium (rVFC fast) lands a tick
+ * earlier via rVFC; either way capture resolves well under timeoutMs.
+ *
+ * If a seek is in flight when "Use this frame" is tapped, the
+ * slider's last-wins coalescer is still mid-decode. Listen for
+ * `seeked` first (the seek IS presenting a new frame, so rVFC would
+ * fire here too, but rAF after `seeked` is equally reliable and
+ * cheaper to reason about). Hard FRAME_CAPTURE_TIMEOUT_MS cap is
+ * preserved as a last-resort safety net, NOT the common path.
  */
 function captureFrameFromVideoElement(
   video: HTMLVideoElement,
@@ -1232,31 +1268,70 @@ function captureFrameFromVideoElement(
       }
     };
 
-    const rvfc = (
-      video as HTMLVideoElement & {
-        requestVideoFrameCallback?: (cb: VideoFrameRequestCallback) => number;
-      }
-    ).requestVideoFrameCallback?.bind(video);
-    const awaitPaintedFrameThenDraw = () => {
+    // A7d.8.5 — race rVFC against rAF. Whichever fires first calls
+    // `draw` once; the loser sees `landed` and bails. The rAF path is
+    // the RELIABLE primary on iOS (where rVFC stays silent for static
+    // frames). rVFC just lets capable browsers land a tick earlier.
+    let landed = false;
+    const landAndDraw = () => {
+      if (landed) return;
+      landed = true;
+      // One rAF gives the compositor a paint tick — drawing here on
+      // the same tick the previous frame already presented is what
+      // captures the visible bytes.
+      requestAnimationFrame(draw);
+    };
+    const racePaintedFrame = () => {
+      // Primary: double rAF. The first schedules the next paint; the
+      // second fires AFTER it has presented, so by the time `draw`
+      // runs the back-buffer for the current frame is finalized. On
+      // a static-paused video this completes in ~32 ms regardless of
+      // whether rVFC ever calls back.
+      requestAnimationFrame(() => requestAnimationFrame(landAndDraw));
+      // Optional accelerator: rVFC, if the browser supports it AND
+      // happens to fire. iOS Safari typically won't for a paused
+      // static frame — that's fine, rAF above lands first.
+      const rvfc = (
+        video as HTMLVideoElement & {
+          requestVideoFrameCallback?: (
+            cb: VideoFrameRequestCallback,
+          ) => number;
+        }
+      ).requestVideoFrameCallback?.bind(video);
       if (rvfc) {
-        rvfc(() => requestAnimationFrame(draw));
-      } else {
-        requestAnimationFrame(draw);
+        rvfc(() => landAndDraw());
       }
     };
 
     if (video.seeking) {
-      // A coalesced seek is still in flight — wait for it to land.
-      // `once: true` keeps the listener short-lived; the timeout above
-      // covers the case where seeked never fires.
+      // A coalesced seek is still in flight — wait for it to land
+      // before drawing, otherwise we'd capture the previous frame.
+      // The new frame paints on the next rAF after `seeked` fires.
       video.addEventListener(
         "seeked",
-        () => awaitPaintedFrameThenDraw(),
+        () => racePaintedFrame(),
         { once: true },
       );
-    } else {
-      awaitPaintedFrameThenDraw();
+      return;
     }
+
+    if (video.readyState < 2 /* HAVE_CURRENT_DATA */) {
+      // Defensive — the main video has metadata + the current frame
+      // by the time the agent can see and tap "Use this frame", but
+      // surface this as a real condition just in case (e.g. a hosted-
+      // URL revisit captured before the network roundtrip lands).
+      video.addEventListener(
+        "loadeddata",
+        () => racePaintedFrame(),
+        { once: true },
+      );
+      return;
+    }
+
+    // Common case: a paused video sitting on the chosen frame. Draw
+    // on the next paint tick — this is the path that pre-A7d.8.5
+    // hit the 4 s timeout on iOS.
+    racePaintedFrame();
   });
 }
 

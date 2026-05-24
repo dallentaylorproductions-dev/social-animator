@@ -40,6 +40,26 @@ import { resolve } from 'node:path';
 
 const FIELD = resolve(process.cwd(), 'src/components/VideoUploadField.tsx');
 
+/**
+ * Strip JS/JSX block + line comments out of a TS source string so
+ * source-grep assertions don't false-positive on prose mentions of
+ * JSX-shaped tokens (e.g. `<video controls playsInline>` in a JSDoc
+ * preamble, or `crossOrigin="anonymous"` in a "why we removed it"
+ * comment).
+ *
+ * For block comments, the `/*` opener must NOT be preceded by a
+ * word/quote char — otherwise `accept="video/*"` (a legitimate JSX
+ * MIME-pattern attribute, not the start of a comment) would be
+ * mis-detected as a comment opener and we'd eat through to the next
+ * unrelated `*​/` and lose huge chunks of real code.
+ */
+function stripComments(src: string): string {
+  return src
+    .replace(/\{\/\*[\s\S]*?\*\/\}/g, '')
+    .replace(/(^|[^"'`\w])\/\*[\s\S]*?\*\//g, '$1')
+    .replace(/\/\/[^\n]*/g, '');
+}
+
 test.describe('Seller Presentation — A7d.8 video poster', () => {
   test.describe('Renderer precedence — override > scrub > auto', () => {
     test('auto-only fixture: poster source = auto, URL = autoPosterUrl', async ({
@@ -714,19 +734,39 @@ test.describe('Seller Presentation — A7d.8 video poster', () => {
       );
     });
 
-    test('main <video> has crossOrigin="anonymous" so hosted-URL canvas capture is taint-free', () => {
-      const src = readFileSync(FIELD, 'utf8');
+    test('main <video> attaches crossOrigin="anonymous" on the hosted-URL path so canvas capture is taint-free', () => {
+      const src = stripComments(readFileSync(FIELD, 'utf8'));
 
       const mainVideoBlock = src.match(
-        /<video[\s\S]*?ref=\{mainVideoRef\}[\s\S]*?\/>/,
+        /<video\s[\s\S]*?ref=\{mainVideoRef\}[\s\S]*?\/>/,
       );
       expect(mainVideoBlock).toBeTruthy();
-      // crossOrigin set as a literal string (not a JSX expression) so
-      // the attribute is present from the very first mount, before
-      // React assigns `src` — the GET that fetches the hosted Vercel
-      // Blob goes out as a CORS request. Local blob: objectURLs are
-      // unaffected (same-origin by construction).
-      expect(mainVideoBlock![0]).toMatch(/crossOrigin="anonymous"/);
+      // A7d.8.5 made this conditional — set ONLY on the hosted-URL
+      // path (revisit) and OMITTED on the local blob: objectURL path
+      // (in-session). The literal `crossOrigin: "anonymous"` still
+      // appears in source, just inside a conditional spread; the
+      // taint-free behavior on the hosted path remains the contract.
+      expect(mainVideoBlock![0]).toMatch(/crossOrigin:\s*"anonymous"/);
+    });
+
+    test('A7d.8.5 — crossOrigin is CONDITIONAL: omitted on local blob: URL, set on hosted URL', () => {
+      const src = stripComments(readFileSync(FIELD, 'utf8'));
+
+      const mainVideoBlock = src.match(
+        /<video\s[\s\S]*?ref=\{mainVideoRef\}[\s\S]*?\/>/,
+      );
+      expect(mainVideoBlock).toBeTruthy();
+      // The attribute is GONE as a static JSX attr — it's now spread
+      // from a ternary on localObjectUrl. The literal JSX shape
+      // `crossOrigin="anonymous"` (attribute syntax) must NOT appear
+      // — that would be the unconditional regression A7d.8.5 fixes.
+      expect(mainVideoBlock![0]).not.toMatch(/crossOrigin="anonymous"/);
+      // The new shape: conditional spread that resolves to
+      // `crossOrigin: "anonymous"` (object property) ONLY when
+      // localObjectUrl is falsy.
+      expect(mainVideoBlock![0]).toMatch(
+        /\{\.\.\.\(localObjectUrl\s*\?\s*\{\}\s*:\s*\{\s*crossOrigin:\s*"anonymous"[\s\S]*?\}\)\}/,
+      );
     });
 
     test('re-thumbnailing on revisit uploads only the IMAGE — the video is never re-uploaded', () => {
@@ -759,6 +799,220 @@ test.describe('Seller Presentation — A7d.8 video poster', () => {
       expect(src).toMatch(
         /void\s+handleFile\(file\)/,
       );
+    });
+  });
+
+  /*
+   * A7d.8.5 — capture-reliability fix. Dallen's 2026-05-23 real-iPhone
+   * smoke: tapping "Use this frame" returned "frame capture timed out"
+   * and the published landing page rendered the video section as a
+   * solid black box. Two coupled root causes:
+   *
+   *   1) requestVideoFrameCallback as SOLE resolver. On iOS Safari rVFC
+   *      only fires for a NEW frame being presented (during playback or
+   *      right after a seek paints). For the paused, static frame the
+   *      agent stares at while tapping "Use this frame", rVFC never
+   *      fires → the 4 s FRAME_CAPTURE_TIMEOUT_MS hits → reject →
+   *      no poster. The same rVFC-only pattern in captureFrameBlob
+   *      (auto first-frame) was unreliable for the same reason.
+   *
+   *   2) Posterless <video> on iOS = solid black box. The "native first
+   *      frame" fallback the renderer relies on doesn't actually paint
+   *      on iOS Safari for a fresh page load with preload="metadata".
+   *      So when capture failed for every slot, the page was visibly
+   *      blank — even though we OMIT the empty `poster=""` correctly.
+   *
+   * Fixes:
+   *   A) rVFC is now wired as an OPTIONAL accelerator RACED against the
+   *      rAF / seeked path. The rAF path is the iOS-reliable primary;
+   *      whichever fires first calls `draw`, the loser sees `landed`
+   *      and bails. Capture resolves well under timeoutMs even when
+   *      rVFC stays silent.
+   *   B) crossOrigin="anonymous" on the main <video> is CONDITIONAL —
+   *      omitted for local blob: URLs (where it's a no-op in spec but
+   *      has been seen to introduce a brief not-ready state on iOS).
+   *   C) Wrapper data-no-poster + CSS branded panel as the last-ditch
+   *      safety net for the rare case where all three poster slots are
+   *      empty.
+   *
+   * All source-grep — a browser-driven device-only failure mode (rVFC
+   * silence on a static paused frame) is not exercisable in Chromium.
+   */
+  test.describe('A7d.8.5 — capture reliability on iOS (rVFC race, conditional crossOrigin, never-blank)', () => {
+    test('captureFrameFromVideoElement does NOT block solely on rVFC — rAF is the reliable primary', () => {
+      const src = readFileSync(FIELD, 'utf8');
+
+      const helperIdx = src.indexOf(
+        'function captureFrameFromVideoElement(',
+      );
+      expect(helperIdx).toBeGreaterThan(0);
+      const nextHelperIdx = src.indexOf('function ', helperIdx + 10);
+      expect(nextHelperIdx).toBeGreaterThan(helperIdx);
+      const helperSrc = src.slice(helperIdx, nextHelperIdx);
+
+      // rVFC is wired (for capable browsers as an accelerator) but
+      // NOT inside an if/else where it's the sole-when-available
+      // branch — that was the pre-A7d.8.5 regression. The new
+      // structure ALWAYS schedules an rAF path; rVFC is fired in
+      // parallel and the first to land calls `draw`.
+      expect(helperSrc).toMatch(/requestVideoFrameCallback/);
+
+      // The race land flag: a single `draw` call regardless of which
+      // resolver arrived first (rVFC OR rAF OR seeked-on-seeking).
+      expect(helperSrc).toMatch(/landed\s*=\s*false/);
+      expect(helperSrc).toMatch(/if\s*\(\s*landed\s*\)\s*return/);
+      expect(helperSrc).toMatch(/landed\s*=\s*true/);
+
+      // The reliable rAF path is present — that's what lands on
+      // iOS where rVFC stays silent. Double rAF is intentional: one
+      // schedules the next paint, the second runs AFTER it presents.
+      expect(helperSrc).toMatch(
+        /requestAnimationFrame\(\s*\(\)\s*=>\s*requestAnimationFrame\(/,
+      );
+      // The OLD shape — `if (rvfc) { rvfc(...) } else { rAF(draw) }`
+      // — is GONE. Pinning the absence of the if/else gate prevents
+      // a regression where someone "simplifies" back to rVFC-only.
+      expect(helperSrc).not.toMatch(
+        /if\s*\(\s*rvfc\s*\)\s*\{\s*rvfc\([\s\S]*?\)\s*\}\s*else\s*\{\s*requestAnimationFrame\(\s*draw\s*\)/,
+      );
+
+      // Wait-for-seek-first remains: when a coalesced seek is in
+      // flight, we listen for seeked THEN race the painted-frame
+      // resolvers. Bypassing this would risk capturing a stale frame.
+      expect(helperSrc).toMatch(/video\.seeking/);
+      expect(helperSrc).toMatch(/addEventListener\(\s*["']seeked["']/);
+    });
+
+    test('captureFrameBlob (auto first-frame) also races rVFC against seeked — no SOLE resolver', () => {
+      const src = readFileSync(FIELD, 'utf8');
+
+      const helperIdx = src.indexOf('function captureFrameBlob(');
+      expect(helperIdx).toBeGreaterThan(0);
+      // Slice up to the start of the NEXT helper so the assertions
+      // only see captureFrameBlob's body (the file also defines
+      // captureFrameFromVideoElement and extractFilmstripFrames,
+      // which would false-positive this scope.)
+      const nextHelperIdx = src.indexOf('function ', helperIdx + 10);
+      expect(nextHelperIdx).toBeGreaterThan(helperIdx);
+      const helperSrc = src.slice(helperIdx, nextHelperIdx);
+
+      // BOTH resolvers arm — seeked listener AND rVFC (when present).
+      // First to fire calls draw via landAndDraw; the loser bails.
+      expect(helperSrc).toMatch(
+        /addEventListener\(\s*["']seeked["']\s*,\s*\(\)\s*=>\s*landAndDraw\(\)/,
+      );
+      expect(helperSrc).toMatch(/if\s*\(\s*rvfc\s*\)/);
+      expect(helperSrc).toMatch(/rvfc\(\s*\(\)\s*=>\s*landAndDraw\(\)/);
+      expect(helperSrc).toMatch(/landed\s*=\s*true/);
+
+      // The pre-A7d.8.5 SOLE-resolver shape (`if (rvfc) { rvfc(...) }
+      // else { seeked }`) is GONE — both arm together now, no
+      // either/or, so iOS rVFC silence can't strand the capture.
+      expect(helperSrc).not.toMatch(
+        /if\s*\(\s*rvfc\s*\)\s*\{\s*rvfc\([\s\S]*?\)\s*\}\s*else\s*\{\s*video\.addEventListener\(\s*["']seeked["']/,
+      );
+    });
+
+    test('main <video> conditional crossOrigin keeps local blob: src attribute-free', () => {
+      const src = stripComments(readFileSync(FIELD, 'utf8'));
+
+      const mainVideoBlock = src.match(
+        /<video\s[\s\S]*?ref=\{mainVideoRef\}[\s\S]*?\/>/,
+      );
+      expect(mainVideoBlock).toBeTruthy();
+      // No literal JSX attribute — that's the unconditional shape
+      // that introduced the iOS not-ready race for blob: URLs.
+      expect(mainVideoBlock![0]).not.toMatch(/crossOrigin="anonymous"/);
+      // The conditional spread sets it ONLY when localObjectUrl is
+      // falsy (revisit case, src is the hosted URL). The local-file
+      // case omits the attribute entirely so iOS Safari treats the
+      // blob: src as the same-origin source it actually is.
+      expect(mainVideoBlock![0]).toMatch(
+        /\{\.\.\.\(localObjectUrl\s*\?\s*\{\}\s*:\s*\{\s*crossOrigin:/,
+      );
+    });
+
+    test('seller page marks the no-poster wrapper for the branded fallback panel', () => {
+      const pageSrc = readFileSync(
+        resolve(
+          process.cwd(),
+          'src/tools/seller-presentation/output/presentation-page.tsx',
+        ),
+        'utf8',
+      );
+
+      // The .video-poster wrapper carries data-no-poster="true" only
+      // when the cascade is empty (poster is falsy). Conditional
+      // spread keeps the happy-path DOM unchanged for the auto/scrub/
+      // override cases the existing precedence tests already pin.
+      const wrapperBlock = pageSrc.match(
+        /<div[\s\S]*?className="video-poster reveal"[\s\S]*?>/,
+      );
+      expect(wrapperBlock).toBeTruthy();
+      expect(wrapperBlock![0]).toMatch(
+        /\{\.\.\.\(poster\s*\?\s*\{\}\s*:\s*\{\s*"data-no-poster":\s*"true"\s*\}\)\}/,
+      );
+    });
+
+    test('seller page CSS renders a branded fallback panel for [data-no-poster]', () => {
+      const cssSrc = readFileSync(
+        resolve(
+          process.cwd(),
+          'src/tools/seller-presentation/output/presentation-page.css',
+        ),
+        'utf8',
+      );
+
+      // The wrapper rule exists, uses existing surface tokens (no new
+      // hardcoded colours), and the inner .video-player goes
+      // transparent so the wrapper's gradient shows through whatever
+      // the paused video would otherwise paint as black on iOS.
+      expect(cssSrc).toMatch(
+        /\.video-poster\[data-no-poster="true"\]\s*\{[\s\S]*?background:[\s\S]*?linear-gradient/,
+      );
+      expect(cssSrc).toMatch(
+        /\.video-poster\[data-no-poster="true"\]\s+\.video-player\s*\{[\s\S]*?background:\s*transparent/,
+      );
+      // No new hex colours snuck in — uses the existing CSS variables.
+      const noPosterRule = cssSrc.match(
+        /\.video-poster\[data-no-poster="true"\]\s*\{[\s\S]*?\}/,
+      );
+      expect(noPosterRule).toBeTruthy();
+      expect(noPosterRule![0]).toMatch(/var\(--/);
+    });
+
+    test('a no-poster fixture renders the branded panel marker on the wrapper', async ({
+      page,
+    }) => {
+      // End-to-end: the renderer actually emits the data-no-poster
+      // attribute when the cascade is empty. The CSS rule above
+      // hooks off the same attribute selector, so this is the proof
+      // the safety net is plumbed all the way through.
+      await page.goto('/seller-presentation-preview?fixture=poster-none');
+      const wrapper = page.getByTestId('sep-video-player');
+      await expect(wrapper).toBeVisible();
+      await expect(wrapper).toHaveAttribute('data-no-poster', 'true');
+      // The <video> itself still renders posterless (existing
+      // never-blank-fixture test pins that contract); this attribute
+      // is on the wrapper so the CSS can swap the surface without
+      // touching the video element.
+      const video = page.getByTestId('sep-video-el');
+      await expect(video).toHaveAttribute('data-poster-source', 'none');
+    });
+
+    test('happy-path posters do NOT carry the data-no-poster marker', async ({
+      page,
+    }) => {
+      // When ANY poster slot resolves, the safety-net marker MUST be
+      // absent so the standard .video-poster surface (which already
+      // sits behind the loading poster image) stays in place.
+      await page.goto('/seller-presentation-preview?fixture=poster-auto-only');
+      const wrapper = page.getByTestId('sep-video-player');
+      await expect(wrapper).toBeVisible();
+      const hasMarker = await wrapper.evaluate((el) =>
+        el.hasAttribute('data-no-poster'),
+      );
+      expect(hasMarker).toBe(false);
     });
   });
 });

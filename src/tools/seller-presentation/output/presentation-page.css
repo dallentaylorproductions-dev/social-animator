@@ -540,6 +540,28 @@
   object-fit: cover;
   background: var(--ink-2);
 }
+
+/* A7d.8.5 — branded fallback panel for the rare case where all three
+   poster slots are empty (capture failed on every path). The
+   posterless <video> on iOS Safari paints a solid black box; this
+   replaces it with a tasteful gradient using existing surface tokens
+   so the page never reads as "broken thumbnail". The primary
+   guarantee is reliable auto-capture upstream — this is the last-
+   ditch safety net the brief calls for. */
+.sep-presentation .video-poster[data-no-poster="true"] {
+  background:
+    linear-gradient(
+      135deg,
+      var(--paper-card) 0%,
+      var(--ink-2) 100%
+    );
+}
+.sep-presentation .video-poster[data-no-poster="true"] .video-player {
+  /* Let the wrapper's gradient show through wherever the paused
+     video would otherwise paint black. Once the buyer taps play
+     the decoder takes over and paints actual frames. */
+  background: transparent;
+}
 .sep-presentation .video-poster .meta {
   position: absolute;
   left: 22px;

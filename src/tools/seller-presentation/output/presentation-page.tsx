@@ -245,8 +245,21 @@ function VideoBlock({ payload }: { payload: PublicPayload }) {
           the video's native first frame, which is far better than the
           black box `poster=""` renders. Capture working is the
           primary path; this is the safety net so a capture timeout
-          never reintroduces the blank poster A7d.8 set out to kill. */}
-      <div className="video-poster reveal" data-testid="sep-video-player">
+          never reintroduces the blank poster A7d.8 set out to kill.
+
+          A7d.8.5 never-blank safety net: on iOS Safari the
+          "native first frame" fallback is unreliable — a posterless
+          <video> just renders a solid black box until the buyer taps
+          play. So when ALL three poster slots are empty, mark the
+          wrapper with `data-no-poster` so the CSS swaps the dark
+          fallback surface for a tasteful branded panel. The video
+          element still mounts on top and plays normally; the panel
+          shows through wherever the paused video would be black. */}
+      <div
+        className="video-poster reveal"
+        data-testid="sep-video-player"
+        {...(poster ? {} : { "data-no-poster": "true" })}
+      >
         <video
           className="video-player"
           src={v.videoUrl}
