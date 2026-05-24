@@ -1,6 +1,6 @@
 "use client";
 
-import { useEffect, useRef, useState } from "react";
+import { useCallback, useEffect, useRef, useState } from "react";
 import { upload } from "@vercel/blob/client";
 
 /**
@@ -173,16 +173,42 @@ export function VideoUploadField({
    */
   const captureVideoRef = useRef<HTMLVideoElement | null>(null);
   /**
-   * Live scrub-frame preview. Re-rendered on every slider drag by
-   * drawing the captureVideo's current frame to a hidden canvas and
-   * dataURL'ing the result for display. The dataURL stays in component
-   * state ONLY — it never reaches the persisted draft / public payload.
-   * The committed thumbnail (after "Use this frame") is always uploaded
-   * to /api/upload-image first, so what lands in storage is a hosted URL.
+   * A7d.8.2 — visible live-preview canvas above the slider. Drawn
+   * directly from the in-DOM `captureVideoRef` <video> on every seeked
+   * event. The agent sees the frame at the current scrub position so
+   * they can pick a thumbnail with their eyes open instead of guessing
+   * (Dallen 2026-05-23 smoke: slider moved but no visible preview).
    */
-  const [scrubPreviewDataUrl, setScrubPreviewDataUrl] = useState<string | null>(
-    null,
-  );
+  const previewCanvasRef = useRef<HTMLCanvasElement | null>(null);
+  /**
+   * Intrinsic aspect ratio of the loaded video (videoWidth / videoHeight).
+   * Used to size the preview canvas so the visible surface matches the
+   * shape of the video (portrait phone clips don't get letterboxed into
+   * a 16:9 box). Null until loadedmetadata fires.
+   */
+  const [videoAspect, setVideoAspect] = useState<number | null>(null);
+
+  /**
+   * A7d.8.2 — last-wins seek coalescer.
+   *
+   *   - `pendingSeekRef`  = the most recent target time the agent has
+   *                         dragged to that hasn't been seeked yet
+   *   - `seekInFlightRef` = a seek is currently between `currentTime=`
+   *                         and its `seeked` event
+   *
+   * Slider input fires `requestSeek(t)` — cheap: it just stamps the
+   * pending target and calls `pumpSeek()`. `pumpSeek()` only starts a
+   * seek if none is in flight; otherwise the seek already running will
+   * pick up the latest `pendingSeekRef` from inside its `seeked` handler
+   * and fire the next one. This means the agent can scrub as fast as
+   * they like — at most ONE seek is in flight + ONE pending (the
+   * latest). No backlog, the slider never lags waiting on the decoder.
+   *
+   * Refs (not state) on purpose: changing them must NOT re-render and
+   * MUST stay in sync with the live <video> across rapid input events.
+   */
+  const pendingSeekRef = useRef<number | null>(null);
+  const seekInFlightRef = useRef<boolean>(false);
 
   // Revoke the object URL when the component unmounts or the file is
   // replaced. Object URLs hold the file in memory until revoked.
@@ -192,46 +218,140 @@ export function VideoUploadField({
     };
   }, [localObjectUrl]);
 
-  // A7d.8 — render a small live-preview thumbnail to the scrubber whenever
-  // the hidden capture video lands on a new seeked frame. Decoupled from
-  // the slider onChange so we don't draw before the decoder has the
-  // pixels. iOS quirk: the seeked event sometimes fires before the
-  // frame buffer has populated, so we slack one animation frame.
+  /**
+   * Paint the capture video's CURRENT frame onto the visible preview
+   * canvas. Sized internally to longest-edge ~640px (plenty for the
+   * thumbnail-sized surface — keeps the per-seek draw cheap on phones).
+   * CSS aspect-ratio on the canvas handles the on-page sizing.
+   */
+  const drawPreviewFrame = useCallback(() => {
+    const video = captureVideoRef.current;
+    const canvas = previewCanvasRef.current;
+    if (!video || !canvas) return;
+    const vw = video.videoWidth;
+    const vh = video.videoHeight;
+    if (!vw || !vh) return;
+    const MAX_EDGE = 640;
+    const scale = Math.min(1, MAX_EDGE / Math.max(vw, vh));
+    const dw = Math.max(1, Math.round(vw * scale));
+    const dh = Math.max(1, Math.round(vh * scale));
+    if (canvas.width !== dw) canvas.width = dw;
+    if (canvas.height !== dh) canvas.height = dh;
+    const ctx = canvas.getContext("2d");
+    if (!ctx) return;
+    try {
+      ctx.drawImage(video, 0, 0, dw, dh);
+    } catch {
+      // SecurityError would only fire on a cross-origin source — our
+      // source is the local objectURL, so this branch is paranoia.
+      // Leave whatever was last drawn on screen rather than blanking.
+    }
+  }, []);
+
+  /**
+   * Start the next pending seek IF none is in flight. Called from
+   * `requestSeek` (on slider input) and from the `seeked` handler (to
+   * pick up whatever the agent dragged to while we were busy).
+   */
+  const pumpSeek = useCallback(() => {
+    if (seekInFlightRef.current) return;
+    const t = pendingSeekRef.current;
+    if (t === null) return;
+    const video = captureVideoRef.current;
+    if (!video) return;
+    pendingSeekRef.current = null;
+    // If we're already at the requested time (within a tick), no seek
+    // would fire `seeked` — and the coalescer would stay stuck "in
+    // flight" forever waiting for it. Bail with the preview unchanged.
+    if (Math.abs(video.currentTime - t) < 0.01) return;
+    seekInFlightRef.current = true;
+    try {
+      if (!video.paused) video.pause();
+      video.currentTime = t;
+    } catch {
+      // currentTime can throw if set before loadedmetadata. Drop the
+      // in-flight flag so the next requestSeek can retry.
+      seekInFlightRef.current = false;
+    }
+  }, []);
+
+  /**
+   * Stamp the latest target time and (if idle) kick a seek. Synchronous
+   * and fire-and-forget — the slider's onChange MUST NOT await this, or
+   * a slow phone decode would freeze the slider (A7d.8.1 invariant).
+   */
+  const requestSeek = useCallback(
+    (t: number) => {
+      pendingSeekRef.current = t;
+      pumpSeek();
+    },
+    [pumpSeek],
+  );
+
+  // A7d.8.2 — on every `seeked`, draw the new frame to the preview
+  // canvas, mark the seek done, and pump the next pending seek (if the
+  // agent dragged further while this one was in flight). iOS quirk: the
+  // seeked event sometimes fires before the buffer has the new pixels,
+  // so slack one animation frame before drawing.
   useEffect(() => {
     const video = captureVideoRef.current;
-    if (!video || !localObjectUrl) {
-      // Clear the preview thumbnail when the local source is gone so a
-      // stale dataURL doesn't outlive a Remove.
-      setScrubPreviewDataUrl(null);
-      return;
-    }
+    if (!video || !localObjectUrl) return;
     const onSeeked = () => {
       requestAnimationFrame(() => {
-        const w = video.videoWidth;
-        const h = video.videoHeight;
-        if (!w || !h) return;
-        // Small thumbnail preview — 160px wide is plenty for the
-        // 64×40 swatch slot. Keeps the dataURL small (a few KB).
-        const targetW = 160;
-        const targetH = Math.max(1, Math.round((h / w) * targetW));
-        const canvas = document.createElement("canvas");
-        canvas.width = targetW;
-        canvas.height = targetH;
-        const ctx = canvas.getContext("2d");
-        if (!ctx) return;
-        try {
-          ctx.drawImage(video, 0, 0, targetW, targetH);
-          setScrubPreviewDataUrl(canvas.toDataURL("image/jpeg", 0.7));
-        } catch {
-          // SecurityError lands here if the source is somehow cross-
-          // origin. Clear the preview so the UI doesn't appear broken.
-          setScrubPreviewDataUrl(null);
-        }
+        drawPreviewFrame();
+        seekInFlightRef.current = false;
+        if (pendingSeekRef.current !== null) pumpSeek();
       });
     };
     video.addEventListener("seeked", onSeeked);
-    return () => video.removeEventListener("seeked", onSeeked);
-  }, [localObjectUrl]);
+    return () => {
+      video.removeEventListener("seeked", onSeeked);
+      // Reset on source change — the OLD pending seek is meaningless
+      // against the NEW src that's about to load.
+      pendingSeekRef.current = null;
+      seekInFlightRef.current = false;
+    };
+  }, [localObjectUrl, drawPreviewFrame, pumpSeek]);
+
+  // A7d.8.2 — initial first-frame paint when the capture video loads.
+  // The brief: "when the scrubber first appears, show the first-frame
+  // (t≈0) in the preview so it's never empty."
+  //
+  // iOS decode-force: a muted-inline play()/pause() bounce primes the
+  // decoder so the subsequent seek can actually land a painted frame
+  // (same trick the off-DOM captureFrameBlob path uses). Then we
+  // requestSeek(0.1) — some encoders don't paint frame 0 until a tiny
+  // seek lands. Mirrors the auto-capture's 0.1s.
+  //
+  // The readyState check guards the race where `loadeddata` fires
+  // BEFORE this effect mounts its listener (the <video> starts loading
+  // the moment `src` is set during render, before useEffect runs).
+  useEffect(() => {
+    const video = captureVideoRef.current;
+    if (!video || !localObjectUrl) return;
+    const primeAndSeek = () => {
+      const p = video.play();
+      if (p && typeof p.then === "function") {
+        p.then(() => {
+          try {
+            video.pause();
+          } catch {
+            // ignore
+          }
+        }).catch(() => {
+          // autoplay may be blocked under strict policies; the seek
+          // below still fires and the preview is best-effort anyway
+        });
+      }
+      requestSeek(0.1);
+    };
+    if (video.readyState >= 2) {
+      primeAndSeek();
+      return;
+    }
+    video.addEventListener("loadeddata", primeAndSeek, { once: true });
+    return () => video.removeEventListener("loadeddata", primeAndSeek);
+  }, [localObjectUrl, requestSeek]);
 
   const tid = (suffix: string) =>
     testIdPrefix ? `${testIdPrefix}-${suffix}` : undefined;
@@ -548,8 +668,16 @@ export function VideoUploadField({
                 pointerEvents: "none",
               }}
               onLoadedMetadata={(e) => {
-                const d = (e.target as HTMLVideoElement).duration;
-                if (Number.isFinite(d) && d > 0) setDuration(d);
+                const v = e.target as HTMLVideoElement;
+                if (Number.isFinite(v.duration) && v.duration > 0) {
+                  setDuration(v.duration);
+                }
+                // A7d.8.2 — capture intrinsic aspect so the preview
+                // canvas sizes to the actual video shape (a portrait
+                // phone clip should not letterbox into a 16:9 box).
+                if (v.videoWidth > 0 && v.videoHeight > 0) {
+                  setVideoAspect(v.videoWidth / v.videoHeight);
+                }
               }}
             />
           )}
@@ -575,6 +703,26 @@ export function VideoUploadField({
                   {formatScrubTime(scrubTime ?? 0)} / {formatScrubTime(duration)}
                 </span>
               </div>
+              {/* A7d.8.2 — visible live-preview canvas ABOVE the slider.
+                  Drawn from the in-DOM captureVideoRef <video> on every
+                  seeked event (coalesced via pendingSeekRef /
+                  seekInFlightRef so we never queue a backlog). Sized to
+                  the video's intrinsic aspect ratio so portrait phone
+                  clips don't get letterboxed.
+
+                  WYSIWYG with "Use this frame": both pipelines read from
+                  the SAME localObjectUrl at the SAME scrubTime — the
+                  live preview through this canvas, the committed
+                  capture through captureFrameBlob below. */}
+              <div className="mt-2">
+                <canvas
+                  ref={previewCanvasRef}
+                  className="block w-full rounded border border-neutral-800 bg-black"
+                  style={{ aspectRatio: videoAspect ?? 16 / 9 }}
+                  aria-label="Live preview of frame at current scrub position"
+                  data-testid={tid("scrubber-preview-canvas")}
+                />
+              </div>
               <input
                 type="range"
                 min={0}
@@ -593,24 +741,14 @@ export function VideoUploadField({
                   const t = parseFloat(e.target.value);
                   if (!Number.isFinite(t)) return;
                   setScrubTime(t);
-                  // Seek the hidden capture video and, on the next
-                  // seeked event, draw a small live-preview frame so
-                  // the agent sees the timestamp they're hovering on.
-                  // The preview is a dataURL kept in component state —
-                  // it never reaches the persisted draft. The committed
-                  // thumbnail (on "Use this frame") always uploads to
-                  // /api/upload-image first, so storage stays hosted.
-                  const video = captureVideoRef.current;
-                  if (video) {
-                    if (!video.paused) video.pause();
-                    try {
-                      video.currentTime = t;
-                    } catch {
-                      // Some browsers throw if currentTime is set
-                      // before loadedmetadata — guard so a fast first
-                      // drag doesn't surface a console error.
-                    }
-                  }
+                  // A7d.8.2 — fire-and-forget coalesced seek. requestSeek
+                  // stamps the latest target and either kicks a seek (if
+                  // idle) or lets the in-flight seek pick this up on its
+                  // way out. Crucially, the slider does NOT await any
+                  // draw or seek — a slow phone decode can never freeze
+                  // the slider, the controls, or the upload-done state
+                  // (A7d.8.1 invariant).
+                  requestSeek(t);
                 }}
                 className="mt-2 w-full accent-mint"
                 aria-label="Scrub to choose a thumbnail frame"
@@ -636,18 +774,11 @@ export function VideoUploadField({
                     Setting first frame…
                   </span>
                 )}
-                {/* Live scrub preview (dataURL, in-wizard only) when the
-                    agent is dragging; falls back to the currently
-                    selected hosted thumbnail otherwise. */}
-                {scrubPreviewDataUrl ? (
-                  // eslint-disable-next-line @next/next/no-img-element
-                  <img
-                    src={scrubPreviewDataUrl}
-                    alt="Frame at current scrub position"
-                    className="ml-auto h-10 w-16 rounded border border-mint object-cover"
-                    data-testid={tid("scrubber-preview")}
-                  />
-                ) : currentPosterUrl ? (
+                {currentPosterUrl && (
+                  // Small "currently selected" indicator — what's
+                  // persisted on the draft right now (auto first-frame,
+                  // or a scrub the agent already committed). The big
+                  // canvas above is the LIVE preview as they drag.
                   // eslint-disable-next-line @next/next/no-img-element
                   <img
                     src={currentPosterUrl}
@@ -655,7 +786,7 @@ export function VideoUploadField({
                     className="ml-auto h-10 w-16 rounded border border-neutral-700 object-cover"
                     data-testid={tid("scrubber-current")}
                   />
-                ) : null}
+                )}
               </div>
             </div>
           )}

@@ -413,4 +413,173 @@ test.describe('Seller Presentation — A7d.8 video poster', () => {
       await expect(video).toHaveAttribute('preload', 'metadata');
     });
   });
+
+  /*
+   * A7d.8.2 — visible live-preview window for the thumbnail scrubber
+   * (Dallen's 2026-05-23 follow-up smoke). The slider moved but there
+   * was no visible preview of the frame at the slider position, so the
+   * agent was picking blind. Fix: a visible <canvas> above the slider
+   * that draws the in-DOM captureVideoRef frame on every seeked event,
+   * with a last-wins coalescing pattern so the slider stays responsive
+   * even when the device's decode lags.
+   *
+   * Three invariants this round establishes — all source-grep because
+   * a browser-driven seek-and-draw exercise needs a real decodable MP4
+   * fixture (same shape as the rest of the A7d wiring proofs):
+   *
+   *   1. The preview canvas exists, is rendered ABOVE the slider, and
+   *      sizes to the video's intrinsic aspect ratio (no letterboxing
+   *      of portrait phone clips).
+   *   2. The seek pipeline coalesces (last-wins) — the slider's
+   *      onChange does NOT set currentTime directly, so it cannot
+   *      queue a backlog of seeks against a slow decoder. The slider
+   *      remains responsive (A7d.8.1 invariant: no UI state may be
+   *      gated on the live-preview draw).
+   *   3. WYSIWYG with "Use this frame" — both the live preview and the
+   *      committed capture read from the same localObjectUrl at the
+   *      same scrubTime.
+   */
+  test.describe('A7d.8.2 — visible live scrub-preview window', () => {
+    test('a visible preview canvas exists, sized to video aspect, ABOVE the slider', () => {
+      const src = readFileSync(FIELD, 'utf8');
+
+      // 1) The canvas is rendered with the testid the wizard targets.
+      expect(src).toContain('data-testid={tid("scrubber-preview-canvas")}');
+      // 2) It's a <canvas> bound to previewCanvasRef (the draw target).
+      expect(src).toMatch(/<canvas[\s\S]*?ref=\{previewCanvasRef\}/);
+      // 3) Sized by the video's intrinsic aspect ratio (falls back to
+      //    16:9 until loadedmetadata fires). Portrait phone clips must
+      //    NOT be forced into a letterboxed 16:9 frame.
+      expect(src).toMatch(/aspectRatio:\s*videoAspect/);
+      // 4) Rendered ABOVE the slider — the canvas testid appears before
+      //    the scrubber-range testid in source order, which matches the
+      //    rendered DOM order inside the scrubber container.
+      const canvasIdx = src.indexOf('data-testid={tid("scrubber-preview-canvas")}');
+      const rangeIdx = src.indexOf('data-testid={tid("scrubber-range")}');
+      expect(canvasIdx).toBeGreaterThan(0);
+      expect(rangeIdx).toBeGreaterThan(0);
+      expect(canvasIdx).toBeLessThan(rangeIdx);
+    });
+
+    test('seek pipeline coalesces (last-wins) — no per-input currentTime backlog', () => {
+      const src = readFileSync(FIELD, 'utf8');
+
+      // 1) The coalescer refs exist by name. Using refs (not state) is
+      //    required so rapid input events don't trigger re-renders +
+      //    don't race against React's batched setState.
+      expect(src).toMatch(/pendingSeekRef\s*=\s*useRef/);
+      expect(src).toMatch(/seekInFlightRef\s*=\s*useRef/);
+
+      // 2) The pump exists and only starts a seek when nothing is in
+      //    flight (the core last-wins property).
+      expect(src).toMatch(/const\s+pumpSeek\s*=/);
+      expect(src).toMatch(/if\s*\(\s*seekInFlightRef\.current\s*\)\s*return/);
+
+      // 3) The seeked handler RE-PUMPS when a target arrived during the
+      //    in-flight seek — that's how the latest drag-position lands
+      //    once the decoder catches up.
+      expect(src).toMatch(
+        /if\s*\(\s*pendingSeekRef\.current\s*!==\s*null\s*\)\s*pumpSeek\(\)/,
+      );
+
+      // 4) The slider's onChange routes through requestSeek and does
+      //    NOT set currentTime directly. If it did, every input event
+      //    would queue another seek and the slider would lag behind a
+      //    backlog of decoder work.
+      //
+      // Walk to the JSX block by its testid, slice the onChange={…}
+      // expression with a brace counter, then assert what's inside.
+      const rangeTestidIdx = src.indexOf('data-testid={tid("scrubber-range")}');
+      expect(rangeTestidIdx).toBeGreaterThan(0);
+      const inputTagStart = src.lastIndexOf('<input', rangeTestidIdx);
+      expect(inputTagStart).toBeGreaterThan(0);
+      const onChangeIdx = src.indexOf('onChange={', inputTagStart);
+      expect(onChangeIdx).toBeGreaterThan(0);
+      expect(onChangeIdx).toBeLessThan(rangeTestidIdx);
+      // Extract the {…} body of the onChange.
+      const bodyStart = onChangeIdx + 'onChange={'.length;
+      let depth = 1;
+      let bodyEnd = bodyStart;
+      for (let i = bodyStart; i < src.length; i++) {
+        const c = src[i];
+        if (c === '{') depth++;
+        else if (c === '}') {
+          depth--;
+          if (depth === 0) {
+            bodyEnd = i;
+            break;
+          }
+        }
+      }
+      // Strip // and /* */ comments before asserting on the handler's
+      // CODE — the rule is about runtime behavior, not what the
+      // comments happen to mention.
+      const onChangeCode = src
+        .slice(bodyStart, bodyEnd)
+        .replace(/\/\*[\s\S]*?\*\//g, '')
+        .replace(/\/\/[^\n]*/g, '');
+      // Calls the coalesced helper.
+      expect(onChangeCode).toMatch(/requestSeek\(/);
+      // Does NOT set currentTime directly inside the handler — that
+      // would defeat the coalescer.
+      expect(onChangeCode).not.toMatch(/\.currentTime\s*=/);
+      // Does NOT block on the seek — the slider must stay responsive
+      // even if the underlying decode is slow. (A7d.8.1 invariant.)
+      expect(onChangeCode).not.toMatch(/\bawait\b/);
+    });
+
+    test('initial first-frame paint: requestSeek(~0.1s) fires when the capture video is ready', () => {
+      const src = readFileSync(FIELD, 'utf8');
+
+      // The init useEffect fires either immediately (readyState >=
+      // HAVE_CURRENT_DATA) OR on loadeddata, and kicks an initial seek
+      // so the preview canvas isn't empty when the scrubber appears.
+      expect(src).toMatch(/readyState\s*>=\s*2/);
+      expect(src).toMatch(/addEventListener\(\s*["']loadeddata["']/);
+      expect(src).toMatch(/requestSeek\(\s*0\.1\s*\)/);
+    });
+
+    test('WYSIWYG — live preview and "Use this frame" share source + time', () => {
+      const src = readFileSync(FIELD, 'utf8');
+
+      // The preview pipeline draws from captureVideoRef (sourced from
+      // localObjectUrl) at whatever time the slider has the in-DOM
+      // <video> seeked to.
+      expect(src).toMatch(/drawPreviewFrame[\s\S]{0,200}captureVideoRef/);
+      expect(src).toMatch(/<video[\s\S]*?ref=\{captureVideoRef\}[\s\S]*?src=\{localObjectUrl\}/);
+
+      // The "Use this frame" pipeline captures from the SAME localObjectUrl
+      // at scrubTime — proving WYSIWYG (same source, same time as the
+      // preview the agent just looked at).
+      expect(src).toMatch(/captureFrameBlob\(localObjectUrl,\s*scrubTime\)/);
+    });
+
+    test('drawPreviewFrame writes to the visible <canvas>, never to a data: URL state', () => {
+      const src = readFileSync(FIELD, 'utf8');
+
+      // The live preview goes DIRECTLY to a real <canvas> via drawImage —
+      // no dataURL round-trip. (A dataURL pipeline would per-frame burn
+      // CPU on toDataURL and would also be a regression toward the old
+      // "tiny 64×40 swatch" UX that hid the preview.)
+      expect(src).toMatch(/ctx\.drawImage\(\s*video/);
+      // The old scrubPreviewDataUrl state is GONE.
+      expect(src).not.toMatch(/scrubPreviewDataUrl/);
+      // And no dataURL is being stuffed into state inside the live-
+      // preview pipeline (the committed "Use this frame" path still
+      // uses canvas.toBlob() — that's the separate capture, not the
+      // per-seek preview).
+      expect(src).not.toMatch(/setScrubPreviewDataUrl/);
+    });
+
+    test('the hosted-URL guard for the FINAL captured poster is intact', () => {
+      const src = readFileSync(FIELD, 'utf8');
+
+      // The in-wizard live preview may render off a canvas, but the
+      // poster that PERSISTS into the draft must still be a hosted
+      // Vercel Blob URL — never a data: URL (sep-photo-upload-requirement).
+      // The receive site enforces this.
+      expect(src).toMatch(/non-hosted URL/);
+      expect(src).toContain('/api/upload-image');
+    });
+  });
 });
