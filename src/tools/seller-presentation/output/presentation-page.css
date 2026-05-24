@@ -1000,6 +1000,14 @@
   stroke-width: 1;
   stroke-dasharray: 4 4;
 }
+/* A7d.7 — opaque chip painted under the recommended-line labels so the
+   tag + price stay legible when the data polyline crosses under them.
+   Paper-tint fill keeps the chip on-brand; ~92% opacity softens the
+   block slightly so the dashed line beneath still feels continuous. */
+.sep-presentation .chart .rec-tag-bg {
+  fill: var(--paper);
+  fill-opacity: 0.92;
+}
 .sep-presentation .chart .rec-tag-text {
   font-family: var(--sep-mono);
   font-size: 8px;

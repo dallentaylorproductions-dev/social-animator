@@ -1,5 +1,7 @@
 "use client";
 
+import { useEffect, useState } from "react";
+
 /**
  * Percent-formatted input ("101%" / "+4.6%" / "−2.1%").
  *
@@ -72,65 +74,16 @@ export function PercentInput({
   "aria-label": ariaLabel,
 }: PercentInputProps) {
   if (signed) {
-    const { sign, magnitude } = parseSignedValue(value);
-
-    const handleMagChange = (e: React.ChangeEvent<HTMLInputElement>) => {
-      // Strip any sign characters from the magnitude input — sign lives
-      // on the toggle, not in the typed text.
-      const cleaned = e.target.value.replace(/[^0-9.%]/g, "");
-      onChange(composeSignedValue(sign, cleaned));
-    };
-
-    const handleMagBlur = (e: React.FocusEvent<HTMLInputElement>) => {
-      const raw = e.target.value.trim();
-      if (!raw) {
-        onChange("");
-        return;
-      }
-      const next = raw.endsWith("%") ? raw : `${raw}%`;
-      onChange(composeSignedValue(sign, next));
-    };
-
-    const toggleSign = () => {
-      const nextSign: Sign = sign === "-" ? "+" : "-";
-      onChange(composeSignedValue(nextSign, magnitude));
-    };
-
-    // Inline `padding: 0` overrides the caller's `px-3 py-2` so the
-    // wrapper can host the sign-toggle + magnitude input compactly. The
-    // toggle and the input each carry their own padding inside.
     return (
-      <div
-        className={`${className ?? DEFAULT_CLASS} flex items-stretch overflow-hidden`}
-        style={{ padding: 0 }}
-        data-signed-percent
-        data-sign={sign === "-" ? "negative" : "positive"}
-      >
-        <button
-          type="button"
-          onClick={toggleSign}
-          disabled={disabled}
-          aria-label={`Toggle sign (currently ${sign === "-" ? "negative" : "positive"})`}
-          aria-pressed={sign === "-"}
-          data-testid="percent-input-sign-toggle"
-          className="shrink-0 w-10 border-r border-neutral-800 text-base lg:text-sm text-text-primary hover:bg-neutral-800/40 active:bg-neutral-800/60 focus:outline-none focus:bg-mint/10"
-        >
-          {sign === "-" ? MINUS_GLYPH : "+"}
-        </button>
-        <input
-          type="text"
-          inputMode="decimal"
-          autoComplete="off"
-          value={magnitude}
-          onChange={handleMagChange}
-          onBlur={handleMagBlur}
-          placeholder={placeholder}
-          required={required}
-          disabled={disabled}
-          aria-label={ariaLabel}
-          className="flex-1 min-w-0 bg-transparent px-3 py-2 text-base lg:text-sm focus:outline-none"
-        />
-      </div>
+      <SignedPercentInput
+        value={value}
+        onChange={onChange}
+        placeholder={placeholder}
+        className={className}
+        required={required}
+        disabled={disabled}
+        ariaLabel={ariaLabel}
+      />
     );
   }
 
@@ -164,5 +117,128 @@ export function PercentInput({
       aria-label={ariaLabel}
       className={className ?? DEFAULT_CLASS}
     />
+  );
+}
+
+/**
+ * Signed variant — kept as its own component because the +/− toggle
+ * needs LOCAL sign state so it remains responsive when the magnitude
+ * is empty (A7d.6 emitted "" on toggle-with-empty-magnitude, which the
+ * parent ignored, which made the toggle look broken — Dallen's A7d.7
+ * smoke report). With local state the visible glyph flips on every tap;
+ * we only emit a composed value to the parent when there's an actual
+ * magnitude to sign.
+ */
+interface SignedPercentInputProps {
+  value: string;
+  onChange: (formatted: string) => void;
+  placeholder?: string;
+  className?: string;
+  required?: boolean;
+  disabled?: boolean;
+  ariaLabel?: string;
+}
+
+function SignedPercentInput({
+  value,
+  onChange,
+  placeholder,
+  className,
+  required,
+  disabled,
+  ariaLabel,
+}: SignedPercentInputProps) {
+  const parsed = parseSignedValue(value);
+  const [internalSign, setInternalSign] = useState<Sign>(parsed.sign);
+
+  // Sync local sign with the parsed value's sign whenever the parent
+  // hands us a non-empty magnitude (so an external state change or a
+  // reload restores the correct sign on the toggle). When magnitude is
+  // empty, keep the user's last toggle choice so a tap is never lost.
+  useEffect(() => {
+    if (parsed.magnitude.trim()) setInternalSign(parsed.sign);
+  }, [parsed.sign, parsed.magnitude]);
+
+  const sign: Sign = parsed.magnitude.trim() ? parsed.sign : internalSign;
+
+  const handleMagChange = (e: React.ChangeEvent<HTMLInputElement>) => {
+    // Strip any sign characters from the magnitude input — sign lives
+    // on the toggle, not in the typed text.
+    const cleaned = e.target.value.replace(/[^0-9.%]/g, "");
+    onChange(composeSignedValue(sign, cleaned));
+  };
+
+  const handleMagBlur = (e: React.FocusEvent<HTMLInputElement>) => {
+    const raw = e.target.value.trim();
+    if (!raw) {
+      onChange("");
+      return;
+    }
+    const next = raw.endsWith("%") ? raw : `${raw}%`;
+    onChange(composeSignedValue(sign, next));
+  };
+
+  const toggleSign = () => {
+    const nextSign: Sign = sign === "-" ? "+" : "-";
+    setInternalSign(nextSign);
+    // Emit ONLY when there's an actual magnitude — otherwise the parent
+    // would receive a "+"/"−" alone, which fails its truthy check and
+    // gets dropped (or worse: stored, then rendered). The toggle's
+    // visible state still flips because we just updated internalSign.
+    if (parsed.magnitude.trim()) {
+      onChange(composeSignedValue(nextSign, parsed.magnitude));
+    }
+  };
+
+  // iOS Safari forwards a label click to the first descendant input,
+  // which would steal focus AND swallow the toggle's own click. Calling
+  // preventDefault on pointerdown stops the label-forwarding without
+  // blocking our onClick. Mirror with onMouseDown for desktop browsers
+  // that route taps through the same path.
+  const swallowLabelClick = (
+    e:
+      | React.PointerEvent<HTMLButtonElement>
+      | React.MouseEvent<HTMLButtonElement>,
+  ) => {
+    e.preventDefault();
+  };
+
+  // Inline `padding: 0` overrides the caller's `px-3 py-2` so the
+  // wrapper can host the sign-toggle + magnitude input compactly. The
+  // toggle and the input each carry their own padding inside.
+  return (
+    <div
+      className={`${className ?? DEFAULT_CLASS} flex items-stretch overflow-hidden`}
+      style={{ padding: 0 }}
+      data-signed-percent
+      data-sign={sign === "-" ? "negative" : "positive"}
+    >
+      <button
+        type="button"
+        onPointerDown={swallowLabelClick}
+        onMouseDown={swallowLabelClick}
+        onClick={toggleSign}
+        disabled={disabled}
+        aria-label={`Toggle sign (currently ${sign === "-" ? "negative" : "positive"})`}
+        aria-pressed={sign === "-"}
+        data-testid="percent-input-sign-toggle"
+        className="shrink-0 w-10 border-r border-neutral-800 text-base lg:text-sm text-text-primary hover:bg-neutral-800/40 active:bg-neutral-800/60 focus:outline-none focus:bg-mint/10"
+      >
+        {sign === "-" ? MINUS_GLYPH : "+"}
+      </button>
+      <input
+        type="text"
+        inputMode="decimal"
+        autoComplete="off"
+        value={parsed.magnitude}
+        onChange={handleMagChange}
+        onBlur={handleMagBlur}
+        placeholder={placeholder}
+        required={required}
+        disabled={disabled}
+        aria-label={ariaLabel}
+        className="flex-1 min-w-0 bg-transparent px-3 py-2 text-base lg:text-sm focus:outline-none"
+      />
+    </div>
   );
 }

@@ -571,6 +571,50 @@ function AreaStatsEditor({ draft, setDraft }: StepEditorialProps) {
     persistSeries(nextLabels, editor.prices);
   };
 
+  // A7d.7 Fix 2 — months-of-history input must allow an empty intermediate
+  // state while editing. The A7d.6 onChange clamped on every keystroke, so
+  // backspacing "12" instantly snapped back to "1" and the agent couldn't
+  // retype (Dallen smoke 2026-05-23 — "get stuck in a loop"). Local string
+  // state holds the raw input so '' / '6' / '12' all flow through; the
+  // numeric clamp only fires on blur. While editing, in-range numbers are
+  // applied live so the row count updates as the agent types.
+  const [countInput, setCountInput] = useState<string>(
+    String(DEFAULT_MONTHLY_COUNT),
+  );
+  useEffect(() => {
+    setCountInput(String(editor.count));
+  }, [editor.count]);
+
+  const handleCountChange = (e: React.ChangeEvent<HTMLInputElement>) => {
+    const raw = e.target.value;
+    // Accept '' (mid-backspace) or 1-2 digit integers ≤ MAX. Anything
+    // outside that window is silently dropped — keeps the input from
+    // letting in "123" or "9a" before blur normalization.
+    if (raw === "" || /^\d{1,2}$/.test(raw)) {
+      const n = parseInt(raw, 10);
+      if (raw === "" || (Number.isFinite(n) && n <= MAX_MONTHLY)) {
+        setCountInput(raw);
+        // Apply IN-RANGE numbers live so labels update as the user types.
+        // Skip the live-apply when the input is empty or below 1 — wait
+        // for blur to normalize.
+        if (Number.isFinite(n) && n >= 1 && n <= MAX_MONTHLY) {
+          setCount(n);
+        }
+      }
+    }
+  };
+
+  const handleCountBlur = () => {
+    const n = parseInt(countInput, 10);
+    if (!Number.isFinite(n) || n < 1) {
+      setCountInput(String(DEFAULT_MONTHLY_COUNT));
+      setCount(DEFAULT_MONTHLY_COUNT);
+    } else if (n > MAX_MONTHLY) {
+      setCountInput(String(MAX_MONTHLY));
+      setCount(MAX_MONTHLY);
+    }
+  };
+
   const setPriceFor = (label: string, price: string) => {
     const nextPrices = { ...editor.prices, [label]: price };
     setEditor((prev) => ({ ...prev, prices: nextPrices }));
@@ -693,16 +737,13 @@ function AreaStatsEditor({ draft, setDraft }: StepEditorialProps) {
               Months of history (1–{MAX_MONTHLY})
             </span>
             <input
-              type="number"
-              min={1}
-              max={MAX_MONTHLY}
+              type="text"
               inputMode="numeric"
+              autoComplete="off"
               className={`${inputCls} mt-1`}
-              value={editor.count}
-              onChange={(e) => {
-                const parsed = parseInt(e.target.value, 10);
-                if (Number.isFinite(parsed)) setCount(parsed);
-              }}
+              value={countInput}
+              onChange={handleCountChange}
+              onBlur={handleCountBlur}
               data-testid="step-editorial-area-month-count"
             />
           </label>
