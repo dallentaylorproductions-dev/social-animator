@@ -6,6 +6,7 @@ import {
   MINIMAL_PAYLOAD,
   OUTLINK_ONLY_PAYLOAD,
   POSTER_AUTO_ONLY_PAYLOAD,
+  POSTER_NONE_PAYLOAD,
   POSTER_OVERRIDE_WINS_PAYLOAD,
   POSTER_SCRUB_OVER_AUTO_PAYLOAD,
 } from "@/tools/seller-presentation/output/__fixtures__/sample-payload";
@@ -52,6 +53,9 @@ export default async function SellerPresentationPreview({ searchParams }: PagePr
     "poster-auto-only",
     "poster-scrub-over-auto",
     "poster-override-wins",
+    // A7d.8.1 — never-blank fallback fixture: video set but all three
+    // poster slots empty (the iOS capture-timeout scenario).
+    "poster-none",
   ] as const;
   type Variant = (typeof VARIANTS)[number];
   const variant = (VARIANTS as readonly string[]).includes(fixture ?? "")
@@ -74,7 +78,9 @@ export default async function SellerPresentationPreview({ searchParams }: PagePr
             ? POSTER_SCRUB_OVER_AUTO_PAYLOAD
             : variant === "poster-override-wins"
               ? POSTER_OVERRIDE_WINS_PAYLOAD
-              : FULL_PAYLOAD;
+              : variant === "poster-none"
+                ? POSTER_NONE_PAYLOAD
+                : FULL_PAYLOAD;
 
   // Wrap the fixture payload in a HandoutRecord so the renderer's
   // contract matches the production /h/[slug] path exactly. The

@@ -236,12 +236,21 @@ function VideoBlock({ payload }: { payload: PublicPayload }) {
             > auto first-frame). The auto first-frame is captured at
             upload time so the block is never blank.
           - `controls` — native browser chrome (play / scrub / mute).
-            Keeps the implementation framework-free and accessible. */}
+            Keeps the implementation framework-free and accessible.
+
+          A7d.8.1 never-blank fallback: when poster is missing (e.g.
+          iOS capture timed out before the auto first-frame landed),
+          OMIT the attribute entirely rather than emit poster="".
+          With preload="metadata" the browser falls back to painting
+          the video's native first frame, which is far better than the
+          black box `poster=""` renders. Capture working is the
+          primary path; this is the safety net so a capture timeout
+          never reintroduces the blank poster A7d.8 set out to kill. */}
       <div className="video-poster reveal" data-testid="sep-video-player">
         <video
           className="video-player"
           src={v.videoUrl}
-          poster={poster}
+          {...(poster ? { poster } : {})}
           controls
           playsInline
           preload="metadata"

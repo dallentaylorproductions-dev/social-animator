@@ -346,30 +346,28 @@ export function VideoUploadField({
 
     setUploading(true);
     setProgressPct(null);
+
+    // Browser → Vercel Blob direct upload (A7d.3.1).
+    //
+    // upload() POSTs a small JSON envelope to handleUploadUrl to
+    // obtain a short-lived client token, then streams the file
+    // bytes straight to Vercel Blob using that token. The file
+    // never traverses our Function, so the platform's 4.5 MB body
+    // limit does not apply.
+    //
+    // multipart is enabled only above MULTIPART_THRESHOLD (~10 MB):
+    // small files take the single-PUT path (one network call to
+    // the Blob API), large files get chunked + parallelized so
+    // a 200 MB phone clip doesn't time out on flaky cell uplinks.
+    //
+    // A7d.5 — `onUploadProgress` is fired by @vercel/blob 2.4.0
+    // throughout the byte stream (both single-PUT and multipart
+    // paths). The handshake POST that precedes it does NOT fire the
+    // callback, so the bar starts indeterminate until the first
+    // event lands; once a percentage arrives it switches to
+    // determinate so the agent sees concrete movement.
+    let hostedUrl: string;
     try {
-      // Browser → Vercel Blob direct upload (A7d.3.1).
-      //
-      // upload() POSTs a small JSON envelope to handleUploadUrl to
-      // obtain a short-lived client token, then streams the file
-      // bytes straight to Vercel Blob using that token. The file
-      // never traverses our Function, so the platform's 4.5 MB body
-      // limit does not apply.
-      //
-      // multipart is enabled only above MULTIPART_THRESHOLD (~10 MB):
-      // small files take the single-PUT path (one network call to
-      // the Blob API), large files get chunked + parallelized so
-      // a 200 MB phone clip doesn't time out on flaky cell uplinks.
-      // Threshold is below the smallest realistic phone clip so any
-      // real upload still benefits, but above the size used by
-      // route-level / round-trip E2E fixtures so those exercise the
-      // simpler PUT path.
-      //
-      // A7d.5 — `onUploadProgress` is fired by @vercel/blob 2.4.0
-      // throughout the byte stream (both single-PUT and multipart
-      // paths). The handshake POST that precedes it does NOT fire the
-      // callback, so the bar starts indeterminate until the first
-      // event lands; once a percentage arrives it switches to
-      // determinate so the agent sees concrete movement.
       const ext = extensionForType(file.type);
       const folderSegment = folder ?? "uploads";
       const pathname = `${folderSegment}/${Date.now()}.${ext}`;
@@ -392,42 +390,63 @@ export function VideoUploadField({
       if (!result.url || !/^https?:\/\//.test(result.url)) {
         throw new Error("Upload did not return a hosted URL");
       }
-      onChange(
-        result.url,
-        Number.isFinite(durationSeconds) ? durationSeconds : undefined,
-      );
-
-      // A7d.8 P1 — never-blank baseline: capture the FIRST FRAME of the
-      // freshly-uploaded video and persist it as autoPosterUrl. Reads
-      // from the LOCAL File via objectURL (no CORS taint). Some encoders
-      // don't paint frame 0 until a tiny seek lands, so we seek to 0.1s.
-      // Failure here is non-fatal — the seller page will still render
-      // with no poster (worse than ideal, but not a regression vs the
-      // pre-A7d.8 behavior). The error is logged to the agent so they
-      // know to upload a manual override if it matters.
-      if (onPosterChange) {
-        setAutoCapturing(true);
-        try {
-          const frame = await captureFrameBlob(nextObjectUrl, 0.1);
-          const posterUrl = await uploadCapturedFrame(
-            frame,
-            `${folder ?? "uploads"}-poster`,
-          );
-          onPosterChange(posterUrl, "auto");
-        } catch {
-          // Soft-fail — the explicit "Use this frame" scrubber path and
-          // the manual ImageUploadField override below both remain
-          // available, and either one will fill the poster slot.
-        } finally {
-          setAutoCapturing(false);
-        }
-      }
+      hostedUrl = result.url;
     } catch (err) {
       setError(err instanceof Error ? err.message : "Upload failed");
-    } finally {
       setUploading(false);
       setProgressPct(null);
       if (fileRef.current) fileRef.current.value = "";
+      return;
+    }
+
+    // A7d.8.1 — DONE STATE, decoupled from frame capture. The Blob
+    // upload resolved with a hosted URL, so the field MUST reach the
+    // done state here — clear "Uploading…", re-enable Replace/Remove,
+    // and notify the parent. Whatever happens in the auto-capture
+    // below is best-effort and CANNOT freeze the UI.
+    //
+    // Pre-A7d.8.1 this lived in a `finally` AFTER the awaited
+    // captureFrameBlob. On iOS Safari the capture could hang (the
+    // off-DOM <video> never decoded a frame), which left the field
+    // stuck on "Uploading… 100%" with the scrubber disabled even
+    // though the upload was finished. Dallen's 2026-05-23 real-iPhone
+    // smoke caught it.
+    onChange(
+      hostedUrl,
+      Number.isFinite(durationSeconds) ? durationSeconds : undefined,
+    );
+    setUploading(false);
+    setProgressPct(null);
+    if (fileRef.current) fileRef.current.value = "";
+
+    // A7d.8 P1 — never-blank baseline: capture the FIRST FRAME of the
+    // freshly-uploaded video and persist it as autoPosterUrl. Reads
+    // from the LOCAL File via objectURL (no CORS taint). Some encoders
+    // don't paint frame 0 until a tiny seek lands, so we seek to 0.1s.
+    //
+    // This is a FIRE-AND-FORGET best-effort step: it must never gate
+    // the done state above. captureFrameBlob carries its own hard
+    // timeout (FRAME_CAPTURE_TIMEOUT_MS) so a stalled decoder can't
+    // freeze the UI, and the seller page's never-blank fallback (omit
+    // empty poster attr → preload="metadata") covers a timeout.
+    if (onPosterChange) {
+      setAutoCapturing(true);
+      try {
+        const frame = await captureFrameBlob(nextObjectUrl, 0.1);
+        const posterUrl = await uploadCapturedFrame(
+          frame,
+          `${folder ?? "uploads"}-poster`,
+        );
+        onPosterChange(posterUrl, "auto");
+      } catch {
+        // Soft-fail — the explicit "Use this frame" scrubber path and
+        // the manual ImageUploadField override both remain available,
+        // and either one will fill the poster slot. The seller page's
+        // <video preload="metadata"> with no poster attribute will
+        // paint a native first frame in the meantime.
+      } finally {
+        setAutoCapturing(false);
+      }
     }
   };
 
@@ -498,11 +517,18 @@ export function VideoUploadField({
               data-testid={tid("preview")}
             />
           </div>
-          {/* A7d.8 — hidden canvas-capture <video>. Off-screen, no
-              controls, sourced from the LOCAL objectURL so canvas
-              .toBlob() doesn't throw SecurityError on a cross-origin
-              hosted source. Reads duration into state so the scrubber
-              can compute its `max`. */}
+          {/* A7d.8 — off-screen canvas-capture <video>. Sourced from
+              the LOCAL objectURL so canvas.toBlob() doesn't throw
+              SecurityError on a cross-origin hosted source. Reads
+              duration into state so the scrubber can compute its `max`.
+
+              A7d.8.1 — IMPORTANT: do NOT use display:none / className=
+              "hidden" here. iOS Safari only decodes frames for a video
+              that is actually in layout — a display:none video never
+              paints, so the live scrub-preview pipeline (the useEffect
+              above that draws on seeked) silently never produces a
+              frame on iPhone. Mounting at 1×1px with opacity 0 keeps
+              the element in layout while staying visually invisible. */}
           {localObjectUrl && (
             <video
               ref={captureVideoRef}
@@ -510,9 +536,17 @@ export function VideoUploadField({
               muted
               playsInline
               preload="auto"
-              className="hidden"
               aria-hidden="true"
               data-testid={tid("capture-source")}
+              style={{
+                position: "absolute",
+                left: 0,
+                top: 0,
+                width: 1,
+                height: 1,
+                opacity: 0,
+                pointerEvents: "none",
+              }}
               onLoadedMetadata={(e) => {
                 const d = (e.target as HTMLVideoElement).duration;
                 if (Number.isFinite(d) && d > 0) setDuration(d);
@@ -547,7 +581,14 @@ export function VideoUploadField({
                 max={duration}
                 step={Math.max(duration / 200, 0.05)}
                 value={scrubTime ?? 0}
-                disabled={capturingFrame || autoCapturing}
+                // A7d.8.1 — slider is gated ONLY on an in-flight scrub
+                // capture, NOT on the auto first-frame capture. The
+                // scrubber becomes usable the instant duration is known
+                // (the readVideoDuration() pre-upload pass writes it),
+                // independent of whether the background auto-capture is
+                // still running. iOS Safari can let auto-capture hang
+                // (pre-fix root cause) but the scrubber must stay live.
+                disabled={capturingFrame}
                 onChange={(e) => {
                   const t = parseFloat(e.target.value);
                   if (!Number.isFinite(t)) return;
@@ -578,9 +619,9 @@ export function VideoUploadField({
               <div className="mt-2 flex items-center justify-between gap-2">
                 <button
                   type="button"
-                  disabled={
-                    scrubTime === null || capturingFrame || autoCapturing
-                  }
+                  // A7d.8.1 — see slider comment above. "Use this frame"
+                  // must NOT be gated on autoCapturing.
+                  disabled={scrubTime === null || capturingFrame}
                   onClick={() => void handleUseThisFrame()}
                   className="rounded border border-mint px-3 py-1.5 text-xs text-mint hover:bg-mint/10 disabled:opacity-60"
                   data-testid={tid("scrubber-use")}
@@ -621,7 +662,10 @@ export function VideoUploadField({
           <div className="flex gap-2">
             <button
               type="button"
-              disabled={uploading || capturingFrame || autoCapturing}
+              // A7d.8.1 — Replace/Remove must be available the moment the
+              // upload itself is done. autoCapturing is a background
+              // best-effort step and intentionally NOT in this gate.
+              disabled={uploading || capturingFrame}
               onClick={() => fileRef.current?.click()}
               className="rounded border border-neutral-700 px-3 py-1.5 text-xs text-text-primary hover:bg-neutral-800 disabled:opacity-60"
               data-testid={tid("replace")}
@@ -630,7 +674,7 @@ export function VideoUploadField({
             </button>
             <button
               type="button"
-              disabled={uploading || capturingFrame || autoCapturing}
+              disabled={uploading || capturingFrame}
               onClick={handleRemove}
               className="px-3 py-1.5 text-xs text-neutral-500 hover:text-red-400 disabled:opacity-60"
               data-testid={tid("remove")}
@@ -711,40 +755,119 @@ function formatScrubTime(totalSeconds: number): string {
 }
 
 /**
+ * A7d.8.1 — hard upper bound on how long any single frame capture is
+ * allowed to take. iOS Safari has been observed to silently never
+ * fire `seeked` if the <video> isn't in layout, and even with the
+ * off-screen-renderable fix below a degenerate codec / file can still
+ * stall mid-decode. The timeout converts a hang into the documented
+ * soft-fail path so the UI never freezes. 4 s is plenty for a real
+ * decode (sub-second on modern phones) without making the user wait
+ * an awkward long beat when something is actually broken.
+ */
+export const FRAME_CAPTURE_TIMEOUT_MS = 4000;
+
+/**
+ * Type-only declaration for HTMLVideoElement.requestVideoFrameCallback
+ * — shipped in Safari 15.4+ / Chrome 83+ / Firefox 132+. Lib.dom.d.ts
+ * in TS 5.x does not yet include it, so we narrow locally rather than
+ * widen the global type. When absent we fall back to seeked + rAF.
+ */
+interface VideoFrameMetadata {
+  presentationTime: number;
+  expectedDisplayTime: number;
+  width: number;
+  height: number;
+  mediaTime: number;
+  presentedFrames: number;
+}
+type VideoFrameRequestCallback = (
+  now: number,
+  metadata: VideoFrameMetadata,
+) => void;
+
+/**
  * A7d.8 — capture a single video frame as a JPEG Blob via the canvas
  * API. The source MUST be the LOCAL file's objectURL — drawing a
- * cross-origin video to canvas throws SecurityError on toBlob(). iOS
- * Safari quirks:
+ * cross-origin video to canvas throws SecurityError on toBlob().
  *
- *   - The <video> needs `muted` + `playsInline` + `preload="auto"` to
- *     decode frames in the background (off-screen) without autoplay
- *     restrictions kicking in.
- *   - First-frame capture targets t≈0.1s (not exactly 0) — some
- *     encoders don't paint frame 0 until a seek lands.
- *   - We wait for BOTH loadeddata AND a subsequent seeked event before
- *     drawing; iOS has been seen to fire seeked before the frame
- *     buffer is actually populated, so we double up.
+ * A7d.8.1 (Dallen 2026-05-23 real-iPhone smoke) — the iOS-safe shape:
+ *
+ *   1. The <video> is MOUNTED off-screen but in layout (1×1px,
+ *      opacity 0, absolutely positioned). iOS Safari only decodes
+ *      frames for a video that's actually in layout; an unmounted
+ *      element OR display:none / visibility:hidden silently never
+ *      paints a frame, so the seeked event never fires.
+ *   2. After loadeddata we DECODE-FORCE by play()→pause(). Muted
+ *      inline autoplay is permitted on iOS without a user gesture
+ *      — this primes the decoder so the subsequent seek can actually
+ *      land a painted frame.
+ *   3. We prefer `requestVideoFrameCallback` when available — it
+ *      fires when a frame is genuinely presented for compositing
+ *      (post-decode, post-paint), avoiding the "seeked fired but the
+ *      buffer is still empty" iOS race. Falls back to seeked + rAF.
+ *   4. A FRAME_CAPTURE_TIMEOUT_MS hard cap converts any hang into a
+ *      reject so callers can soft-fail cleanly. Always cleans up the
+ *      mounted element regardless of resolution path.
  *
  * Resolves with a JPEG Blob ready to upload through /api/upload-image.
  */
 function captureFrameBlob(
   objectUrl: string,
   atSeconds: number,
+  timeoutMs: number = FRAME_CAPTURE_TIMEOUT_MS,
 ): Promise<Blob> {
   return new Promise((resolve, reject) => {
     const video = document.createElement("video");
     video.muted = true;
+    // Some older WebKit builds only respect muted via the attribute,
+    // not the property — set both so the muted-autoplay gate is open.
+    video.setAttribute("muted", "");
     video.playsInline = true;
+    video.setAttribute("playsinline", "");
     video.preload = "auto";
-    // The <video> is never attached to the DOM — purely off-screen
-    // decoder. crossOrigin doesn't matter because the source is a
-    // blob: URL (same-origin by spec).
+    // Off-screen but in layout — see point (1) above. opacity:0 +
+    // pointerEvents:none keeps it visually + interactively inert
+    // while leaving it laid out so the decoder will paint.
+    Object.assign(video.style, {
+      position: "absolute",
+      left: "0px",
+      top: "0px",
+      width: "1px",
+      height: "1px",
+      opacity: "0",
+      pointerEvents: "none",
+    });
+    video.setAttribute("aria-hidden", "true");
+
     let settled = false;
+    let timeoutId: ReturnType<typeof setTimeout> | null = null;
+
+    const cleanup = () => {
+      if (timeoutId !== null) {
+        clearTimeout(timeoutId);
+        timeoutId = null;
+      }
+      try {
+        video.removeAttribute("src");
+        video.load();
+      } catch {
+        // ignore — best-effort teardown
+      }
+      if (video.parentNode) video.parentNode.removeChild(video);
+    };
+
     const settle = (fn: () => void) => {
       if (settled) return;
       settled = true;
+      cleanup();
       fn();
     };
+
+    timeoutId = setTimeout(() => {
+      // A7d.8.1 — hang → soft-fail. The caller catches and the seller
+      // page's never-blank fallback covers a missing poster.
+      settle(() => reject(new Error("frame capture timed out")));
+    }, timeoutMs);
 
     const onError = () =>
       settle(() => reject(new Error("frame decode failed")));
@@ -785,30 +908,72 @@ function captureFrameBlob(
           0.85,
         );
       } catch (err) {
-        // SecurityError lands here when the source is cross-origin —
-        // shouldn't trigger because we use objectURLs, but surfacing
-        // the error message is more useful than a generic "failed".
         settle(() =>
           reject(err instanceof Error ? err : new Error("draw failed")),
         );
       }
     };
 
-    const onSeeked = () => {
-      // iOS quirk — the seeked event sometimes fires before the buffer
-      // has populated. One animation-frame of slack lets the decoder
-      // catch up.
-      requestAnimationFrame(draw);
+    // Prefer requestVideoFrameCallback when available — it fires on a
+    // genuinely PAINTED frame, sidestepping the iOS "seeked fired but
+    // the buffer is empty" race. Falls back to seeked + rAF slack.
+    const rvfc = (
+      video as HTMLVideoElement & {
+        requestVideoFrameCallback?: (cb: VideoFrameRequestCallback) => number;
+      }
+    ).requestVideoFrameCallback?.bind(video);
+    const awaitPaintedFrame = () => {
+      if (rvfc) {
+        rvfc(() => requestAnimationFrame(draw));
+      } else {
+        video.addEventListener(
+          "seeked",
+          () => requestAnimationFrame(draw),
+          { once: true },
+        );
+      }
     };
 
-    video.onloadeddata = () => {
-      const target = Math.max(0, Math.min(atSeconds, video.duration || 0));
-      // Seeking to exactly 0 sometimes no-ops (already at 0). Nudge.
-      const seekTo = target === 0 ? 0.001 : target;
-      video.currentTime = seekTo;
-    };
-    video.onseeked = onSeeked;
+    video.addEventListener(
+      "loadeddata",
+      () => {
+        // Decode-force on iOS: a muted inline play() bounce primes the
+        // decoder so the subsequent seek can land a painted frame.
+        // Ignored errors are fine — autoplay can still be blocked by
+        // some configs, and the timeout safety net covers true hangs.
+        const playAttempt = video.play();
+        if (playAttempt && typeof playAttempt.then === "function") {
+          playAttempt
+            .then(() => {
+              try {
+                video.pause();
+              } catch {
+                // ignore
+              }
+            })
+            .catch(() => {
+              // ignore — play() can reject under strict autoplay
+              // policies; the awaited frame callback below still
+              // arms, and the timeout catches any genuine hang.
+            });
+        }
+        const target = Math.max(0, Math.min(atSeconds, video.duration || 0));
+        // Seeking to exactly 0 sometimes no-ops (already at 0). Nudge.
+        const seekTo = target === 0 ? 0.001 : target;
+        awaitPaintedFrame();
+        try {
+          video.currentTime = seekTo;
+        } catch {
+          // ignore — timeout will catch true hangs
+        }
+      },
+      { once: true },
+    );
     video.onerror = onError;
+
+    // Mount BEFORE assigning src so iOS has a laid-out element to
+    // decode into from the very first byte.
+    document.body.appendChild(video);
     video.src = objectUrl;
   });
 }

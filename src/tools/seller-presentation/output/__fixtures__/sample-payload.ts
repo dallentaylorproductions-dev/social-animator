@@ -306,3 +306,18 @@ export const POSTER_OVERRIDE_WINS_PAYLOAD: PublicPayload = {
     posterUrl: "https://blob.example.com/manual-override-thumbnail.jpg",
   },
 };
+
+/**
+ * A7d.8.1 — never-blank fallback fixture. Video is set but ALL THREE
+ * poster slots are empty (the iOS-Safari capture-timeout scenario, post
+ * decouple + soft-fail). The renderer must omit the poster attribute
+ * entirely rather than emit poster="", so the browser's
+ * preload="metadata" path paints the native first frame instead of a
+ * blank black box.
+ */
+export const POSTER_NONE_PAYLOAD: PublicPayload = {
+  ...MINIMAL_PAYLOAD,
+  video: {
+    videoUrl: "https://example.com/walkthrough.mp4",
+  },
+};
