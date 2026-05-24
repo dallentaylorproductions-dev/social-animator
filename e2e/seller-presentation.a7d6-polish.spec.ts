@@ -1,7 +1,7 @@
 import { test, expect } from '@playwright/test';
 
 /**
- * Seller Presentation — A7d.6 + A7d.7 polish coverage.
+ * Seller Presentation — A7d.6 + A7d.7 + A7d.9 polish coverage.
  *
  * A7d.6 shipped four refinements from Dallen's 2026-05-23 smoke. A7d.7
  * is the bug-fix round on top — three of A7d.6's fixes didn't behave on
@@ -20,11 +20,14 @@ import { test, expect } from '@playwright/test';
  *          [1, MAX_MONTHLY] on blur (empty/invalid → DEFAULT_MONTHLY_COUNT).
  *
  *   Fix 3: A7d.6's polyline-avoidance pushed the "$685k" tag to corners
- *          and chopped "RECOMMENDED" at the left edge. A7d.7 keeps both
- *          labels ON the dashed line and paints an opaque chip behind
- *          them for legibility (Dallen's locked choice: smart-label-on-
- *          line). Geometry test now asserts both chip rects are INSIDE
- *          the plot and neither overlaps the callout or the x-tick row.
+ *          and chopped "RECOMMENDED" at the left edge. A7d.7 kept both
+ *          labels ON the dashed line behind paper chips. **A7d.9 then
+ *          replaced the value-scaled line entirely** with a fixed-top
+ *          reference banner: dashed line pinned to a fixed y near the
+ *          top of the viewBox, both labels stacked top-left on chips,
+ *          decoupled from the y-scale. The geometry test now asserts
+ *          that those positions are constant for any data shape and
+ *          stay inside the plot / clear of the callout + axis row.
  *
  *   Fix 4: A7d.6's "Latest month" device-clock default — verified math
  *          and added a Dec→Jan wrap test. No off-by-one (Dallen's "JUN
@@ -36,8 +39,12 @@ import { test, expect } from '@playwright/test';
  */
 
 import {
-  placeRecAnnotation,
-  polylineYAtX,
+  REC_LINE_Y,
+  REC_LEFT_X,
+  REC_NUM_Y,
+  REC_LABEL_Y,
+  REC_NUM_CHIP,
+  REC_LABEL_CHIP,
   detectReviewsSource,
   reviewsCardCopy,
   seeAllReviewsCopy,
@@ -310,47 +317,30 @@ test.describe('A7d.7 / Fix 2 — Months-of-history input is clearable + retypabl
 });
 
 // =====================================================================
-// A7d.7 Fix 3 — Chart annotation chip: on-the-line, no clip, no overlap.
+// A7d.9 Fix 3 — Recommended annotation is a FIXED-TOP reference banner.
 // =====================================================================
+//
+// A7d.6/.7's adaptive placeRecAnnotation was deleted. The recommended
+// dashed line is now pinned to a fixed y near the top of the viewBox,
+// with the price + "RECOMMENDED" caption stacked top-left behind paper
+// chips. Layout is the same for any data shape (recommended above /
+// below / within the data range), so we assert constants — not a
+// per-shape placement — and verify the band stays inside the plot and
+// never collides with the polyline / current callout / axis row.
 
-test.describe('A7d.7 / Fix 3 — Recommended annotation is on-line, within-plot, callout/axis-safe', () => {
+test.describe('A7d.9 / Fix 3 — Recommended annotation pins to a fixed top band', () => {
   // Chart geometry constants from presentation-page.tsx AreaChart.
   const X0 = 40;
   const X1 = 388;
   const Y_BOTTOM = 184;
+  const Y_TOP_GRID = 104;
   // x-tick text row baseline is y=204; cap-height ~8 reaches y≈196.
   const X_TICK_TOP = 196;
   // Locked-design upper-right current-value callout rect.
   const CALLOUT = { x0: X1 - 110, y0: 25, x1: X1, y1: 95 } as const;
-  // Plot horizontal bounds — chips MUST stay within these to avoid clipping.
   const PLOT_LEFT = X0;
   const PLOT_RIGHT = X1;
-  const PLOT_TOP = 12;
-
-  function buildPoints(prices: number[]): {
-    points: { x: number; y: number }[];
-    min: number;
-    max: number;
-  } {
-    const min = Math.min(...prices);
-    const max = Math.max(...prices);
-    const range = Math.max(max - min, 1);
-    const Y_TOP = 104;
-    const plotHeight = Y_BOTTOM - Y_TOP;
-    const points = prices.map((p, i) => ({
-      x: X0 + ((X1 - X0) * i) / (prices.length - 1),
-      y: Y_BOTTOM - ((p - min) / range) * (plotHeight - 6),
-    }));
-    return { points, min, max };
-  }
-
-  function recLineYFor(price: number, min: number, max: number): number {
-    const range = Math.max(max - min, 1);
-    const Y_TOP = 104;
-    const plotHeight = Y_BOTTOM - Y_TOP;
-    const y = Y_BOTTOM - ((price - min) / range) * (plotHeight - 6);
-    return Math.max(20, Math.min(y, Y_BOTTOM - 4));
-  }
+  const VIEWBOX_TOP = 0;
 
   function rectsOverlap(
     a: { x: number; y: number; width: number; height: number },
@@ -364,113 +354,94 @@ test.describe('A7d.7 / Fix 3 — Recommended annotation is on-line, within-plot,
     );
   }
 
-  // Touch — silences "polylineYAtX imported but unused" when this file's
-  // legacy assertions are stripped. The helper is still part of the
-  // module's public test surface.
-  void polylineYAtX;
+  function buildPolyline(prices: number[]): { x: number; y: number }[] {
+    const min = Math.min(...prices);
+    const max = Math.max(...prices);
+    const range = Math.max(max - min, 1);
+    const plotHeight = Y_BOTTOM - Y_TOP_GRID;
+    return prices.map((p, i) => ({
+      x: X0 + ((X1 - X0) * i) / (prices.length - 1),
+      y: Y_BOTTOM - ((p - min) / range) * (plotHeight - 6),
+    }));
+  }
 
-  const SHAPES: Array<{
-    name: string;
-    prices: number[];
-    recommendedPrice: number;
-  }> = [
+  test('exported constants describe a left-anchored, stacked, top-of-viewBox band', () => {
+    // Dashed line is well above the plot grid — no overlap with data.
+    expect(REC_LINE_Y).toBeLessThan(Y_TOP_GRID);
+    expect(REC_LINE_Y).toBeGreaterThanOrEqual(VIEWBOX_TOP);
+
+    // Both labels anchored at the same left x (stacked, start-anchored).
+    expect(REC_LEFT_X).toBeGreaterThan(PLOT_LEFT);
+    expect(REC_NUM_CHIP.x).toBe(REC_LABEL_CHIP.x);
+
+    // Price sits closer to the line; caption stacks BELOW the price.
+    expect(REC_NUM_Y).toBeGreaterThan(REC_LINE_Y);
+    expect(REC_LABEL_Y).toBeGreaterThan(REC_NUM_Y);
+
+    // The two chips don't overlap each other.
+    const a = REC_NUM_CHIP;
+    const b = REC_LABEL_CHIP;
+    const disjoint =
+      a.x + a.width <= b.x ||
+      b.x + b.width <= a.x ||
+      a.y + a.height <= b.y ||
+      b.y + b.height <= a.y;
+    expect(disjoint).toBe(true);
+  });
+
+  for (const chipName of ['num', 'label'] as const) {
+    const chip = chipName === 'num' ? REC_NUM_CHIP : REC_LABEL_CHIP;
+    test(`${chipName} chip stays in-plot horizontally, above the grid, and clear of the callout`, () => {
+      // 1) Chip is fully INSIDE the plot horizontally — never clipped.
+      expect(chip.x).toBeGreaterThanOrEqual(PLOT_LEFT);
+      expect(chip.x + chip.width).toBeLessThanOrEqual(PLOT_RIGHT);
+
+      // 2) Chip top stays inside the viewBox.
+      expect(chip.y).toBeGreaterThanOrEqual(VIEWBOX_TOP);
+
+      // 3) Chip bottom stays above the plot grid — never crashes into
+      //    the polyline / current marker / y-grid lines / x-tick row.
+      expect(chip.y + chip.height).toBeLessThanOrEqual(Y_TOP_GRID);
+      expect(chip.y + chip.height).toBeLessThanOrEqual(X_TICK_TOP);
+
+      // 4) Chip never overlaps the upper-right current-value callout.
+      expect(rectsOverlap(chip, CALLOUT)).toBe(false);
+    });
+  }
+
+  // Geometry is data-independent now — verify the polyline (rendered in
+  // its own plot band) never reaches the rec annotation band, for the
+  // same data shapes that previously stressed the adaptive placer.
+  const SHAPES: Array<{ name: string; prices: number[] }> = [
     {
-      name: 'rising — recommended above all points',
+      name: 'rising',
       prices: [600, 605, 610, 615, 622, 628, 633, 639, 645, 650, 656, 660],
-      recommendedPrice: 720,
     },
     {
-      name: 'falling — recommended below all points',
+      name: 'falling',
       prices: [700, 695, 688, 680, 672, 665, 658, 650, 642, 635, 628, 620],
-      recommendedPrice: 580,
     },
+    { name: 'flat', prices: Array.from({ length: 12 }, () => 640) },
     {
-      name: 'flat — recommended ≈ current',
-      prices: [640, 640, 640, 640, 640, 640, 640, 640, 640, 640, 640, 640],
-      recommendedPrice: 640,
-    },
-    {
-      name: 'rising into top-right — recommended in the callout band',
+      name: 'rising-into-top-right',
       prices: [600, 610, 615, 625, 635, 645, 658, 670, 680, 690, 700, 712],
-      recommendedPrice: 715,
     },
     {
-      name: 'V-shape — polyline dips then climbs through the rec line',
+      name: 'V-shape',
       prices: [660, 650, 640, 628, 620, 615, 620, 628, 640, 650, 660, 668],
-      recommendedPrice: 645,
     },
   ];
 
   for (const shape of SHAPES) {
-    test(`chips stay in-plot + clear of callout + clear of x-tick row — ${shape.name}`, () => {
-      const { points, min, max } = buildPoints(shape.prices);
-      const recLineY = recLineYFor(shape.recommendedPrice, min, max);
-      const current = points[points.length - 1];
-
-      const placement = placeRecAnnotation(
-        points,
-        recLineY,
-        current,
-        X0,
-        X1,
-        Y_BOTTOM,
+    test(`polyline never reaches the rec band — ${shape.name}`, () => {
+      const polyline = buildPolyline(shape.prices);
+      const recBandBottom = Math.max(
+        REC_NUM_CHIP.y + REC_NUM_CHIP.height,
+        REC_LABEL_CHIP.y + REC_LABEL_CHIP.height,
       );
-
-      const chips = [placement.numChip, placement.labelChip];
-
-      for (const [name, chip] of [
-        ['num', placement.numChip] as const,
-        ['label', placement.labelChip] as const,
-      ]) {
-        // 1) Chip is fully INSIDE the plot horizontally — never clipped
-        //    at left/right edges (the bug Dallen saw as "ECOMMENDED").
-        expect(
-          chip.x,
-          `${name} chip x ${chip.x} clips left edge (PLOT_LEFT=${PLOT_LEFT})`,
-        ).toBeGreaterThanOrEqual(PLOT_LEFT);
-        expect(
-          chip.x + chip.width,
-          `${name} chip right edge ${chip.x + chip.width} clips right edge (PLOT_RIGHT=${PLOT_RIGHT})`,
-        ).toBeLessThanOrEqual(PLOT_RIGHT);
-
-        // 2) Chip top stays inside the viewBox (no chip flying off top).
-        expect(chip.y).toBeGreaterThanOrEqual(PLOT_TOP);
-
-        // 3) Chip bottom stays above the x-tick label row — no
-        //    collision with "MAY '26 JUN '26" text.
-        expect(
-          chip.y + chip.height,
-          `${name} chip bottom ${chip.y + chip.height} crashes into x-tick row (>= ${X_TICK_TOP})`,
-        ).toBeLessThanOrEqual(X_TICK_TOP);
-
-        // 4) Chip never overlaps the upper-right current-value callout.
-        expect(
-          rectsOverlap(chip, CALLOUT),
-          `${name} chip overlaps current-value callout rect`,
-        ).toBe(false);
-      }
-
-      // 5) The two chips don't overlap each other.
-      const a = chips[0];
-      const b = chips[1];
-      const chipsDisjoint =
-        a.x + a.width <= b.x ||
-        b.x + b.width <= a.x ||
-        a.y + a.height <= b.y ||
-        b.y + b.height <= a.y;
-      expect(chipsDisjoint).toBe(true);
-
-      // 6) The price tag baseline sits ON the dashed line (within a
-      //    small offset). It does NOT flee to the bottom-right corner
-      //    (the A7d.6 bug). Same for the caption when not stacked.
-      const ON_LINE_TOLERANCE = 24; // baseline ± offset for above/below side
-      expect(Math.abs(placement.numY - recLineY)).toBeLessThanOrEqual(
-        ON_LINE_TOLERANCE,
-      );
-      if (!placement.labelsStacked) {
-        expect(Math.abs(placement.labelY - recLineY)).toBeLessThanOrEqual(
-          ON_LINE_TOLERANCE,
-        );
+      for (const p of polyline) {
+        expect(p.y).toBeGreaterThanOrEqual(Y_TOP_GRID);
+        expect(p.y).toBeGreaterThan(recBandBottom);
       }
     });
   }

@@ -752,27 +752,15 @@ function AreaChart({
 
   const current = points[points.length - 1];
   const recommendedNumeric = parsePriceToNumber(recommended);
-  const recommendedY =
-    recommendedNumeric !== null
-      ? Y_BOTTOM - ((recommendedNumeric - min) / range) * (plotHeight - 6)
-      : 24;
-  // Clamp the recommended-line y to a visible band (don't render off-canvas).
-  const recLineY = Math.max(20, Math.min(recommendedY, Y_BOTTOM - 4));
 
-  // A7d.6 — adaptive placement for the recommended-line annotation. The
-  // "RECOMMENDED" caption + the price tag sat at fixed left/right ends
-  // of the dashed line. Real data shapes routinely pushed the polyline,
-  // the current-value glow, or the upper-right callout block on top of
-  // the price tag (Dallen smoke 2026-05-23). placeRecAnnotation derives
-  // collision-safe positions for both labels for any data shape.
-  const recPlacement = placeRecAnnotation(
-    points,
-    recLineY,
-    current,
-    X0,
-    X1,
-    Y_BOTTOM,
-  );
+  // A7d.9 — recommended price renders as a fixed-top reference banner.
+  // The dashed line + labels pin to a fixed band at the TOP of the chart,
+  // decoupled from the y-scale. The NUMBER communicates the value;
+  // vertical position no longer encodes it (Dallen's deliberate call:
+  // clean > positionally-encoded). Supersedes A7d.6/.7 placeRecAnnotation
+  // — at the top there's clear space, so chip-collision / edge-swap
+  // gymnastics are gone. Layout matches Dallen's 2026-05-23 smoke: dashed
+  // line across the top; price + caption stacked top-left on paper chips.
 
   return (
     <div className="chart-wrap reveal">
@@ -866,42 +854,42 @@ function AreaChart({
               className="rec-line"
               x1={X0}
               x2={X1}
-              y1={recLineY}
-              y2={recLineY}
+              y1={REC_LINE_Y}
+              y2={REC_LINE_Y}
             />
             <rect
               className="rec-tag-bg"
-              x={recPlacement.labelChip.x}
-              y={recPlacement.labelChip.y}
-              width={recPlacement.labelChip.width}
-              height={recPlacement.labelChip.height}
-              rx={2}
-              ry={2}
-            />
-            <text
-              className="rec-tag-text"
-              x={recPlacement.labelX}
-              y={recPlacement.labelY}
-              textAnchor={recPlacement.labelAnchor}
-            >
-              Recommended
-            </text>
-            <rect
-              className="rec-tag-bg"
-              x={recPlacement.numChip.x}
-              y={recPlacement.numChip.y}
-              width={recPlacement.numChip.width}
-              height={recPlacement.numChip.height}
+              x={REC_NUM_CHIP.x}
+              y={REC_NUM_CHIP.y}
+              width={REC_NUM_CHIP.width}
+              height={REC_NUM_CHIP.height}
               rx={2}
               ry={2}
             />
             <text
               className="rec-tag-num"
-              x={recPlacement.numX}
-              y={recPlacement.numY}
-              textAnchor={recPlacement.numAnchor}
+              x={REC_LEFT_X}
+              y={REC_NUM_Y}
+              textAnchor="start"
             >
               {formatCompact(recommendedNumeric ?? max)}
+            </text>
+            <rect
+              className="rec-tag-bg"
+              x={REC_LABEL_CHIP.x}
+              y={REC_LABEL_CHIP.y}
+              width={REC_LABEL_CHIP.width}
+              height={REC_LABEL_CHIP.height}
+              rx={2}
+              ry={2}
+            />
+            <text
+              className="rec-tag-text"
+              x={REC_LEFT_X}
+              y={REC_LABEL_Y}
+              textAnchor="start"
+            >
+              Recommended
             </text>
           </g>
         )}
@@ -928,91 +916,30 @@ function AreaChart({
 }
 
 /**
- * A7d.7 — placement output for the recommended-line annotation. The
- * "RECOMMENDED" caption and the price tag both sit ON the dashed line
- * (Dallen's locked choice: smart-label-on-line, not a caption). Each
- * gets its own (x, y, anchor) and an opaque background `chip` rect so
- * the polyline crossing under the label stays legible without the
- * label having to flee a corner.
- */
-export interface RecAnnotationPlacement {
-  labelX: number;
-  labelY: number;
-  labelAnchor: "start" | "end";
-  numX: number;
-  numY: number;
-  numAnchor: "start" | "end";
-  /** Background chip rect painted under the "RECOMMENDED" caption. */
-  labelChip: { x: number; y: number; width: number; height: number };
-  /** Background chip rect painted under the price tag. */
-  numChip: { x: number; y: number; width: number; height: number };
-  /** Which side of the dashed line the labels landed on. */
-  side: "above" | "below";
-  /** Which horizontal edge the price tag landed on. */
-  numEdge: "left" | "right";
-  /** True when both labels stack at the same edge (callout-avoidance). */
-  labelsStacked: boolean;
-}
-
-/**
- * Linear-interpolate the polyline y at a given x. Returns `fallback`
- * for an empty point list. Used to detect collisions between the
- * data polyline and the recommended-line annotation labels.
- */
-export function polylineYAtX(
-  pts: { x: number; y: number }[],
-  x: number,
-  fallback: number,
-): number {
-  if (pts.length === 0) return fallback;
-  if (x <= pts[0].x) return pts[0].y;
-  if (x >= pts[pts.length - 1].x) return pts[pts.length - 1].y;
-  for (let i = 1; i < pts.length; i++) {
-    if (x <= pts[i].x) {
-      const x0 = pts[i - 1].x;
-      const x1 = pts[i].x;
-      const y0 = pts[i - 1].y;
-      const y1 = pts[i].y;
-      const t = (x - x0) / (x1 - x0);
-      return y0 + (y1 - y0) * t;
-    }
-  }
-  return pts[pts.length - 1].y;
-}
-
-/**
- * A7d.7 — derive on-the-line, never-clipped, never-callout-overlapping
- * positions for the recommended-line annotation. Replaces A7d.6's
- * polyline-collision-driven flight to corners (which Dallen's round-2
- * smoke caught clipping the caption and dragging the price to the
- * bottom-right). The new approach:
+ * A7d.9 — fixed-top reference banner for the recommended-price line.
  *
- *   - Both labels sit ON the dashed line (above it by default, below
- *     only if there's no room above) — the price tag stays anchored to
- *     its line, never wanders to a corner.
- *   - Legibility over the polyline comes from an opaque BACKGROUND CHIP
- *     painted under each label (see `labelChip` / `numChip`), drawn
- *     after the polyline so it stacks above. The chip is the explicit
- *     trade-off Dallen approved: "on the line" beats "out of the way".
- *   - Horizontal positions are INSET from the plot edges (X0+INSET /
- *     X1−INSET) so no part of either chip or text clips at the edge.
- *   - The price tag defaults to the right edge; it moves to the left
- *     when the recommended line passes through the upper-right
- *     current-value callout band — and in that case the "RECOMMENDED"
- *     caption stacks ABOVE the price tag (same edge) instead of going
- *     to the callout-occupied right edge.
- *   - Neither chip ever overlaps the upper-right callout rect, the
- *     x-tick-label row, or each other (when stacked the stack offset
- *     is large enough to keep both chips clear).
+ * The dashed line sits at a fixed y near the TOP of the chart viewBox,
+ * NOT at the data-scaled y. The price tag + "RECOMMENDED" caption stack
+ * top-left, both anchored at the plot's left edge, both above paper-tint
+ * chips so the dashed line stays continuous-looking across the top.
  *
- * Geometry overview (SVG y grows downward):
- *   - viewBox 400 × 234, plot band y ∈ [104, 184]
- *   - x-axis ticks at y ≈ 204 (cap-height up to y ≈ 198)
- *   - upper-right current-value callout occupies roughly the rect
- *     [X1 − 110, X1] × [25, 95]
- *   - y-axis labels live at x ≈ 4, so any chip anchored at X0+INSET
- *     stays clear of them
+ * Supersedes A7d.6/A7d.7 placeRecAnnotation (chip-on-line, edge-swap,
+ * callout-avoidance) — at the top there's clear space, so the gymnastics
+ * are no longer needed. Vertical position no longer encodes the recommended
+ * price relative to the trend; the number communicates the value.
+ *
+ * Geometry (viewBox 400 × 234, SVG y grows downward):
+ *   - rec line y = 22 (well above plot band y ∈ [104, 184])
+ *   - left inset = 6 from X0; both labels anchored at start
+ *   - price chip sits just below the line; caption stacks below the price
+ *   - upper-right callout (≈ x ∈ [278, 388], y ∈ [25, 95]) is untouched
+ *     since the left-anchored chips never reach that x band
  */
+export const REC_LINE_Y = 22;
+const REC_LEFT_INSET = 6;
+export const REC_LEFT_X = 40 + REC_LEFT_INSET;
+export const REC_NUM_Y = REC_LINE_Y + 14;
+export const REC_LABEL_Y = REC_NUM_Y + 18;
 
 const REC_NUM_TEXT_WIDTH = 50; // "$685k" / "$1.2m" visible width
 const REC_NUM_TEXT_HEIGHT = 14; // cap-height + descender for 16px display
@@ -1020,184 +947,30 @@ const REC_LABEL_TEXT_WIDTH = 72; // "RECOMMENDED" small caps + letter-spacing
 const REC_LABEL_TEXT_HEIGHT = 7; // cap-height for 8.5px small caps
 const REC_CHIP_PAD_X = 5;
 const REC_CHIP_PAD_Y = 2;
-const REC_INSET_X = 6;
-const REC_ABOVE_NUM_BASELINE_OFFSET = 6;
-const REC_ABOVE_LABEL_BASELINE_OFFSET = 6;
-const REC_BELOW_NUM_BASELINE_OFFSET = 14;
-const REC_BELOW_LABEL_BASELINE_OFFSET = 12;
-// Stacked caption sits above the price chip with a 2-svg-unit gap.
-// numChip total height ≈ NUM_TEXT_HEIGHT + 2 * PAD_Y = 18. labelChip
-// total ≈ 11. The stack offset must move the caption far enough that
-// labelChip bottom clears numChip top:
-//   labelY + labelChipBottomFromBaseline + GAP <= numY - numChipTopFromBaseline
-//   → STACK_OFFSET >= LABEL_HEIGHT + NUM_HEIGHT/2 + GAP ≈ 20
-const REC_STACK_OFFSET = 20;
-const REC_VIEWBOX_TOP = 12;
-const REC_TICK_LABEL_TOP = 196;
-const REC_CALLOUT_RECT = { x0: 388 - 110, y0: 25, x1: 388, y1: 95 } as const;
 
-/** Build a chip rect that surrounds an SVG text at (anchorX, baselineY). */
-function chipForText(
-  anchorX: number,
+function leftChip(
   baselineY: number,
-  anchor: "start" | "end",
   textWidth: number,
   textHeight: number,
 ): { x: number; y: number; width: number; height: number } {
-  const x =
-    anchor === "end"
-      ? anchorX - textWidth - REC_CHIP_PAD_X
-      : anchorX - REC_CHIP_PAD_X;
-  const y = baselineY - textHeight - REC_CHIP_PAD_Y + 1;
   return {
-    x,
-    y,
+    x: REC_LEFT_X - REC_CHIP_PAD_X,
+    y: baselineY - textHeight - REC_CHIP_PAD_Y + 1,
     width: textWidth + REC_CHIP_PAD_X * 2,
     height: textHeight + REC_CHIP_PAD_Y * 2,
   };
 }
 
-/** Axis-aligned bounding box intersection. Closed on both sides. */
-function rectsOverlap(
-  a: { x: number; y: number; width: number; height: number },
-  b: { x0: number; y0: number; x1: number; y1: number },
-): boolean {
-  return !(
-    a.x + a.width <= b.x0 ||
-    b.x1 <= a.x ||
-    a.y + a.height <= b.y0 ||
-    b.y1 <= a.y
-  );
-}
-
-export function placeRecAnnotation(
-  _points: { x: number; y: number }[],
-  recLineY: number,
-  current: { x: number; y: number },
-  X0: number,
-  X1: number,
-  _Y_BOTTOM: number,
-): RecAnnotationPlacement {
-  // 1. Decide if the price tag's default right edge would collide with
-  //    the upper-right current-value callout. The callout is a fixed
-  //    rect in the locked design; the rec line sweeps vertically with
-  //    the recommendation. Two crowding triggers: rec line within (or
-  //    just past) the callout y band, OR the current marker pulse
-  //    radius right next to the rec line.
-  const callout = REC_CALLOUT_RECT;
-  const calloutXLeft = X1 - (X1 - callout.x0);
-  const recCrossesCalloutY =
-    recLineY >= callout.y0 - REC_CHIP_PAD_Y - 4 &&
-    recLineY <= callout.y1 + REC_CHIP_PAD_Y + 4;
-  const recCrowdsCurrentMarker =
-    Math.abs(recLineY - current.y) < 22 && current.x >= calloutXLeft;
-  const priceAtLeft = recCrossesCalloutY || recCrowdsCurrentMarker;
-
-  const numEdge: "left" | "right" = priceAtLeft ? "left" : "right";
-  const numX = numEdge === "left" ? X0 + REC_INSET_X : X1 - REC_INSET_X;
-  const numAnchor: "start" | "end" = numEdge === "left" ? "start" : "end";
-
-  // 2. Decide caption edge first — when the OPPOSITE-edge caption
-  //    would intersect the callout rect at the rec-line y, stack it on
-  //    the same edge as the price. (The caption is small enough that
-  //    we only care about callout, not the polyline.)
-  const oppositeEdge: "left" | "right" =
-    numEdge === "left" ? "right" : "left";
-  const onLineLabelY = recLineY - REC_ABOVE_LABEL_BASELINE_OFFSET;
-  const onLineLabelChipAtOpposite = chipForText(
-    oppositeEdge === "left" ? X0 + REC_INSET_X : X1 - REC_INSET_X,
-    onLineLabelY,
-    oppositeEdge === "left" ? "start" : "end",
-    REC_LABEL_TEXT_WIDTH,
-    REC_LABEL_TEXT_HEIGHT,
-  );
-  const labelWouldHitCallout =
-    oppositeEdge === "right" && rectsOverlap(onLineLabelChipAtOpposite, callout);
-  const labelsStacked = labelWouldHitCallout;
-
-  // 3. Pick a vertical side. Stacking + ABOVE may push the caption chip
-  //    above the viewBox top — when that happens, the whole annotation
-  //    flips BELOW the rec line so both chips have room. Without
-  //    stacking, ABOVE is preferred and only flips when there's no room.
-  const stackTopIfAbove =
-    recLineY - REC_ABOVE_NUM_BASELINE_OFFSET -
-    REC_STACK_OFFSET -
-    REC_LABEL_TEXT_HEIGHT -
-    REC_CHIP_PAD_Y +
-    1;
-  const stackBottomIfBelow =
-    recLineY + REC_BELOW_NUM_BASELINE_OFFSET +
-    REC_STACK_OFFSET +
-    REC_CHIP_PAD_Y +
-    1;
-  const aboveChipTop = labelsStacked
-    ? stackTopIfAbove
-    : recLineY -
-      REC_ABOVE_NUM_BASELINE_OFFSET -
-      REC_NUM_TEXT_HEIGHT -
-      REC_CHIP_PAD_Y;
-  const belowChipBottom = labelsStacked
-    ? stackBottomIfBelow
-    : recLineY +
-      REC_BELOW_NUM_BASELINE_OFFSET +
-      REC_NUM_TEXT_HEIGHT * 0.3 +
-      REC_CHIP_PAD_Y;
-  const noRoomAbove = aboveChipTop < REC_VIEWBOX_TOP;
-  const noRoomBelow = belowChipBottom > REC_TICK_LABEL_TOP;
-  let side: "above" | "below";
-  if (noRoomAbove && !noRoomBelow) side = "below";
-  else if (noRoomBelow && !noRoomAbove) side = "above";
-  else side = "above";
-
-  const labelEdge: "left" | "right" = labelsStacked ? numEdge : oppositeEdge;
-  const labelX =
-    labelEdge === "left" ? X0 + REC_INSET_X : X1 - REC_INSET_X;
-  const labelAnchor: "start" | "end" =
-    labelEdge === "left" ? "start" : "end";
-
-  // Price-tag baseline sits on the line; caption either matches it
-  // (opposite edge) or stacks above/below it (same edge).
-  const numY =
-    side === "above"
-      ? recLineY - REC_ABOVE_NUM_BASELINE_OFFSET
-      : recLineY + REC_BELOW_NUM_BASELINE_OFFSET;
-  const labelY = labelsStacked
-    ? side === "above"
-      ? numY - REC_STACK_OFFSET
-      : numY + REC_STACK_OFFSET
-    : side === "above"
-      ? recLineY - REC_ABOVE_LABEL_BASELINE_OFFSET
-      : recLineY + REC_BELOW_LABEL_BASELINE_OFFSET;
-
-  const numChip = chipForText(
-    numX,
-    numY,
-    numAnchor,
-    REC_NUM_TEXT_WIDTH,
-    REC_NUM_TEXT_HEIGHT,
-  );
-  const labelChip = chipForText(
-    labelX,
-    labelY,
-    labelAnchor,
-    REC_LABEL_TEXT_WIDTH,
-    REC_LABEL_TEXT_HEIGHT,
-  );
-
-  return {
-    labelX,
-    labelY,
-    labelAnchor,
-    numX,
-    numY,
-    numAnchor,
-    labelChip,
-    numChip,
-    side,
-    numEdge,
-    labelsStacked,
-  };
-}
+export const REC_NUM_CHIP = leftChip(
+  REC_NUM_Y,
+  REC_NUM_TEXT_WIDTH,
+  REC_NUM_TEXT_HEIGHT,
+);
+export const REC_LABEL_CHIP = leftChip(
+  REC_LABEL_Y,
+  REC_LABEL_TEXT_WIDTH,
+  REC_LABEL_TEXT_HEIGHT,
+);
 
 /** Parse a price string like "$642,000" or "642000" into a number. */
 function parsePriceToNumber(v: string | undefined): number | null {
