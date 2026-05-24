@@ -62,13 +62,42 @@ export interface PitchPoint {
  * card; when unset, the section hides cleanly.
  */
 export interface PresentationVideo {
+  /**
+   * Manual upload override (A7d.3 camera-roll "Video thumbnail" field).
+   * Highest precedence at render time — beats the scrub-pick and the
+   * auto first-frame.
+   */
   posterUrl?: string;
+  /**
+   * Frame picked via the scrubber (A7d.8). Second precedence — beats
+   * the auto first-frame default but yields to a manual override.
+   */
+  scrubPosterUrl?: string;
+  /**
+   * First-frame default captured automatically right after video upload
+   * (A7d.8). Lowest precedence — the never-blank baseline so the
+   * seller page is never poster-less even when the agent does nothing.
+   */
+  autoPosterUrl?: string;
   videoUrl?: string;
   title?: string;
   /** Free-text duration ("2:14" or "2 min"). */
   runtime?: string;
   /** ISO 8601 date or free-text ("April 2026"). */
   recordedOn?: string;
+}
+
+/**
+ * Effective poster precedence (A7d.8): override > scrub > auto. Returns
+ * `undefined` when none of the three is set so the renderer can decide
+ * whether to omit the poster attribute entirely. Centralized so the
+ * renderer, the projector, and any test fixture agree on the order.
+ */
+export function effectivePosterUrl(
+  video: PresentationVideo | undefined,
+): string | undefined {
+  if (!video) return undefined;
+  return video.posterUrl || video.scrubPosterUrl || video.autoPosterUrl;
 }
 
 /** A single review surfaced in the reviews section. Manual/curated only — no scrape. */
@@ -229,6 +258,8 @@ function clampPresentationVideo(raw: unknown): PresentationVideo | undefined {
   const r = raw as Record<string, unknown>;
   const video: PresentationVideo = {
     posterUrl: clampString(r.posterUrl),
+    scrubPosterUrl: clampString(r.scrubPosterUrl),
+    autoPosterUrl: clampString(r.autoPosterUrl),
     videoUrl: clampString(r.videoUrl),
     title: clampString(r.title),
     runtime: clampString(r.runtime),

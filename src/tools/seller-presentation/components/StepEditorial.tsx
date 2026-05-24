@@ -12,6 +12,7 @@ import type {
   PresentationVideo,
   SellerPresentationDraft,
 } from "../engine/types";
+import { effectivePosterUrl } from "../engine/types";
 
 /**
  * Seller Presentation Step 5 — Editorial extras (v1.47 / A7d + A7d.1 + A7d.2).
@@ -237,7 +238,9 @@ function VideoEditor({ draft, setDraft }: StepEditorialProps) {
   return (
     <>
       {/* A7d.3: camera-roll upload (no paste-URL). Plays inline on
-          the seller page via <video controls playsInline>. */}
+          the seller page via <video controls playsInline>.
+          A7d.8: also drives the first-frame auto-capture + scrubber
+          (never-blank poster + Instagram-style frame picker). */}
       <VideoUploadField
         label="Walk-through video"
         value={v.videoUrl ?? ""}
@@ -247,8 +250,17 @@ function VideoEditor({ draft, setDraft }: StepEditorialProps) {
           // .video captured at render time, so the second one
           // would clobber the first (this regressed once when
           // onChange + onDuration were split props).
+          //
+          // A7d.8 — on Replace / Remove we ALSO clear the auto +
+          // scrub poster URLs because they're captured frames of a
+          // video that no longer exists. The manual `posterUrl`
+          // override stays (some agents upload a branded still that
+          // outlives their walk-through edits — and the renderer's
+          // precedence still has it on top).
           const patch: Partial<PresentationVideo> = {
             videoUrl: url || undefined,
+            autoPosterUrl: undefined,
+            scrubPosterUrl: undefined,
           };
           if (
             durationSeconds !== undefined &&
@@ -258,6 +270,19 @@ function VideoEditor({ draft, setDraft }: StepEditorialProps) {
           }
           setVideo(patch);
         }}
+        onPosterChange={(url, source) => {
+          // A7d.8 — the field captures two kinds of posters:
+          //   'auto'  → first-frame default (never-blank baseline)
+          //   'scrub' → frame picked via the Instagram-style scrubber
+          // Each lands in its own draft field so the renderer's
+          // precedence (override > scrub > auto) can pick correctly.
+          if (source === "auto") {
+            setVideo({ autoPosterUrl: url || undefined });
+          } else {
+            setVideo({ scrubPosterUrl: url || undefined });
+          }
+        }}
+        currentPosterUrl={effectivePosterUrl(draft.video)}
         folder="seller-presentation-video"
         testIdPrefix="step-editorial-video"
         helpText="Up to 90 seconds, 250 MB. MP4, MOV, or WebM."

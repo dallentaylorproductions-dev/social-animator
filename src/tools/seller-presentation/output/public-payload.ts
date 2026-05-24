@@ -210,6 +210,8 @@ function projectPresentationVideo(
   // hand-tampered draft would otherwise leak through a spread.
   return {
     posterUrl: v.posterUrl,
+    scrubPosterUrl: v.scrubPosterUrl,
+    autoPosterUrl: v.autoPosterUrl,
     videoUrl: v.videoUrl,
     title: v.title,
     runtime: v.runtime,
@@ -543,6 +545,10 @@ function clampPresentationVideo(raw: unknown): PresentationVideo | undefined {
   const r = raw as Record<string, unknown>;
   const video: PresentationVideo = {
     posterUrl: typeof r.posterUrl === "string" ? r.posterUrl : undefined,
+    scrubPosterUrl:
+      typeof r.scrubPosterUrl === "string" ? r.scrubPosterUrl : undefined,
+    autoPosterUrl:
+      typeof r.autoPosterUrl === "string" ? r.autoPosterUrl : undefined,
     videoUrl: typeof r.videoUrl === "string" ? r.videoUrl : undefined,
     title: typeof r.title === "string" ? r.title : undefined,
     runtime: typeof r.runtime === "string" ? r.runtime : undefined,

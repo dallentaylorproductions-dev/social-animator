@@ -5,6 +5,9 @@ import {
   FULL_PAYLOAD,
   MINIMAL_PAYLOAD,
   OUTLINK_ONLY_PAYLOAD,
+  POSTER_AUTO_ONLY_PAYLOAD,
+  POSTER_OVERRIDE_WINS_PAYLOAD,
+  POSTER_SCRUB_OVER_AUTO_PAYLOAD,
 } from "@/tools/seller-presentation/output/__fixtures__/sample-payload";
 
 /**
@@ -38,14 +41,22 @@ interface PageProps {
 
 export default async function SellerPresentationPreview({ searchParams }: PageProps) {
   const { fixture } = await searchParams;
-  const variant =
-    fixture === "minimal"
-      ? "minimal"
-      : fixture === "full"
-        ? "full"
-        : fixture === "outlink-only"
-          ? "outlink-only"
-          : null;
+  // A7d.8 — added three poster-precedence variants. The renderer's
+  // VideoBlock emits `data-poster-source` so the e2e suite can assert
+  // which branch of the override > scrub > auto cascade fired without
+  // parsing the rendered URL.
+  const VARIANTS = [
+    "full",
+    "minimal",
+    "outlink-only",
+    "poster-auto-only",
+    "poster-scrub-over-auto",
+    "poster-override-wins",
+  ] as const;
+  type Variant = (typeof VARIANTS)[number];
+  const variant = (VARIANTS as readonly string[]).includes(fixture ?? "")
+    ? (fixture as Variant)
+    : null;
   if (!variant) {
     // No (or unknown) fixture → 404. Forces explicit `?fixture=…`
     // so an accidental link doesn't render a default page.
@@ -57,7 +68,13 @@ export default async function SellerPresentationPreview({ searchParams }: PagePr
       ? MINIMAL_PAYLOAD
       : variant === "outlink-only"
         ? OUTLINK_ONLY_PAYLOAD
-        : FULL_PAYLOAD;
+        : variant === "poster-auto-only"
+          ? POSTER_AUTO_ONLY_PAYLOAD
+          : variant === "poster-scrub-over-auto"
+            ? POSTER_SCRUB_OVER_AUTO_PAYLOAD
+            : variant === "poster-override-wins"
+              ? POSTER_OVERRIDE_WINS_PAYLOAD
+              : FULL_PAYLOAD;
 
   // Wrap the fixture payload in a HandoutRecord so the renderer's
   // contract matches the production /h/[slug] path exactly. The

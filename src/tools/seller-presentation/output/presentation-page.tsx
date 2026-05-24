@@ -6,6 +6,7 @@ import {
   type PublicPayload,
   type AreaStatsMonthly,
 } from "./public-payload";
+import { effectivePosterUrl } from "../engine/types";
 import { PresentationPageMotion } from "./motion";
 import "./presentation-page.css";
 
@@ -207,6 +208,12 @@ function VideoBlock({ payload }: { payload: PublicPayload }) {
   const v = payload.video;
   if (!v || !v.videoUrl) return null;
 
+  // A7d.8 — never-blank precedence: manual override > scrub-pick > auto
+  // first-frame. The auto first-frame is captured at upload time so
+  // there is always *some* poster as long as a video has been uploaded
+  // (the seller page is never a black box pre-play).
+  const poster = effectivePosterUrl(v);
+
   return (
     <section className="video-block" data-testid="sep-video">
       <div className="sec-label reveal">
@@ -225,22 +232,30 @@ function VideoBlock({ payload }: { payload: PublicPayload }) {
           - `preload="metadata"` — fetch only the moov atom on page
             load. The actual stream doesn't pull until play; protects
             bandwidth for the 99% of visits that won't tap play.
-          - `poster={v.posterUrl}` — the thumbnail uploaded in the
-            wizard. Renders inside the same .video-poster geometry
-            (aspect-ratio 4/5 + min-height floor) so the block
-            doesn't collapse before the poster loads.
+          - `poster` — resolved via A7d.8 precedence (override > scrub
+            > auto first-frame). The auto first-frame is captured at
+            upload time so the block is never blank.
           - `controls` — native browser chrome (play / scrub / mute).
             Keeps the implementation framework-free and accessible. */}
       <div className="video-poster reveal" data-testid="sep-video-player">
         <video
           className="video-player"
           src={v.videoUrl}
-          poster={v.posterUrl}
+          poster={poster}
           controls
           playsInline
           preload="metadata"
           aria-label={v.title ?? "Walk-through video"}
           data-testid="sep-video-el"
+          data-poster-source={
+            v.posterUrl
+              ? "override"
+              : v.scrubPosterUrl
+                ? "scrub"
+                : v.autoPosterUrl
+                  ? "auto"
+                  : "none"
+          }
         />
         {(v.title || v.runtime || v.recordedOn) && (
           <span className="meta">

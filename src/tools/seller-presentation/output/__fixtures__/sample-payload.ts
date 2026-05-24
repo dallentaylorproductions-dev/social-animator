@@ -267,3 +267,42 @@ export const OUTLINK_ONLY_PAYLOAD: PublicPayload = {
     url: "https://www.zillow.com/profile/aarontest",
   },
 };
+
+/**
+ * A7d.8 — poster-precedence fixtures. Three siblings of MINIMAL_PAYLOAD
+ * that each set a different subset of the three poster slots so the
+ * renderer's `override > scrub > auto first-frame` cascade can be
+ * proven independently. The helper that resolves the cascade lives in
+ * engine/types.ts (`effectivePosterUrl`); the renderer also emits a
+ * `data-poster-source` attribute on <video> so tests can assert which
+ * branch fired without parsing the rendered URL.
+ *
+ * Each variant uses obviously-distinct URLs so an off-by-one in the
+ * cascade is immediately visible in test failure output.
+ */
+export const POSTER_AUTO_ONLY_PAYLOAD: PublicPayload = {
+  ...MINIMAL_PAYLOAD,
+  video: {
+    videoUrl: "https://example.com/walkthrough.mp4",
+    autoPosterUrl: "https://blob.example.com/auto-first-frame.jpg",
+  },
+};
+
+export const POSTER_SCRUB_OVER_AUTO_PAYLOAD: PublicPayload = {
+  ...MINIMAL_PAYLOAD,
+  video: {
+    videoUrl: "https://example.com/walkthrough.mp4",
+    autoPosterUrl: "https://blob.example.com/auto-first-frame.jpg",
+    scrubPosterUrl: "https://blob.example.com/scrub-picked-frame.jpg",
+  },
+};
+
+export const POSTER_OVERRIDE_WINS_PAYLOAD: PublicPayload = {
+  ...MINIMAL_PAYLOAD,
+  video: {
+    videoUrl: "https://example.com/walkthrough.mp4",
+    autoPosterUrl: "https://blob.example.com/auto-first-frame.jpg",
+    scrubPosterUrl: "https://blob.example.com/scrub-picked-frame.jpg",
+    posterUrl: "https://blob.example.com/manual-override-thumbnail.jpg",
+  },
+};
