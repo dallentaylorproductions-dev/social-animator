@@ -1491,10 +1491,22 @@ test.describe('Seller Presentation — A7d editorial extras', () => {
     await chooser.setFiles([
       { name: 'walkthrough.mp4', mimeType: 'video/mp4', buffer: fakeBuffer },
     ]);
-    // Wait for the preview <video> to materialize with the mocked URL.
+    // Wait for the preview <video> to materialize.
+    //
+    // A7d.8.3: the wizard preview now sources from the LOCAL objectURL
+    // while available (`blob:…`) and falls back to the hosted URL after
+    // reload. That swap lets the slider seek the preview with fast
+    // random-access on iOS instead of fetching hosted-video chunks
+    // per seek. So immediately after upload we expect a blob: src
+    // here, NOT the hosted URL. The hosted-URL round-trip contract is
+    // still proven below by the localStorage assertion
+    // (`d.video?.videoUrl === MOCK_VIDEO_URL`) and by the post-reload
+    // assertion further down (after reload the local File is gone, so
+    // the preview falls back to the hosted URL).
     const videoPreview = page.getByTestId('step-editorial-video-preview');
     await expect(videoPreview).toBeVisible({ timeout: 10_000 });
-    await expect(videoPreview).toHaveAttribute('src', MOCK_VIDEO_URL);
+    const previewSrc = await videoPreview.getAttribute('src');
+    expect(previewSrc).toMatch(/^blob:/);
 
     await page
       .getByTestId('step-editorial-video-title')

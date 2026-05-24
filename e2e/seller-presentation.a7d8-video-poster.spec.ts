@@ -336,31 +336,6 @@ test.describe('Seller Presentation — A7d.8 video poster', () => {
       expect(src).toMatch(/parentNode\.removeChild\(video\)/);
     });
 
-    test('in-DOM scrubber-preview <video> is mounted off-screen renderable, not display:none', () => {
-      const src = readFileSync(FIELD, 'utf8');
-
-      // The in-DOM capture-source video (bound to captureVideoRef +
-      // used by the live scrub-preview canvas pipeline) must NOT be
-      // className="hidden". On iOS Safari that CSS rule (display:none)
-      // caused the live preview to silently never paint a frame.
-      //
-      // Anchor by the unique `ref={captureVideoRef}` prop so the match
-      // can't slide into the user-facing <video> above.
-      const captureBlock = src.match(
-        /<video\s+ref=\{captureVideoRef\}[\s\S]*?\/>/,
-      );
-      expect(captureBlock).toBeTruthy();
-      expect(captureBlock![0]).not.toMatch(/className=["']hidden["']/);
-      // It has an inline style anchoring it off-screen but in layout
-      // (1×1px, opacity 0, absolutely positioned).
-      expect(captureBlock![0]).toMatch(/position:\s*["']absolute["']/);
-      expect(captureBlock![0]).toMatch(/opacity:\s*0/);
-      // And it still carries the testid the wizard relies on.
-      expect(captureBlock![0]).toMatch(
-        /data-testid=\{tid\("capture-source"\)\}/,
-      );
-    });
-
     test('seller page omits the poster attribute when the cascade is empty', () => {
       const pageSrc = readFileSync(
         resolve(
@@ -415,80 +390,79 @@ test.describe('Seller Presentation — A7d.8 video poster', () => {
   });
 
   /*
-   * A7d.8.2 — visible live-preview window for the thumbnail scrubber
-   * (Dallen's 2026-05-23 follow-up smoke). The slider moved but there
-   * was no visible preview of the frame at the slider position, so the
-   * agent was picking blind. Fix: a visible <canvas> above the slider
-   * that draws the in-DOM captureVideoRef frame on every seeked event,
-   * with a last-wins coalescing pattern so the slider stays responsive
-   * even when the device's decode lags.
+   * A7d.8.3 — consolidate to ONE preview surface (the main video) +
+   * Instagram-style filmstrip + live scrub correlation. Reverses the
+   * A7d.8.2 separate-preview-canvas direction after Dallen's 2026-05-23
+   * smoke: the A7d.8.2 canvas rendered huge (sized to the clip's
+   * intrinsic portrait aspect → filled the screen) and showed BLACK
+   * because the off-DOM capture pipeline wasn't actually painting on
+   * iOS. The new shape:
    *
-   * Three invariants this round establishes — all source-grep because
-   * a browser-driven seek-and-draw exercise needs a real decodable MP4
-   * fixture (same shape as the rest of the A7d wiring proofs):
+   *   - Seek the MAIN visible <video> on slider input — iOS decodes a
+   *     visible, in-layout, in-DOM <video> reliably, sidestepping the
+   *     off-DOM decode problem entirely. The agent sees the current
+   *     frame live in the same window buyers will see.
+   *   - A best-effort filmstrip of N pre-extracted thumbnails sits as
+   *     a visual scrub track ABOVE the slider; fallback to a plain
+   *     slider if extraction soft-fails (the slider still seeks the
+   *     main video, so scrubbing always works).
+   *   - The separate preview canvas the A7d.8.2 round introduced is
+   *     GONE. Portrait clips can't blow up the layout — the main video
+   *     keeps its existing aspect-video constraint.
    *
-   *   1. The preview canvas exists, is rendered ABOVE the slider, and
-   *      sizes to the video's intrinsic aspect ratio (no letterboxing
-   *      of portrait phone clips).
-   *   2. The seek pipeline coalesces (last-wins) — the slider's
-   *      onChange does NOT set currentTime directly, so it cannot
-   *      queue a backlog of seeks against a slow decoder. The slider
-   *      remains responsive (A7d.8.1 invariant: no UI state may be
-   *      gated on the live-preview draw).
-   *   3. WYSIWYG with "Use this frame" — both the live preview and the
-   *      committed capture read from the same localObjectUrl at the
-   *      same scrubTime.
+   * All assertions are source-grep — a browser-driven seek-and-paint
+   * exercise needs a real decodable MP4 fixture (same shape as the
+   * rest of the A7d wiring proofs).
    */
-  test.describe('A7d.8.2 — visible live scrub-preview window', () => {
-    test('a visible preview canvas exists, sized to video aspect, ABOVE the slider', () => {
+  test.describe('A7d.8.3 — single preview + filmstrip scrub', () => {
+    test('the separate A7d.8.2 preview canvas is GONE — only ONE preview surface', () => {
       const src = readFileSync(FIELD, 'utf8');
 
-      // 1) The canvas is rendered with the testid the wizard targets.
-      expect(src).toContain('data-testid={tid("scrubber-preview-canvas")}');
-      // 2) It's a <canvas> bound to previewCanvasRef (the draw target).
-      expect(src).toMatch(/<canvas[\s\S]*?ref=\{previewCanvasRef\}/);
-      // 3) Sized by the video's intrinsic aspect ratio (falls back to
-      //    16:9 until loadedmetadata fires). Portrait phone clips must
-      //    NOT be forced into a letterboxed 16:9 frame.
-      expect(src).toMatch(/aspectRatio:\s*videoAspect/);
-      // 4) Rendered ABOVE the slider — the canvas testid appears before
-      //    the scrubber-range testid in source order, which matches the
-      //    rendered DOM order inside the scrubber container.
-      const canvasIdx = src.indexOf('data-testid={tid("scrubber-preview-canvas")}');
-      const rangeIdx = src.indexOf('data-testid={tid("scrubber-range")}');
-      expect(canvasIdx).toBeGreaterThan(0);
-      expect(rangeIdx).toBeGreaterThan(0);
-      expect(canvasIdx).toBeLessThan(rangeIdx);
+      // 1) No scrubber-preview-canvas element in source.
+      expect(src).not.toContain('scrubber-preview-canvas');
+      // 2) No previewCanvasRef / drawPreviewFrame / videoAspect (the
+      //    A7d.8.2 plumbing). Their absence proves the canvas pipeline
+      //    is fully removed, not just hidden.
+      expect(src).not.toMatch(/previewCanvasRef/);
+      expect(src).not.toMatch(/drawPreviewFrame/);
+      expect(src).not.toMatch(/setVideoAspect/);
+      // 3) No second <video> bound to captureVideoRef in the JSX —
+      //    the off-DOM scrub source the A7d.8.2 canvas needed is gone
+      //    (captureFrameBlob still mounts its own helper-scoped one).
+      expect(src).not.toMatch(/<video[\s\S]*?ref=\{captureVideoRef\}/);
+      // 4) There is still exactly ONE <video> JSX tag in the component
+      //    region — the user-facing preview the slider now seeks. Strip
+      //    comments first so JSDoc mentions of "<video>" don't inflate
+      //    the count; match JSX-shape openings (whitespace after the
+      //    name, which precludes "<video>" in prose).
+      const componentEndIdx = src.indexOf('function readVideoDuration(');
+      expect(componentEndIdx).toBeGreaterThan(0);
+      const componentSrc = src
+        .slice(0, componentEndIdx)
+        .replace(/\/\*[\s\S]*?\*\//g, '')
+        .replace(/\/\/[^\n]*/g, '');
+      const videoTags = componentSrc.match(/<video\s/g) ?? [];
+      expect(videoTags.length).toBe(1);
+      expect(componentSrc).toMatch(/<video[\s\S]*?ref=\{mainVideoRef\}/);
     });
 
-    test('seek pipeline coalesces (last-wins) — no per-input currentTime backlog', () => {
+    test('slider onChange seeks the MAIN video (no direct currentTime, no await)', () => {
       const src = readFileSync(FIELD, 'utf8');
 
-      // 1) The coalescer refs exist by name. Using refs (not state) is
-      //    required so rapid input events don't trigger re-renders +
-      //    don't race against React's batched setState.
-      expect(src).toMatch(/pendingSeekRef\s*=\s*useRef/);
-      expect(src).toMatch(/seekInFlightRef\s*=\s*useRef/);
+      // 1) The coalescer pumps against mainVideoRef now, not the old
+      //    captureVideoRef. Pin both halves of the indirection.
+      const pumpMatch = src.match(/const\s+pumpSeek\s*=\s*useCallback\([\s\S]*?\}\s*,\s*\[\s*\]\s*\)/);
+      expect(pumpMatch).toBeTruthy();
+      expect(pumpMatch![0]).toMatch(/mainVideoRef\.current/);
+      expect(pumpMatch![0]).not.toMatch(/captureVideoRef/);
 
-      // 2) The pump exists and only starts a seek when nothing is in
-      //    flight (the core last-wins property).
-      expect(src).toMatch(/const\s+pumpSeek\s*=/);
-      expect(src).toMatch(/if\s*\(\s*seekInFlightRef\.current\s*\)\s*return/);
+      // 2) The seeked listener targets the main video on src change
+      //    (value or localObjectUrl) so a Replace flow re-binds.
+      expect(src).toMatch(/const\s+video\s*=\s*mainVideoRef\.current[\s\S]{0,400}addEventListener\(\s*["']seeked["']/);
 
-      // 3) The seeked handler RE-PUMPS when a target arrived during the
-      //    in-flight seek — that's how the latest drag-position lands
-      //    once the decoder catches up.
-      expect(src).toMatch(
-        /if\s*\(\s*pendingSeekRef\.current\s*!==\s*null\s*\)\s*pumpSeek\(\)/,
-      );
-
-      // 4) The slider's onChange routes through requestSeek and does
-      //    NOT set currentTime directly. If it did, every input event
-      //    would queue another seek and the slider would lag behind a
-      //    backlog of decoder work.
-      //
-      // Walk to the JSX block by its testid, slice the onChange={…}
-      // expression with a brace counter, then assert what's inside.
+      // 3) Slider onChange routes through requestSeek and does NOT
+      //    set currentTime directly or await any seek (A7d.8.1
+      //    invariant — the slider must never freeze).
       const rangeTestidIdx = src.indexOf('data-testid={tid("scrubber-range")}');
       expect(rangeTestidIdx).toBeGreaterThan(0);
       const inputTagStart = src.lastIndexOf('<input', rangeTestidIdx);
@@ -496,7 +470,6 @@ test.describe('Seller Presentation — A7d.8 video poster', () => {
       const onChangeIdx = src.indexOf('onChange={', inputTagStart);
       expect(onChangeIdx).toBeGreaterThan(0);
       expect(onChangeIdx).toBeLessThan(rangeTestidIdx);
-      // Extract the {…} body of the onChange.
       const bodyStart = onChangeIdx + 'onChange={'.length;
       let depth = 1;
       let bodyEnd = bodyStart;
@@ -511,75 +484,137 @@ test.describe('Seller Presentation — A7d.8 video poster', () => {
           }
         }
       }
-      // Strip // and /* */ comments before asserting on the handler's
-      // CODE — the rule is about runtime behavior, not what the
-      // comments happen to mention.
       const onChangeCode = src
         .slice(bodyStart, bodyEnd)
         .replace(/\/\*[\s\S]*?\*\//g, '')
         .replace(/\/\/[^\n]*/g, '');
-      // Calls the coalesced helper.
       expect(onChangeCode).toMatch(/requestSeek\(/);
-      // Does NOT set currentTime directly inside the handler — that
-      // would defeat the coalescer.
       expect(onChangeCode).not.toMatch(/\.currentTime\s*=/);
-      // Does NOT block on the seek — the slider must stay responsive
-      // even if the underlying decode is slow. (A7d.8.1 invariant.)
       expect(onChangeCode).not.toMatch(/\bawait\b/);
     });
 
-    test('initial first-frame paint: requestSeek(~0.1s) fires when the capture video is ready', () => {
+    test('coalescer is retained — last-wins prevents seek backlog under fast drags', () => {
       const src = readFileSync(FIELD, 'utf8');
 
-      // The init useEffect fires either immediately (readyState >=
-      // HAVE_CURRENT_DATA) OR on loadeddata, and kicks an initial seek
-      // so the preview canvas isn't empty when the scrubber appears.
-      expect(src).toMatch(/readyState\s*>=\s*2/);
-      expect(src).toMatch(/addEventListener\(\s*["']loadeddata["']/);
-      expect(src).toMatch(/requestSeek\(\s*0\.1\s*\)/);
+      // Same coalescer-shape rules as A7d.8.2 carried forward: refs (not
+      // state), pump bails when busy, seeked re-pumps the latest target.
+      expect(src).toMatch(/pendingSeekRef\s*=\s*useRef/);
+      expect(src).toMatch(/seekInFlightRef\s*=\s*useRef/);
+      expect(src).toMatch(/const\s+pumpSeek\s*=/);
+      expect(src).toMatch(/if\s*\(\s*seekInFlightRef\.current\s*\)\s*return/);
+      expect(src).toMatch(
+        /if\s*\(\s*pendingSeekRef\.current\s*!==\s*null\s*\)\s*pumpSeek\(\)/,
+      );
     });
 
-    test('WYSIWYG — live preview and "Use this frame" share source + time', () => {
+    test('main preview <video> sources localObjectUrl while available, hosted URL after reload', () => {
       const src = readFileSync(FIELD, 'utf8');
 
-      // The preview pipeline draws from captureVideoRef (sourced from
-      // localObjectUrl) at whatever time the slider has the in-DOM
-      // <video> seeked to.
-      expect(src).toMatch(/drawPreviewFrame[\s\S]{0,200}captureVideoRef/);
-      expect(src).toMatch(/<video[\s\S]*?ref=\{captureVideoRef\}[\s\S]*?src=\{localObjectUrl\}/);
+      // The main video's src falls back from local (fast random-access
+      // seek) to hosted (post-reload). The local source is the same
+      // one canvas.toBlob() reads from for "Use this frame" — so the
+      // WYSIWYG promise holds (same bytes, same time).
+      const mainVideoBlock = src.match(
+        /<video[\s\S]*?ref=\{mainVideoRef\}[\s\S]*?\/>/,
+      );
+      expect(mainVideoBlock).toBeTruthy();
+      expect(mainVideoBlock![0]).toMatch(/src=\{localObjectUrl\s*\?\?\s*value\}/);
+      // Layout safety: aspect-video keeps portrait clips from blowing
+      // up the picker — they letterbox inside the constrained frame.
+      expect(mainVideoBlock![0]).toMatch(/aspect-video/);
+      // Still controls + playsInline so the agent can also play/scrub
+      // natively when they're done picking.
+      expect(mainVideoBlock![0]).toMatch(/\bcontrols\b/);
+      expect(mainVideoBlock![0]).toMatch(/playsInline/);
+    });
 
-      // The "Use this frame" pipeline captures from the SAME localObjectUrl
-      // at scrubTime — proving WYSIWYG (same source, same time as the
-      // preview the agent just looked at).
+    test('filmstrip pre-extraction exists, is bounded, and is best-effort fallback', () => {
+      const src = readFileSync(FIELD, 'utf8');
+
+      // 1) The helper exists with a total wall-clock budget. Hangs
+      //    convert to "resolve with whatever we got" rather than
+      //    reject — the strip is purely a visual aid and the slider
+      //    works without it.
+      expect(src).toMatch(/FILMSTRIP_TOTAL_TIMEOUT_MS\s*=\s*6000/);
+      expect(src).toMatch(/async function extractFilmstripFrames/);
+      expect(src).toMatch(/setTimeout\(/);
+
+      // 2) Reuses the A7d.8.1 decode-safe machinery on a single
+      //    off-screen renderable <video> (mounted in layout, opacity 0)
+      //    and walks N seeks serially. Decode-force + painted-frame
+      //    await (rVFC w/ seeked fallback) are present.
+      const helperIdx = src.indexOf('async function extractFilmstripFrames');
+      expect(helperIdx).toBeGreaterThan(0);
+      const helperSrc = src.slice(helperIdx);
+      expect(helperSrc).toMatch(/document\.body\.appendChild\(video\)/);
+      expect(helperSrc).toMatch(/position:\s*["']absolute["']/);
+      expect(helperSrc).toMatch(/opacity:\s*["']0["']/);
+      expect(helperSrc).toMatch(/video\.play\(\)/);
+      expect(helperSrc).toMatch(/video\.pause\(\)/);
+      expect(helperSrc).toMatch(/requestVideoFrameCallback/);
+      expect(helperSrc).toMatch(/parentNode\.removeChild\(video\)/);
+
+      // 3) Result is best-effort: per-frame failure skips the frame,
+      //    and the outer promise NEVER rejects. The component treats
+      //    [] as "fall back to a plain slider".
+      expect(helperSrc).not.toMatch(/Promise<string\[\]>\s*\([\s\S]*?reject/);
+      expect(src).toMatch(/Promise<string\[\]>/);
+
+      // 4) The component renders the strip conditionally on
+      //    filmstripFrames.length > 0 — empty array hides the strip
+      //    cleanly, leaving the slider as the sole scrub control.
+      expect(src).toMatch(/filmstripFrames\.length\s*>\s*0/);
+    });
+
+    test('filmstrip extraction does NOT gate the upload-done state (A7d.8.1 invariant)', () => {
+      const src = readFileSync(FIELD, 'utf8');
+
+      // The filmstrip kicks via a useEffect reactive to localObjectUrl,
+      // NOT from inside handleFile. That structural decoupling means the
+      // upload-done state (setUploading(false) + onChange(hostedUrl))
+      // can NEVER be chained behind filmstrip extraction landing.
+      const handleFileMatch = src.match(
+        /const\s+handleFile\s*=\s*async[\s\S]*?\n\s*\};\s*\n/,
+      );
+      expect(handleFileMatch).toBeTruthy();
+      const handleFileSrc = handleFileMatch![0];
+      // No call to extractFilmstripFrames inside handleFile.
+      expect(handleFileSrc).not.toMatch(/extractFilmstripFrames\s*\(/);
+      // No `await` on it anywhere either — fire-and-forget by design.
+      expect(src).not.toMatch(/await\s+extractFilmstripFrames\s*\(/);
+
+      // The scrubber + Use-this-frame + Replace + Remove disabled
+      // attributes are STILL not gated on the filmstrip extraction —
+      // the strip is purely visual and never blocks the slider.
+      expect(src).not.toMatch(/disabled=\{[^}]*filmstripStatus[^}]*\}/);
+      expect(src).not.toMatch(/disabled=\{[^}]*filmstripFrames[^}]*\}/);
+    });
+
+    test('filmstrip thumbnails are data URLs in state — hosted-URL guard for FINAL poster intact', () => {
+      const src = readFileSync(FIELD, 'utf8');
+
+      // The filmstrip thumbs are ephemeral UI hints (component state
+      // only) so canvas.toDataURL() is acceptable here. But the
+      // PERSISTED poster ("Use this frame" → onPosterChange) still
+      // routes through uploadCapturedFrame which rejects a non-hosted
+      // URL — that's the sep-photo-upload-requirement rule.
+      expect(src).toMatch(/canvas\.toDataURL\(/);
+      expect(src).toMatch(/non-hosted URL/);
+      expect(src).toContain('/api/upload-image');
+      // Sanity: the "Use this frame" path goes via captureFrameBlob +
+      // uploadCapturedFrame, NOT via the filmstrip data URL.
       expect(src).toMatch(/captureFrameBlob\(localObjectUrl,\s*scrubTime\)/);
     });
 
-    test('drawPreviewFrame writes to the visible <canvas>, never to a data: URL state', () => {
+    test('WYSIWYG — main-video preview and "Use this frame" share source + time', () => {
       const src = readFileSync(FIELD, 'utf8');
 
-      // The live preview goes DIRECTLY to a real <canvas> via drawImage —
-      // no dataURL round-trip. (A dataURL pipeline would per-frame burn
-      // CPU on toDataURL and would also be a regression toward the old
-      // "tiny 64×40 swatch" UX that hid the preview.)
-      expect(src).toMatch(/ctx\.drawImage\(\s*video/);
-      // The old scrubPreviewDataUrl state is GONE.
-      expect(src).not.toMatch(/scrubPreviewDataUrl/);
-      // And no dataURL is being stuffed into state inside the live-
-      // preview pipeline (the committed "Use this frame" path still
-      // uses canvas.toBlob() — that's the separate capture, not the
-      // per-seek preview).
-      expect(src).not.toMatch(/setScrubPreviewDataUrl/);
-    });
-
-    test('the hosted-URL guard for the FINAL captured poster is intact', () => {
-      const src = readFileSync(FIELD, 'utf8');
-
-      // The in-wizard live preview may render off a canvas, but the
-      // poster that PERSISTS into the draft must still be a hosted
-      // Vercel Blob URL — never a data: URL (sep-photo-upload-requirement).
-      // The receive site enforces this.
-      expect(src).toMatch(/non-hosted URL/);
-      expect(src).toContain('/api/upload-image');
+      // The main video's src is localObjectUrl (while available), the
+      // slider seeks it to scrubTime, and "Use this frame" captures
+      // from the SAME localObjectUrl at the SAME scrubTime. Same bytes,
+      // same timestamp → what the agent sees is what gets captured.
+      expect(src).toMatch(/src=\{localObjectUrl\s*\?\?\s*value\}/);
+      expect(src).toMatch(/captureFrameBlob\(localObjectUrl,\s*scrubTime\)/);
     });
   });
 });

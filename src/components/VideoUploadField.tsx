@@ -36,6 +36,24 @@ import { upload } from "@vercel/blob/client";
  *
  * The hosted URL is what gets persisted in `draft.video.videoUrl`;
  * the seller page renders it inline via <video controls playsInline>.
+ *
+ * A7d.8.3 — Thumbnail picker rework (Dallen 2026-05-23 smoke):
+ *
+ *   - ONE preview surface: the MAIN visible <video>. Scrubbing the
+ *     slider seeks the main video so the agent sees the current
+ *     frame live in the same window buyers will see. The A7d.8.2
+ *     separate preview canvas (which rendered huge + black on iOS)
+ *     is GONE.
+ *   - Instagram-style filmstrip: best-effort pre-extracted thumbnails
+ *     of N evenly-spaced frames, rendered as a thin track above the
+ *     slider for visual scrub orientation. Falls back to a plain
+ *     slider (still seeking the main video) if extraction fails —
+ *     no UI state is gated on the strip landing.
+ *   - The main video is sourced from the LOCAL objectURL while
+ *     available (fast random-access seek for the scrubber); falls
+ *     back to the hosted URL after reload. Buyers ALWAYS see the
+ *     hosted URL via the seller-page renderer; this swap only
+ *     affects the wizard's preview surface during a live edit.
  */
 
 interface VideoUploadFieldProps {
@@ -107,6 +125,23 @@ const ALLOWED_MIME = new Set([
   "video/webm",
 ]);
 
+/**
+ * A7d.8.3 — how many filmstrip frames to pre-extract. 8 evenly-spaced
+ * thumbnails fit a phone-width track without scrolling and stay cheap
+ * enough to extract in well under the total budget on real devices.
+ */
+const FILMSTRIP_FRAME_COUNT = 8;
+
+/**
+ * A7d.8.3 — total wall-clock budget for filmstrip pre-extraction
+ * across all N frames. Best-effort: when the budget expires we resolve
+ * with whatever frames have been captured so far (possibly zero), and
+ * the picker falls back to a plain slider. iOS Safari has been seen
+ * to take ~300–500 ms per painted seek on a cold decode of a real
+ * phone clip — 6 s leaves comfortable headroom for 8 frames.
+ */
+export const FILMSTRIP_TOTAL_TIMEOUT_MS = 6000;
+
 function extensionForType(type: string): string {
   switch (type) {
     case "video/mp4":
@@ -153,7 +188,7 @@ export function VideoUploadField({
   const [duration, setDuration] = useState<number | null>(null);
   // Scrubber position in seconds. `null` until the agent first touches
   // the slider — keeps the UI from claiming a chosen frame they didn't
-  // pick. Once they drag, this is the timestamp the preview video is
+  // pick. Once they drag, this is the timestamp the main video is
   // seeked to.
   const [scrubTime, setScrubTime] = useState<number | null>(null);
   // Whether a "Use this frame" capture is in flight. While true the
@@ -163,33 +198,32 @@ export function VideoUploadField({
   // in flight. We surface this separately so the agent sees a calm
   // "Setting first frame…" hint rather than a generic spinner.
   const [autoCapturing, setAutoCapturing] = useState(false);
-  /**
-   * Hidden off-screen <video> sourced from the LOCAL objectURL. This
-   * is the canvas-capture source (CORS-clean). It is NOT the
-   * user-facing preview — that one stays pointed at the hosted URL so
-   * the round-trip e2e contract holds and so the agent sees the same
-   * thing buyers will see. Splitting the two means the scrubber's
-   * seek/drag motion never disturbs the user-facing playback.
-   */
-  const captureVideoRef = useRef<HTMLVideoElement | null>(null);
-  /**
-   * A7d.8.2 — visible live-preview canvas above the slider. Drawn
-   * directly from the in-DOM `captureVideoRef` <video> on every seeked
-   * event. The agent sees the frame at the current scrub position so
-   * they can pick a thumbnail with their eyes open instead of guessing
-   * (Dallen 2026-05-23 smoke: slider moved but no visible preview).
-   */
-  const previewCanvasRef = useRef<HTMLCanvasElement | null>(null);
-  /**
-   * Intrinsic aspect ratio of the loaded video (videoWidth / videoHeight).
-   * Used to size the preview canvas so the visible surface matches the
-   * shape of the video (portrait phone clips don't get letterboxed into
-   * a 16:9 box). Null until loadedmetadata fires.
-   */
-  const [videoAspect, setVideoAspect] = useState<number | null>(null);
 
   /**
-   * A7d.8.2 — last-wins seek coalescer.
+   * A7d.8.3 — the MAIN visible <video>. The slider seeks this element
+   * directly so the agent sees the current frame live in the same
+   * window buyers will see (Instagram-style: one preview surface, not
+   * a separate canvas). iOS decodes a visible, in-layout, in-DOM
+   * <video> reliably — that sidesteps the off-DOM hidden-video decode
+   * problem A7d.8.1 had to work around.
+   */
+  const mainVideoRef = useRef<HTMLVideoElement | null>(null);
+
+  /**
+   * A7d.8.3 — filmstrip thumbnails. Data URLs (kept in-memory, never
+   * persisted on the draft — the persisted poster goes through
+   * uploadCapturedFrame's hosted-URL guard below). Empty array means
+   * extraction hasn't landed yet or soft-failed; in either case the
+   * plain slider remains fully functional.
+   */
+  const [filmstripFrames, setFilmstripFrames] = useState<string[]>([]);
+  type FilmstripStatus = "idle" | "extracting" | "ready" | "failed";
+  const [filmstripStatus, setFilmstripStatus] =
+    useState<FilmstripStatus>("idle");
+
+  /**
+   * A7d.8.2 — last-wins seek coalescer (retained in A7d.8.3 but now
+   * targets the MAIN video instead of an off-screen capture source).
    *
    *   - `pendingSeekRef`  = the most recent target time the agent has
    *                         dragged to that hasn't been seeked yet
@@ -219,36 +253,6 @@ export function VideoUploadField({
   }, [localObjectUrl]);
 
   /**
-   * Paint the capture video's CURRENT frame onto the visible preview
-   * canvas. Sized internally to longest-edge ~640px (plenty for the
-   * thumbnail-sized surface — keeps the per-seek draw cheap on phones).
-   * CSS aspect-ratio on the canvas handles the on-page sizing.
-   */
-  const drawPreviewFrame = useCallback(() => {
-    const video = captureVideoRef.current;
-    const canvas = previewCanvasRef.current;
-    if (!video || !canvas) return;
-    const vw = video.videoWidth;
-    const vh = video.videoHeight;
-    if (!vw || !vh) return;
-    const MAX_EDGE = 640;
-    const scale = Math.min(1, MAX_EDGE / Math.max(vw, vh));
-    const dw = Math.max(1, Math.round(vw * scale));
-    const dh = Math.max(1, Math.round(vh * scale));
-    if (canvas.width !== dw) canvas.width = dw;
-    if (canvas.height !== dh) canvas.height = dh;
-    const ctx = canvas.getContext("2d");
-    if (!ctx) return;
-    try {
-      ctx.drawImage(video, 0, 0, dw, dh);
-    } catch {
-      // SecurityError would only fire on a cross-origin source — our
-      // source is the local objectURL, so this branch is paranoia.
-      // Leave whatever was last drawn on screen rather than blanking.
-    }
-  }, []);
-
-  /**
    * Start the next pending seek IF none is in flight. Called from
    * `requestSeek` (on slider input) and from the `seeked` handler (to
    * pick up whatever the agent dragged to while we were busy).
@@ -257,7 +261,7 @@ export function VideoUploadField({
     if (seekInFlightRef.current) return;
     const t = pendingSeekRef.current;
     if (t === null) return;
-    const video = captureVideoRef.current;
+    const video = mainVideoRef.current;
     if (!video) return;
     pendingSeekRef.current = null;
     // If we're already at the requested time (within a tick), no seek
@@ -266,6 +270,10 @@ export function VideoUploadField({
     if (Math.abs(video.currentTime - t) < 0.01) return;
     seekInFlightRef.current = true;
     try {
+      // Pause-while-scrubbing: setting currentTime on a playing video
+      // shows the seek frame, but the controls UI still treats it as
+      // "playing" which is confusing. Match Instagram's "pause + step"
+      // behavior — the agent can re-tap play when they're done picking.
       if (!video.paused) video.pause();
       video.currentTime = t;
     } catch {
@@ -288,20 +296,16 @@ export function VideoUploadField({
     [pumpSeek],
   );
 
-  // A7d.8.2 — on every `seeked`, draw the new frame to the preview
-  // canvas, mark the seek done, and pump the next pending seek (if the
-  // agent dragged further while this one was in flight). iOS quirk: the
-  // seeked event sometimes fires before the buffer has the new pixels,
-  // so slack one animation frame before drawing.
+  // A7d.8.3 — on every `seeked` of the main video, mark the seek done
+  // and pump the next pending seek (if the agent dragged further while
+  // this one was in flight). No canvas draw needed — the main <video>
+  // element shows the new frame natively.
   useEffect(() => {
-    const video = captureVideoRef.current;
-    if (!video || !localObjectUrl) return;
+    const video = mainVideoRef.current;
+    if (!video) return;
     const onSeeked = () => {
-      requestAnimationFrame(() => {
-        drawPreviewFrame();
-        seekInFlightRef.current = false;
-        if (pendingSeekRef.current !== null) pumpSeek();
-      });
+      seekInFlightRef.current = false;
+      if (pendingSeekRef.current !== null) pumpSeek();
     };
     video.addEventListener("seeked", onSeeked);
     return () => {
@@ -311,47 +315,38 @@ export function VideoUploadField({
       pendingSeekRef.current = null;
       seekInFlightRef.current = false;
     };
-  }, [localObjectUrl, drawPreviewFrame, pumpSeek]);
+    // Re-bind when the underlying src changes (local objectURL → hosted
+    // URL on reload, or Replace flow swaps the file). value AND
+    // localObjectUrl both feed `src` on the main video.
+  }, [value, localObjectUrl, pumpSeek]);
 
-  // A7d.8.2 — initial first-frame paint when the capture video loads.
-  // The brief: "when the scrubber first appears, show the first-frame
-  // (t≈0) in the preview so it's never empty."
-  //
-  // iOS decode-force: a muted-inline play()/pause() bounce primes the
-  // decoder so the subsequent seek can actually land a painted frame
-  // (same trick the off-DOM captureFrameBlob path uses). Then we
-  // requestSeek(0.1) — some encoders don't paint frame 0 until a tiny
-  // seek lands. Mirrors the auto-capture's 0.1s.
-  //
-  // The readyState check guards the race where `loadeddata` fires
-  // BEFORE this effect mounts its listener (the <video> starts loading
-  // the moment `src` is set during render, before useEffect runs).
+  // A7d.8.3 — filmstrip pre-extraction. Best-effort, fire-and-forget.
+  // Runs on every fresh local file (and re-runs on Replace). Cancelled
+  // on unmount or before the next file lands so a stale result doesn't
+  // splash onto a new clip.
   useEffect(() => {
-    const video = captureVideoRef.current;
-    if (!video || !localObjectUrl) return;
-    const primeAndSeek = () => {
-      const p = video.play();
-      if (p && typeof p.then === "function") {
-        p.then(() => {
-          try {
-            video.pause();
-          } catch {
-            // ignore
-          }
-        }).catch(() => {
-          // autoplay may be blocked under strict policies; the seek
-          // below still fires and the preview is best-effort anyway
-        });
-      }
-      requestSeek(0.1);
-    };
-    if (video.readyState >= 2) {
-      primeAndSeek();
+    if (!localObjectUrl) {
+      setFilmstripFrames([]);
+      setFilmstripStatus("idle");
       return;
     }
-    video.addEventListener("loadeddata", primeAndSeek, { once: true });
-    return () => video.removeEventListener("loadeddata", primeAndSeek);
-  }, [localObjectUrl, requestSeek]);
+    let cancelled = false;
+    setFilmstripStatus("extracting");
+    setFilmstripFrames([]);
+    extractFilmstripFrames(localObjectUrl, FILMSTRIP_FRAME_COUNT)
+      .then((frames) => {
+        if (cancelled) return;
+        setFilmstripFrames(frames);
+        setFilmstripStatus(frames.length > 0 ? "ready" : "failed");
+      })
+      .catch(() => {
+        if (cancelled) return;
+        setFilmstripStatus("failed");
+      });
+    return () => {
+      cancelled = true;
+    };
+  }, [localObjectUrl]);
 
   const tid = (suffix: string) =>
     testIdPrefix ? `${testIdPrefix}-${suffix}` : undefined;
@@ -599,7 +594,19 @@ export function VideoUploadField({
     setLocalObjectUrl(null);
     setDuration(null);
     setScrubTime(null);
+    setFilmstripFrames([]);
+    setFilmstripStatus("idle");
     onChange("");
+  };
+
+  // A7d.8.3 — when the agent clicks a filmstrip frame, jump the slider
+  // (and the main video) to that frame's timestamp. Provides a quick
+  // coarse-grained pick on top of the fine-grained slider drag.
+  const handleFilmstripFrameClick = (index: number) => {
+    if (!duration || duration <= 0) return;
+    const t = ((index + 0.5) / FILMSTRIP_FRAME_COUNT) * duration;
+    setScrubTime(t);
+    requestSeek(t);
   };
 
   return (
@@ -623,64 +630,34 @@ export function VideoUploadField({
       {value ? (
         <div className="space-y-2">
           <div className="relative overflow-hidden rounded border border-neutral-700 bg-black">
-            {/* User-facing preview. Stays pointed at the hosted URL —
-                the agent sees what buyers will see, and the round-trip
-                e2e contract (preview.src === hostedURL) holds. The
-                scrubber's seek/canvas work happens on a SEPARATE
-                hidden video below sourced from the local objectURL. */}
+            {/* A7d.8.3 — single preview surface. Sourced from the LOCAL
+                objectURL while available (fast random-access seek for
+                the scrubber; iOS decodes a visible, in-layout, in-DOM
+                <video> reliably). Falls back to the hosted URL after
+                reload so the preview still works once the local File
+                is gone. Buyers always see the hosted URL via the
+                seller-page renderer; this swap only affects the
+                wizard's preview during a live edit. */}
             <video
-              src={value}
+              ref={mainVideoRef}
+              src={localObjectUrl ?? value}
               controls
               playsInline
               preload="metadata"
               className="aspect-video w-full"
               data-testid={tid("preview")}
-            />
-          </div>
-          {/* A7d.8 — off-screen canvas-capture <video>. Sourced from
-              the LOCAL objectURL so canvas.toBlob() doesn't throw
-              SecurityError on a cross-origin hosted source. Reads
-              duration into state so the scrubber can compute its `max`.
-
-              A7d.8.1 — IMPORTANT: do NOT use display:none / className=
-              "hidden" here. iOS Safari only decodes frames for a video
-              that is actually in layout — a display:none video never
-              paints, so the live scrub-preview pipeline (the useEffect
-              above that draws on seeked) silently never produces a
-              frame on iPhone. Mounting at 1×1px with opacity 0 keeps
-              the element in layout while staying visually invisible. */}
-          {localObjectUrl && (
-            <video
-              ref={captureVideoRef}
-              src={localObjectUrl}
-              muted
-              playsInline
-              preload="auto"
-              aria-hidden="true"
-              data-testid={tid("capture-source")}
-              style={{
-                position: "absolute",
-                left: 0,
-                top: 0,
-                width: 1,
-                height: 1,
-                opacity: 0,
-                pointerEvents: "none",
-              }}
               onLoadedMetadata={(e) => {
+                // Mirror the duration into state from the MAIN video
+                // too — the pre-upload readVideoDuration() already
+                // wrote it from the File, this is a belt-and-braces
+                // refresh in case the upstream value differs slightly.
                 const v = e.target as HTMLVideoElement;
                 if (Number.isFinite(v.duration) && v.duration > 0) {
                   setDuration(v.duration);
                 }
-                // A7d.8.2 — capture intrinsic aspect so the preview
-                // canvas sizes to the actual video shape (a portrait
-                // phone clip should not letterbox into a 16:9 box).
-                if (v.videoWidth > 0 && v.videoHeight > 0) {
-                  setVideoAspect(v.videoWidth / v.videoHeight);
-                }
               }}
             />
-          )}
+          </div>
           {/* A7d.8 — Instagram-style scrubber. Visible only when the
               local File is in memory (capture from hosted URL would
               taint the canvas) AND the duration is known. After a
@@ -703,26 +680,45 @@ export function VideoUploadField({
                   {formatScrubTime(scrubTime ?? 0)} / {formatScrubTime(duration)}
                 </span>
               </div>
-              {/* A7d.8.2 — visible live-preview canvas ABOVE the slider.
-                  Drawn from the in-DOM captureVideoRef <video> on every
-                  seeked event (coalesced via pendingSeekRef /
-                  seekInFlightRef so we never queue a backlog). Sized to
-                  the video's intrinsic aspect ratio so portrait phone
-                  clips don't get letterboxed.
-
-                  WYSIWYG with "Use this frame": both pipelines read from
-                  the SAME localObjectUrl at the SAME scrubTime — the
-                  live preview through this canvas, the committed
-                  capture through captureFrameBlob below. */}
-              <div className="mt-2">
-                <canvas
-                  ref={previewCanvasRef}
-                  className="block w-full rounded border border-neutral-800 bg-black"
-                  style={{ aspectRatio: videoAspect ?? 16 / 9 }}
-                  aria-label="Live preview of frame at current scrub position"
-                  data-testid={tid("scrubber-preview-canvas")}
-                />
-              </div>
+              {/* A7d.8.3 — filmstrip track. Best-effort visual aid;
+                  failure / empty array drops back to a plain slider
+                  that still seeks the main video. Frame clicks jump
+                  the slider; the drag fine-tunes. */}
+              {filmstripFrames.length > 0 && (
+                <div
+                  className="mt-2 flex h-12 w-full overflow-hidden rounded border border-neutral-800 bg-black"
+                  data-testid={tid("scrubber-filmstrip")}
+                >
+                  {filmstripFrames.map((src, i) => (
+                    <button
+                      key={i}
+                      type="button"
+                      onClick={() => handleFilmstripFrameClick(i)}
+                      className="relative h-full flex-1 overflow-hidden border-r border-neutral-900 last:border-r-0 disabled:opacity-60"
+                      disabled={capturingFrame}
+                      style={{ minWidth: 0 }}
+                      data-testid={tid(`scrubber-filmstrip-frame-${i}`)}
+                      aria-label={`Jump to frame ${i + 1} of ${FILMSTRIP_FRAME_COUNT}`}
+                    >
+                      {/* eslint-disable-next-line @next/next/no-img-element */}
+                      <img
+                        src={src}
+                        alt=""
+                        aria-hidden="true"
+                        className="block h-full w-full object-cover"
+                      />
+                    </button>
+                  ))}
+                </div>
+              )}
+              {filmstripStatus === "extracting" && filmstripFrames.length === 0 && (
+                <p
+                  className="mt-2 text-[10px] uppercase tracking-[0.15em] text-neutral-500"
+                  data-testid={tid("scrubber-filmstrip-status")}
+                >
+                  Building filmstrip…
+                </p>
+              )}
               <input
                 type="range"
                 min={0}
@@ -741,13 +737,12 @@ export function VideoUploadField({
                   const t = parseFloat(e.target.value);
                   if (!Number.isFinite(t)) return;
                   setScrubTime(t);
-                  // A7d.8.2 — fire-and-forget coalesced seek. requestSeek
-                  // stamps the latest target and either kicks a seek (if
-                  // idle) or lets the in-flight seek pick this up on its
-                  // way out. Crucially, the slider does NOT await any
-                  // draw or seek — a slow phone decode can never freeze
-                  // the slider, the controls, or the upload-done state
-                  // (A7d.8.1 invariant).
+                  // A7d.8.3 — fire-and-forget coalesced seek of the MAIN
+                  // video. The main <video> shows the frame natively;
+                  // no separate canvas draw is needed. The slider does
+                  // NOT await any seek — a slow phone decode can never
+                  // freeze the slider, the controls, or the upload-done
+                  // state (A7d.8.1 invariant).
                   requestSeek(t);
                 }}
                 className="mt-2 w-full accent-mint"
@@ -777,8 +772,8 @@ export function VideoUploadField({
                 {currentPosterUrl && (
                   // Small "currently selected" indicator — what's
                   // persisted on the draft right now (auto first-frame,
-                  // or a scrub the agent already committed). The big
-                  // canvas above is the LIVE preview as they drag.
+                  // or a scrub the agent already committed). The main
+                  // video above is the LIVE preview as they drag.
                   // eslint-disable-next-line @next/next/no-img-element
                   <img
                     src={currentPosterUrl}
@@ -1104,6 +1099,183 @@ function captureFrameBlob(
 
     // Mount BEFORE assigning src so iOS has a laid-out element to
     // decode into from the very first byte.
+    document.body.appendChild(video);
+    video.src = objectUrl;
+  });
+}
+
+/**
+ * A7d.8.3 — pre-extract N evenly-spaced filmstrip thumbnails from the
+ * LOCAL objectURL. Reuses the A7d.8.1 decode-safe machinery (off-screen
+ * renderable <video>, muted-inline play()/pause() decode-force, the
+ * requestVideoFrameCallback painted-frame await with seeked-fallback)
+ * but on a SINGLE <video> that walks N seek targets serially — much
+ * cheaper than N separate captureFrameBlob() calls (each of which would
+ * re-prime its own decoder).
+ *
+ * Best-effort + bounded:
+ *
+ *   - Hard total-time budget (FILMSTRIP_TOTAL_TIMEOUT_MS). On expiry,
+ *     resolves with whatever frames have been captured so far (possibly
+ *     zero). Caller treats `[]` as "fall back to a plain slider".
+ *   - Per-frame failure (no painted frame, no intrinsic size) skips the
+ *     frame and moves on rather than aborting the whole strip.
+ *   - Always tears down the mounted <video> on every resolution path
+ *     (timeout, completion, decode error) so the body never grows a
+ *     stray element per upload.
+ *
+ * Output is JPEG **data URLs** because the strip is purely a UI hint
+ * — they live in component state and are never persisted on the draft.
+ * The committed "Use this frame" path still routes through the hosted
+ * uploadCapturedFrame helper below so the sep-photo-upload-requirement
+ * (no data: URLs in the published payload) remains intact.
+ */
+async function extractFilmstripFrames(
+  objectUrl: string,
+  count: number,
+  totalTimeoutMs: number = FILMSTRIP_TOTAL_TIMEOUT_MS,
+): Promise<string[]> {
+  return new Promise((resolve) => {
+    const frames: string[] = [];
+    const video = document.createElement("video");
+    video.muted = true;
+    video.setAttribute("muted", "");
+    video.playsInline = true;
+    video.setAttribute("playsinline", "");
+    video.preload = "auto";
+    Object.assign(video.style, {
+      position: "absolute",
+      left: "0px",
+      top: "0px",
+      width: "1px",
+      height: "1px",
+      opacity: "0",
+      pointerEvents: "none",
+    });
+    video.setAttribute("aria-hidden", "true");
+
+    let settled = false;
+    let timeoutId: ReturnType<typeof setTimeout> | null = null;
+
+    const cleanup = () => {
+      if (timeoutId !== null) {
+        clearTimeout(timeoutId);
+        timeoutId = null;
+      }
+      try {
+        video.removeAttribute("src");
+        video.load();
+      } catch {
+        // ignore
+      }
+      if (video.parentNode) video.parentNode.removeChild(video);
+    };
+
+    const settle = () => {
+      if (settled) return;
+      settled = true;
+      cleanup();
+      resolve(frames);
+    };
+
+    timeoutId = setTimeout(() => {
+      // Budget expired — resolve with whatever we got. UI falls back
+      // to a plain slider if frames is empty.
+      settle();
+    }, totalTimeoutMs);
+
+    const rvfc = (
+      video as HTMLVideoElement & {
+        requestVideoFrameCallback?: (cb: VideoFrameRequestCallback) => number;
+      }
+    ).requestVideoFrameCallback?.bind(video);
+
+    const drawAndPush = () => {
+      try {
+        const vw = video.videoWidth;
+        const vh = video.videoHeight;
+        if (!vw || !vh) return;
+        // Small thumbnail: longest edge ~128px. The on-screen strip
+        // renders ~48–64px wide per cell, so 128 keeps it crisp on
+        // retina without ballooning the data-URL string in state.
+        const MAX_EDGE = 128;
+        const scale = Math.min(1, MAX_EDGE / Math.max(vw, vh));
+        const dw = Math.max(1, Math.round(vw * scale));
+        const dh = Math.max(1, Math.round(vh * scale));
+        const canvas = document.createElement("canvas");
+        canvas.width = dw;
+        canvas.height = dh;
+        const ctx = canvas.getContext("2d");
+        if (!ctx) return;
+        ctx.drawImage(video, 0, 0, dw, dh);
+        frames.push(canvas.toDataURL("image/jpeg", 0.7));
+      } catch {
+        // Per-frame failure: skip and move on.
+      }
+    };
+
+    const armPainted = (onPainted: () => void) => {
+      if (rvfc) {
+        rvfc(() => requestAnimationFrame(onPainted));
+      } else {
+        video.addEventListener("seeked", () => requestAnimationFrame(onPainted), {
+          once: true,
+        });
+      }
+    };
+
+    const seekNext = (index: number, duration: number) => {
+      if (settled) return;
+      if (index >= count) {
+        settle();
+        return;
+      }
+      // Evenly distributed. Center each frame in its slice + skip the
+      // very start (some encoders don't paint frame 0) and very end
+      // (often a partial frame on phone clips).
+      const target = ((index + 0.5) / count) * duration;
+      const seekTo = Math.max(0.05, Math.min(target, Math.max(0.05, duration - 0.05)));
+      armPainted(() => {
+        drawAndPush();
+        seekNext(index + 1, duration);
+      });
+      try {
+        video.currentTime = seekTo;
+      } catch {
+        // Skip this frame on error.
+        seekNext(index + 1, duration);
+      }
+    };
+
+    video.addEventListener(
+      "loadeddata",
+      () => {
+        // Decode-force on iOS (same trick as captureFrameBlob).
+        const playAttempt = video.play();
+        if (playAttempt && typeof playAttempt.then === "function") {
+          playAttempt
+            .then(() => {
+              try {
+                video.pause();
+              } catch {
+                // ignore
+              }
+            })
+            .catch(() => {
+              // ignore
+            });
+        }
+        const duration = video.duration;
+        if (!Number.isFinite(duration) || duration <= 0) {
+          settle();
+          return;
+        }
+        seekNext(0, duration);
+      },
+      { once: true },
+    );
+    video.onerror = () => settle();
+
     document.body.appendChild(video);
     video.src = objectUrl;
   });
