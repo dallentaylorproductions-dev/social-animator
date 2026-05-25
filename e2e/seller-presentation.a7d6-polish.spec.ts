@@ -21,13 +21,17 @@ import { test, expect } from '@playwright/test';
  *
  *   Fix 3: A7d.6's polyline-avoidance pushed the "$685k" tag to corners
  *          and chopped "RECOMMENDED" at the left edge. A7d.7 kept both
- *          labels ON the dashed line behind paper chips. **A7d.9 then
- *          replaced the value-scaled line entirely** with a fixed-top
- *          reference banner: dashed line pinned to a fixed y near the
- *          top of the viewBox, both labels stacked top-left on chips,
- *          decoupled from the y-scale. The geometry test now asserts
- *          that those positions are constant for any data shape and
- *          stay inside the plot / clear of the callout + axis row.
+ *          labels ON the dashed line behind paper chips. **A7d.9
+ *          replaced the value-scaled line entirely** with a fixed
+ *          reference banner: dashed line pinned to a fixed y, both
+ *          labels stacked top-left on chips, decoupled from the y-scale.
+ *          **A7d.10** then mirrored the right-side current-value callout:
+ *          the dashed line moved DOWN into the gap between the header
+ *          band (callout y ∈ [25, 95]) and the plot grid (y = 104), and
+ *          the label stack flipped so the "RECOMMENDED" caption sits
+ *          ABOVE the price chip. The geometry test asserts those positions
+ *          are constant for any data shape and stay inside the plot /
+ *          clear of the callout + axis row.
  *
  *   Fix 4: A7d.6's "Latest month" device-clock default — verified math
  *          and added a Dec→Jan wrap test. No off-by-one (Dallen's "JUN
@@ -317,18 +321,21 @@ test.describe('A7d.7 / Fix 2 — Months-of-history input is clearable + retypabl
 });
 
 // =====================================================================
-// A7d.9 Fix 3 — Recommended annotation is a FIXED-TOP reference banner.
+// A7d.10 Fix 3 — Recommended annotation is a FIXED reference banner
+// that mirrors the right-side current-value callout.
 // =====================================================================
 //
 // A7d.6/.7's adaptive placeRecAnnotation was deleted. The recommended
-// dashed line is now pinned to a fixed y near the top of the viewBox,
-// with the price + "RECOMMENDED" caption stacked top-left behind paper
-// chips. Layout is the same for any data shape (recommended above /
-// below / within the data range), so we assert constants — not a
-// per-shape placement — and verify the band stays inside the plot and
-// never collides with the polyline / current callout / axis row.
+// dashed line is pinned to a fixed y JUST BELOW the chart's header band
+// (above the plot grid), with the "RECOMMENDED" caption stacked ABOVE
+// the price chip on the left — mirroring the right-side "MAY '26 ·
+// CURRENT" caption + current value callout. Layout is the same for any
+// data shape (recommended above / below / within the data range), so we
+// assert constants — not a per-shape placement — and verify the band
+// stays inside the plot and never collides with the polyline / current
+// callout / axis row.
 
-test.describe('A7d.9 / Fix 3 — Recommended annotation pins to a fixed top band', () => {
+test.describe('A7d.10 / Fix 3 — Recommended annotation pins to a fixed band below the header row', () => {
   // Chart geometry constants from presentation-page.tsx AreaChart.
   const X0 = 40;
   const X1 = 388;
@@ -365,8 +372,10 @@ test.describe('A7d.9 / Fix 3 — Recommended annotation pins to a fixed top band
     }));
   }
 
-  test('exported constants describe a left-anchored, stacked, top-of-viewBox band', () => {
-    // Dashed line is well above the plot grid — no overlap with data.
+  test('exported constants describe a left-anchored, stacked band just below the header row', () => {
+    // Dashed line sits just below the header band and above the plot
+    // grid — clear of the upper-right callout AND of the data polyline.
+    expect(REC_LINE_Y).toBeGreaterThanOrEqual(CALLOUT.y1);
     expect(REC_LINE_Y).toBeLessThan(Y_TOP_GRID);
     expect(REC_LINE_Y).toBeGreaterThanOrEqual(VIEWBOX_TOP);
 
@@ -374,9 +383,9 @@ test.describe('A7d.9 / Fix 3 — Recommended annotation pins to a fixed top band
     expect(REC_LEFT_X).toBeGreaterThan(PLOT_LEFT);
     expect(REC_NUM_CHIP.x).toBe(REC_LABEL_CHIP.x);
 
-    // Price sits closer to the line; caption stacks BELOW the price.
-    expect(REC_NUM_Y).toBeGreaterThan(REC_LINE_Y);
-    expect(REC_LABEL_Y).toBeGreaterThan(REC_NUM_Y);
+    // Caption sits ABOVE the price; both stack above the line.
+    expect(REC_LABEL_Y).toBeLessThan(REC_NUM_Y);
+    expect(REC_NUM_Y).toBeLessThan(REC_LINE_Y);
 
     // The two chips don't overlap each other.
     const a = REC_NUM_CHIP;
@@ -387,6 +396,11 @@ test.describe('A7d.9 / Fix 3 — Recommended annotation pins to a fixed top band
       a.y + a.height <= b.y ||
       b.y + b.height <= a.y;
     expect(disjoint).toBe(true);
+
+    // Label chip (caption) sits above the number chip (price).
+    expect(REC_LABEL_CHIP.y + REC_LABEL_CHIP.height).toBeLessThanOrEqual(
+      REC_NUM_CHIP.y,
+    );
   });
 
   for (const chipName of ['num', 'label'] as const) {

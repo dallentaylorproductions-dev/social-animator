@@ -753,14 +753,15 @@ function AreaChart({
   const current = points[points.length - 1];
   const recommendedNumeric = parsePriceToNumber(recommended);
 
-  // A7d.9 — recommended price renders as a fixed-top reference banner.
-  // The dashed line + labels pin to a fixed band at the TOP of the chart,
-  // decoupled from the y-scale. The NUMBER communicates the value;
+  // A7d.10 — recommended price renders as a fixed reference banner that
+  // mirrors the right-side current-value callout. The dashed line + labels
+  // pin to a fixed band JUST BELOW the chart's header row (caption +
+  // value), decoupled from the y-scale. The NUMBER communicates the value;
   // vertical position no longer encodes it (Dallen's deliberate call:
   // clean > positionally-encoded). Supersedes A7d.6/.7 placeRecAnnotation
-  // — at the top there's clear space, so chip-collision / edge-swap
-  // gymnastics are gone. Layout matches Dallen's 2026-05-23 smoke: dashed
-  // line across the top; price + caption stacked top-left on paper chips.
+  // — in this band there's clear space, so chip-collision / edge-swap
+  // gymnastics are gone. Left-side stack mirrors the right: "RECOMMENDED"
+  // caption on top, price chip below, then the dashed line.
 
   return (
     <div className="chart-wrap reveal">
@@ -916,30 +917,34 @@ function AreaChart({
 }
 
 /**
- * A7d.9 — fixed-top reference banner for the recommended-price line.
+ * A7d.10 — fixed reference banner for the recommended-price line, with
+ * the left-side stack mirroring the right-side current-value callout.
  *
- * The dashed line sits at a fixed y near the TOP of the chart viewBox,
- * NOT at the data-scaled y. The price tag + "RECOMMENDED" caption stack
- * top-left, both anchored at the plot's left edge, both above paper-tint
- * chips so the dashed line stays continuous-looking across the top.
+ * The dashed line sits at a fixed y JUST BELOW the chart's header band
+ * (caption + value), NOT at the data-scaled y. The "RECOMMENDED" caption
+ * + price chip stack top-left (caption on top, price below), mirroring
+ * the right-side "MAY '26 · CURRENT" caption + current value callout.
  *
  * Supersedes A7d.6/A7d.7 placeRecAnnotation (chip-on-line, edge-swap,
- * callout-avoidance) — at the top there's clear space, so the gymnastics
- * are no longer needed. Vertical position no longer encodes the recommended
- * price relative to the trend; the number communicates the value.
+ * callout-avoidance) — in this band there's clear space, so the
+ * gymnastics are no longer needed. Vertical position no longer encodes
+ * the recommended price relative to the trend; the number communicates
+ * the value.
  *
  * Geometry (viewBox 400 × 234, SVG y grows downward):
- *   - rec line y = 22 (well above plot band y ∈ [104, 184])
- *   - left inset = 6 from X0; both labels anchored at start
- *   - price chip sits just below the line; caption stacks below the price
+ *   - REC_LABEL_Y = 52: caption baseline (mirrors right-side callout-sub)
+ *   - REC_NUM_Y   = 86: price baseline   (mirrors right-side callout-text)
+ *   - REC_LINE_Y  = 96: dashed line just below header band, above plot
+ *   - plot band   = y ∈ [104, 184]
  *   - upper-right callout (≈ x ∈ [278, 388], y ∈ [25, 95]) is untouched
- *     since the left-anchored chips never reach that x band
+ *     since the left-anchored chips never reach that x band; the line
+ *     lives in the gap between the callout band and the plot grid.
  */
-export const REC_LINE_Y = 22;
+export const REC_LINE_Y = 96;
 const REC_LEFT_INSET = 6;
 export const REC_LEFT_X = 40 + REC_LEFT_INSET;
-export const REC_NUM_Y = REC_LINE_Y + 14;
-export const REC_LABEL_Y = REC_NUM_Y + 18;
+export const REC_LABEL_Y = 52;
+export const REC_NUM_Y = 86;
 
 const REC_NUM_TEXT_WIDTH = 50; // "$685k" / "$1.2m" visible width
 const REC_NUM_TEXT_HEIGHT = 14; // cap-height + descender for 16px display
