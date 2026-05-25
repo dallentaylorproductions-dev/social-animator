@@ -28,17 +28,18 @@ import { test, expect } from '@playwright/test';
  *          **A7d.10** then placed the dashed line in the gap between the
  *          header band (callout y ∈ [25, 95]) and the plot grid (y = 104),
  *          and flipped the label stack so the "RECOMMENDED" caption sits
- *          ABOVE the price chip. **A7d.10.1** tightens that badge: A7d.10
- *          mirrored the price baseline to the right-side callout-text
- *          (y=86), which opened a large empty gap between the caption
- *          (y=52) and the price. A7d.10.1 stops mirroring the price —
- *          REC_NUM_Y drops to 70 (tight under the caption) and REC_LINE_Y
- *          to 80 (just beneath the price), so RECOMMENDED + price + line
- *          form a compact top-left badge. Caption alignment with the right
- *          callout-sub is preserved. The geometry test asserts the gap is
- *          small and the price baseline sits ABOVE the right-side current
- *          value, for any data shape, while staying inside the plot and
- *          clear of the callout + axis row.
+ *          ABOVE the price chip. **A7d.10.1** tightened that badge by
+ *          dropping REC_NUM_Y to 70 (tight under the caption) and
+ *          REC_LINE_Y to 80 — but the right-side current value was still
+ *          pinned at y=86, so the dashed line at y=80 landed in the same
+ *          row as the current value and sliced through the number whenever
+ *          the recommended price was below it. **A7d.10.2** fixes the
+ *          collision by aligning BOTH header values to a single baseline
+ *          (clean header band): captions at y=52, values at y=70, dashed
+ *          line at y=80 BELOW both values. The geometry test asserts the
+ *          two value baselines are EQUAL (REC_NUM_Y === callout-text y),
+ *          the two caption baselines are EQUAL, and the dashed line sits
+ *          between the value row and the plot grid — for any data shape.
  *
  *   Fix 4: A7d.6's "Latest month" device-clock default — verified math
  *          and added a Dec→Jan wrap test. No off-by-one (Dallen's "JUN
@@ -328,23 +329,27 @@ test.describe('A7d.7 / Fix 2 — Months-of-history input is clearable + retypabl
 });
 
 // =====================================================================
-// A7d.10.1 Fix 3 — Recommended annotation is a FIXED reference badge,
-// tight top-left (caption + price + line stacked together).
+// A7d.10.2 Fix 3 — Recommended annotation is a FIXED reference badge,
+// with the header values aligned to a clean header band.
 // =====================================================================
 //
 // A7d.6/.7's adaptive placeRecAnnotation was deleted. The recommended
 // dashed line is pinned to a fixed y, with the "RECOMMENDED" caption
 // stacked ABOVE the price chip on the left. A7d.10 mirrored the price
 // baseline to the right-side current-value callout-text (y=86), which
-// opened a large empty gap between caption and price. A7d.10.1 stops
-// the mirror: the price now sits tight under the caption (REC_NUM_Y=70)
-// and the dashed line sits just beneath the price (REC_LINE_Y=80),
-// forming a compact top-left badge ABOVE the right-side current value.
-// Layout is the same for any data shape, so we assert constants — not a
-// per-shape placement — and verify the badge stays inside the plot and
-// never collides with the polyline / current callout / axis row.
+// opened a large empty gap between caption and price. A7d.10.1 dropped
+// the price to y=70 (tight under the caption) and the line to y=80 —
+// but with the current value still at y=86, the line at y=80 sat in
+// the SAME row as the current value and sliced through it whenever the
+// recommended price was below the current value. A7d.10.2 aligns BOTH
+// header values to one row: captions at y=52, values at y=70, dashed
+// line at y=80 (BELOW both values). The line can now never overlap
+// either number, for any data shape. Layout is the same for any data
+// shape, so we assert constants — not a per-shape placement — and
+// verify the badge stays inside the plot and never collides with the
+// polyline / current callout / axis row.
 
-test.describe('A7d.10.1 / Fix 3 — Recommended annotation is a compact top-left badge', () => {
+test.describe('A7d.10.2 / Fix 3 — Recommended annotation is a clean header band', () => {
   // Chart geometry constants from presentation-page.tsx AreaChart.
   const X0 = 40;
   const X1 = 388;
@@ -354,8 +359,9 @@ test.describe('A7d.10.1 / Fix 3 — Recommended annotation is a compact top-left
   const X_TICK_TOP = 196;
   // Locked-design upper-right current-value callout rect.
   const CALLOUT = { x0: X1 - 110, y0: 25, x1: X1, y1: 95 } as const;
-  // Right-side current-value text baseline (callout-text).
-  const CALLOUT_TEXT_Y = 86;
+  // Right-side caption + value text baselines, locked to the header band.
+  const CALLOUT_SUB_Y = 52;
+  const CALLOUT_TEXT_Y = 70;
   const PLOT_LEFT = X0;
   const PLOT_RIGHT = X1;
   const VIEWBOX_TOP = 0;
@@ -383,11 +389,8 @@ test.describe('A7d.10.1 / Fix 3 — Recommended annotation is a compact top-left
     }));
   }
 
-  test('exported constants describe a compact, left-anchored top-left badge', () => {
+  test('exported constants describe a clean header band with the line below both values', () => {
     // Dashed line sits above the plot grid and inside the viewBox.
-    // (The A7d.10 ">= CALLOUT.y1" floor was a side effect of mirroring
-    // the price to the right callout-text — A7d.10.1 stops the mirror,
-    // so the line sits higher, tucked under the price.)
     expect(REC_LINE_Y).toBeLessThan(Y_TOP_GRID);
     expect(REC_LINE_Y).toBeGreaterThanOrEqual(VIEWBOX_TOP);
 
@@ -399,14 +402,17 @@ test.describe('A7d.10.1 / Fix 3 — Recommended annotation is a compact top-left
     expect(REC_LABEL_Y).toBeLessThan(REC_NUM_Y);
     expect(REC_NUM_Y).toBeLessThan(REC_LINE_Y);
 
-    // A7d.10.1: caption → price is a TIGHT pair (about one caption
-    // line-height apart). A7d.10 mirrored the price to the right
-    // callout-text and opened a 34-unit gap; the badge must be compact.
+    // Caption → price is a TIGHT pair (about one caption line-height
+    // apart). The badge must stay compact.
     expect(REC_NUM_Y - REC_LABEL_Y).toBeLessThanOrEqual(22);
 
-    // A7d.10.1: recommended price baseline must sit ABOVE the right-side
-    // current-value baseline — the two are no longer mirrored.
-    expect(REC_NUM_Y).toBeLessThan(CALLOUT_TEXT_Y);
+    // A7d.10.2: header values share ONE baseline (aligned header band),
+    // captions share one baseline, and the dashed line sits BELOW both
+    // values — never in the same row as either, for any data shape.
+    expect(REC_LABEL_Y).toBe(CALLOUT_SUB_Y);
+    expect(REC_NUM_Y).toBe(CALLOUT_TEXT_Y);
+    expect(REC_NUM_Y).toBeLessThan(REC_LINE_Y);
+    expect(REC_LINE_Y).toBeLessThan(Y_TOP_GRID);
 
     // The two chips don't overlap each other.
     const a = REC_NUM_CHIP;

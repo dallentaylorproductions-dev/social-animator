@@ -789,7 +789,7 @@ function AreaChart({
         <text className="callout-sub" x={X1} y={52} textAnchor="end">
           {current.month} · current
         </text>
-        <text className="callout-text" x={X1} y={86} textAnchor="end">
+        <text className="callout-text" x={X1} y={70} textAnchor="end">
           {formatCompact(current.value)}
         </text>
 
@@ -917,17 +917,22 @@ function AreaChart({
 }
 
 /**
- * A7d.10.1 — fixed reference banner for the recommended-price line.
+ * A7d.10.2 — fixed reference banner for the recommended-price line,
+ * with a CLEAN HEADER BAND: both header values share one baseline.
  *
- * The dashed line sits at a fixed y JUST BELOW the recommended-price
- * chip, NOT at the data-scaled y. The "RECOMMENDED" caption + price
- * chip form a compact top-left badge: caption on top, price tucked
- * tightly beneath it, dashed line directly underneath. The caption
- * still aligns with the right-side "MAY '26 · CURRENT" caption, but
- * the price intentionally sits ABOVE the right-side current value —
- * the two values are not mirrored. (A7d.10 mirrored the price baseline
- * to the right callout-text at y=86, which opened a large empty gap
- * between the caption and the price; that mirroring is removed here.)
+ * The dashed line sits at a fixed y JUST BELOW both header values, NOT
+ * at the data-scaled y. The "RECOMMENDED" caption + price chip on the
+ * left and the "{month} · CURRENT" caption + current value on the right
+ * are aligned to the same two-row header band: captions at y=52, values
+ * at y=70. The dashed line sits BELOW both values at y=80, so it can
+ * never overlap either number — for any data (recommended < current OR
+ * recommended > current).
+ *
+ * A7d.10.1 left the current value pinned at y=86 (its locked-design
+ * baseline), which placed it in the SAME row as the dashed line at y=80
+ * and let the line slice through the number whenever the recommended
+ * price was below the current value. Aligning both values to y=70 and
+ * keeping the line at y=80 fixes the collision for every data shape.
  *
  * Supersedes A7d.6/A7d.7 placeRecAnnotation (chip-on-line, edge-swap,
  * callout-avoidance) — in this band there's clear space, so the
@@ -937,9 +942,8 @@ function AreaChart({
  *
  * Geometry (viewBox 400 × 234, SVG y grows downward):
  *   - REC_LABEL_Y = 52: caption baseline (aligned with right callout-sub)
- *   - REC_NUM_Y   = 70: price baseline   (tight under caption; ABOVE the
- *                       right-side callout-text at y=86 — no longer mirrored)
- *   - REC_LINE_Y  = 80: dashed line just beneath the price chip
+ *   - REC_NUM_Y   = 70: price baseline   (aligned with right callout-text)
+ *   - REC_LINE_Y  = 80: dashed line BELOW both header values
  *   - plot band   = y ∈ [104, 184]
  *   - upper-right callout (≈ x ∈ [278, 388], y ∈ [25, 95]) is untouched
  *     since the left-anchored chips never reach that x band; the line
