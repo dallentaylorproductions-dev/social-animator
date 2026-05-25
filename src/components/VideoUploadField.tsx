@@ -1,7 +1,18 @@
 "use client";
 
-import { useCallback, useEffect, useRef, useState } from "react";
-import { upload } from "@vercel/blob/client";
+import {
+  useCallback,
+  useEffect,
+  useRef,
+  useState,
+  useSyncExternalStore,
+} from "react";
+import {
+  getVideoUploadSessionState,
+  resetVideoUploadSession,
+  startVideoUpload,
+  subscribeVideoUploadSession,
+} from "@/lib/video-upload-session";
 
 /**
  * VideoUploadField — phone-camera-roll → hosted-URL uploader
@@ -191,26 +202,73 @@ export function VideoUploadField({
   currentPosterUrl,
 }: VideoUploadFieldProps) {
   const fileRef = useRef<HTMLInputElement>(null);
-  const [uploading, setUploading] = useState(false);
   const [error, setError] = useState<string | null>(null);
-  // A7d.5 — upload-progress percentage. `null` means "in-flight but no
-  // progress event yet" (handshake before the byte stream starts) →
-  // render the bar in indeterminate mode. A number 0–100 → determinate
-  // bar + label. Reset to null on every fresh upload attempt.
-  const [progressPct, setProgressPct] = useState<number | null>(null);
 
-  // A7d.8 — local in-session state for the scrubber + frame capture.
+  // A7d.11 — the in-flight upload state lives in a module-level session
+  // (src/lib/video-upload-session.ts), NOT in this component's `useState`.
+  // That's load-bearing for two real-deploy bugs Dallen hit 2026-05-24:
+  // (1) DESKTOP: any parent re-render that unmounts/remounts the field
+  // would lose `uploading` + `localObjectUrl` and the completed-upload UI
+  // never rendered, even though the blob did land. (2) BOTH: editing
+  // sibling fields during an upload clobbered the user's typing because
+  // the OLD onChange arrow captured a stale `setVideo` closure.
   //
-  // `localFile` is the original File the agent just picked. We hold it
-  // for the lifetime of this mount because canvas.toBlob() throws
-  // SecurityError when the source <video> is cross-origin (the hosted
-  // Blob URL is cross-origin from the wizard's hostname). Reading from
-  // `URL.createObjectURL(file)` sidesteps the taint entirely. After a
-  // page reload the File is gone and the scrubber hides — the
-  // previously-captured auto / scrub poster URLs still persist on the
-  // draft so the seller page stays non-blank.
-  const [localObjectUrl, setLocalObjectUrl] = useState<string | null>(null);
-  const [duration, setDuration] = useState<number | null>(null);
+  // Both go away when the upload state outlives any React mount and the
+  // completion path uses a functional setDraft updater (the parent owns
+  // that — see StepEditorial.tsx). The session key is the upload folder
+  // (one in-flight upload per field surface). useSyncExternalStore is
+  // the React 19 hook for subscribing to a non-React store while keeping
+  // the snapshot stable across re-renders.
+  const sessionKey = folder ?? "uploads";
+  const session = useSyncExternalStore(
+    useCallback((l) => subscribeVideoUploadSession(sessionKey, l), [sessionKey]),
+    useCallback(() => getVideoUploadSessionState(sessionKey), [sessionKey]),
+    // Server snapshot — the session is client-only; on the server we
+    // always look idle so SSR + first-client-paint match.
+    useCallback(() => getVideoUploadSessionState(sessionKey), [sessionKey]),
+  );
+  const uploading = session.status === "uploading";
+  const progressPct = session.progressPct;
+  const localObjectUrl = session.localObjectUrl;
+
+  // A7d.11 — stash the latest `onChange` so the completion effect can
+  // call it without re-firing whenever the prop's identity changes (each
+  // parent render creates a fresh inline arrow). The effect's deps are
+  // the session's *terminal* fields (status + hostedUrl), so it fires
+  // exactly once per completed upload regardless of prop churn.
+  const onChangeRef = useRef(onChange);
+  useEffect(() => {
+    onChangeRef.current = onChange;
+  });
+
+  // A7d.11 — drive the parent's draft from a `completed` session. Use a
+  // mounted flag to gate against the `value`-feedback double-fire: when
+  // the parent applies the URL, `value === session.hostedUrl` becomes
+  // true on the next render, the effect sees the post-fire state, and
+  // does nothing. If the field remounts mid-upload, this effect still
+  // fires once the session reaches `completed` — the parent's functional
+  // setDraft merges the URL into the latest draft without clobbering.
+  const lastFiredHostedUrlRef = useRef<string | null>(null);
+  useEffect(() => {
+    if (
+      session.status === "completed" &&
+      session.hostedUrl &&
+      session.hostedUrl !== value &&
+      lastFiredHostedUrlRef.current !== session.hostedUrl
+    ) {
+      lastFiredHostedUrlRef.current = session.hostedUrl;
+      onChangeRef.current(
+        session.hostedUrl,
+        session.durationSeconds !== null && Number.isFinite(session.durationSeconds)
+          ? session.durationSeconds
+          : undefined,
+      );
+    }
+  }, [session.status, session.hostedUrl, session.durationSeconds, value]);
+
+  const [duration, setDuration] = useState<number | null>(
+    session.durationSeconds,
+  );
   // Scrubber position in seconds. `null` until the agent first touches
   // the slider — keeps the UI from claiming a chosen frame they didn't
   // pick. Once they drag, this is the timestamp the main video is
@@ -269,13 +327,9 @@ export function VideoUploadField({
   const pendingSeekRef = useRef<number | null>(null);
   const seekInFlightRef = useRef<boolean>(false);
 
-  // Revoke the object URL when the component unmounts or the file is
-  // replaced. Object URLs hold the file in memory until revoked.
-  useEffect(() => {
-    return () => {
-      if (localObjectUrl) URL.revokeObjectURL(localObjectUrl);
-    };
-  }, [localObjectUrl]);
+  // A7d.11 — local objectURL lifecycle is owned by the session module
+  // (it survives remount); revocation happens on Replace / Remove via
+  // `resetVideoUploadSession`. No per-mount cleanup needed here.
 
   /**
    * Start the next pending seek IF none is in flight. Called from
@@ -344,6 +398,13 @@ export function VideoUploadField({
     // URL on reload, or Replace flow swaps the file). value AND
     // localObjectUrl both feed `src` on the main video.
   }, [value, localObjectUrl, pumpSeek]);
+
+  // A7d.11 — no useEffect needed to mirror session.durationSeconds into
+  // local `duration`: the useState above initializes from the session,
+  // and on remount React calls the initializer again, picking up the
+  // session value across the mount boundary. After mount, fresh
+  // uploads update local `duration` in handleFile BEFORE delegating to
+  // startVideoUpload, so the two stay coherent without a sync effect.
 
   // A7d.8.3 — filmstrip pre-extraction. Best-effort, fire-and-forget.
   // Runs on every fresh local file (and re-runs on Replace). Cancelled
@@ -473,122 +534,79 @@ export function VideoUploadField({
       return;
     }
 
-    // A7d.8 — stash the local File + objectURL BEFORE the network
-    // upload starts so the scrubber + first-frame capture can read
-    // from the CORS-free local source even if the hosted upload races
-    // ahead. Revoke any previous one first to avoid leaking blob:
-    // memory across Replace flows.
-    if (localObjectUrl) URL.revokeObjectURL(localObjectUrl);
-    const nextObjectUrl = URL.createObjectURL(file);
-    setLocalObjectUrl(nextObjectUrl);
-    setDuration(Number.isFinite(durationSeconds) ? durationSeconds : null);
     setScrubTime(null);
+    setDuration(Number.isFinite(durationSeconds) ? durationSeconds : null);
 
-    setUploading(true);
-    setProgressPct(null);
+    // A7d.11 — delegate the upload to the module-level session. State
+    // (uploading/progress/localObjectUrl/hostedUrl) lives there now so
+    // a re-render or remount of this field can't lose it. The fileRef
+    // value is cleared here so picking the SAME file again immediately
+    // after a Remove still fires onChange (otherwise <input type=file>
+    // de-dups by value and the change event never fires).
+    if (fileRef.current) fileRef.current.value = "";
+    const ext = extensionForType(file.type);
+    const folderSegment = folder ?? "uploads";
+    const pathname = `${folderSegment}/${Date.now()}.${ext}`;
+    const MULTIPART_THRESHOLD = 10 * 1024 * 1024;
+    // Fire-and-forget. The session's external store drives the UI;
+    // the completion effect at the top of this component picks up the
+    // hostedUrl and calls onChange exactly once. Awaiting here would
+    // re-couple the in-flight state to this React frame's lifecycle —
+    // the whole point of the A7d.11 refactor is that this component
+    // can mount/unmount during the upload and the upload doesn't care.
+    void startVideoUpload(sessionKey, file, {
+      pathname,
+      contentType: file.type,
+      handleUploadUrl: "/api/upload-video",
+      multipart: file.size > MULTIPART_THRESHOLD,
+      durationSeconds: Number.isFinite(durationSeconds)
+        ? durationSeconds
+        : null,
+    });
+  };
 
-    // Browser → Vercel Blob direct upload (A7d.3.1).
-    //
-    // upload() POSTs a small JSON envelope to handleUploadUrl to
-    // obtain a short-lived client token, then streams the file
-    // bytes straight to Vercel Blob using that token. The file
-    // never traverses our Function, so the platform's 4.5 MB body
-    // limit does not apply.
-    //
-    // multipart is enabled only above MULTIPART_THRESHOLD (~10 MB):
-    // small files take the single-PUT path (one network call to
-    // the Blob API), large files get chunked + parallelized so
-    // a 200 MB phone clip doesn't time out on flaky cell uplinks.
-    //
-    // A7d.5 — `onUploadProgress` is fired by @vercel/blob 2.4.0
-    // throughout the byte stream (both single-PUT and multipart
-    // paths). The handshake POST that precedes it does NOT fire the
-    // callback, so the bar starts indeterminate until the first
-    // event lands; once a percentage arrives it switches to
-    // determinate so the agent sees concrete movement.
-    let hostedUrl: string;
-    try {
-      const ext = extensionForType(file.type);
-      const folderSegment = folder ?? "uploads";
-      const pathname = `${folderSegment}/${Date.now()}.${ext}`;
-      const MULTIPART_THRESHOLD = 10 * 1024 * 1024;
-      const result = await upload(pathname, file, {
-        access: "public",
-        handleUploadUrl: "/api/upload-video",
-        contentType: file.type,
-        multipart: file.size > MULTIPART_THRESHOLD,
-        onUploadProgress: (e) => {
-          if (typeof e?.percentage === "number" && Number.isFinite(e.percentage)) {
-            // Clamp into [0, 100] — the SDK normally stays in range
-            // but a slightly-over-100 final tick has been seen in the
-            // multipart path.
-            const pct = Math.max(0, Math.min(100, e.percentage));
-            setProgressPct(pct);
-          }
-        },
-      });
-      if (!result.url || !/^https?:\/\//.test(result.url)) {
-        throw new Error("Upload did not return a hosted URL");
-      }
-      hostedUrl = result.url;
-    } catch (err) {
-      setError(err instanceof Error ? err.message : "Upload failed");
-      setUploading(false);
-      setProgressPct(null);
-      if (fileRef.current) fileRef.current.value = "";
+  // A7d.11 — never-blank auto first-frame capture, moved out of
+  // handleFile so it survives a remount mid-upload. Fires when the
+  // session reaches `completed` AND we have the local objectURL +
+  // a poster sink to fill. Best-effort: a soft-fail leaves the seller
+  // page's native first-frame fallback in place.
+  const autoCapturedRef = useRef<string | null>(null);
+  useEffect(() => {
+    if (
+      session.status !== "completed" ||
+      !session.localObjectUrl ||
+      !onPosterChange ||
+      autoCapturedRef.current === session.hostedUrl
+    ) {
       return;
     }
-
-    // A7d.8.1 — DONE STATE, decoupled from frame capture. The Blob
-    // upload resolved with a hosted URL, so the field MUST reach the
-    // done state here — clear "Uploading…", re-enable Replace/Remove,
-    // and notify the parent. Whatever happens in the auto-capture
-    // below is best-effort and CANNOT freeze the UI.
-    //
-    // Pre-A7d.8.1 this lived in a `finally` AFTER the awaited
-    // captureFrameBlob. On iOS Safari the capture could hang (the
-    // off-DOM <video> never decoded a frame), which left the field
-    // stuck on "Uploading… 100%" with the scrubber disabled even
-    // though the upload was finished. Dallen's 2026-05-23 real-iPhone
-    // smoke caught it.
-    onChange(
-      hostedUrl,
-      Number.isFinite(durationSeconds) ? durationSeconds : undefined,
-    );
-    setUploading(false);
-    setProgressPct(null);
-    if (fileRef.current) fileRef.current.value = "";
-
-    // A7d.8 P1 — never-blank baseline: capture the FIRST FRAME of the
-    // freshly-uploaded video and persist it as autoPosterUrl. Reads
-    // from the LOCAL File via objectURL (no CORS taint). Some encoders
-    // don't paint frame 0 until a tiny seek lands, so we seek to 0.1s.
-    //
-    // This is a FIRE-AND-FORGET best-effort step: it must never gate
-    // the done state above. captureFrameBlob carries its own hard
-    // timeout (FRAME_CAPTURE_TIMEOUT_MS) so a stalled decoder can't
-    // freeze the UI, and the seller page's never-blank fallback (omit
-    // empty poster attr → preload="metadata") covers a timeout.
-    if (onPosterChange) {
-      setAutoCapturing(true);
+    autoCapturedRef.current = session.hostedUrl;
+    let cancelled = false;
+    setAutoCapturing(true);
+    const sourceUrl = session.localObjectUrl;
+    (async () => {
       try {
-        const frame = await captureFrameBlob(nextObjectUrl, 0.1);
+        const frame = await captureFrameBlob(sourceUrl, 0.1);
         const posterUrl = await uploadCapturedFrame(
           frame,
           `${folder ?? "uploads"}-poster`,
         );
-        onPosterChange(posterUrl, "auto");
+        if (!cancelled) onPosterChange(posterUrl, "auto");
       } catch {
-        // Soft-fail — the explicit "Use this frame" scrubber path and
-        // the manual ImageUploadField override both remain available,
-        // and either one will fill the poster slot. The seller page's
-        // <video preload="metadata"> with no poster attribute will
-        // paint a native first frame in the meantime.
+        // Soft-fail; the renderer's preload="metadata" + no-poster
+        // fallback paints a native first frame in the meantime.
       } finally {
-        setAutoCapturing(false);
+        if (!cancelled) setAutoCapturing(false);
       }
-    }
-  };
+    })();
+    return () => {
+      cancelled = true;
+    };
+    // `folder` and `onPosterChange` are stable across the upload's
+    // lifetime in practice; we depend only on the terminal session
+    // fields so a redundant in-progress re-render can't re-fire.
+    // eslint-disable-next-line react-hooks/exhaustive-deps
+  }, [session.status, session.hostedUrl, session.localObjectUrl]);
 
   // A7d.8.4 — "Use this frame" captures from the SAME <video> the agent
   // is previewing, at its CURRENT painted frame. Before A7d.8.4 this
@@ -625,14 +643,29 @@ export function VideoUploadField({
   };
 
   const handleRemove = () => {
-    if (localObjectUrl) URL.revokeObjectURL(localObjectUrl);
-    setLocalObjectUrl(null);
+    // A7d.11 — tear down the module-level session (revokes the local
+    // objectURL, aborts any in-flight upload, snaps to `idle`). The
+    // completion-effect guard `lastFiredHostedUrlRef` is intentionally
+    // NOT reset here — without that, a session that's torn down and
+    // immediately restarted with the SAME hostedUrl could re-fire
+    // onChange. Replace below uses a fresh pathname (Date.now()) so
+    // hostedUrl uniqueness in practice is a non-issue.
+    resetVideoUploadSession(sessionKey);
     setDuration(null);
     setScrubTime(null);
     setFilmstripFrames([]);
     setFilmstripStatus("idle");
+    setError(null);
     onChange("");
   };
+
+  // A7d.11 — display the field-local error (pre-upload validations,
+  // frame-capture failures) PLUS the upload session's error if it
+  // failed. Computed inline rather than mirrored via useEffect so we
+  // don't trigger the cascading-setState lint and so the displayed
+  // error is always a pure function of the current state.
+  const displayedError =
+    error ?? (session.status === "failed" ? session.error : null);
 
   // A7d.8.3 — when the agent clicks a filmstrip frame, jump the slider
   // (and the main video) to that frame's timestamp. Provides a quick
@@ -881,12 +914,12 @@ export function VideoUploadField({
         </>
       )}
 
-      {error && (
+      {displayedError && (
         <p
           className="mt-1 text-[11px] text-red-400"
           data-testid={tid("error")}
         >
-          {error}
+          {displayedError}
         </p>
       )}
 

@@ -246,33 +246,49 @@ test.describe('Seller Presentation — A7d.3.1 walk-through video', () => {
    * exercise isn't tractable.
    */
   test.describe('Wiring — onUploadProgress + progress UI', () => {
-    test('VideoUploadField passes onUploadProgress to @vercel/blob/client and renders a progress bar', () => {
-      const src = readFileSync(
+    test('VideoUploadField + video-upload-session wire onUploadProgress to @vercel/blob/client and render a progress bar', () => {
+      // A7d.11 — the in-flight upload state was extracted from
+      // VideoUploadField into a module-level session at
+      // src/lib/video-upload-session.ts so it survives any React
+      // remount of the field or its parents. The SDK call moved with
+      // it; the FIELD's job is now to subscribe + display.
+      const sessionSrc = readFileSync(
+        resolve(process.cwd(), 'src/lib/video-upload-session.ts'),
+        'utf8',
+      );
+      const fieldSrc = readFileSync(
         resolve(process.cwd(), 'src/components/VideoUploadField.tsx'),
         'utf8',
       );
 
-      // 1) The SDK's progress callback is wired into the upload() options.
-      expect(src).toMatch(/onUploadProgress\s*:/);
+      // 1) The SDK's progress callback is wired into the upload()
+      //    options in the SESSION module (not in the field component).
+      expect(sessionSrc).toMatch(/onUploadProgress\s*:/);
       // The callback reads `percentage` off the event (per the
       // @vercel/blob 2.4.0 UploadProgressEvent shape).
-      expect(src).toMatch(/\.percentage/);
+      expect(sessionSrc).toMatch(/\.percentage/);
 
-      // 2) A determinate progress UI lives in the render tree.
-      expect(src).toContain('data-testid={tid("progress")}');
-      expect(src).toContain('data-testid={tid("progress-fill")}');
+      // 2) The field's determinate progress UI is unchanged: the
+      //    progress bar reads from the subscribed session state.
+      expect(fieldSrc).toContain('data-testid={tid("progress")}');
+      expect(fieldSrc).toContain('data-testid={tid("progress-fill")}');
       // Indeterminate fallback is present (so the bar shows even
       // before the first onUploadProgress event lands).
-      expect(src).toMatch(/data-progress-mode=/);
+      expect(fieldSrc).toMatch(/data-progress-mode=/);
 
-      // 3) The Replace + Remove controls are disabled mid-upload so
-      //    an agent can't double-submit (already true pre-A7d.5, but
-      //    assert it here to lock the contract).
-      expect(src).toMatch(/disabled=\{uploading\}/);
+      // 3) The Replace + Remove controls are still gated on the
+      //    uploading state so an agent can't double-submit.
+      expect(fieldSrc).toMatch(/disabled=\{uploading\}/);
 
-      // 4) Progress state is reset on completion AND failure (the
-      //    `finally` block scrubs both `uploading` and `progressPct`).
-      expect(src).toMatch(/setProgressPct\(null\)/);
+      // 4) A7d.11 — the field NO LONGER imports `upload` from
+      //    @vercel/blob/client directly; only the session module
+      //    does. This guarantees the in-flight upload state isn't
+      //    coupled to the field's mount lifecycle.
+      expect(fieldSrc).not.toMatch(/from\s+["']@vercel\/blob\/client["']/);
+      // And the field DOES import the session contract.
+      expect(fieldSrc).toMatch(
+        /from\s+["']@\/lib\/video-upload-session["']/,
+      );
     });
 
     test('Installed @vercel/blob version supports onUploadProgress (UploadProgressEvent shipped in 2.x)', () => {

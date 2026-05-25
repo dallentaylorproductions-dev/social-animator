@@ -1,11 +1,15 @@
 "use client";
 
-import { useEffect, useMemo, useState } from "react";
+import { useCallback, useEffect, useMemo, useState, useSyncExternalStore } from "react";
 import { ImageUploadField } from "@/components/ImageUploadField";
 import { VideoUploadField } from "@/components/VideoUploadField";
 import { CurrencyInput } from "@/components/inputs/CurrencyInput";
 import { NumberInput } from "@/components/inputs/NumberInput";
 import { PercentInput } from "@/components/inputs/PercentInput";
+import {
+  getVideoUploadSessionState,
+  subscribeVideoUploadSession,
+} from "@/lib/video-upload-session";
 import type {
   AreaStats,
   AreaStatsMonthly,
@@ -13,6 +17,14 @@ import type {
   SellerPresentationDraft,
 } from "../engine/types";
 import { effectivePosterUrl } from "../engine/types";
+
+/**
+ * A7d.11 — the upload session key used by the walk-through video
+ * field. Mirrors the `folder` prop passed to `VideoUploadField` so
+ * StepEditorial and the field both read the same module-level
+ * session. Keep these in sync if the folder ever changes.
+ */
+const VIDEO_UPLOAD_SESSION_KEY = "seller-presentation-video";
 
 /**
  * Seller Presentation Step 5 — Editorial extras (v1.47 / A7d + A7d.1 + A7d.2).
@@ -29,7 +41,17 @@ import { effectivePosterUrl } from "../engine/types";
 
 interface StepEditorialProps {
   draft: SellerPresentationDraft;
-  setDraft: (next: SellerPresentationDraft) => void;
+  /**
+   * A7d.11 — accepts either a replacement draft (legacy callers) or a
+   * functional updater. The functional form is load-bearing for the
+   * walk-through-video upload completion path so a stale onChange
+   * closure cannot clobber the user's mid-upload sibling-field edits.
+   */
+  setDraft: (
+    next:
+      | SellerPresentationDraft
+      | ((prev: SellerPresentationDraft) => SellerPresentationDraft),
+  ) => void;
 }
 
 const inputCls =
@@ -91,7 +113,21 @@ export function StepEditorial({ draft, setDraft }: StepEditorialProps) {
   // remount after hydration.
   const [added, setAdded] = useState<Set<SectionKey>>(() => new Set());
   useEffect(() => {
-    setAdded(new Set(sectionsWithContent(draft)));
+    const initial = new Set(sectionsWithContent(draft));
+    // A7d.11 — if an upload is mid-flight (e.g., this StepEditorial
+    // just remounted while the user's walkthrough video is uploading),
+    // keep the video section open so its in-flight state is reachable.
+    // Without this, a remount whose `draft.video` is still undefined
+    // would re-derive `added` to {} and collapse the section, hiding
+    // the field while the bytes are still flowing — exactly the
+    // desktop "picker resets mid-upload" symptom from 2026-05-24.
+    if (
+      getVideoUploadSessionState(VIDEO_UPLOAD_SESSION_KEY).status !==
+      "idle"
+    ) {
+      initial.add("video");
+    }
+    setAdded(initial);
     // Open exactly the sections that have content on first mount. We
     // intentionally don't depend on `draft` here — subsequent edits
     // shouldn't close a section the agent is actively editing (an
@@ -100,7 +136,30 @@ export function StepEditorial({ draft, setDraft }: StepEditorialProps) {
     // eslint-disable-next-line react-hooks/exhaustive-deps
   }, []);
 
-  const isOpen = (k: SectionKey) => added.has(k);
+  // A7d.11 — subscribe to the walk-through video upload session so we
+  // can render the step-level lock overlay during upload AND keep the
+  // video card open while an upload is in flight even if it landed
+  // here via a remount whose `useEffect` initialization saw an empty
+  // `draft.video`. `useSyncExternalStore` is the React 19 hook for a
+  // stable, snapshot-consistent read of a non-React store.
+  const videoUploadSession = useSyncExternalStore(
+    useCallback(
+      (l) => subscribeVideoUploadSession(VIDEO_UPLOAD_SESSION_KEY, l),
+      [],
+    ),
+    useCallback(
+      () => getVideoUploadSessionState(VIDEO_UPLOAD_SESSION_KEY),
+      [],
+    ),
+    useCallback(
+      () => getVideoUploadSessionState(VIDEO_UPLOAD_SESSION_KEY),
+      [],
+    ),
+  );
+  const videoUploadInFlight = videoUploadSession.status === "uploading";
+
+  const isOpen = (k: SectionKey) =>
+    added.has(k) || (k === "video" && videoUploadInFlight);
 
   const openSection = (k: SectionKey) => {
     setAdded((prev) => {
@@ -117,12 +176,15 @@ export function StepEditorial({ draft, setDraft }: StepEditorialProps) {
       return next;
     });
     // Clear the draft fields so the published page hides the block.
+    // A7d.11 — functional setDraft so a click on Remove that races with
+    // any in-flight write (e.g. a typed sibling field that hasn't
+    // flushed yet) still merges against the freshest draft.
     switch (k) {
       case "video":
-        setDraft({ ...draft, video: undefined });
+        setDraft((prev) => ({ ...prev, video: undefined }));
         break;
       case "areaStats":
-        setDraft({ ...draft, areaStats: undefined });
+        setDraft((prev) => ({ ...prev, areaStats: undefined }));
         break;
     }
   };
@@ -137,23 +199,111 @@ export function StepEditorial({ draft, setDraft }: StepEditorialProps) {
         </p>
       </header>
 
-      <div className="space-y-4">
-        {SECTIONS.map((s) => (
-          <SectionCard
-            key={s.key}
-            def={s}
-            open={isOpen(s.key)}
-            onAdd={() => openSection(s.key)}
-            onRemove={() => closeSection(s.key)}
-          >
-            {s.key === "video" && (
-              <VideoEditor draft={draft} setDraft={setDraft} />
-            )}
-            {s.key === "areaStats" && (
-              <AreaStatsEditor draft={draft} setDraft={setDraft} />
-            )}
-          </SectionCard>
-        ))}
+      {/* A7d.11 — step body wrapper. The lock overlay below sits
+          absolutely over this container while the walk-through video
+          upload is in flight, so the agent cannot edit OTHER fields
+          (or remove/replace the in-flight video card) during the
+          upload. Dallen 2026-05-24 picked this UX explicitly — the
+          upload is quick, so a brief reliable lock is acceptable and
+          is the intended design (vs. trying to support edits during
+          a stale-closure-prone in-flight state). The lock unlocks on
+          completion OR failure (a failed upload must never trap the
+          user — VideoUploadField surfaces a retry + manual fallback). */}
+      <div className="relative">
+        <div
+          className="space-y-4"
+          // aria-busy mirrors the visual lock for assistive tech.
+          aria-busy={videoUploadInFlight}
+          // pointer-events:none on the body during upload moves the
+          // tap target up to the overlay, so a touchstart on a child
+          // input still intercepts cleanly. The visible inputs also
+          // dim slightly so the lock reads as INTENTIONAL not broken.
+          inert={videoUploadInFlight || undefined}
+          data-step-locked={videoUploadInFlight ? "true" : undefined}
+        >
+          {SECTIONS.map((s) => (
+            <SectionCard
+              key={s.key}
+              def={s}
+              open={isOpen(s.key)}
+              onAdd={() => openSection(s.key)}
+              onRemove={() => closeSection(s.key)}
+            >
+              {s.key === "video" && (
+                <VideoEditor draft={draft} setDraft={setDraft} />
+              )}
+              {s.key === "areaStats" && (
+                <AreaStatsEditor draft={draft} setDraft={setDraft} />
+              )}
+            </SectionCard>
+          ))}
+        </div>
+        {videoUploadInFlight && (
+          <UploadingLockOverlay progressPct={videoUploadSession.progressPct} />
+        )}
+      </div>
+    </div>
+  );
+}
+
+/**
+ * A7d.11 — the brief, reliable input lock shown over the editorial
+ * step body while the walk-through video upload is in flight. Calm
+ * voice ("Uploading walkthrough video"), determinate or indeterminate
+ * progress mirroring the field's own bar, no em-dashes. Dismissable
+ * only by the upload finishing — there is no Cancel button because
+ * canceling an in-flight Vercel Blob upload doesn't actually stop the
+ * bytes from landing (the abortSignal is honored at the handshake but
+ * not the byte PUT), so a Cancel would mislead the agent. On failure
+ * the field's own retry surface is reachable as soon as this overlay
+ * unmounts.
+ */
+function UploadingLockOverlay({
+  progressPct,
+}: {
+  progressPct: number | null;
+}) {
+  const label =
+    progressPct === null
+      ? "Uploading walkthrough video"
+      : `Uploading walkthrough video ${Math.round(progressPct)}%`;
+  return (
+    <div
+      className="absolute inset-0 z-10 flex items-center justify-center rounded bg-black/55 backdrop-blur-[1px]"
+      role="status"
+      aria-live="polite"
+      data-testid="step-editorial-upload-lock"
+    >
+      <div className="flex w-72 max-w-[80%] flex-col items-center gap-3 rounded border border-neutral-700 bg-neutral-900/95 px-4 py-5 text-center">
+        <p className="text-[10px] uppercase tracking-[0.18em] text-mint">
+          {label}
+        </p>
+        <div className="h-1 w-full overflow-hidden rounded bg-neutral-800">
+          <div
+            className={
+              progressPct === null
+                ? "h-full w-1/3 bg-mint/70"
+                : "h-full bg-mint transition-[width] duration-150 ease-linear"
+            }
+            style={
+              progressPct === null
+                ? undefined
+                : {
+                    width: `${Math.max(0, Math.min(100, progressPct))}%`,
+                  }
+            }
+            data-testid="step-editorial-upload-lock-progress"
+            data-progress-mode={
+              progressPct === null ? "indeterminate" : "determinate"
+            }
+            data-progress-pct={
+              progressPct === null ? "" : String(Math.round(progressPct))
+            }
+          />
+        </div>
+        <p className="text-[11px] text-neutral-400">
+          Hold tight. The rest of the step unlocks the moment this finishes.
+        </p>
       </div>
     </div>
   );
@@ -226,13 +376,24 @@ function SectionCard({ def, open, onAdd, onRemove, children }: SectionCardProps)
 
 function VideoEditor({ draft, setDraft }: StepEditorialProps) {
   const v = draft.video ?? {};
+  // A7d.11 — setVideo now uses a FUNCTIONAL setDraft so the merge
+  // always reads the freshest draft.video, not a render-time closure.
+  // This is load-bearing for the walkthrough-upload completion path:
+  // VideoUploadField's onChange may fire long after the user typed
+  // sibling fields (title, runtime, recordedOn) during the upload,
+  // and the pre-A7d.11 closure-captured `v` / `draft` would have
+  // clobbered those edits. The functional form makes the order of
+  // setState calls irrelevant — each merge composes onto the latest.
   const setVideo = (patch: Partial<PresentationVideo>) => {
-    const merged: PresentationVideo = { ...v, ...patch };
-    // Drop the block when every field is empty so the renderer hides it.
-    const hasAny = Object.values(merged).some(
-      (val) => typeof val === "string" && val.trim().length > 0,
-    );
-    setDraft({ ...draft, video: hasAny ? merged : undefined });
+    setDraft((prev) => {
+      const prevVideo = prev.video ?? {};
+      const merged: PresentationVideo = { ...prevVideo, ...patch };
+      // Drop the block when every field is empty so the renderer hides it.
+      const hasAny = Object.values(merged).some(
+        (val) => typeof val === "string" && val.trim().length > 0,
+      );
+      return { ...prev, video: hasAny ? merged : undefined };
+    });
   };
 
   return (

@@ -182,8 +182,30 @@ export default function SellerPresentationPage() {
     window.scrollTo({ top: 0, left: 0, behavior: "auto" });
   }, [currentStep]);
 
-  const setDraft = (next: SellerPresentationDraft) => {
-    setInstance((prev) => (prev ? { ...prev, draft: next } : prev));
+  // A7d.11 — `setDraft` accepts either a replacement draft or a
+  // functional updater. The functional form is load-bearing for the
+  // video-upload completion path: the upload completes asynchronously
+  // and its onChange callback fires against whatever draft is current
+  // at completion time (which may have new sibling-field edits the
+  // user typed during the upload). A stale closure with the
+  // pre-upload draft would clobber those edits — exactly the bug
+  // Dallen hit on 2026-05-24. Passing a function instead of a value
+  // means we always merge against the freshest draft.
+  const setDraft = (
+    next:
+      | SellerPresentationDraft
+      | ((prev: SellerPresentationDraft) => SellerPresentationDraft),
+  ) => {
+    setInstance((prev) => {
+      if (!prev) return prev;
+      const nextDraft =
+        typeof next === "function"
+          ? (next as (p: SellerPresentationDraft) => SellerPresentationDraft)(
+              prev.draft,
+            )
+          : next;
+      return { ...prev, draft: nextDraft };
+    });
   };
 
   const setCurrentStep = (next: StepId) => {

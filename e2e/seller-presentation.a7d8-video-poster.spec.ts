@@ -195,8 +195,12 @@ test.describe('Seller Presentation — A7d.8 video poster', () => {
 
       // 4) Auto first-frame capture fires immediately after upload.
       //    The brief says t≈0.0–0.1s because some encoders don't paint
-      //    frame 0 until a seek lands.
-      expect(src).toMatch(/captureFrameBlob\(nextObjectUrl,\s*0\.1\)/);
+      //    frame 0 until a seek lands. A7d.11 moved the call site from
+      //    handleFile's local `nextObjectUrl` to a completion effect
+      //    that reads `session.localObjectUrl` (aliased to `sourceUrl`
+      //    for the inner async closure) — same semantics, survives a
+      //    mid-upload remount.
+      expect(src).toMatch(/captureFrameBlob\(sourceUrl,\s*0\.1\)/);
 
       // 5) onPosterChange callback fires with both 'auto' and 'scrub'
       //    source tags so the caller can store them in the right
@@ -243,25 +247,30 @@ test.describe('Seller Presentation — A7d.8 video poster', () => {
    * as the rest of A7d's wiring proofs).
    */
   test.describe('A7d.8.1 — iOS hang fix (decouple + timeout + off-screen render)', () => {
-    test('done-state is decoupled from auto-capture: setUploading(false) runs BEFORE the capture await', () => {
+    test('done-state is decoupled from auto-capture: completion flips the UI BEFORE the capture effect runs', () => {
       const src = readFileSync(FIELD, 'utf8');
 
-      // setUploading(false) lives BEFORE the captureFrameBlob await
-      // for the auto first-frame, not in a finally below it. A capture
-      // that never resolves therefore cannot leave the field stuck on
-      // "Uploading… 100%".
-      const uploadFalseIdx = src.indexOf('setUploading(false)');
-      const captureAwaitIdx = src.indexOf('await captureFrameBlob(nextObjectUrl');
-      expect(uploadFalseIdx).toBeGreaterThan(0);
-      expect(captureAwaitIdx).toBeGreaterThan(0);
-      expect(uploadFalseIdx).toBeLessThan(captureAwaitIdx);
-
-      // The onChange that delivers the hosted URL to the parent also
-      // fires BEFORE the capture — the parent's runtime auto-fill +
-      // value population must not wait on the optional poster.
-      const onChangeIdx = src.indexOf('onChange(\n      hostedUrl');
-      expect(onChangeIdx).toBeGreaterThan(0);
-      expect(onChangeIdx).toBeLessThan(captureAwaitIdx);
+      // A7d.11 — the A7d.8.1 invariant was preserved across the
+      // refactor, just expressed differently. The session reaches
+      // `status: "completed"` (the field's "done" view) the instant
+      // the upload's Promise resolves; the auto first-frame capture
+      // moved into a SEPARATE `useEffect` that fires only AFTER the
+      // session has already transitioned to completed (because the
+      // effect depends on `session.status`). React runs effects
+      // strictly after render commits, so the field has already
+      // rendered the completed UI by the time captureFrameBlob is
+      // awaited. A hang in the capture therefore CANNOT freeze the
+      // field on "Uploading… 100%" — the same invariant the pre-
+      // A7d.11 setUploading(false)-before-await shape encoded.
+      expect(src).toMatch(
+        /useEffect\(\s*\(\)\s*=>\s*\{[\s\S]*?session\.status\s*!==\s*["']completed["'][\s\S]*?await\s+captureFrameBlob/,
+      );
+      // The capture is FIRE-AND-FORGET inside the effect (an inner
+      // async IIFE) so a slow / hung capture doesn't block the
+      // surrounding render or the completion signal to the parent.
+      expect(src).toMatch(
+        /useEffect\([\s\S]*?\(\s*async\s*\(\s*\)\s*=>\s*\{[\s\S]*?captureFrameBlob/,
+      );
     });
 
     test('scrubber + "Use this frame" are NOT gated on autoCapturing (only on capturingFrame)', () => {
@@ -676,8 +685,10 @@ test.describe('Seller Presentation — A7d.8 video poster', () => {
       expect(fn![0]).toMatch(/uploadCapturedFrame\(/);
       // Auto first-frame (captureFrameBlob) is unaffected — it runs
       // before the main video has mounted/decoded and intentionally
-      // uses its own off-screen pipeline.
-      expect(src).toMatch(/captureFrameBlob\(nextObjectUrl,\s*0\.1\)/);
+      // uses its own off-screen pipeline. A7d.11 renamed the local
+      // variable (was `nextObjectUrl` inside handleFile, now
+      // `sourceUrl` inside the completion effect's closure).
+      expect(src).toMatch(/captureFrameBlob\(sourceUrl,\s*0\.1\)/);
     });
 
     test('captureFrameFromVideoElement draws the live element and is bounded by the same hard timeout', () => {
