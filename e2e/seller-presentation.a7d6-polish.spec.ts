@@ -360,8 +360,13 @@ test.describe('A7d.10.2 / Fix 3 — Recommended annotation is a clean header ban
   // Locked-design upper-right current-value callout rect.
   const CALLOUT = { x0: X1 - 110, y0: 25, x1: X1, y1: 95 } as const;
   // Right-side caption + value text baselines, locked to the header band.
+  // A7d.10.3: callout-text is intentionally lowered from 70 → 73 so the
+  // current value sits with equal visible padding between the caption above
+  // (y=52) and the dashed line below (y=80). The recommended price
+  // (REC_NUM_Y=70) stays put — its terracotta chip supplies its own
+  // padding, so the 3-unit baseline difference reads fine optically.
   const CALLOUT_SUB_Y = 52;
-  const CALLOUT_TEXT_Y = 70;
+  const CALLOUT_TEXT_Y = 73;
   const PLOT_LEFT = X0;
   const PLOT_RIGHT = X1;
   const VIEWBOX_TOP = 0;
@@ -406,11 +411,15 @@ test.describe('A7d.10.2 / Fix 3 — Recommended annotation is a clean header ban
     // apart). The badge must stay compact.
     expect(REC_NUM_Y - REC_LABEL_Y).toBeLessThanOrEqual(22);
 
-    // A7d.10.2: header values share ONE baseline (aligned header band),
-    // captions share one baseline, and the dashed line sits BELOW both
-    // values — never in the same row as either, for any data shape.
+    // A7d.10.2/.3: captions share one baseline (REC_LABEL_Y === CALLOUT_SUB_Y),
+    // and the dashed line sits BELOW both values for any data shape.
+    // A7d.10.3 lowers the current value (callout-text) from 70 → 73 so its
+    // visible padding to the caption above equals its padding to the
+    // dashed line below. REC_NUM_Y stays at 70 — the equality with
+    // callout-text no longer holds by design.
     expect(REC_LABEL_Y).toBe(CALLOUT_SUB_Y);
-    expect(REC_NUM_Y).toBe(CALLOUT_TEXT_Y);
+    expect(CALLOUT_SUB_Y).toBeLessThan(CALLOUT_TEXT_Y);
+    expect(CALLOUT_TEXT_Y).toBeLessThan(REC_LINE_Y);
     expect(REC_NUM_Y).toBeLessThan(REC_LINE_Y);
     expect(REC_LINE_Y).toBeLessThan(Y_TOP_GRID);
 

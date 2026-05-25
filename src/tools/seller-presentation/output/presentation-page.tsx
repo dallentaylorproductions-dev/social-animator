@@ -789,7 +789,7 @@ function AreaChart({
         <text className="callout-sub" x={X1} y={52} textAnchor="end">
           {current.month} · current
         </text>
-        <text className="callout-text" x={X1} y={70} textAnchor="end">
+        <text className="callout-text" x={X1} y={73} textAnchor="end">
           {formatCompact(current.value)}
         </text>
 
