@@ -541,6 +541,37 @@
   background: var(--ink-2);
 }
 
+/* A7d.12 — fullscreen-only override. The inline 4/5 frame uses
+   `object-fit: cover` so portrait phone clips look intentional in
+   the editorial box. That same `cover` persists when the buyer
+   presses the native fullscreen control: a portrait source covering
+   a landscape display crops top and bottom out of the picture
+   (Dallen's 2026-05-25 smoke: only the subject's chin visible). The
+   fix swaps to `contain` ONLY in native fullscreen — the whole
+   frame shows, letterboxed with black bars on a landscape display.
+   Inline appearance is untouched.
+
+   :fullscreen and :-webkit-full-screen are kept in SEPARATE rules
+   on purpose. Per CSS selector parsing, if any item in a
+   comma-separated selector list is unknown to the UA, the entire
+   rule is discarded. Splitting them guarantees Chrome applies its
+   rule even if it doesn't recognize the WebKit alias (and vice
+   versa on older Safari). */
+.sep-presentation .video-poster .video-player:fullscreen {
+  object-fit: contain;
+  width: 100%;
+  height: 100%;
+  border-radius: 0;
+  background: #000;
+}
+.sep-presentation .video-poster .video-player:-webkit-full-screen {
+  object-fit: contain;
+  width: 100%;
+  height: 100%;
+  border-radius: 0;
+  background: #000;
+}
+
 /* A7d.8.5 — branded fallback panel for the rare case where all three
    poster slots are empty (capture failed on every path). The
    posterless <video> on iOS Safari paints a solid black box; this
