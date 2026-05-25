@@ -25,12 +25,19 @@ import { test, expect } from '@playwright/test';
  *          replaced the value-scaled line entirely** with a fixed
  *          reference banner: dashed line pinned to a fixed y, both
  *          labels stacked top-left on chips, decoupled from the y-scale.
- *          **A7d.10** then mirrored the right-side current-value callout:
- *          the dashed line moved DOWN into the gap between the header
- *          band (callout y ∈ [25, 95]) and the plot grid (y = 104), and
- *          the label stack flipped so the "RECOMMENDED" caption sits
- *          ABOVE the price chip. The geometry test asserts those positions
- *          are constant for any data shape and stay inside the plot /
+ *          **A7d.10** then placed the dashed line in the gap between the
+ *          header band (callout y ∈ [25, 95]) and the plot grid (y = 104),
+ *          and flipped the label stack so the "RECOMMENDED" caption sits
+ *          ABOVE the price chip. **A7d.10.1** tightens that badge: A7d.10
+ *          mirrored the price baseline to the right-side callout-text
+ *          (y=86), which opened a large empty gap between the caption
+ *          (y=52) and the price. A7d.10.1 stops mirroring the price —
+ *          REC_NUM_Y drops to 70 (tight under the caption) and REC_LINE_Y
+ *          to 80 (just beneath the price), so RECOMMENDED + price + line
+ *          form a compact top-left badge. Caption alignment with the right
+ *          callout-sub is preserved. The geometry test asserts the gap is
+ *          small and the price baseline sits ABOVE the right-side current
+ *          value, for any data shape, while staying inside the plot and
  *          clear of the callout + axis row.
  *
  *   Fix 4: A7d.6's "Latest month" device-clock default — verified math
@@ -321,21 +328,23 @@ test.describe('A7d.7 / Fix 2 — Months-of-history input is clearable + retypabl
 });
 
 // =====================================================================
-// A7d.10 Fix 3 — Recommended annotation is a FIXED reference banner
-// that mirrors the right-side current-value callout.
+// A7d.10.1 Fix 3 — Recommended annotation is a FIXED reference badge,
+// tight top-left (caption + price + line stacked together).
 // =====================================================================
 //
 // A7d.6/.7's adaptive placeRecAnnotation was deleted. The recommended
-// dashed line is pinned to a fixed y JUST BELOW the chart's header band
-// (above the plot grid), with the "RECOMMENDED" caption stacked ABOVE
-// the price chip on the left — mirroring the right-side "MAY '26 ·
-// CURRENT" caption + current value callout. Layout is the same for any
-// data shape (recommended above / below / within the data range), so we
-// assert constants — not a per-shape placement — and verify the band
-// stays inside the plot and never collides with the polyline / current
-// callout / axis row.
+// dashed line is pinned to a fixed y, with the "RECOMMENDED" caption
+// stacked ABOVE the price chip on the left. A7d.10 mirrored the price
+// baseline to the right-side current-value callout-text (y=86), which
+// opened a large empty gap between caption and price. A7d.10.1 stops
+// the mirror: the price now sits tight under the caption (REC_NUM_Y=70)
+// and the dashed line sits just beneath the price (REC_LINE_Y=80),
+// forming a compact top-left badge ABOVE the right-side current value.
+// Layout is the same for any data shape, so we assert constants — not a
+// per-shape placement — and verify the badge stays inside the plot and
+// never collides with the polyline / current callout / axis row.
 
-test.describe('A7d.10 / Fix 3 — Recommended annotation pins to a fixed band below the header row', () => {
+test.describe('A7d.10.1 / Fix 3 — Recommended annotation is a compact top-left badge', () => {
   // Chart geometry constants from presentation-page.tsx AreaChart.
   const X0 = 40;
   const X1 = 388;
@@ -345,6 +354,8 @@ test.describe('A7d.10 / Fix 3 — Recommended annotation pins to a fixed band be
   const X_TICK_TOP = 196;
   // Locked-design upper-right current-value callout rect.
   const CALLOUT = { x0: X1 - 110, y0: 25, x1: X1, y1: 95 } as const;
+  // Right-side current-value text baseline (callout-text).
+  const CALLOUT_TEXT_Y = 86;
   const PLOT_LEFT = X0;
   const PLOT_RIGHT = X1;
   const VIEWBOX_TOP = 0;
@@ -372,10 +383,11 @@ test.describe('A7d.10 / Fix 3 — Recommended annotation pins to a fixed band be
     }));
   }
 
-  test('exported constants describe a left-anchored, stacked band just below the header row', () => {
-    // Dashed line sits just below the header band and above the plot
-    // grid — clear of the upper-right callout AND of the data polyline.
-    expect(REC_LINE_Y).toBeGreaterThanOrEqual(CALLOUT.y1);
+  test('exported constants describe a compact, left-anchored top-left badge', () => {
+    // Dashed line sits above the plot grid and inside the viewBox.
+    // (The A7d.10 ">= CALLOUT.y1" floor was a side effect of mirroring
+    // the price to the right callout-text — A7d.10.1 stops the mirror,
+    // so the line sits higher, tucked under the price.)
     expect(REC_LINE_Y).toBeLessThan(Y_TOP_GRID);
     expect(REC_LINE_Y).toBeGreaterThanOrEqual(VIEWBOX_TOP);
 
@@ -386,6 +398,15 @@ test.describe('A7d.10 / Fix 3 — Recommended annotation pins to a fixed band be
     // Caption sits ABOVE the price; both stack above the line.
     expect(REC_LABEL_Y).toBeLessThan(REC_NUM_Y);
     expect(REC_NUM_Y).toBeLessThan(REC_LINE_Y);
+
+    // A7d.10.1: caption → price is a TIGHT pair (about one caption
+    // line-height apart). A7d.10 mirrored the price to the right
+    // callout-text and opened a 34-unit gap; the badge must be compact.
+    expect(REC_NUM_Y - REC_LABEL_Y).toBeLessThanOrEqual(22);
+
+    // A7d.10.1: recommended price baseline must sit ABOVE the right-side
+    // current-value baseline — the two are no longer mirrored.
+    expect(REC_NUM_Y).toBeLessThan(CALLOUT_TEXT_Y);
 
     // The two chips don't overlap each other.
     const a = REC_NUM_CHIP;

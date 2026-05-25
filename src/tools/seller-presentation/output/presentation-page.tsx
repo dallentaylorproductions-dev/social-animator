@@ -917,13 +917,17 @@ function AreaChart({
 }
 
 /**
- * A7d.10 — fixed reference banner for the recommended-price line, with
- * the left-side stack mirroring the right-side current-value callout.
+ * A7d.10.1 — fixed reference banner for the recommended-price line.
  *
- * The dashed line sits at a fixed y JUST BELOW the chart's header band
- * (caption + value), NOT at the data-scaled y. The "RECOMMENDED" caption
- * + price chip stack top-left (caption on top, price below), mirroring
- * the right-side "MAY '26 · CURRENT" caption + current value callout.
+ * The dashed line sits at a fixed y JUST BELOW the recommended-price
+ * chip, NOT at the data-scaled y. The "RECOMMENDED" caption + price
+ * chip form a compact top-left badge: caption on top, price tucked
+ * tightly beneath it, dashed line directly underneath. The caption
+ * still aligns with the right-side "MAY '26 · CURRENT" caption, but
+ * the price intentionally sits ABOVE the right-side current value —
+ * the two values are not mirrored. (A7d.10 mirrored the price baseline
+ * to the right callout-text at y=86, which opened a large empty gap
+ * between the caption and the price; that mirroring is removed here.)
  *
  * Supersedes A7d.6/A7d.7 placeRecAnnotation (chip-on-line, edge-swap,
  * callout-avoidance) — in this band there's clear space, so the
@@ -932,19 +936,20 @@ function AreaChart({
  * the value.
  *
  * Geometry (viewBox 400 × 234, SVG y grows downward):
- *   - REC_LABEL_Y = 52: caption baseline (mirrors right-side callout-sub)
- *   - REC_NUM_Y   = 86: price baseline   (mirrors right-side callout-text)
- *   - REC_LINE_Y  = 96: dashed line just below header band, above plot
+ *   - REC_LABEL_Y = 52: caption baseline (aligned with right callout-sub)
+ *   - REC_NUM_Y   = 70: price baseline   (tight under caption; ABOVE the
+ *                       right-side callout-text at y=86 — no longer mirrored)
+ *   - REC_LINE_Y  = 80: dashed line just beneath the price chip
  *   - plot band   = y ∈ [104, 184]
  *   - upper-right callout (≈ x ∈ [278, 388], y ∈ [25, 95]) is untouched
  *     since the left-anchored chips never reach that x band; the line
  *     lives in the gap between the callout band and the plot grid.
  */
-export const REC_LINE_Y = 96;
+export const REC_LINE_Y = 80;
 const REC_LEFT_INSET = 6;
 export const REC_LEFT_X = 40 + REC_LEFT_INSET;
 export const REC_LABEL_Y = 52;
-export const REC_NUM_Y = 86;
+export const REC_NUM_Y = 70;
 
 const REC_NUM_TEXT_WIDTH = 50; // "$685k" / "$1.2m" visible width
 const REC_NUM_TEXT_HEIGHT = 14; // cap-height + descender for 16px display
