@@ -67,7 +67,7 @@ function PaywallBody() {
 
       <p className="mt-6 text-xs text-neutral-500">
         Have a beta code?{" "}
-        <a href="/access" className="text-mint hover:underline">
+        <a href="/login" className="text-mint hover:underline">
           Enter it here →
         </a>
       </p>
