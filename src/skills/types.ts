@@ -116,6 +116,27 @@ export type WorkflowState =
   | 'lead_decay_state'
   | 'follow_up_state';
 
+/**
+ * Per-skill availability declaration (Substrate §3.2 + §8.5, v1.47 /
+ * A7f.2). Each dimension carries the MINIMUM tier required for full
+ * (unlocked) access. The single entitlement resolver in
+ * src/lib/entitlements/resolver.ts joins this with the agent's
+ * EntitlementContext to produce a ResolvedSkill — no surface re-derives.
+ *
+ * Optional on `CallableSkill` so skills that haven't declared yet
+ * continue to compile and resolve to fully-available (no-op gating).
+ * Today only the Seller Presentation declares; later packets backfill
+ * the rest as their gate shapes get drawn.
+ */
+export interface SkillAvailability {
+  /** Tier required to RUN the core workflow at all. Most skills: 'base'. */
+  baseWorkflow?: 'base' | 'pro' | 'ai';
+  /** Tier required to publish PREMIUM themes (Base theme is always free). */
+  premiumThemes?: 'base' | 'pro' | 'ai';
+  /** Tier required to use AI plug-points (Category 1 friction-AI). */
+  aiPlugPoints?: 'base' | 'pro' | 'ai';
+}
+
 export interface CallableSkill {
   id: SkillId;
   name: string;
@@ -134,6 +155,12 @@ export interface CallableSkill {
   costProfile: 'free' | 'fixed' | 'variable-ai';
   supportedStates: WorkflowState[];
   recommendedNextSkills?: SkillId[];
+  /**
+   * Per-dimension tier requirements (Substrate §3.2). Consumed by the
+   * single resolver in src/lib/entitlements/resolver.ts; surfaces never
+   * read this directly. Optional during the per-skill rollout.
+   */
+  availability?: SkillAvailability;
 }
 
 // ----- SkillStatus + SkillRuntime (Substrate §3.2 + §3.3, v1.47 / A4) -----

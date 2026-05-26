@@ -1,5 +1,6 @@
 import Link from "next/link";
 import { auth, signOut } from "@/lib/auth";
+import { loadAgentProfile } from "@/lib/entitlements/load-agent-profile";
 import { DashboardClient } from "./DashboardClient";
 
 /**
@@ -9,11 +10,29 @@ import { DashboardClient } from "./DashboardClient";
  * action" surface. The page shell stays a server component (auth + greeting +
  * Settings/Sign Out chrome); state detection lives in DashboardClient since
  * it needs window.localStorage.
+ *
+ * v1.47 / A7f.2: server-side resolves the AgentProfile (dev-access +
+ * subscription state via KV) and passes it to DashboardClient. The client
+ * runs the synchronous resolver (resolveEntitlements + resolveSkill) over
+ * the materialized profile, so every dashboard surface consumes the same
+ * source of truth (Substrate §8.5).
  */
-export default async function DashboardPage() {
+export default async function DashboardPage({
+  searchParams,
+}: {
+  searchParams: Promise<{ [key: string]: string | string[] | undefined }>;
+}) {
   const session = await auth();
   const email = session?.user?.email ?? "";
   const greetingName = email ? email.split("@")[0] : "";
+
+  // ?testTier=base|pro|ai — Dallen's internal-test QA knob (§8.5). Reading
+  // searchParams forces dynamic rendering on this route, which is fine —
+  // /dashboard already depends on the auth session (also dynamic).
+  const sp = await searchParams;
+  const agentProfile = await loadAgentProfile(email || null, {
+    testTier: sp.testTier,
+  });
 
   return (
     <main className="min-h-screen bg-neutral-950 text-white overflow-x-hidden">
@@ -53,7 +72,7 @@ export default async function DashboardPage() {
           </nav>
         </header>
 
-        <DashboardClient />
+        <DashboardClient agentProfile={agentProfile} />
       </div>
     </main>
   );

@@ -4,22 +4,22 @@ import { isDevAccessGranted } from "./dev-access";
 /**
  * Effective-tier resolver (Substrate §3, §8, §9.7 trust boundary).
  *
- * v1.47 / A2 minimal stub per pinned decision Q-2: tier is server-
- * authoritative, derived from the SAME state the paywall middleware
- * (src/middleware.ts) consults — never a client flag. Pro billing
- * itself (H-8) doesn't exist yet, so this effectively returns 'base'
- * for everyone outside the beta cohort. The core Seller Presentation
- * workflow is Base = ungated, so that's the right v1.47 answer.
+ * @deprecated v1.47 / A7f.2 — replaced by the multi-dimensional resolver
+ * in src/lib/entitlements/resolver.ts (resolveEntitlements +
+ * resolveSkill). That module is now the single source of truth for
+ * gating decisions; this single-tier stub had no production consumers
+ * by the time A7f.2 landed and is retained only as a rollback shim.
+ * Do not call from new code — depend on the new resolver instead.
  *
- * Not built here: the multi-dimensional availability resolver
- * (per skill × {baseWorkflow, premiumThemes, aiPlugPoints}) and any
- * actual gate enforcement. Those land alongside the premium-theme
- * catalog (A7) and Pro billing (H-8). Keeping the surface area
- * minimal until then avoids cementing assumptions the real billing
- * model hasn't validated.
+ * Original v1.47 / A2 docstring follows:
  *
- * Mapping rule (intentionally permissive — Pro is currently a proxy
- * for "is a paying customer or invited beta tester"):
+ * A2 minimal stub per pinned decision Q-2: tier is server-authoritative,
+ * derived from the SAME state the paywall middleware (src/middleware.ts)
+ * consults — never a client flag. Pro billing itself (H-8) doesn't exist
+ * yet, so this effectively returns 'base' for everyone outside the beta
+ * cohort.
+ *
+ * Mapping rule:
  *   - active Stripe subscription → 'pro'
  *   - dev-access bypass granted  → 'pro'
  *   - anything else (incl. unauthenticated callers) → 'base'

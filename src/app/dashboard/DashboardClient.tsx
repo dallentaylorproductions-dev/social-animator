@@ -1,7 +1,7 @@
 'use client';
 
 import Link from 'next/link';
-import { useEffect, useState } from 'react';
+import { useEffect, useMemo, useState } from 'react';
 import {
   detectActiveStates,
   hasBrandProfileConfigured,
@@ -9,6 +9,11 @@ import {
 import { getActiveWorkflows, getWorkflowPrimarySkill } from './workflows';
 import { getCategorizedSkills } from '@/skills/registry';
 import { findLatestInProgress } from '@/skills/workflow-instance-storage';
+import { resolveEntitlements, resolveSkill } from '@/lib/entitlements/resolver';
+import type {
+  AgentProfile,
+  EntitlementContext,
+} from '@/lib/entitlements/types';
 import { NextBestActionCard } from './components/NextBestActionCard';
 import { SkillTile } from './components/SkillTile';
 import type { CallableSkill, WorkflowState } from '@/skills/types';
@@ -16,9 +21,15 @@ import type { CallableSkill, WorkflowState } from '@/skills/types';
 /**
  * Client island for the state-aware dashboard surface. Reads localStorage
  * for state detection (requires `window`); the parent server component
- * handles auth + the welcome header chrome.
+ * handles auth + the welcome header chrome AND resolves the AgentProfile
+ * (KV reads).
+ *
+ * v1.47 / A7f.2: the resolver runs HERE (synchronous, over the
+ * materialized AgentProfile). Both the Next Best Action card and the
+ * All Skills tiles consume `ResolvedSkill` — no surface re-derives
+ * gating from the agent profile or hardcodes per-skill access logic.
  */
-export function DashboardClient() {
+export function DashboardClient({ agentProfile }: { agentProfile: AgentProfile }) {
   const [activeStates, setActiveStates] = useState<WorkflowState[]>([]);
   const [brandConfigured, setBrandConfigured] = useState<boolean | null>(null);
   // A7f.1: which primary-skill ids have an in-flight converged
@@ -40,6 +51,15 @@ export function DashboardClient() {
     setResumableSkillIds(resumable);
   }, []);
 
+  // A7f.2: resolve entitlements ONCE per render, then resolve each skill
+  // through the same context. Memoized on the AgentProfile reference —
+  // the server passes a fresh object per request, so this recomputes on
+  // a sub change / dev-access flip but is stable within a render.
+  const entitlement: EntitlementContext = useMemo(
+    () => resolveEntitlements(agentProfile),
+    [agentProfile],
+  );
+
   // Hydrating — render a minimal placeholder to avoid layout shift.
   if (brandConfigured === null) {
     return <div data-testid="dashboard-loading" className="h-32" aria-hidden />;
@@ -60,12 +80,13 @@ export function DashboardClient() {
             primarySkill: getWorkflowPrimarySkill(w),
           }))}
           resumableSkillIds={resumableSkillIds}
+          entitlement={entitlement}
         />
       ) : (
         <NoActiveWorkflowsState />
       )}
 
-      <AllSkillsSection />
+      <AllSkillsSection entitlement={entitlement} />
     </div>
   );
 }
@@ -101,14 +122,28 @@ interface WorkflowEntry {
 function NextBestActionSection({
   workflows,
   resumableSkillIds,
+  entitlement,
 }: {
   workflows: WorkflowEntry[];
   resumableSkillIds: Set<string>;
+  entitlement: EntitlementContext;
 }) {
-  const renderable = workflows.filter(
-    (w): w is { workflow: WorkflowEntry['workflow']; primarySkill: CallableSkill } =>
-      w.primarySkill !== null
-  );
+  // A7f.2: filter by `coreAccess.state === 'available'` BEFORE rendering
+  // the card. Today this is a no-op (every skill's baseWorkflow is
+  // 'base' or undefined, so core is always available); when a skill
+  // lands whose entire workflow lives at a higher tier, this drops it
+  // out of Next Best Action without per-surface gating logic.
+  const renderable = workflows
+    .filter(
+      (w): w is { workflow: WorkflowEntry['workflow']; primarySkill: CallableSkill } =>
+        w.primarySkill !== null,
+    )
+    .map(({ workflow, primarySkill }) => ({
+      workflow,
+      primarySkill,
+      resolved: resolveSkill(primarySkill, entitlement),
+    }))
+    .filter(({ resolved }) => resolved.coreAccess.state === 'available');
   if (renderable.length === 0) return <NoActiveWorkflowsState />;
 
   return (
@@ -140,12 +175,16 @@ function NoActiveWorkflowsState() {
   );
 }
 
-function AllSkillsSection() {
+function AllSkillsSection({ entitlement }: { entitlement: EntitlementContext }) {
   // Commit 3 refactor: buckets derived from each skill's required `category`
   // field (declared at the skill record's spec site) instead of hardcoded
   // ID-match filters here. Adding a new skill no longer requires editing
   // this file — declaring `category` on its CallableSkill is sufficient.
   // Root-cause fix for the v1.44.1 SIR-dropout bug class.
+  //
+  // A7f.2: each bucket runs through the resolver and drops tiles whose
+  // `coreAccess` isn't available. Today everything is `available` (Base
+  // workflows or undeclared), so this is a no-op — but proves the wiring.
   const buckets = getCategorizedSkills();
 
   return (
@@ -154,9 +193,12 @@ function AllSkillsSection() {
         All skills
       </h2>
 
-      {buckets.map(({ category, skills }) => (
-        <SkillGroup key={category} title={category} skills={skills} />
-      ))}
+      {buckets.map(({ category, skills }) => {
+        const accessible = skills.filter(
+          (s) => resolveSkill(s, entitlement).coreAccess.state === 'available',
+        );
+        return <SkillGroup key={category} title={category} skills={accessible} />;
+      })}
     </section>
   );
 }

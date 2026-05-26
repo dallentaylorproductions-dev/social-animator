@@ -194,6 +194,22 @@ export const SELLER_PRESENTATION_SKILL: CallableSkill = {
   // step is launching the listing. The 'listing-launch' workflow's
   // primary skill is currently `listing-flyer`, so point there directly.
   recommendedNextSkills: ["listing-flyer"],
+  // A7f.2: per-dimension availability declaration (Substrate §3.2).
+  // Resolved by src/lib/entitlements/resolver.ts; surfaces consume
+  // ResolvedSkill and never read this directly.
+  //   - baseWorkflow: 'base' — core workflow ALWAYS runs (§8.6 trust
+  //     rule: never gate the core Base deliverable).
+  //   - premiumThemes: 'pro' — A7f.3 will render the preview-but-lock
+  //     UX from `themeAccess` (Base agents see + scrub the premium
+  //     theme; export resolves to preview-only with a Base fallback).
+  //   - aiPlugPoints: 'pro' — declared now; no plug-point UI exists
+  //     yet (Lane C). When Lane C lands, aiAccess on ResolvedSkill is
+  //     already wired and consumed; no resolver change required.
+  availability: {
+    baseWorkflow: "base",
+    premiumThemes: "pro",
+    aiPlugPoints: "pro",
+  },
 };
 
 // ---- AI plug-point declarations (Lane C consumes) ----
