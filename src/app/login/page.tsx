@@ -148,7 +148,7 @@ function LoginForm() {
             autoComplete="off"
             value={code}
             onChange={(e) => setCode(e.target.value)}
-            placeholder="ATHT2026"
+            placeholder="Code from your invite email"
             className="w-full bg-neutral-900 border border-neutral-800 rounded-md px-3 py-2.5 text-base lg:text-sm font-mono tracking-wider focus:outline-none focus:border-mint"
           />
         </div>

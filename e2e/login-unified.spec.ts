@@ -46,7 +46,10 @@ test.describe("/login unified form", () => {
 
     const codeInput = page.getByRole("textbox", { name: /beta access code/i });
     await expect(codeInput).toBeVisible();
-    await expect(codeInput).toHaveAttribute("placeholder", "ATHT2026");
+    await expect(codeInput).toHaveAttribute(
+      "placeholder",
+      "Code from your invite email",
+    );
 
     // Before typing, submit button still says "Send sign-in link"
     // (code field open but empty → no-code path).
