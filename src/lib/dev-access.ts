@@ -1,26 +1,25 @@
 /**
- * Dev-access bypass mechanism (v1.45.3).
+ * Dev-access bypass mechanism.
  *
  * Parallel sign-in path for invited beta cohort members. Bypasses the
  * subscription paywall in src/middleware.ts without modifying the
  * existing paid signup flow.
  *
- * Two-stage KV pattern guarantees the bypass is only granted to users
- * who proved control of an email (no self-grant by submitting any
- * address through the /access form):
+ * v1.47 Lane A polish: cohort sign-in is DIRECT. The beta-code
+ * Credentials provider in src/lib/auth.ts validates the access code
+ * inside authorize() and calls grantDevAccess() to write the permanent
+ * dev_access:<email> record before Auth.js issues the session — no
+ * magic-link loop, no two-stage promotion. Knowledge of the
+ * shared-secret code IS the verification for the closed cohort.
  *
- *   1. /api/access/grant validates the access code and writes a PENDING
- *      record with short TTL, then triggers Auth.js to send the magic
- *      link.
- *   2. When the user clicks the magic link, Auth.js's signIn callback
- *      (src/lib/auth.ts) calls consumeDevAccessPending(email). If a
- *      pending record exists, it's deleted and grantDevAccess() writes
- *      the PERMANENT record.
- *   3. src/middleware.ts checks isDevAccessGranted(email) before the
- *      Stripe sub check; granted users bypass /paywall.
+ * The pending-record helpers (markPendingDevAccess /
+ * consumeDevAccessPending) survive in case a future flow needs the
+ * proven-email-control variant again; the signIn callback in
+ * src/lib/auth.ts still calls consumeDevAccessPending defensively for
+ * any other sign-in (it's a no-op when no pending key exists).
  *
- * Reversibility (at paid launch): delete /access route + /api/access/
- * grant route + the middleware bypass check + this file. ~30 LOC total.
+ * Reversibility (at paid launch): delete the beta-code provider +
+ * the /login code field + the middleware bypass check + this file.
  * Stale dev_access:* records in KV become inert (no further effect).
  */
 
@@ -44,9 +43,9 @@ export interface DevAccessRecord {
 }
 
 /**
- * Stage 1: write the pending record. Called by /api/access/grant AFTER
- * code validation but BEFORE the magic link is sent. Short TTL so a
- * leaked pending record doesn't grant access weeks later.
+ * Stage 1 of the two-stage email-proven pattern: write a short-TTL
+ * pending record. Unused by the current direct-sign-in flow but kept
+ * for any future surface that needs to gate on proven email control.
  */
 export async function markPendingDevAccess(email: string): Promise<void> {
   await kv.set(`${PENDING_PREFIX}${normalize(email)}`, "1", {
@@ -55,10 +54,11 @@ export async function markPendingDevAccess(email: string): Promise<void> {
 }
 
 /**
- * Stage 2: called by the Auth.js signIn callback after the user clicks
- * the magic link. If a pending record exists, returns true AND deletes
- * the pending key (one-shot). Caller follows up with grantDevAccess()
- * to write the permanent record.
+ * Stage 2 of the two-stage pattern. If a pending record exists,
+ * returns true AND deletes the pending key (one-shot). The signIn
+ * callback in src/lib/auth.ts still calls this defensively, but since
+ * the direct beta-code provider no longer writes pending records, it
+ * is a no-op in the current flow.
  *
  * Atomic-ish: read-then-delete has a tiny race window where two
  * concurrent sign-ins could both see the pending and both call

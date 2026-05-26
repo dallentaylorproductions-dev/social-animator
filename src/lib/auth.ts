@@ -1,12 +1,56 @@
-import NextAuth from "next-auth";
+import NextAuth, { CredentialsSignin } from "next-auth";
+import Credentials from "next-auth/providers/credentials";
 import Resend from "next-auth/providers/resend";
 import { UpstashRedisAdapter } from "@auth/upstash-redis-adapter";
 import { Redis } from "@upstash/redis";
+import { kv } from "@vercel/kv";
 import { consumeDevAccessPending, grantDevAccess } from "@/lib/dev-access";
 
 const resendKey = process.env.AUTH_RESEND_KEY;
 const fromAddress =
   process.env.AUTH_EMAIL_FROM ?? "login@send.simplyeditpro.com";
+
+const DEV_ACCESS_CODE = process.env.DEV_ACCESS_CODE;
+const RATE_LIMIT_MAX = 10;
+const RATE_LIMIT_WINDOW_SECONDS = 60 * 60; // 1 hour
+const EMAIL_RE = /^[^\s@]+@[^\s@]+\.[^\s@]+$/;
+
+// Constant-time string compare. Cheap mitigation against timing-oracle
+// leaks on the access-code equality check.
+function timingSafeEqual(a: string, b: string): boolean {
+  if (a.length !== b.length) return false;
+  let diff = 0;
+  for (let i = 0; i < a.length; i++) {
+    diff |= a.charCodeAt(i) ^ b.charCodeAt(i);
+  }
+  return diff === 0;
+}
+
+function getClientIp(headers: Headers): string {
+  const fwd = headers.get("x-forwarded-for");
+  if (fwd) return fwd.split(",")[0].trim();
+  return headers.get("x-real-ip") ?? "unknown";
+}
+
+// Same key shape + budget as the retired /api/access/grant. 10 attempts
+// per IP per hour against `rate_limit_access:<ip>`. The cohort-code
+// surface stays non-brute-forceable even though the code is
+// shared-secret-strong.
+async function checkAccessRateLimit(ip: string): Promise<boolean> {
+  const key = `rate_limit_access:${ip}`;
+  const count = (await kv.incr(key)) as number;
+  if (count === 1) {
+    await kv.expire(key, RATE_LIMIT_WINDOW_SECONDS);
+  }
+  return count <= RATE_LIMIT_MAX;
+}
+
+// Custom CredentialsSignin subclass so the client `signIn(..., { redirect: false })`
+// result surfaces `code: "rate_limit"` and the form can render the
+// "Too many attempts" copy instead of the generic "Code not recognized."
+class AccessCodeRateLimitError extends CredentialsSignin {
+  code = "rate_limit";
+}
 
 // Auth.js v5's Email/Resend provider requires an adapter to persist
 // verification tokens (and minimal user/account stubs) — even with JWT
@@ -32,6 +76,63 @@ const redis = new Redis({
 export const { handlers, signIn, signOut, auth } = NextAuth({
   adapter: UpstashRedisAdapter(redis),
   providers: [
+    // v1.47 Lane A polish: direct cohort sign-in. Email + valid
+    // DEV_ACCESS_CODE → permanent dev-access grant + JWT session in one
+    // POST. No magic-link intermediate (the code knowledge IS the
+    // verification for the closed beta cohort). Paid users still use
+    // the Resend provider below.
+    //
+    // Mirrors the validation primitives the retired POST /api/access/grant
+    // used: same EMAIL_RE shape, same timing-safe code compare, same
+    // `rate_limit_access:<ip>` 10/hr budget, same `dev_access:<email>` KV
+    // key (via grantDevAccess) so the entitlement resolver and middleware
+    // recognize the agent identically.
+    Credentials({
+      id: "beta-code",
+      name: "Beta access code",
+      credentials: {
+        email: { label: "Email", type: "email" },
+        code: { label: "Beta access code", type: "text" },
+      },
+      async authorize(credentials, request) {
+        if (!DEV_ACCESS_CODE) {
+          // Fail closed if the env var is missing — same posture as the
+          // retired endpoint.
+          console.error("[beta-code] DEV_ACCESS_CODE is not configured");
+          return null;
+        }
+
+        const rawEmail =
+          typeof credentials?.email === "string" ? credentials.email : "";
+        const rawCode =
+          typeof credentials?.code === "string" ? credentials.code : "";
+        const email = rawEmail.trim().toLowerCase();
+        const code = rawCode.trim();
+
+        if (!email || !EMAIL_RE.test(email)) return null;
+        if (!code) return null;
+
+        // Rate-limit BEFORE the compare so a noisy IP can't pivot the
+        // budget by toggling between malformed payloads.
+        const ip = getClientIp(request.headers);
+        const withinBudget = await checkAccessRateLimit(ip);
+        if (!withinBudget) {
+          throw new AccessCodeRateLimitError();
+        }
+
+        if (!timingSafeEqual(code, DEV_ACCESS_CODE)) return null;
+
+        // Code valid → write the permanent record directly. Skips the
+        // markPendingDevAccess intermediate the magic-link path uses;
+        // the user proving knowledge of the code IS the verification
+        // for this cohort surface. Write happens BEFORE the session
+        // cookie ships, so the next request to /dashboard sees the
+        // dev_access:<email> record on its middleware KV read.
+        await grantDevAccess(email);
+
+        return { id: email, email };
+      },
+    }),
     Resend({
       from: fromAddress,
       apiKey: resendKey,

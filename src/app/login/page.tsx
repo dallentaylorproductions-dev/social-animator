@@ -1,28 +1,31 @@
 "use client";
 
 import { Suspense, useState } from "react";
-import { useSearchParams } from "next/navigation";
+import { useRouter, useSearchParams } from "next/navigation";
 import { signIn } from "next-auth/react";
 
 /**
  * Unified sign-in (v1.47).
  *
  * One URL for both cohorts:
- *   - Paid users: enter email, get magic link, sign in.
+ *   - Paid users: enter email, get a magic link, click through to sign in.
  *   - Beta cohort: click "Have a beta access code?", enter email + code,
- *     get magic link, sign in WITH dev-access promotion.
+ *     sign in DIRECTLY (no email step) via the beta-code Credentials
+ *     provider. The provider writes dev_access:<email> in KV so the
+ *     middleware + entitlement resolver classify them as team-invite/pro.
  *
  * The code field is collapsed by default so paid users see the same form
- * they did before. When the code field has a non-empty value, the submit
- * routes to /api/access/grant (which validates the code, marks pending
- * dev-access in KV, then dispatches the magic link). When empty, the
- * submit uses the regular client-side signIn('resend', …) path — no
- * dev-access promotion happens.
+ * they did before. When the code field has a non-empty value, submit
+ * goes through Auth.js's client-side `signIn('beta-code', …)` and the
+ * form navigates to /dashboard on success. When empty, submit uses
+ * `signIn('resend', …)` and shows the "Check your email" intermediate
+ * (unchanged from before).
  *
  * /access still exists as a 308 redirect to /login (next.config.ts) so
  * any beta links already shared keep working.
  */
 function LoginForm() {
+  const router = useRouter();
   const params = useSearchParams();
   const checkEmail = params.get("check") === "email";
   const errored = params.get("error") === "true";
@@ -46,25 +49,35 @@ function LoginForm() {
     setSubmitting(true);
     try {
       if (codeProvided) {
-        // Dev-access path: validate code + send magic link via the
-        // existing /api/access/grant endpoint. Mirrors what /access did.
-        const res = await fetch("/api/access/grant", {
-          method: "POST",
-          headers: { "Content-Type": "application/json" },
-          body: JSON.stringify({ email, code: trimmedCode }),
+        // Direct cohort sign-in (v1.47 Lane A polish). The Credentials
+        // provider validates code + writes the dev_access KV record +
+        // returns a session in one POST. On success we navigate the
+        // user straight to /dashboard — no "Check your email" detour.
+        const result = await signIn("beta-code", {
+          email,
+          code: trimmedCode,
+          redirect: false,
         });
-        const data = await res.json().catch(() => null);
-        if (res.ok && data?.ok) {
-          setSubmitted(true);
+        // Auth.js v5: the credentials callback returns HTTP 200 even
+        // on failure (with `?error=CredentialsSignin&code=…` in the
+        // returned URL). `result.ok` is therefore true in both cases —
+        // `result.error` is the real discriminator.
+        if (result && !result.error) {
+          router.push(callbackUrl);
+          return; // keep submitting=true during navigation
+        }
+        if (result?.code === "rate_limit") {
+          setError("Too many attempts — try again in a moment.");
+        } else if (result?.code === "credentials") {
+          setError("Code not recognized.");
         } else {
-          setError(data?.error ?? "Couldn't send sign-in email. Try again.");
+          setError("Something went wrong — please try again.");
         }
       } else {
-        // redirect: false keeps the form's success state in control —
-        // signIn returns a result object instead of navigating to the
-        // verify-request URL. The magic-link callback URL still travels
-        // server-side via redirectTo, so click-through lands on
-        // `callbackUrl` as before.
+        // Paid path — unchanged. redirect:false keeps the form's
+        // success state in control; the magic-link callbackUrl still
+        // travels server-side via redirectTo so click-through lands on
+        // the intended destination.
         const result = await signIn("resend", {
           email,
           redirectTo: callbackUrl,
@@ -78,7 +91,7 @@ function LoginForm() {
       }
     } catch (err) {
       console.error(err);
-      setError("Couldn't send sign-in email. Please try again.");
+      setError("Something went wrong — please try again.");
     } finally {
       setSubmitting(false);
     }
@@ -133,6 +146,9 @@ function LoginForm() {
         placeholder="you@example.com"
         className="w-full bg-neutral-900 border border-neutral-800 rounded-md px-3 py-2.5 text-base lg:text-sm focus:outline-none focus:border-mint"
       />
+      <p className="mt-2 text-[12px] text-neutral-500 leading-relaxed">
+        We&apos;ll save your work to this email.
+      </p>
 
       {codeFieldOpen ? (
         <div className="mt-4">
