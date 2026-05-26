@@ -9,13 +9,27 @@ import { skillRoute } from './skill-route';
 interface NextBestActionCardProps {
   workflow: Workflow;
   primarySkill: CallableSkill;
+  /**
+   * Set by DashboardClient when an in-flight converged WorkflowInstance for
+   * `primarySkill.id` exists. When true, the primary CTA relabels to
+   * "Resume your draft →"; the href is unchanged because the wizard's
+   * mount effect auto-resumes the latest in-progress instance on a bare
+   * skill URL (see src/skills/workflow-instance-storage.ts:findLatestInProgress
+   * and src/app/seller-presentation/page.tsx). Optional — older workflows
+   * without a converged store leave this unset and the card behaves as before.
+   */
+  resumeAvailable?: boolean;
 }
 
 export function NextBestActionCard({
   workflow,
   primarySkill,
+  resumeAvailable = false,
 }: NextBestActionCardProps) {
   const nextSkills = getRecommendedNextSkills(primarySkill.id);
+  const primaryLabel = resumeAvailable
+    ? 'Resume your draft'
+    : primarySkill.name;
 
   return (
     <div className="rounded-2xl bg-neutral-900 border border-mint/30 p-6 md:p-7 transition hover:border-mint/60">
@@ -38,7 +52,7 @@ export function NextBestActionCard({
           href={skillRoute(primarySkill.id)}
           className="inline-flex items-center justify-center rounded-lg bg-mint text-black text-sm font-semibold px-5 py-2.5 transition hover:bg-mint-hover"
         >
-          {primarySkill.name} →
+          {primaryLabel} →
         </Link>
         {nextSkills.length > 0 && (
           <div className="flex flex-wrap items-center gap-2">

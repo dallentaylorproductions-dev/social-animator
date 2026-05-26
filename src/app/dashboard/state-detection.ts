@@ -1,4 +1,5 @@
 import type { WorkflowState } from '@/skills/types';
+import { findLatestInProgress } from '@/skills/workflow-instance-storage';
 
 /**
  * Rule-based WorkflowState detection from localStorage. Phase 1 logic per
@@ -15,6 +16,8 @@ import type { WorkflowState } from '@/skills/types';
  *   listingPresentation:draft        — src/tools/listing-presentation/engine/draft-storage.ts
  *   sellerIntelligenceReport:draft   — src/tools/seller-intelligence-report/engine/draft-storage.ts
  *   openHousePrep:draft              — src/tools/open-house-prep/engine/draft-storage.ts
+ *   workflowInstance:<id>            — src/skills/workflow-instance-storage.ts
+ *                                      (converged substrate; seller-presentation lives here)
  */
 
 function readJson<T>(key: string): T | null {
@@ -59,6 +62,17 @@ export function detectActiveStates(): WorkflowState[] {
   );
   if (presentationDraft?.propertyAddress) {
     active.push('seller_appointment_state');
+  }
+
+  // Seller Presentation (converged substrate, v1.47 / A7f.1). Lives in the
+  // workflowInstance:<id> namespace, not a per-tool *:draft key — read via
+  // the typed helper instead of duplicating the index walk. An in-flight
+  // instance (no completedAt) signals seller-appointment prep, same as
+  // SIR/LP drafts do above. Cheap: hits the index + one record load.
+  if (findLatestInProgress('seller-presentation')) {
+    if (!active.includes('seller_appointment_state')) {
+      active.push('seller_appointment_state');
+    }
   }
 
   // SIR draft — seller appointment prep. Tracks the agent-facing companion

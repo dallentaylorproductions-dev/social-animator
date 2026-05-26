@@ -72,7 +72,12 @@ export const WORKFLOWS: Workflow[] = [
       'seller_appointment_state',
       'seller_conversion_state',
     ],
-    primarySkillId: 'seller-intelligence-report',
+    // A7f.1: primary retargeted from SIR → seller-presentation. The Seller
+    // Presentation is now the real seller-appointment deliverable; SIR/LP
+    // remain available as tiles under "Seller pitch" and still trigger this
+    // card via state-detection. The next-skill chip is derived from
+    // seller-presentation's recommendedNextSkills (currently ["listing-flyer"]).
+    primarySkillId: 'seller-presentation',
   },
   {
     id: 'open-house-prep',

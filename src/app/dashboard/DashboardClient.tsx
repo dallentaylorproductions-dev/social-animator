@@ -8,6 +8,7 @@ import {
 } from './state-detection';
 import { getActiveWorkflows, getWorkflowPrimarySkill } from './workflows';
 import { getCategorizedSkills } from '@/skills/registry';
+import { findLatestInProgress } from '@/skills/workflow-instance-storage';
 import { NextBestActionCard } from './components/NextBestActionCard';
 import { SkillTile } from './components/SkillTile';
 import type { CallableSkill, WorkflowState } from '@/skills/types';
@@ -20,10 +21,23 @@ import type { CallableSkill, WorkflowState } from '@/skills/types';
 export function DashboardClient() {
   const [activeStates, setActiveStates] = useState<WorkflowState[]>([]);
   const [brandConfigured, setBrandConfigured] = useState<boolean | null>(null);
+  // A7f.1: which primary-skill ids have an in-flight converged
+  // WorkflowInstance the agent can resume from the dashboard. Populated in
+  // the same useEffect as the rest of localStorage-derived state so the
+  // SSR-empty / browser-populated contract is preserved (the watch-out the
+  // brief flagged from the v1.44 hydration class).
+  const [resumableSkillIds, setResumableSkillIds] = useState<Set<string>>(
+    () => new Set(),
+  );
 
   useEffect(() => {
     setActiveStates(detectActiveStates());
     setBrandConfigured(hasBrandProfileConfigured());
+    const resumable = new Set<string>();
+    if (findLatestInProgress('seller-presentation')) {
+      resumable.add('seller-presentation');
+    }
+    setResumableSkillIds(resumable);
   }, []);
 
   // Hydrating — render a minimal placeholder to avoid layout shift.
@@ -45,6 +59,7 @@ export function DashboardClient() {
             workflow: w,
             primarySkill: getWorkflowPrimarySkill(w),
           }))}
+          resumableSkillIds={resumableSkillIds}
         />
       ) : (
         <NoActiveWorkflowsState />
@@ -83,7 +98,13 @@ interface WorkflowEntry {
   primarySkill: CallableSkill | null;
 }
 
-function NextBestActionSection({ workflows }: { workflows: WorkflowEntry[] }) {
+function NextBestActionSection({
+  workflows,
+  resumableSkillIds,
+}: {
+  workflows: WorkflowEntry[];
+  resumableSkillIds: Set<string>;
+}) {
   const renderable = workflows.filter(
     (w): w is { workflow: WorkflowEntry['workflow']; primarySkill: CallableSkill } =>
       w.primarySkill !== null
@@ -101,6 +122,7 @@ function NextBestActionSection({ workflows }: { workflows: WorkflowEntry[] }) {
             key={workflow.id}
             workflow={workflow}
             primarySkill={primarySkill}
+            resumeAvailable={resumableSkillIds.has(primarySkill.id)}
           />
         ))}
       </div>
