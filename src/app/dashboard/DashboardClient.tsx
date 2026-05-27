@@ -18,10 +18,6 @@ import { HeroNextAction, HeroEmptyState } from './components/HeroNextAction';
 import { StageHeader } from './components/StageHeader';
 import { Tile, type TileStage } from './components/Tile';
 import { posterForSkillId } from './components/posters/posterForSkillId';
-import {
-  SocialStudioTile,
-  SocialStudioModal,
-} from './components/SocialStudio';
 
 /**
  * Dashboard client island (v1.47 Lane A re-brand — SEP-S Studio shell).
@@ -62,78 +58,47 @@ import {
  */
 
 /* ───────────────────────────────────────────────────────────────────────── */
-/* TILE CONFIG — design-driven copy overrides + poster pinning              */
-
-interface WinTileConfig {
-  skillId: string;
-  /** Tile title to render (overrides the skill's `name` for design copy). */
-  titleOverride?: string;
-  /** Tile blurb to render (overrides the skill's `purpose` for design copy). */
-  blurbOverride?: string;
-}
+/* TILE ORDER — hand-curated hierarchy; tile CONTENT binds to the registry  */
 
 /**
- * Win-stage tile order. Hand-curated so the design's intended hierarchy
- * surfaces (Seller Presentation lead → SIR prep → legacy one-pager →
- * OH Prep), but EACH tile resolves to a real ALL_SKILLS record — no
- * design-fixture tiles ship. The title/blurb overrides for the lead
- * tile match the design exactly per the stop-condition resolution:
- * "Listing Presentation" with the "Full seller-facing deck" copy IS
- * the seller-presentation skill.
+ * Win-stage tile order. Curates the visual sequence (lead with the
+ * Seller Presentation, then SIR prep, then the legacy one-pager, then
+ * OH Prep) but each tile binds title/blurb/formats/route to its
+ * ALL_SKILLS record — no design-literal overrides. Skills in
+ * 'Seller pitch' or 'Open house' categories not in this list append
+ * automatically.
  */
-const WIN_TILE_ORDER: WinTileConfig[] = [
-  {
-    skillId: 'seller-presentation',
-    titleOverride: 'Listing Presentation',
-    blurbOverride:
-      'Full seller-facing deck. Agent prep + premium presentation page.',
-  },
-  { skillId: 'seller-intelligence-report' },
-  { skillId: 'listing-presentation' }, // legacy "Listing Presentation One-Pager" — still surfaced
-  { skillId: 'open-house-prep' },
+const WIN_TILE_ORDER: string[] = [
+  'seller-presentation',
+  'seller-intelligence-report',
+  'listing-presentation', // legacy "Listing Presentation One-Pager" — still surfaced
+  'open-house-prep',
 ];
 
 const LAUNCH_TILE_ORDER: string[] = ['listing-flyer', 'open-house-promo'];
 
-/* ───────────────────────────────────────────────────────────────────────── */
-
-interface ResolvedWinTile {
-  config: WinTileConfig;
-  skill: CallableSkill;
-}
-
-function resolveWinTiles(): ResolvedWinTile[] {
-  const ordered: ResolvedWinTile[] = [];
-  for (const config of WIN_TILE_ORDER) {
-    const skill = ALL_SKILLS.find((s) => s.id === config.skillId);
-    if (skill) ordered.push({ config, skill });
-  }
-  // Surface ANY OTHER skill in Seller pitch / Open house that the
-  // curated order missed — keeps the registry as ground truth (the
-  // packet's "if the registry has a skill in a stage's category that
-  // the design doesn't show, STILL surface it" rule).
-  const orderedIds = new Set(ordered.map((t) => t.skill.id));
-  const extras = [
-    ...getSkillsByCategory('Seller pitch'),
-    ...getSkillsByCategory('Open house'),
-  ].filter((s) => !orderedIds.has(s.id));
-  for (const skill of extras) {
-    ordered.push({ config: { skillId: skill.id }, skill });
-  }
-  return ordered;
-}
-
-function resolveLaunchTiles(): CallableSkill[] {
-  const orderedIds = new Set(LAUNCH_TILE_ORDER);
+function resolveStageSkills(order: string[], categories: string[]): CallableSkill[] {
   const inOrder: CallableSkill[] = [];
-  for (const id of LAUNCH_TILE_ORDER) {
+  const seen = new Set<string>();
+  for (const id of order) {
     const skill = ALL_SKILLS.find((s) => s.id === id);
-    if (skill) inOrder.push(skill);
+    if (skill) {
+      inOrder.push(skill);
+      seen.add(skill.id);
+    }
   }
-  const extras = getSkillsByCategory('Marketing assets').filter(
-    (s) => !orderedIds.has(s.id),
-  );
+  const extras = categories
+    .flatMap((c) => getSkillsByCategory(c as Parameters<typeof getSkillsByCategory>[0]))
+    .filter((s) => !seen.has(s.id));
   return [...inOrder, ...extras];
+}
+
+function resolveWinSkills(): CallableSkill[] {
+  return resolveStageSkills(WIN_TILE_ORDER, ['Seller pitch', 'Open house']);
+}
+
+function resolveLaunchSkills(): CallableSkill[] {
+  return resolveStageSkills(LAUNCH_TILE_ORDER, ['Marketing assets']);
 }
 
 function resolveVisibilitySkills(): CallableSkill[] {
@@ -200,7 +165,6 @@ export function DashboardClient({ agentProfile }: { agentProfile: AgentProfile }
   const [resumableSkillIds, setResumableSkillIds] = useState<Set<string>>(
     () => new Set(),
   );
-  const [studioOpen, setStudioOpen] = useState(false);
   /**
    * SSR-safe date eyebrow per sep-nextjs-hydration-pattern. Initialized
    * empty so SSR + first client paint match; populated in useEffect so
@@ -249,24 +213,33 @@ export function DashboardClient({ agentProfile }: { agentProfile: AgentProfile }
     return null;
   }, [activeWorkflows, entitlement]);
 
-  // Pre-resolve tile data once per render.
+  // Pre-resolve tile data once per render. All three stages share the
+  // same shape post-fix-it (skill record → resolved gate); the social
+  // grid no longer carries different data than the Win / Launch grids.
   const winTiles = useMemo(
     () =>
-      resolveWinTiles().map(({ config, skill }) => ({
-        config,
+      resolveWinSkills().map((skill) => ({
+        skill,
         resolved: resolveSkill(skill, entitlement),
       })),
     [entitlement],
   );
   const launchTiles = useMemo(
     () =>
-      resolveLaunchTiles().map((skill) => ({
+      resolveLaunchSkills().map((skill) => ({
         skill,
         resolved: resolveSkill(skill, entitlement),
       })),
     [entitlement],
   );
-  const visibilitySkills = useMemo(resolveVisibilitySkills, []);
+  const visibilityTiles = useMemo(
+    () =>
+      resolveVisibilitySkills().map((skill) => ({
+        skill,
+        resolved: resolveSkill(skill, entitlement),
+      })),
+    [entitlement],
+  );
 
   // Hydrating — show a minimal placeholder for the dynamic blocks.
   // The shell (topbar) already rendered server-side, so this is just for
@@ -328,14 +301,12 @@ export function DashboardClient({ agentProfile }: { agentProfile: AgentProfile }
           stage="win"
         />
         <div className="grid grid-4" data-testid="sep-stage-win-grid">
-          {winTiles.map(({ config, resolved }) => (
+          {winTiles.map(({ skill, resolved }) => (
             <Tile
-              key={config.skillId}
+              key={skill.id}
               resolved={resolved}
               stage="win"
-              poster={posterForSkillId(config.skillId)}
-              titleOverride={config.titleOverride}
-              blurbOverride={config.blurbOverride}
+              poster={posterForSkillId(skill.id)}
             />
           ))}
         </div>
@@ -366,7 +337,7 @@ export function DashboardClient({ agentProfile }: { agentProfile: AgentProfile }
         </div>
       </section>
 
-      {/* STAGE 03 — VISIBILITY (flagship) */}
+      {/* STAGE 03 — VISIBILITY (one tile per social-animator template) */}
       <section
         className="stage"
         id="stage-visibility"
@@ -375,26 +346,26 @@ export function DashboardClient({ agentProfile }: { agentProfile: AgentProfile }
         <StageHeader
           index={3}
           label="Stay visible"
-          hint="Cadence content. One studio, ten formats."
+          hint="Cadence content. Ten animated formats."
           stage="visibility"
         />
-        <SocialStudioTile
-          skills={visibilitySkills}
-          onClick={() => setStudioOpen(true)}
-        />
+        <div className="grid grid-5" data-testid="sep-stage-visibility-grid">
+          {visibilityTiles.map(({ skill, resolved }) => (
+            <Tile
+              key={skill.id}
+              resolved={resolved}
+              stage="visibility"
+              size="social"
+              poster={posterForSkillId(skill.id)}
+            />
+          ))}
+        </div>
       </section>
 
       {/* FOOTER */}
       <footer className="bottom">
         <span>SEP-S v1.47 · Lane A re-brand</span>
       </footer>
-
-      {/* MODAL */}
-      <SocialStudioModal
-        open={studioOpen}
-        onClose={() => setStudioOpen(false)}
-        skills={visibilitySkills}
-      />
     </>
   );
 }

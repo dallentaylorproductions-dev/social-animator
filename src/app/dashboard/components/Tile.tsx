@@ -19,7 +19,7 @@ import { skillRoute } from './skill-route';
  */
 
 export type TileStage = 'win' | 'launch' | 'visibility';
-export type TileSize = 'sm' | 'md';
+export type TileSize = 'sm' | 'md' | 'social';
 
 const STAGE_COLOR_VAR: Record<TileStage, string> = {
   win: 'var(--stage-win)',
@@ -74,33 +74,21 @@ interface TileProps {
   resolved: ResolvedSkill;
   stage: TileStage;
   poster: ReactElement;
-  /**
-   * Optional title override — used for the one design-driven tile that
-   * relabels the seller-presentation skill (the design's "Listing
-   * Presentation" tile renders the SELLER_PRESENTATION_SKILL but with
-   * the design's chosen title + blurb per the stop-condition resolution).
-   */
-  titleOverride?: string;
-  /**
-   * Optional blurb override — same use case as titleOverride. When
-   * omitted, falls back to the skill record's `purpose` (ground truth).
-   */
-  blurbOverride?: string;
   size?: TileSize;
 }
 
-export function Tile({
-  resolved,
-  stage,
-  poster,
-  titleOverride,
-  blurbOverride,
-  size = 'sm',
-}: TileProps) {
+/**
+ * Tile renders one skill registry record. Title, blurb, format chips,
+ * and route are ALL derived from `resolved.skill` — no per-tile copy
+ * overrides. The post-rebrand fix-it removed the override props the
+ * initial port carried so the design's literal copy could never drift
+ * from the skill's actual `name` / `purpose`.
+ */
+export function Tile({ resolved, stage, poster, size = 'sm' }: TileProps) {
   const { skill, coreAccess } = resolved;
   const locked = coreAccess.state !== 'available';
-  const title = titleOverride ?? skill.name;
-  const blurb = blurbOverride ?? skill.purpose;
+  const title = skill.name;
+  const blurb = skill.purpose;
   const formats = formatsForOutputs(skill.outputs);
 
   return (

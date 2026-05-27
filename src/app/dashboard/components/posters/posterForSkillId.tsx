@@ -5,6 +5,7 @@ import { IntelPoster } from './IntelPoster';
 import { OpenHousePoster } from './OpenHousePoster';
 import { PrepPoster } from './PrepPoster';
 import { PresentationPoster } from './PresentationPoster';
+import { SocialThumbnail } from './SocialThumbnail';
 
 /**
  * Map a skill ID to the poster preview that represents its output on the
@@ -19,12 +20,19 @@ import { PresentationPoster } from './PresentationPoster';
  *   - open-house-prep: PrepPoster — agent's day-of prep checklist.
  *   - listing-flyer: FlyerPoster — printable single-listing flyer.
  *   - open-house-promo: OpenHousePoster — event-day flyer + QR sign-in.
+ *   - social-animator-*: SocialThumbnail — the SAME canvas-looping
+ *     preview the /social-animator picker page renders (no static SVG
+ *     approximation). Routed via prefix-match so every new social
+ *     template auto-surfaces with its live preview.
  *
- * Anything not in the map (e.g. a future skill that ships before its
+ * Anything else (e.g. a future non-social skill that ships before its
  * poster does) renders the DocPoster fallback so the tile still has a
  * visual identity instead of an empty box.
  */
 export function posterForSkillId(skillId: string): ReactElement {
+  if (skillId.startsWith('social-animator-')) {
+    return <SocialThumbnail skillId={skillId} />;
+  }
   switch (skillId) {
     case 'seller-presentation':
       return <PresentationPoster />;

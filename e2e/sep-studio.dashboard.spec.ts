@@ -2,21 +2,20 @@ import { test, expect } from '@playwright/test';
 import { seedBrandProfile } from './fixtures/seed-helpers';
 
 /**
- * SEP-S Studio dashboard shell — v1.47 Lane A re-brand structural
- * proofs.
+ * SEP-S Studio dashboard shell — structural proofs (post-fix-it).
  *
- * Locks in the new structure the dashboard rebrand introduces:
- *   - Root scoping class so styles can't leak
- *   - Topbar (brand + topnav) renders
- *   - Welcome block with first-name personalization
- *   - 3 stage sections with correct data-stage attrs + tile counts
- *   - Social Studio flagship opens the modal and shows all 10
- *     social-animator templates with the right links
- *   - ?testTier=base URL knob threads through the resolver (no 500)
- *
- * No pixel snapshots — the token system (data-bg / data-density) will
- * evolve through A7f.3. Structural + testid + copy assertions are the
- * durable contract.
+ * Locks in the shape after the fix-it pass on top of the initial
+ * f3529e6 rebrand:
+ *   - Tile content binds to ALL_SKILLS (skill.name / skill.purpose) —
+ *     no hardcoded design literals.
+ *   - Stage 3 renders 10 visible tiles, one per social-animator
+ *     template, in a 5-up grid. The flagship marquee + picker modal
+ *     are gone.
+ *   - Each Stage 3 tile mounts the shared TemplatePreview component
+ *     (canvas-rendered looping thumbnail) — proven by the presence
+ *     of a <canvas> inside the tile's poster.
+ *   - Topnav has no dead Library link.
+ *   - A7f.2 entitlement wiring + ?testTier= URL knob still threaded.
  */
 
 test.describe('SEP-S Studio dashboard shell (v1.47 Lane A)', () => {
@@ -26,8 +25,6 @@ test.describe('SEP-S Studio dashboard shell (v1.47 Lane A)', () => {
     await seedBrandProfile(page);
     await page.goto('/dashboard');
 
-    // .sep-studio root is the single scoping anchor for every CSS rule
-    // in sep-studio.css. data-attrs carry the static defaults.
     const root = page.getByTestId('sep-studio-root');
     await expect(root).toBeVisible({ timeout: 10_000 });
     await expect(root).toHaveAttribute('data-bg', 'warm');
@@ -38,17 +35,20 @@ test.describe('SEP-S Studio dashboard shell (v1.47 Lane A)', () => {
     await expect(topbar).toBeVisible();
     await expect(topbar).toContainText('SIMPLY EDIT');
     await expect(topbar).toContainText('PRO STUDIO');
-    // Sign-out is wired to the server action.
+    // Dead Library link was removed in the fix-it — only Brand kit +
+    // Settings remain, both pointing at /settings, plus the sign-out
+    // server-action button.
+    await expect(topbar).not.toContainText(/library/i);
+    const navLinks = topbar.getByRole('link');
+    await expect(navLinks).toHaveCount(2);
+    await expect(navLinks.nth(0)).toHaveAttribute('href', '/settings');
+    await expect(navLinks.nth(1)).toHaveAttribute('href', '/settings');
     await expect(page.getByTestId('sep-sign-out')).toBeVisible();
   });
 
   test('welcome block personalizes the first name from BrandSettings', async ({
     page,
   }) => {
-    // seedBrandProfile sets agentName; the welcome derives firstName by
-    // taking the first whitespace-split token. We override here so the
-    // assertion is anchored on a known string instead of whatever the
-    // helper happens to seed.
     await page.addInitScript(() => {
       window.localStorage.setItem(
         'socanim_brand_settings',
@@ -75,7 +75,6 @@ test.describe('SEP-S Studio dashboard shell (v1.47 Lane A)', () => {
       await expect(stage).toBeVisible({ timeout: 10_000 });
     }
 
-    // Stage header data-stage drives the amber/mint/periwinkle tints.
     await expect(page.getByTestId('sep-stage-head-win')).toHaveAttribute(
       'data-stage',
       'win',
@@ -104,48 +103,12 @@ test.describe('SEP-S Studio dashboard shell (v1.47 Lane A)', () => {
       await expect(page.getByTestId(`sep-tile-${skillId}`)).toBeVisible();
     }
 
-    // Visibility surfaces ONE flagship tile (the modal trigger), not
-    // ten individual tiles — that's the design's intentional collapse.
-    await expect(page.getByTestId('sep-flagship-social')).toBeVisible();
-  });
-
-  test('Social Studio modal opens with all 10 templates linking to /social-animator routes', async ({
-    page,
-  }) => {
-    await seedBrandProfile(page);
-    await page.goto('/dashboard');
-
-    // Modal is closed by default.
-    await expect(page.getByTestId('sep-studio-modal')).toHaveCount(0);
-
-    await page.getByTestId('sep-flagship-social').click();
-
-    const modal = page.getByTestId('sep-studio-modal');
-    await expect(modal).toBeVisible({ timeout: 10_000 });
-    await expect(modal).toContainText(/pick a template/i);
-
-    // All 10 social-animator templates surface as linked cards.
-    const templateIds = [
-      'social-animator-qa-card',
-      'social-animator-listing-card',
-      'social-animator-listing-showcase',
-      'social-animator-listing-carousel',
-      'social-animator-before-after',
-      'social-animator-testimonial-card',
-      'social-animator-numbered-process',
-      'social-animator-grid-comparison',
-      'social-animator-stat-highlight',
-      'social-animator-market-update',
-    ];
-    for (const id of templateIds) {
-      const tile = page.getByTestId(`sep-studio-modal-tile-${id}`);
-      await expect(tile).toBeVisible();
-      const expectedHref = `/social-animator/${id.replace('social-animator-', '')}`;
-      await expect(tile).toHaveAttribute('href', expectedHref);
+    // Visibility = 10 visible social-animator tiles (one per template) —
+    // the flagship + modal pattern is gone.
+    for (const id of SOCIAL_TEMPLATE_IDS) {
+      await expect(page.getByTestId(`sep-tile-${id}`)).toBeVisible();
     }
-
-    // Esc closes the modal.
-    await page.keyboard.press('Escape');
+    await expect(page.getByTestId('sep-flagship-social')).toHaveCount(0);
     await expect(page.getByTestId('sep-studio-modal')).toHaveCount(0);
   });
 
@@ -154,22 +117,15 @@ test.describe('SEP-S Studio dashboard shell (v1.47 Lane A)', () => {
   }) => {
     await seedBrandProfile(page);
     await page.goto('/dashboard');
-
-    // Wait for the client island to hydrate + tile grids to mount —
-    // counting locators before hydration returns 0 and races the
-    // `expect(...).toBeGreaterThan(0)` assertion.
+    // Wait for hydration via a known tile before counting.
     await expect(
       page.getByTestId('sep-tile-seller-presentation'),
     ).toBeVisible({ timeout: 10_000 });
 
-    // Every Tile renders `data-gate="available"` (or "locked"). Today
-    // no registry skill declares `baseWorkflow > base`, so all tiles
-    // resolve to "available" — proves the resolver wiring is live
-    // without depending on a future-gated skill. When A7f.3 lands its
-    // first gated declaration, this assertion gains a "locked" branch.
     const tiles = page.locator('[data-testid^="sep-tile-"]');
     const count = await tiles.count();
-    expect(count).toBeGreaterThan(0);
+    // 4 Win + 2 Launch + 10 Visibility = 16.
+    expect(count).toBeGreaterThanOrEqual(16);
     for (let i = 0; i < count; i++) {
       const gate = await tiles.nth(i).getAttribute('data-gate');
       expect(gate === 'available' || gate === 'locked').toBe(true);
@@ -182,17 +138,12 @@ test.describe('SEP-S Studio dashboard shell (v1.47 Lane A)', () => {
     await seedBrandProfile(page);
     await page.goto('/dashboard?testTier=base');
 
-    // Page renders the full shell — no 500, no missing root.
     await expect(page.getByTestId('sep-studio-root')).toBeVisible({
       timeout: 10_000,
     });
     await expect(page.getByTestId('sep-stage-win')).toBeVisible();
     await expect(page.getByTestId('sep-stage-launch')).toBeVisible();
     await expect(page.getByTestId('sep-stage-visibility')).toBeVisible();
-    // Today no skill is gated above base, so every tile is available.
-    // The locked-tile assertion lands when A7f.3 ships its first
-    // baseWorkflow > base declaration — wiring is structurally proven
-    // by the "every tile carries gate marker" test above.
   });
 
   test('?testTier=pro renders the same tile set as default — wiring stable across tiers', async ({
@@ -217,26 +168,80 @@ test.describe('SEP-S Studio dashboard shell (v1.47 Lane A)', () => {
     }
   });
 
-  test('Win-stage seller-presentation tile uses design titleOverride ("Listing Presentation")', async ({
+  test('Win-stage tiles bind to registry name/purpose (no design-literal overrides)', async ({
     page,
   }) => {
     await seedBrandProfile(page);
     await page.goto('/dashboard');
 
-    // Per stop-condition resolution: the design's "Listing Presentation"
-    // tile (with the "Full seller-facing deck" blurb) IS the
-    // SELLER_PRESENTATION_SKILL. Tile renders the override copy but
-    // routes via skillRoute('seller-presentation').
-    const tile = page.getByTestId('sep-tile-seller-presentation');
-    await expect(tile).toContainText('Listing Presentation');
-    await expect(tile).toContainText(/full seller-facing deck/i);
-    await expect(tile).toHaveAttribute('href', '/seller-presentation');
+    // The seller-presentation tile MUST show "Seller Presentation"
+    // (skill.name) — not "Listing Presentation" (the design's now-
+    // dropped override). The blurb comes from skill.purpose.
+    const sp = page.getByTestId('sep-tile-seller-presentation');
+    await expect(sp).toBeVisible({ timeout: 10_000 });
+    await expect(sp).toContainText('Seller Presentation');
+    // The blurb starts with "Build a seller presentation" per
+    // SELLER_PRESENTATION_SKILL.purpose — anchor on that prefix so a
+    // future copy tweak doesn't require re-touching the test, but a
+    // regression to the design-literal "Full seller-facing deck" copy
+    // would fail.
+    await expect(sp).not.toContainText(/full seller-facing deck/i);
 
-    // The LEGACY listing-presentation skill ("Listing Presentation
-    // One-Pager") still surfaces as its own tile — registry-truth
-    // beats design omission.
-    const legacy = page.getByTestId('sep-tile-listing-presentation');
-    await expect(legacy).toBeVisible();
-    await expect(legacy).toHaveAttribute('href', '/listing-presentation');
+    // The legacy listing-presentation skill's tile shows its real
+    // registry name ("Listing Presentation One-Pager"), not just
+    // "Listing Presentation".
+    const lp = page.getByTestId('sep-tile-listing-presentation');
+    await expect(lp).toBeVisible();
+    await expect(lp).toContainText('Listing Presentation One-Pager');
+    await expect(lp).toHaveAttribute('href', '/listing-presentation');
+  });
+
+  test('Stage 3 social tiles mount the live TemplatePreview canvas (no static SVG)', async ({
+    page,
+  }) => {
+    await seedBrandProfile(page);
+    await page.goto('/dashboard');
+
+    // Wait for the visibility section's first tile to be visible.
+    const firstSocialTile = page.getByTestId(
+      `sep-tile-${SOCIAL_TEMPLATE_IDS[0]}`,
+    );
+    await expect(firstSocialTile).toBeVisible({ timeout: 10_000 });
+
+    // Each Stage 3 tile must contain a <canvas> — that's the
+    // TemplatePreview render target. If a future refactor reverts to
+    // static SVG / divs, this asserts the regression immediately.
+    for (const id of SOCIAL_TEMPLATE_IDS) {
+      const tile = page.getByTestId(`sep-tile-${id}`);
+      await expect(tile.locator('canvas')).toHaveCount(1);
+    }
+
+    // The tiles route to /social-animator/<template-id> (stripping the
+    // social-animator- prefix from the skill id).
+    for (const id of SOCIAL_TEMPLATE_IDS) {
+      const templateId = id.replace('social-animator-', '');
+      const tile = page.getByTestId(`sep-tile-${id}`);
+      await expect(tile).toHaveAttribute(
+        'href',
+        `/social-animator/${templateId}`,
+      );
+    }
   });
 });
+
+// Mirror of SOCIAL_ANIMATOR_SKILLS order from src/templates/skills.ts.
+// Kept inline so the spec doesn't import production source (Playwright's
+// runner has its own TS pipeline that doesn't always agree with the
+// app's path aliases without extra config).
+const SOCIAL_TEMPLATE_IDS = [
+  'social-animator-qa-card',
+  'social-animator-listing-card',
+  'social-animator-listing-showcase',
+  'social-animator-listing-carousel',
+  'social-animator-before-after',
+  'social-animator-testimonial-card',
+  'social-animator-numbered-process',
+  'social-animator-grid-comparison',
+  'social-animator-stat-highlight',
+  'social-animator-market-update',
+] as const;

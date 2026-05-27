@@ -404,6 +404,7 @@
   gap: var(--gap-grid);
 }
 .sep-studio .grid-4 { grid-template-columns: repeat(4, minmax(0, 1fr)); }
+.sep-studio .grid-5 { grid-template-columns: repeat(5, minmax(0, 1fr)); }
 .sep-studio .grid-2 { grid-template-columns: repeat(2, minmax(0, 1fr)); }
 
 /* ─── tile (common) ─────────────────────────────────────────────────────── */
@@ -495,6 +496,21 @@
 .sep-studio .tile-md .tile-body   { padding: 22px 22px 54px; }
 .sep-studio .tile-md .tile-title  { font-size: 18px; }
 .sep-studio .tile-md .tile-blurb  { font-size: 13.5px; }
+
+/* social variant — Stage 3 tiles. 4:5 poster matches the canvas-rendered
+ * TemplatePreview's native aspect (1080×1350) so the looping thumbnail
+ * fills the box without letterboxing. Tighter typography because the
+ * social grid is 5-up on desktop. */
+.sep-studio .tile-social .tile-poster { aspect-ratio: 4 / 5; }
+.sep-studio .tile-social .tile-body   { padding: 14px 14px 44px; }
+.sep-studio .tile-social .tile-title  { font-size: 14px; }
+.sep-studio .tile-social .tile-blurb  { font-size: 11.5px; line-height: 1.45; }
+/* TemplatePreview renders <div><canvas/></div> — the inner div needs to
+ * fill the absolutely-positioned poster box. The canvas's own
+ * aspect-ratio matches the .tile-social poster aspect so it sits
+ * flush. */
+.sep-studio .tile-social .tile-poster > div { display: block; width: 100%; height: 100%; }
+.sep-studio .tile-social .tile-poster canvas { width: 100%; height: 100%; display: block; }
 
 /* preview-but-lock gate state (preview-only / upgrade-required). The
  * polished lock UX is A7f.3; here we just dim the tile + surface a tiny
@@ -1094,6 +1110,7 @@
 /* ─── responsive trims ──────────────────────────────────────────────────── */
 @media (max-width: 1100px) {
   .sep-studio .grid-4 { grid-template-columns: repeat(2, 1fr); }
+  .sep-studio .grid-5 { grid-template-columns: repeat(3, 1fr); }
   .sep-studio .welcome { flex-direction: column; align-items: flex-start; }
   .sep-studio .welcome-stats { width: 100%; justify-content: flex-start; }
   .sep-studio .modal-grid { grid-template-columns: repeat(3, 1fr); }
@@ -1103,6 +1120,7 @@
   .sep-studio .hero-card { grid-template-columns: 1fr; }
   .sep-studio .hero-right { display: none; }
   .sep-studio .grid-4, .sep-studio .grid-2 { grid-template-columns: 1fr; }
+  .sep-studio .grid-5 { grid-template-columns: repeat(2, 1fr); }
   .sep-studio .welcome-title { font-size: 40px; }
   .sep-studio .modal-grid { grid-template-columns: repeat(2, 1fr); }
 }

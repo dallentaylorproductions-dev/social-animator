@@ -67,12 +67,10 @@ export default async function DashboardPage({
             </span>
           </div>
           <nav className="topnav" aria-label="Primary">
-            {/* Library route doesn't ship yet — link points to /library so
-                the design lands intact; that route returns 404 today and
-                will be wired in a follow-up (asset-library feature). */}
-            <Link href="/library" className="topnav-link">
-              Library
-            </Link>
+            {/* Library is intentionally absent — the asset-library route
+                doesn't exist yet. The link will land back here when that
+                feature ships; we'd rather ship 3 live links than 4 with a
+                404 in the mix. */}
             <Link href="/settings" className="topnav-link">
               Brand kit
             </Link>
