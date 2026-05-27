@@ -2,20 +2,28 @@ import Link from "next/link";
 import { auth, signOut } from "@/lib/auth";
 import { loadAgentProfile } from "@/lib/entitlements/load-agent-profile";
 import { DashboardClient } from "./DashboardClient";
+import "./sep-studio.css";
 
 /**
- * Dashboard — the user's home base after auth.
+ * Dashboard server shell (v1.47 Lane A — SEP-S Studio re-brand).
  *
- * W-1 Half B replaced the tool-launcher grid with a state-aware "next best
- * action" surface. The page shell stays a server component (auth + greeting +
- * Settings/Sign Out chrome); state detection lives in DashboardClient since
- * it needs window.localStorage.
+ * Layer responsibilities:
+ *   - Server: auth, AgentProfile resolution (entitlements + KV reads),
+ *     the `?testTier=` URL knob, and the static topbar (brand + topnav
+ *     + sign-out server action). Sign-out stays an inline server action
+ *     because that's the cleanest Next.js App Router idiom for a single
+ *     button — no need to extract to a 'use server' module.
+ *   - Client (DashboardClient): welcome derived from localStorage (brand
+ *     name, listing address, OH events), hero card driven by
+ *     getActiveWorkflows + entitlement resolver, three stage sections,
+ *     flagship Social Studio + modal, footer.
  *
- * v1.47 / A7f.2: server-side resolves the AgentProfile (dev-access +
- * subscription state via KV) and passes it to DashboardClient. The client
- * runs the synchronous resolver (resolveEntitlements + resolveSkill) over
- * the materialized profile, so every dashboard surface consumes the same
- * source of truth (Substrate §8.5).
+ * Root: `.sep-studio` is the SINGLE scoping anchor for every CSS rule
+ * in ./sep-studio.css. Other routes (/login, /h/[slug], wizard surfaces)
+ * never receive this class, so the warm-dark palette / ambient orbs /
+ * tile geometry can't leak. data-attrs (`data-bg`, `data-density`,
+ * `data-stagedots`) carry static defaults; the TweaksPanel UI from the
+ * reference is deliberately not ported (theme picker = A7f.3).
  */
 export default async function DashboardPage({
   searchParams,
@@ -24,38 +32,54 @@ export default async function DashboardPage({
 }) {
   const session = await auth();
   const email = session?.user?.email ?? "";
-  const greetingName = email ? email.split("@")[0] : "";
 
-  // ?testTier=base|pro|ai — Dallen's internal-test QA knob (§8.5). Reading
-  // searchParams forces dynamic rendering on this route, which is fine —
-  // /dashboard already depends on the auth session (also dynamic).
+  // ?testTier=base|pro|ai — Dallen's internal-test QA knob (§8.5).
+  // Reading searchParams forces dynamic rendering on /dashboard, which
+  // is fine — the route already depends on auth (also dynamic). The
+  // resolver maps the override into AgentProfile.internalTestOverride,
+  // which DashboardClient consumes via resolveEntitlements → resolveSkill.
   const sp = await searchParams;
   const agentProfile = await loadAgentProfile(email || null, {
     testTier: sp.testTier,
   });
 
   return (
-    <main className="min-h-screen bg-neutral-950 text-white overflow-x-hidden">
-      <div className="max-w-5xl mx-auto px-6 py-12 lg:py-20">
-        <header className="mb-12 flex flex-col gap-4 md:flex-row md:items-start md:justify-between md:gap-6">
-          <div>
-            <p className="text-xs uppercase tracking-[0.2em] text-mint">
-              Simply Edit Pro Studio
-            </p>
-            <h1 className="text-3xl font-bold mt-1">
-              {greetingName ? `Welcome back, ${greetingName}.` : "Welcome back."}
-            </h1>
-            <p className="text-sm text-neutral-400 mt-3 max-w-lg">
-              What's happening in your business right now.
-            </p>
+    <main
+      className="sep-studio"
+      data-bg="warm"
+      data-density="comfy"
+      data-stagedots="on"
+      data-testid="sep-studio-root"
+    >
+      <div className="ambient" aria-hidden>
+        <div className="orb orb-1" />
+        <div className="orb orb-2" />
+      </div>
+
+      <div className="app">
+        <header className="topbar" data-testid="sep-topbar">
+          <div className="brand">
+            <span className="brand-mark" aria-hidden>
+              <span className="brand-dot" />
+            </span>
+            <span className="brand-name">
+              SIMPLY EDIT <span className="brand-pro">PRO STUDIO</span>
+            </span>
           </div>
-          <nav className="flex items-center gap-5 text-xs uppercase tracking-[0.15em]">
-            <Link
-              href="/settings"
-              className="text-neutral-400 hover:text-mint transition"
-            >
-              Settings →
+          <nav className="topnav" aria-label="Primary">
+            {/* Library route doesn't ship yet — link points to /library so
+                the design lands intact; that route returns 404 today and
+                will be wired in a follow-up (asset-library feature). */}
+            <Link href="/library" className="topnav-link">
+              Library
             </Link>
+            <Link href="/settings" className="topnav-link">
+              Brand kit
+            </Link>
+            <Link href="/settings" className="topnav-link">
+              Settings
+            </Link>
+            <span className="topnav-sep" aria-hidden />
             <form
               action={async () => {
                 "use server";
@@ -64,7 +88,8 @@ export default async function DashboardPage({
             >
               <button
                 type="submit"
-                className="text-neutral-400 hover:text-mint transition"
+                className="topnav-link topnav-quiet"
+                data-testid="sep-sign-out"
               >
                 Sign out
               </button>

@@ -2,32 +2,40 @@ import { test, expect } from '@playwright/test';
 import { seedBrandProfile, seedListingProfile } from './fixtures/seed-helpers';
 
 /**
- * Dashboard — state-aware navigation (W-1 Half B impl 2).
+ * Dashboard — state-aware navigation (v1.47 Lane A re-brand).
  *
- * File-level tests only — no visual snapshots. The dashboard's content will
- * evolve through Phases 2-4 (behavior tracking, calendar awareness, AI
- * orchestration); pixel snapshots would be fragile and high-maintenance.
- * Asserts on copy + DOM structure that the impl-2 contract guarantees.
+ * Asserts on the SEP-S Studio shell: warm-dark warm-dark bento with
+ * topbar + welcome + hero "Up next" card + three named stage sections.
+ * Pixel snapshots stay deliberately absent — the dashboard rebrand
+ * shipped a token system that A7f.3 will continue to tune; structural
+ * + testid + copy assertions are the durable contract.
+ *
+ * Migrated from W-1 Half B impl 2's "Next best action" + "All skills"
+ * shape. Test intent is preserved: empty-state CTA, workflow-driven
+ * hero, skill discoverability under the right stage.
  */
 
 test.describe('Dashboard — state-aware navigation', () => {
-  test('renders empty-state CTA when brand profile is not configured', async ({
+  test('renders empty-state hero when brand profile is not configured', async ({
     page,
   }) => {
-    // No seedBrandProfile — agentName is empty so hasBrandProfileConfigured() is false.
+    // No seedBrandProfile — agentName empty so hasBrandProfileConfigured() is false.
     await page.goto('/dashboard');
     await expect(page).not.toHaveURL(/\/login/i);
 
-    // Empty-state CTA copy from DashboardClient.EmptyState
+    // SEP-S shell renders the topbar regardless of brand state.
+    await expect(page.getByTestId('sep-topbar')).toBeVisible({ timeout: 10_000 });
+
+    // Empty-state hero: calm "Ready when you are." headline + brand-kit CTA.
+    const hero = page.getByTestId('sep-hero-empty');
+    await expect(hero).toBeVisible({ timeout: 10_000 });
+    await expect(hero).toContainText(/ready when you are/i);
     await expect(
-      page.getByText(/set up your brand profile to unlock skills/i)
-    ).toBeVisible({ timeout: 10_000 });
-    await expect(
-      page.getByRole('link', { name: /set up brand profile/i })
-    ).toBeVisible();
+      page.getByTestId('sep-hero-primary'),
+    ).toHaveAttribute('href', '/settings');
   });
 
-  test('renders Listing Launch card when listing profile is populated', async ({
+  test('renders Listing Launch hero when a listing profile is populated', async ({
     page,
   }) => {
     await seedBrandProfile(page);
@@ -40,44 +48,30 @@ test.describe('Dashboard — state-aware navigation', () => {
     await page.goto('/dashboard');
     await expect(page).not.toHaveURL(/\/login/i);
 
-    // Listing Launch workflow card surfaces because listing_launch_state matches.
-    await expect(page.getByText(/launch your listing/i)).toBeVisible({
-      timeout: 10_000,
-    });
-    // CTA links to the Listing Flyer tool route. Exact-string match on the
-    // arrow-suffixed text isolates the card's primary CTA from the
-    // SkillTile in the AllSkillsSection (which links to the same route but
-    // has a longer accessible name including its output-format badge).
+    // Hero card surfaces the listing-launch workflow as a heading.
     await expect(
-      page.getByRole('link', { name: 'Listing Flyer Generator →' })
-    ).toHaveAttribute('href', '/listing-flyer');
+      page.getByRole('heading', { name: /launch your listing/i }),
+    ).toBeVisible({ timeout: 10_000 });
+
+    // Primary CTA → Listing Flyer Generator. The new shell renders the
+    // skill name + an arrow span; matching the substring "Listing Flyer
+    // Generator" on the link is the portable contract (the arrow span
+    // contributes "→" to the accessible name).
+    const primary = page.getByTestId('sep-hero-primary');
+    await expect(primary).toContainText('Listing Flyer Generator');
+    await expect(primary).toHaveAttribute('href', '/listing-flyer');
   });
 });
 
 /**
- * A7f.1 — Seller Presentation dashboard discovery/launch (v1.47 / Lane A).
- *
- * Purely additive: the tile lands automatically under "Seller pitch" via
- * the Commit 3 derive-from-skill-record refactor (no hardcoded filter
- * change needed). These tests lock in:
- *   - Seller Win card retargets to Seller Presentation when in seller-
- *     appointment-prep state (state-detection triggers unchanged).
- *   - Card stays silent on a no-seller state (listing-launch only).
- *   - Direct launch via the All-skills tile under Seller pitch.
- *   - Resume-your-draft affordance when a converged WorkflowInstance
- *     exists for seller-presentation.
- *
- * Gating (A7f.2) and themes (A7f.3) are intentionally NOT exercised here.
+ * A7f.1 retained — Seller Presentation dashboard discovery (now in
+ * the new shell). Same trigger states, new tile / hero assertions.
  */
 test.describe('Dashboard — Seller Presentation discovery (A7f.1)', () => {
-  test('Seller Win card surfaces with Seller Presentation primary when SIR draft exists', async ({
+  test('Hero surfaces Seller Win System with Seller Presentation primary when SIR draft exists', async ({
     page,
   }) => {
     await seedBrandProfile(page);
-    // SIR draft with a propertyAddress fires seller_appointment_state via
-    // state-detection.ts — same path the SIR build's card relied on; the
-    // retarget swaps the primary to seller-presentation while keeping the
-    // trigger unchanged.
     await page.addInitScript(() => {
       window.localStorage.setItem(
         'sellerIntelligenceReport:draft',
@@ -98,22 +92,17 @@ test.describe('Dashboard — Seller Presentation discovery (A7f.1)', () => {
     await expect(
       page.getByRole('heading', { name: /seller win system/i }),
     ).toBeVisible({ timeout: 10_000 });
-    // Primary CTA — exact arrow-suffixed label isolates it from the
-    // Seller pitch tile (which renders the bare skill name).
-    await expect(
-      page.getByRole('link', { name: 'Seller Presentation →' }).first(),
-    ).toHaveAttribute('href', '/seller-presentation');
-    // No resume affordance — there is no in-flight converged instance.
-    await expect(
-      page.getByRole('link', { name: /resume your draft/i }),
-    ).toHaveCount(0);
+    const primary = page.getByTestId('sep-hero-primary');
+    await expect(primary).toContainText('Seller Presentation');
+    await expect(primary).toHaveAttribute('href', '/seller-presentation');
+    // No resume affordance — no in-flight WorkflowInstance.
+    await expect(primary).not.toContainText(/resume your draft/i);
   });
 
-  test('Seller Win card stays silent when no seller state is active', async ({
+  test('Hero stays on Listing Launch when no seller state is active', async ({
     page,
   }) => {
     await seedBrandProfile(page);
-    // listing-launch state only — no SIR / LP / Seller Presentation draft.
     await seedListingProfile(page, {
       address: '1234 Test Drive NE',
       status: 'Just Listed',
@@ -122,50 +111,44 @@ test.describe('Dashboard — Seller Presentation discovery (A7f.1)', () => {
 
     await page.goto('/dashboard');
 
-    // Listing Launch card visible (sanity — confirms the dashboard is
-    // rendering its Next Best Action surface for THIS state).
-    await expect(page.getByText(/launch your listing/i)).toBeVisible({
-      timeout: 10_000,
-    });
-    // Seller Win System card must NOT surface — none of its trigger
-    // states (pre_listing_state, seller_appointment_state,
-    // seller_conversion_state) is active.
+    // Listing Launch wins priority order, surfaces in hero.
+    await expect(
+      page.getByRole('heading', { name: /launch your listing/i }),
+    ).toBeVisible({ timeout: 10_000 });
+    // Seller Win System must NOT surface in the hero — its triggers
+    // (seller_appointment_state etc.) aren't active here.
     await expect(
       page.getByRole('heading', { name: /seller win system/i }),
     ).toHaveCount(0);
   });
 
-  test('Seller Presentation tile under "Seller pitch" launches the wizard', async ({
+  test('Seller Presentation tile lives in the Win stage and links to the wizard', async ({
     page,
   }) => {
     await seedBrandProfile(page);
 
     await page.goto('/dashboard');
 
-    // "Seller pitch" group heading from AllSkillsSection's SkillGroup.
-    await expect(
-      page.getByRole('heading', { name: /^seller pitch$/i }),
-    ).toBeVisible({ timeout: 10_000 });
-    // Tile is a Link whose accessible name starts with the skill name +
-    // includes the format badge ("Seller Presentation HTML" etc.).
-    // Asserting href is the portable contract.
-    const tile = page
-      .getByRole('link', { name: /^Seller Presentation/ })
-      .first();
+    // Win stage is the first named section.
+    await expect(page.getByTestId('sep-stage-win')).toBeVisible({
+      timeout: 10_000,
+    });
+    // The seller-presentation tile gets a stable testid from the Tile
+    // component (sep-tile-<skillId>) — the design's titleOverride
+    // ("Listing Presentation") is a cosmetic label only; the href is
+    // the load-bearing contract.
+    const tile = page.getByTestId('sep-tile-seller-presentation');
+    await expect(tile).toBeVisible();
     await expect(tile).toHaveAttribute('href', '/seller-presentation');
   });
 
-  test('Resume your draft affordance appears when a Seller Presentation WorkflowInstance exists', async ({
+  test('Resume your draft affordance surfaces when a Seller Presentation WorkflowInstance exists', async ({
     page,
   }) => {
     await seedBrandProfile(page);
-    // Seed a converged WorkflowInstance in the workflowInstance:* namespace.
-    // Minimal shape matches src/skills/workflow-instance-storage.ts's
-    // isWorkflowInstanceShape guard (instanceId + skillId + timestamps +
-    // resolvedPrimitives). No completedAt = "in-progress" = resumable.
     await page.addInitScript(() => {
       const now = new Date().toISOString();
-      const id = 'wf_test_seller_presentation_a7f1';
+      const id = 'wf_test_seller_presentation_rebrand';
       window.localStorage.setItem(
         `workflowInstance:${id}`,
         JSON.stringify({
@@ -184,13 +167,13 @@ test.describe('Dashboard — Seller Presentation discovery (A7f.1)', () => {
 
     await page.goto('/dashboard');
 
-    // The in-flight instance triggers seller_appointment_state, which
-    // surfaces the Seller Win card with the resume label.
+    // In-flight instance triggers seller_appointment_state → Seller Win
+    // hero with the resume label baked into the primary CTA.
     await expect(
       page.getByRole('heading', { name: /seller win system/i }),
     ).toBeVisible({ timeout: 10_000 });
-    await expect(
-      page.getByRole('link', { name: 'Resume your draft →' }),
-    ).toHaveAttribute('href', '/seller-presentation');
+    const primary = page.getByTestId('sep-hero-primary');
+    await expect(primary).toContainText(/resume your draft/i);
+    await expect(primary).toHaveAttribute('href', '/seller-presentation');
   });
 });

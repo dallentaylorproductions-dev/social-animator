@@ -1,226 +1,400 @@
 'use client';
 
-import Link from 'next/link';
 import { useEffect, useMemo, useState } from 'react';
 import {
   detectActiveStates,
   hasBrandProfileConfigured,
 } from './state-detection';
 import { getActiveWorkflows, getWorkflowPrimarySkill } from './workflows';
-import { getCategorizedSkills } from '@/skills/registry';
+import { ALL_SKILLS, getSkillsByCategory } from '@/skills/registry';
 import { findLatestInProgress } from '@/skills/workflow-instance-storage';
 import { resolveEntitlements, resolveSkill } from '@/lib/entitlements/resolver';
 import type {
   AgentProfile,
   EntitlementContext,
 } from '@/lib/entitlements/types';
-import { NextBestActionCard } from './components/NextBestActionCard';
-import { SkillTile } from './components/SkillTile';
 import type { CallableSkill, WorkflowState } from '@/skills/types';
+import { HeroNextAction, HeroEmptyState } from './components/HeroNextAction';
+import { StageHeader } from './components/StageHeader';
+import { Tile, type TileStage } from './components/Tile';
+import { posterForSkillId } from './components/posters/posterForSkillId';
+import {
+  SocialStudioTile,
+  SocialStudioModal,
+} from './components/SocialStudio';
 
 /**
- * Client island for the state-aware dashboard surface. Reads localStorage
- * for state detection (requires `window`); the parent server component
- * handles auth + the welcome header chrome AND resolves the AgentProfile
- * (KV reads).
+ * Dashboard client island (v1.47 Lane A re-brand — SEP-S Studio shell).
  *
- * v1.47 / A7f.2: the resolver runs HERE (synchronous, over the
- * materialized AgentProfile). Both the Next Best Action card and the
- * All Skills tiles consume `ResolvedSkill` — no surface re-derives
- * gating from the agent profile or hardcodes per-skill access logic.
+ * Replaces the prior NextBestAction + AllSkillsSection structure with a
+ * magazine-style bento: welcome → hero "Up next" → three stage sections
+ * (Win → Launch → Stay visible) → footer. Three concerns kept clean:
+ *
+ *   1. Composition (this file): topbar lives in page.tsx (sign-out is
+ *      a server action); everything below — welcome, hero, stages,
+ *      flagship, footer — composes here from a small set of typed
+ *      primitives in ./components/.
+ *
+ *   2. State detection (./state-detection.ts) — unchanged. Same
+ *      localStorage reads, same activeStates union.
+ *
+ *   3. Entitlement resolution (../../lib/entitlements/resolver) —
+ *      unchanged. resolveEntitlements(agentProfile) runs once per render
+ *      via useMemo; resolveSkill(...) lifts each registry record into a
+ *      ResolvedSkill the tile then consumes. The ?testTier= URL knob
+ *      flows in via the AgentProfile that page.tsx passes — preserved
+ *      by construction.
+ *
+ * Stage assignment (registry-driven — derive don't hardcode, per the
+ * v1.44 lesson):
+ *
+ *   - WIN     = SkillCategory ∈ { 'Seller pitch', 'Open house' }
+ *   - LAUNCH  = SkillCategory  =  'Marketing assets'
+ *   - VISIBILITY = SkillCategory = 'Social content' (rendered as ONE
+ *     flagship tile + modal picker, not individual tiles)
+ *
+ * The seller-presentation skill renders TWO tiles' worth of visual
+ * identity per the packet's stop-condition: the design's "Listing
+ * Presentation" title + blurb is the title-overrode wrapper around the
+ * SAME skill record. The legacy listing-presentation skill renders its
+ * own tile (registry-truth: surface a category-matching skill even if
+ * the design didn't show it).
  */
+
+/* ───────────────────────────────────────────────────────────────────────── */
+/* TILE CONFIG — design-driven copy overrides + poster pinning              */
+
+interface WinTileConfig {
+  skillId: string;
+  /** Tile title to render (overrides the skill's `name` for design copy). */
+  titleOverride?: string;
+  /** Tile blurb to render (overrides the skill's `purpose` for design copy). */
+  blurbOverride?: string;
+}
+
+/**
+ * Win-stage tile order. Hand-curated so the design's intended hierarchy
+ * surfaces (Seller Presentation lead → SIR prep → legacy one-pager →
+ * OH Prep), but EACH tile resolves to a real ALL_SKILLS record — no
+ * design-fixture tiles ship. The title/blurb overrides for the lead
+ * tile match the design exactly per the stop-condition resolution:
+ * "Listing Presentation" with the "Full seller-facing deck" copy IS
+ * the seller-presentation skill.
+ */
+const WIN_TILE_ORDER: WinTileConfig[] = [
+  {
+    skillId: 'seller-presentation',
+    titleOverride: 'Listing Presentation',
+    blurbOverride:
+      'Full seller-facing deck. Agent prep + premium presentation page.',
+  },
+  { skillId: 'seller-intelligence-report' },
+  { skillId: 'listing-presentation' }, // legacy "Listing Presentation One-Pager" — still surfaced
+  { skillId: 'open-house-prep' },
+];
+
+const LAUNCH_TILE_ORDER: string[] = ['listing-flyer', 'open-house-promo'];
+
+/* ───────────────────────────────────────────────────────────────────────── */
+
+interface ResolvedWinTile {
+  config: WinTileConfig;
+  skill: CallableSkill;
+}
+
+function resolveWinTiles(): ResolvedWinTile[] {
+  const ordered: ResolvedWinTile[] = [];
+  for (const config of WIN_TILE_ORDER) {
+    const skill = ALL_SKILLS.find((s) => s.id === config.skillId);
+    if (skill) ordered.push({ config, skill });
+  }
+  // Surface ANY OTHER skill in Seller pitch / Open house that the
+  // curated order missed — keeps the registry as ground truth (the
+  // packet's "if the registry has a skill in a stage's category that
+  // the design doesn't show, STILL surface it" rule).
+  const orderedIds = new Set(ordered.map((t) => t.skill.id));
+  const extras = [
+    ...getSkillsByCategory('Seller pitch'),
+    ...getSkillsByCategory('Open house'),
+  ].filter((s) => !orderedIds.has(s.id));
+  for (const skill of extras) {
+    ordered.push({ config: { skillId: skill.id }, skill });
+  }
+  return ordered;
+}
+
+function resolveLaunchTiles(): CallableSkill[] {
+  const orderedIds = new Set(LAUNCH_TILE_ORDER);
+  const inOrder: CallableSkill[] = [];
+  for (const id of LAUNCH_TILE_ORDER) {
+    const skill = ALL_SKILLS.find((s) => s.id === id);
+    if (skill) inOrder.push(skill);
+  }
+  const extras = getSkillsByCategory('Marketing assets').filter(
+    (s) => !orderedIds.has(s.id),
+  );
+  return [...inOrder, ...extras];
+}
+
+function resolveVisibilitySkills(): CallableSkill[] {
+  return getSkillsByCategory('Social content');
+}
+
+/* ───────────────────────────────────────────────────────────────────────── */
+/* Welcome derivations (subtitle from active listing + OH; first name)      */
+
+function readJson<T>(key: string): T | null {
+  if (typeof window === 'undefined' || !window.localStorage) return null;
+  try {
+    const raw = window.localStorage.getItem(key);
+    return raw ? (JSON.parse(raw) as T) : null;
+  } catch {
+    return null;
+  }
+}
+
+interface WelcomeSnapshot {
+  firstName: string;
+  subtitle: string;
+}
+
+function readWelcomeSnapshot(): WelcomeSnapshot {
+  const brand = readJson<{ agentName?: string }>('socanim_brand_settings');
+  const fullName = brand?.agentName?.trim() ?? '';
+  const firstName = fullName ? fullName.split(/\s+/)[0] : 'there';
+
+  const parts: string[] = [];
+  const listing = readJson<{ address?: string }>('socanim_listing_profile');
+  if (listing?.address?.trim()) {
+    parts.push(`${listing.address.trim()} is live`);
+  }
+
+  // Open house upcoming in the next 7 days (across prep + promo drafts).
+  const candidates: Array<{ eventDate?: string } | null> = [
+    readJson<{ eventDate?: string }>('openHousePromo:draft'),
+    readJson<{ eventDate?: string }>('openHousePrep:draft'),
+  ];
+  const now = Date.now();
+  const weekMs = 7 * 24 * 60 * 60 * 1000;
+  const hasUpcomingOh = candidates.some((c) => {
+    if (!c?.eventDate) return false;
+    const ts = new Date(c.eventDate).getTime();
+    return Number.isFinite(ts) && ts >= now && ts <= now + weekMs;
+  });
+  if (hasUpcomingOh) parts.push('one open house this week');
+
+  const subtitle = parts.length > 0 ? `${parts.join(' · ')}.` : 'Ready when you are.';
+
+  return { firstName, subtitle };
+}
+
+/* ───────────────────────────────────────────────────────────────────────── */
+
 export function DashboardClient({ agentProfile }: { agentProfile: AgentProfile }) {
   const [activeStates, setActiveStates] = useState<WorkflowState[]>([]);
   const [brandConfigured, setBrandConfigured] = useState<boolean | null>(null);
-  // A7f.1: which primary-skill ids have an in-flight converged
-  // WorkflowInstance the agent can resume from the dashboard. Populated in
-  // the same useEffect as the rest of localStorage-derived state so the
-  // SSR-empty / browser-populated contract is preserved (the watch-out the
-  // brief flagged from the v1.44 hydration class).
+  const [welcome, setWelcome] = useState<WelcomeSnapshot>({
+    firstName: 'there',
+    subtitle: 'Ready when you are.',
+  });
   const [resumableSkillIds, setResumableSkillIds] = useState<Set<string>>(
     () => new Set(),
   );
+  const [studioOpen, setStudioOpen] = useState(false);
+  /**
+   * SSR-safe date eyebrow per sep-nextjs-hydration-pattern. Initialized
+   * empty so SSR + first client paint match; populated in useEffect so
+   * the date string differs between server time and the agent's locale
+   * without throwing a hydration warning.
+   */
+  const [dateEyebrow, setDateEyebrow] = useState<string>('');
 
   useEffect(() => {
     setActiveStates(detectActiveStates());
     setBrandConfigured(hasBrandProfileConfigured());
+    setWelcome(readWelcomeSnapshot());
+
     const resumable = new Set<string>();
     if (findLatestInProgress('seller-presentation')) {
       resumable.add('seller-presentation');
     }
     setResumableSkillIds(resumable);
+
+    setDateEyebrow(
+      new Date()
+        .toLocaleDateString('en-US', {
+          weekday: 'long',
+          month: 'long',
+          day: 'numeric',
+        })
+        .toUpperCase(),
+    );
   }, []);
 
-  // A7f.2: resolve entitlements ONCE per render, then resolve each skill
-  // through the same context. Memoized on the AgentProfile reference —
-  // the server passes a fresh object per request, so this recomputes on
-  // a sub change / dev-access flip but is stable within a render.
   const entitlement: EntitlementContext = useMemo(
     () => resolveEntitlements(agentProfile),
     [agentProfile],
   );
 
-  // Hydrating — render a minimal placeholder to avoid layout shift.
-  if (brandConfigured === null) {
-    return <div data-testid="dashboard-loading" className="h-32" aria-hidden />;
-  }
-
-  if (!brandConfigured) {
-    return <EmptyState />;
-  }
-
+  // First active workflow (priority-ordered) drives the hero card.
   const activeWorkflows = getActiveWorkflows(activeStates);
+  const heroPair = useMemo(() => {
+    for (const w of activeWorkflows) {
+      const skill = getWorkflowPrimarySkill(w);
+      if (!skill) continue;
+      const resolved = resolveSkill(skill, entitlement);
+      if (resolved.coreAccess.state !== 'available') continue;
+      return { workflow: w, primarySkill: skill };
+    }
+    return null;
+  }, [activeWorkflows, entitlement]);
+
+  // Pre-resolve tile data once per render.
+  const winTiles = useMemo(
+    () =>
+      resolveWinTiles().map(({ config, skill }) => ({
+        config,
+        resolved: resolveSkill(skill, entitlement),
+      })),
+    [entitlement],
+  );
+  const launchTiles = useMemo(
+    () =>
+      resolveLaunchTiles().map((skill) => ({
+        skill,
+        resolved: resolveSkill(skill, entitlement),
+      })),
+    [entitlement],
+  );
+  const visibilitySkills = useMemo(resolveVisibilitySkills, []);
+
+  // Hydrating — show a minimal placeholder for the dynamic blocks.
+  // The shell (topbar) already rendered server-side, so this is just for
+  // the welcome + hero + tile content. Mirrors the prior loading testid
+  // so existing test infra keeps working.
+  if (brandConfigured === null) {
+    return (
+      <div data-testid="dashboard-loading" className="dashboard-loading">
+        {/* Reserve hero-sized vertical space to minimize layout shift. */}
+        <div style={{ minHeight: '480px' }} aria-hidden />
+      </div>
+    );
+  }
 
   return (
-    <div className="flex flex-col gap-10">
-      {activeWorkflows.length > 0 ? (
-        <NextBestActionSection
-          workflows={activeWorkflows.map((w) => ({
-            workflow: w,
-            primarySkill: getWorkflowPrimarySkill(w),
-          }))}
-          resumableSkillIds={resumableSkillIds}
-          entitlement={entitlement}
+    <>
+      {/* WELCOME */}
+      <section className="welcome">
+        <div className="welcome-left">
+          <div className="welcome-eyebrow">
+            <span className="live-dot" />
+            DASHBOARD{dateEyebrow ? ` · ${dateEyebrow}` : ''}
+          </div>
+          <h1 className="welcome-title">
+            Welcome back,
+            <br />
+            <span className="welcome-name" data-testid="sep-welcome-name">
+              {welcome.firstName}.
+            </span>
+          </h1>
+          <p className="welcome-sub" data-testid="sep-welcome-sub">
+            {welcome.subtitle}
+          </p>
+        </div>
+        {/* welcome-stats intentionally hidden in MVP — wiring real counters
+            is a phase-2 ticket; "0 / 0 / 0" reads worse than nothing. */}
+      </section>
+
+      {/* HERO "UP NEXT" — brand-not-configured wins over any matched
+          workflow (cadence states like visibility_gap_state are always
+          on, so without this gate a fresh account would jump straight
+          to a Social-template recommendation before brand setup). */}
+      {brandConfigured && heroPair ? (
+        <HeroNextAction
+          workflow={heroPair.workflow}
+          primarySkill={heroPair.primarySkill}
+          resumeAvailable={resumableSkillIds.has(heroPair.primarySkill.id)}
         />
       ) : (
-        <NoActiveWorkflowsState />
+        <HeroEmptyState />
       )}
 
-      <AllSkillsSection entitlement={entitlement} />
-    </div>
-  );
-}
+      {/* STAGE 01 — WIN */}
+      <section className="stage" id="stage-win" data-testid="sep-stage-win">
+        <StageHeader
+          index={1}
+          label="Win the listing"
+          hint="Show up prepared. Close the appointment."
+          stage="win"
+        />
+        <div className="grid grid-4" data-testid="sep-stage-win-grid">
+          {winTiles.map(({ config, resolved }) => (
+            <Tile
+              key={config.skillId}
+              resolved={resolved}
+              stage="win"
+              poster={posterForSkillId(config.skillId)}
+              titleOverride={config.titleOverride}
+              blurbOverride={config.blurbOverride}
+            />
+          ))}
+        </div>
+      </section>
 
-function EmptyState() {
-  return (
-    <div className="rounded-2xl bg-neutral-900 border border-mint/30 p-8 md:p-10">
-      <p className="text-[11px] uppercase tracking-[0.18em] text-mint">
-        Welcome to Studio
-      </p>
-      <h2 className="text-2xl font-semibold mt-2 leading-tight">
-        Set up your brand profile to unlock skills.
-      </h2>
-      <p className="text-sm text-neutral-400 mt-3 max-w-xl leading-relaxed">
-        Your logo, name, contact info, and brand colors flow into every
-        marketing asset Studio generates. It takes about a minute.
-      </p>
-      <Link
-        href="/settings"
-        className="inline-flex items-center justify-center rounded-lg bg-mint text-black text-sm font-semibold px-5 py-2.5 mt-6 transition hover:bg-mint-hover"
+      {/* STAGE 02 — LAUNCH */}
+      <section
+        className="stage"
+        id="stage-launch"
+        data-testid="sep-stage-launch"
       >
-        Set up brand profile →
-      </Link>
-    </div>
-  );
-}
+        <StageHeader
+          index={2}
+          label="Launch the marketing"
+          hint="Branded assets, ready in a minute."
+          stage="launch"
+        />
+        <div className="grid grid-2" data-testid="sep-stage-launch-grid">
+          {launchTiles.map(({ skill, resolved }) => (
+            <Tile
+              key={skill.id}
+              resolved={resolved}
+              stage={'launch' satisfies TileStage}
+              poster={posterForSkillId(skill.id)}
+              size="md"
+            />
+          ))}
+        </div>
+      </section>
 
-interface WorkflowEntry {
-  workflow: ReturnType<typeof getActiveWorkflows>[number];
-  primarySkill: CallableSkill | null;
-}
+      {/* STAGE 03 — VISIBILITY (flagship) */}
+      <section
+        className="stage"
+        id="stage-visibility"
+        data-testid="sep-stage-visibility"
+      >
+        <StageHeader
+          index={3}
+          label="Stay visible"
+          hint="Cadence content. One studio, ten formats."
+          stage="visibility"
+        />
+        <SocialStudioTile
+          skills={visibilitySkills}
+          onClick={() => setStudioOpen(true)}
+        />
+      </section>
 
-function NextBestActionSection({
-  workflows,
-  resumableSkillIds,
-  entitlement,
-}: {
-  workflows: WorkflowEntry[];
-  resumableSkillIds: Set<string>;
-  entitlement: EntitlementContext;
-}) {
-  // A7f.2: filter by `coreAccess.state === 'available'` BEFORE rendering
-  // the card. Today this is a no-op (every skill's baseWorkflow is
-  // 'base' or undefined, so core is always available); when a skill
-  // lands whose entire workflow lives at a higher tier, this drops it
-  // out of Next Best Action without per-surface gating logic.
-  const renderable = workflows
-    .filter(
-      (w): w is { workflow: WorkflowEntry['workflow']; primarySkill: CallableSkill } =>
-        w.primarySkill !== null,
-    )
-    .map(({ workflow, primarySkill }) => ({
-      workflow,
-      primarySkill,
-      resolved: resolveSkill(primarySkill, entitlement),
-    }))
-    .filter(({ resolved }) => resolved.coreAccess.state === 'available');
-  if (renderable.length === 0) return <NoActiveWorkflowsState />;
+      {/* FOOTER */}
+      <footer className="bottom">
+        <span>SEP-S v1.47 · Lane A re-brand</span>
+      </footer>
 
-  return (
-    <section className="flex flex-col gap-4">
-      <h2 className="text-xs uppercase tracking-[0.18em] text-neutral-500">
-        What to do next
-      </h2>
-      <div className="grid gap-4 md:grid-cols-2">
-        {renderable.map(({ workflow, primarySkill }) => (
-          <NextBestActionCard
-            key={workflow.id}
-            workflow={workflow}
-            primarySkill={primarySkill}
-            resumeAvailable={resumableSkillIds.has(primarySkill.id)}
-          />
-        ))}
-      </div>
-    </section>
-  );
-}
-
-function NoActiveWorkflowsState() {
-  return (
-    <div className="rounded-xl bg-neutral-900 border border-neutral-800 p-6">
-      <p className="text-sm text-neutral-300">
-        You're all set up. Pick a tool below to start.
-      </p>
-    </div>
-  );
-}
-
-function AllSkillsSection({ entitlement }: { entitlement: EntitlementContext }) {
-  // Commit 3 refactor: buckets derived from each skill's required `category`
-  // field (declared at the skill record's spec site) instead of hardcoded
-  // ID-match filters here. Adding a new skill no longer requires editing
-  // this file — declaring `category` on its CallableSkill is sufficient.
-  // Root-cause fix for the v1.44.1 SIR-dropout bug class.
-  //
-  // A7f.2: each bucket runs through the resolver and drops tiles whose
-  // `coreAccess` isn't available. Today everything is `available` (Base
-  // workflows or undeclared), so this is a no-op — but proves the wiring.
-  const buckets = getCategorizedSkills();
-
-  return (
-    <section className="flex flex-col gap-6">
-      <h2 className="text-xs uppercase tracking-[0.18em] text-neutral-500">
-        All skills
-      </h2>
-
-      {buckets.map(({ category, skills }) => {
-        const accessible = skills.filter(
-          (s) => resolveSkill(s, entitlement).coreAccess.state === 'available',
-        );
-        return <SkillGroup key={category} title={category} skills={accessible} />;
-      })}
-    </section>
-  );
-}
-
-function SkillGroup({
-  title,
-  skills,
-}: {
-  title: string;
-  skills: CallableSkill[];
-}) {
-  if (skills.length === 0) return null;
-  return (
-    <div className="flex flex-col gap-3">
-      <h3 className="text-[11px] uppercase tracking-wider text-neutral-600">
-        {title}
-      </h3>
-      <div className="grid gap-3 sm:grid-cols-2 lg:grid-cols-3">
-        {skills.map((skill) => (
-          <SkillTile key={skill.id} skill={skill} />
-        ))}
-      </div>
-    </div>
+      {/* MODAL */}
+      <SocialStudioModal
+        open={studioOpen}
+        onClose={() => setStudioOpen(false)}
+        skills={visibilitySkills}
+      />
+    </>
   );
 }
