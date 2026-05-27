@@ -41,13 +41,17 @@ export const FULL_PAYLOAD: PublicPayload = {
       soldPrice: "$648,000",
       soldDate: "Sold March 14, 2026",
       sqft: "1,810",
+      yearBuilt: 1908,
     },
     {
       address: "1908 Castle Avenue",
       soldPrice: "$691,000",
       soldDate: "Sold April 02, 2026",
       sqft: "1,920",
+      yearBuilt: 1924,
     },
+    // Third comp intentionally omits yearBuilt so the FULL fixture
+    // also exercises the graceful-hide path on the comp card.
     {
       address: "2401 Professor Avenue",
       soldPrice: "$662,000",
@@ -107,12 +111,14 @@ export const FULL_PAYLOAD: PublicPayload = {
         soldPrice: "$648,000",
         soldDate: "Sold March 14, 2026",
         sqft: "1,810",
+        yearBuilt: 1908,
       },
       {
         address: "1908 Castle Avenue",
         soldPrice: "$691,000",
         soldDate: "Sold April 02, 2026",
         sqft: "1,920",
+        yearBuilt: 1924,
       },
       {
         address: "2401 Professor Avenue",

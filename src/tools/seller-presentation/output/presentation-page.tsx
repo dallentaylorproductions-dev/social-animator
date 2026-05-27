@@ -332,7 +332,11 @@ function WhyPriceSection({ payload }: { payload: PublicPayload }) {
 
 function CompRow({ comp, index }: { comp: PublicComp; index: number }) {
   const indexLabel = String(index + 1).padStart(2, "0");
-  const subline = [comp.soldDate, comp.sqft ? `${comp.sqft} sqft` : null]
+  const subline = [
+    comp.soldDate,
+    comp.sqft ? `${comp.sqft} sqft` : null,
+    comp.yearBuilt !== undefined ? `Built ${comp.yearBuilt}` : null,
+  ]
     .filter(Boolean)
     .join(" · ");
 

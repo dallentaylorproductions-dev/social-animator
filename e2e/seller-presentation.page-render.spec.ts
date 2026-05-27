@@ -483,4 +483,36 @@ test.describe('Seller Presentation — A7b premium page render', () => {
       await context.close();
     }
   });
+
+  test('v1.47 Lane A — comp card renders "Built [year]" when yearBuilt is set, hides cleanly when absent', async ({
+    page,
+  }) => {
+    // FULL fixture: comps 0 + 1 carry yearBuilt (1908, 1924); comp 2
+    // intentionally omits it so the same fixture exercises both
+    // branches. The caption rides the existing <small> subline next
+    // to sold-date / sqft — no new DOM, just an extra " · " segment.
+    await page.goto('/seller-presentation-preview?fixture=full');
+    await expect(page.getByTestId('sep-why-price')).toBeVisible();
+
+    const comp0 = page.getByTestId('sep-comp-0');
+    await expect(comp0).toContainText('Built 1908');
+    const comp1 = page.getByTestId('sep-comp-1');
+    await expect(comp1).toContainText('Built 1924');
+    // Comp 2 has no yearBuilt — must NOT render "Built —" or a stray
+    // "Built" anywhere in its row.
+    const comp2 = page.getByTestId('sep-comp-2');
+    await expect(comp2).not.toContainText('Built');
+  });
+
+  test('v1.47 Lane A — MINIMAL fixture has no "Built …" caption on any comp', async ({
+    page,
+  }) => {
+    // MINIMAL has one comp with no yearBuilt. Renders the row cleanly
+    // — no empty caption, no "Built —" placeholder.
+    await page.goto('/seller-presentation-preview?fixture=minimal');
+    await expect(page.getByTestId('sep-why-price')).toBeVisible();
+    const comp0 = page.getByTestId('sep-comp-0');
+    await expect(comp0).toBeVisible();
+    await expect(comp0).not.toContainText('Built');
+  });
 });

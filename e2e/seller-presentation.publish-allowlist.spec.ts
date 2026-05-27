@@ -108,6 +108,10 @@ const ALLOWED_COMP_KEYS = new Set([
   'soldPrice',
   'soldDate',
   'sqft',
+  // v1.47 Lane A polish — public emit gains yearBuilt for the consumer
+  // comp card's "Built [year]" caption. Stays the only new addition;
+  // the test below proves no sibling private fields ride in alongside.
+  'yearBuilt',
 ]);
 
 const ALLOWED_AGENT_KEYS = new Set([
@@ -226,6 +230,11 @@ function maxedDraft(): SellerPresentationDraft {
         squareFeet: '2,840', // draft uses `squareFeet`; emitted as `sqft`
         distanceMiles: '0.4',
         soldDate: '2026-04-15',
+        yearBuilt: 1998,
+        // Rogue sibling on the same comp record. yearBuilt is now in
+        // the public allowlist; this sentinel proves the projector
+        // didn't widen the gate to anything beyond yearBuilt.
+        yearRemodeled: 'PRIVATE_SENTINEL_YEAR_REMODELED',
         notes: S.compNotes,
         source: S.compSource,
         fieldConfidence: {
@@ -624,6 +633,55 @@ test.describe('toPublicPayload — privacy allowlist (R-1 proof)', () => {
     expect(payload.comps[0].sqft).toBe('2,840');
     // soldDate from comp[0] survives.
     expect(payload.comps[0].soldDate).toBe('2026-04-15');
+  });
+
+  test('v1.47 Lane A — yearBuilt round-trips; rogue sibling on the same comp drops', () => {
+    // The maxedDraft's comp[0] carries yearBuilt:1998 alongside a rogue
+    // yearRemodeled string. yearBuilt is now allowlisted in public
+    // emit; the rogue sibling tests that the projector didn't widen
+    // the gate beyond yearBuilt.
+    const draft = maxedDraft();
+    const payload = toPublicPayload(
+      draft,
+      FIXTURE_AGENT_CONTACT,
+      FIXTURE_BRAND_REVIEWS,
+    );
+
+    // Positive: yearBuilt survives in both top-level comps and whyPrice.comps.
+    expect(payload.comps[0].yearBuilt).toBe(1998);
+    expect(payload.whyPrice.comps[0].yearBuilt).toBe(1998);
+    // Comp[1] never set yearBuilt — absent emit.
+    expect(payload.comps[1].yearBuilt).toBeUndefined();
+
+    // Negative: rogue sibling never escapes — neither as a value nor
+    // as a key on any emitted comp.
+    const serialized = JSON.stringify(payload);
+    expect(serialized).not.toContain('PRIVATE_SENTINEL_YEAR_REMODELED');
+    expect(serialized).not.toContain('"yearRemodeled":');
+  });
+
+  test('v1.47 Lane A — non-number yearBuilt on a comp drops (no string smuggle)', () => {
+    // A hand-tampered KV record could try to ride a yearBuilt-shaped
+    // STRING through publish ("1998" instead of 1998). The projector's
+    // typeof === 'number' guard must drop it so the consumer page
+    // doesn't render arbitrary text in the "Built …" caption.
+    const draft = {
+      comps: [
+        {
+          address: '5678 Elm Ave NE',
+          soldPrice: '$695,000',
+          yearBuilt: 'PRIVATE_SENTINEL_YEAR_STRING' as unknown as number,
+        },
+      ],
+      pitchPoints: [],
+      commitments: [],
+      asks: [],
+    } as unknown as SellerPresentationDraft;
+    const payload = toPublicPayload(draft, FIXTURE_AGENT_CONTACT);
+    const serialized = JSON.stringify(payload);
+
+    expect(payload.comps[0].yearBuilt).toBeUndefined();
+    expect(serialized).not.toContain('PRIVATE_SENTINEL_YEAR_STRING');
   });
 
   test('A7a — agent block emits no key outside the public agent allowlist', () => {

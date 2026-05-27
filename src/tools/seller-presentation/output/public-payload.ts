@@ -91,6 +91,8 @@ export const REVIEWS_OUTLINK_LABEL = "See all reviews on Zillow";
 /**
  * Public projection of a comp. A7a trims the PUBLIC emit to exactly
  * `{address, soldPrice, soldDate, sqft}` per the locked design.
+ * v1.47 Lane A polish: `yearBuilt` joins the public emit so the
+ * consumer comp card can render the build-era signal.
  * The deprecated A6 keys stay on the type so the A6 functional
  * renderer keeps compiling (they're always undefined post-A7a; the
  * renderer's `&&` short-circuits and renders nothing for them).
@@ -103,6 +105,7 @@ export interface PublicComp {
   // ---- A7a locked-design emit set ----
   soldDate?: string;
   sqft?: string;
+  yearBuilt?: number;
   // ---- A6 deprecated — never populated by toPublicPayload post-A7a.
   //      Type kept for A6 functional renderer back-compat ONLY.
   /** @deprecated A7a removed from public emit. Will be removed once A7b ships. */
@@ -179,6 +182,10 @@ function projectComp(comp: Comp): PublicComp {
     soldPrice: comp.soldPrice,
     soldDate: comp.soldDate,
     sqft: comp.squareFeet, // rename: draft uses `squareFeet`, public uses `sqft` per locked design
+    yearBuilt:
+      typeof comp.yearBuilt === "number" && Number.isFinite(comp.yearBuilt)
+        ? comp.yearBuilt
+        : undefined,
   };
 }
 
@@ -465,6 +472,10 @@ function clampPublicComp(raw: unknown): PublicComp | null {
     soldPrice: r.soldPrice,
     soldDate: typeof r.soldDate === "string" ? r.soldDate : undefined,
     sqft: typeof r.sqft === "string" ? r.sqft : undefined,
+    yearBuilt:
+      typeof r.yearBuilt === "number" && Number.isFinite(r.yearBuilt)
+        ? r.yearBuilt
+        : undefined,
   };
 }
 

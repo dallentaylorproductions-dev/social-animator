@@ -1,5 +1,6 @@
 "use client";
 
+import { useEffect, useState } from "react";
 import { CurrencyInput } from "@/components/inputs/CurrencyInput";
 import { NumberInput } from "@/components/inputs/NumberInput";
 import type { Comp, SellerPresentationDraft } from "../engine/types";
@@ -50,6 +51,14 @@ function newComp(): Comp {
 }
 
 export function StepComps({ draft, setDraft }: StepCompsProps) {
+  // SSR-safe currentYear: initialize undefined so SSR + first client
+  // paint render identically (no hydration mismatch), then populate
+  // in effect. Used by the Year built blur-time range clamp.
+  const [currentYear, setCurrentYear] = useState<number | undefined>(undefined);
+  useEffect(() => {
+    setCurrentYear(new Date().getFullYear());
+  }, []);
+
   const updateComp = (index: number, patch: Partial<Comp>) => {
     const next = draft.comps.map((c, i) =>
       i === index ? { ...c, ...patch } : c,
@@ -96,6 +105,7 @@ export function StepComps({ draft, setDraft }: StepCompsProps) {
             key={index}
             comp={comp}
             index={index}
+            currentYear={currentYear}
             onUpdate={(patch) => updateComp(index, patch)}
             onRemove={() => removeComp(index)}
           />
@@ -119,11 +129,13 @@ export function StepComps({ draft, setDraft }: StepCompsProps) {
 interface CompCardProps {
   comp: Comp;
   index: number;
+  /** Undefined on SSR + pre-hydration; populated client-side for blur-time range clamp. */
+  currentYear: number | undefined;
   onUpdate: (patch: Partial<Comp>) => void;
   onRemove: () => void;
 }
 
-function CompCard({ comp, index, onUpdate, onRemove }: CompCardProps) {
+function CompCard({ comp, index, currentYear, onUpdate, onRemove }: CompCardProps) {
   return (
     <div
       className="space-y-4 rounded border border-neutral-700 bg-neutral-900/30 p-4"
@@ -227,6 +239,43 @@ function CompCard({ comp, index, onUpdate, onRemove }: CompCardProps) {
             value={comp.squareFeet ?? ""}
             onChange={(v) => onUpdate({ squareFeet: v || undefined })}
             placeholder="2,840"
+          />
+        </label>
+
+        <label className="block">
+          <span className="text-xs uppercase tracking-wider text-gray-500">
+            Year built
+          </span>
+          {/* Numeric keypad on iOS; 4-digit cap on input. Range
+              validation (1800 ≤ y ≤ currentYear) runs on BLUR so the
+              user can type "19" → "199" → "1998" without the field
+              flickering empty mid-entry. currentYear is populated in
+              an effect to keep SSR + first client paint identical. */}
+          <input
+            type="text"
+            inputMode="numeric"
+            className={`${inputCls} mt-1`}
+            value={comp.yearBuilt !== undefined ? String(comp.yearBuilt) : ""}
+            onChange={(e) => {
+              const digits = e.target.value
+                .replace(/[^0-9]/g, "")
+                .slice(0, 4);
+              if (!digits) {
+                onUpdate({ yearBuilt: undefined });
+                return;
+              }
+              onUpdate({ yearBuilt: parseInt(digits, 10) });
+            }}
+            onBlur={() => {
+              const y = comp.yearBuilt;
+              if (y === undefined || currentYear === undefined) return;
+              if (y < 1800 || y > currentYear) {
+                onUpdate({ yearBuilt: undefined });
+              }
+            }}
+            placeholder="1998"
+            data-testid={`step-comps-year-built-${index}`}
+            aria-label={`comp-${index + 1}-year-built`}
           />
         </label>
 
