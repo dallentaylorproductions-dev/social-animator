@@ -18,6 +18,10 @@ import { HeroNextAction, HeroEmptyState } from './components/HeroNextAction';
 import { StageHeader } from './components/StageHeader';
 import { Tile, type TileStage } from './components/Tile';
 import { posterForSkillId } from './components/posters/posterForSkillId';
+import {
+  SocialStudioTile,
+  SocialStudioModal,
+} from './components/SocialStudio';
 
 /**
  * Dashboard client island (v1.47 Lane A re-brand — SEP-S Studio shell).
@@ -165,6 +169,7 @@ export function DashboardClient({ agentProfile }: { agentProfile: AgentProfile }
   const [resumableSkillIds, setResumableSkillIds] = useState<Set<string>>(
     () => new Set(),
   );
+  const [studioOpen, setStudioOpen] = useState(false);
   /**
    * SSR-safe date eyebrow per sep-nextjs-hydration-pattern. Initialized
    * empty so SSR + first client paint match; populated in useEffect so
@@ -232,14 +237,10 @@ export function DashboardClient({ agentProfile }: { agentProfile: AgentProfile }
       })),
     [entitlement],
   );
-  const visibilityTiles = useMemo(
-    () =>
-      resolveVisibilitySkills().map((skill) => ({
-        skill,
-        resolved: resolveSkill(skill, entitlement),
-      })),
-    [entitlement],
-  );
+  // Stage 3 collapses behind one flagship; the modal renders ALL
+  // social-animator skills as navigable cards (entitlement gating on
+  // each card lands when A7f.3 ships its first gated social skill).
+  const visibilitySkills = useMemo(resolveVisibilitySkills, []);
 
   // Hydrating — show a minimal placeholder for the dynamic blocks.
   // The shell (topbar) already rendered server-side, so this is just for
@@ -337,7 +338,7 @@ export function DashboardClient({ agentProfile }: { agentProfile: AgentProfile }
         </div>
       </section>
 
-      {/* STAGE 03 — VISIBILITY (one tile per social-animator template) */}
+      {/* STAGE 03 — VISIBILITY (single flagship; modal lists all 10) */}
       <section
         className="stage"
         id="stage-visibility"
@@ -346,26 +347,28 @@ export function DashboardClient({ agentProfile }: { agentProfile: AgentProfile }
         <StageHeader
           index={3}
           label="Stay visible"
-          hint="Cadence content. Ten animated formats."
+          hint="Cadence content. One studio, ten formats."
           stage="visibility"
         />
-        <div className="grid grid-5" data-testid="sep-stage-visibility-grid">
-          {visibilityTiles.map(({ skill, resolved }) => (
-            <Tile
-              key={skill.id}
-              resolved={resolved}
-              stage="visibility"
-              size="social"
-              poster={posterForSkillId(skill.id)}
-            />
-          ))}
-        </div>
+        <SocialStudioTile
+          skills={visibilitySkills}
+          onClick={() => setStudioOpen(true)}
+        />
       </section>
 
       {/* FOOTER */}
       <footer className="bottom">
         <span>SEP-S v1.47 · Lane A re-brand</span>
       </footer>
+
+      {/* MODAL — mounted near the dashboard root so the scrim covers
+          the whole viewport. Subtree unmounts on close, killing each
+          TemplatePreview's RAF loop via its effect cleanup. */}
+      <SocialStudioModal
+        open={studioOpen}
+        onClose={() => setStudioOpen(false)}
+        skills={visibilitySkills}
+      />
     </>
   );
 }

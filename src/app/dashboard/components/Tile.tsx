@@ -19,7 +19,7 @@ import { skillRoute } from './skill-route';
  */
 
 export type TileStage = 'win' | 'launch' | 'visibility';
-export type TileSize = 'sm' | 'md' | 'social';
+export type TileSize = 'sm' | 'md';
 
 const STAGE_COLOR_VAR: Record<TileStage, string> = {
   win: 'var(--stage-win)',

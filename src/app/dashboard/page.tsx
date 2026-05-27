@@ -67,13 +67,12 @@ export default async function DashboardPage({
             </span>
           </div>
           <nav className="topnav" aria-label="Primary">
-            {/* Library is intentionally absent — the asset-library route
-                doesn't exist yet. The link will land back here when that
-                feature ships; we'd rather ship 3 live links than 4 with a
-                404 in the mix. */}
-            <Link href="/settings" className="topnav-link">
-              Brand kit
-            </Link>
+            {/* Topnav consolidated: Library was dropped (route doesn't
+                exist); Brand kit was dropped (redundant with Settings —
+                both pointed at /settings, which mounts BrandProfileForm).
+                Hero empty-state CTA still says "Open brand kit" because
+                that's the action a fresh agent is doing — different
+                surfaces, different jobs. */}
             <Link href="/settings" className="topnav-link">
               Settings
             </Link>

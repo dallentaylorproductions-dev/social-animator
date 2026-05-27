@@ -42,6 +42,27 @@ test.describe('Dashboard screenshot capture (A7f.1)', () => {
     });
   });
 
+  test('modal-open state (Social Studio modal showing all 10 social-animator cards)', async ({
+    page,
+  }) => {
+    // v1.47 Lane A restore: confirms Stage 3 is a single flagship that
+    // opens into a modal listing 10 templates as canvas-thumbnail
+    // cards. Captured separately from default/active so the
+    // before/after handoff can show the modal contents.
+    await seedBrandProfile(page);
+    await page.goto('/dashboard');
+    await page.getByTestId('sep-flagship-social').click();
+    await page.getByTestId('sep-studio-modal').waitFor();
+    // Give each TemplatePreview's RAF loop a moment to paint its first
+    // frame before the snapshot — the canvas's first non-skeleton draw
+    // races networkidle since assets load async inside the effect.
+    await page.waitForTimeout(800);
+    await page.screenshot({
+      path: path.join(OUT_DIR, `dashboard-modal-${LABEL}.png`),
+      fullPage: true,
+    });
+  });
+
   test('active state (brand + listing + SIR + in-flight Seller Presentation)', async ({
     page,
   }) => {
