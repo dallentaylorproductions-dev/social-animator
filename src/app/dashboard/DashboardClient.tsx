@@ -18,10 +18,7 @@ import { HeroNextAction, HeroEmptyState } from './components/HeroNextAction';
 import { StageHeader } from './components/StageHeader';
 import { Tile, type TileStage } from './components/Tile';
 import { posterForSkillId } from './components/posters/posterForSkillId';
-import {
-  SocialStudioTile,
-  SocialStudioModal,
-} from './components/SocialStudio';
+import { SocialStudioTile } from './components/SocialStudio';
 
 /**
  * Dashboard client island (v1.47 Lane A re-brand — SEP-S Studio shell).
@@ -169,7 +166,6 @@ export function DashboardClient({ agentProfile }: { agentProfile: AgentProfile }
   const [resumableSkillIds, setResumableSkillIds] = useState<Set<string>>(
     () => new Set(),
   );
-  const [studioOpen, setStudioOpen] = useState(false);
   /**
    * SSR-safe date eyebrow per sep-nextjs-hydration-pattern. Initialized
    * empty so SSR + first client paint match; populated in useEffect so
@@ -237,9 +233,11 @@ export function DashboardClient({ agentProfile }: { agentProfile: AgentProfile }
       })),
     [entitlement],
   );
-  // Stage 3 collapses behind one flagship; the modal renders ALL
-  // social-animator skills as navigable cards (entitlement gating on
-  // each card lands when A7f.3 ships its first gated social skill).
+  // Stage 3 collapses behind one flagship Social Studio tile. Click
+  // navigates DIRECTLY to /social-animator (the existing picker page
+  // that lists every template with a live <TemplatePreview>) — no
+  // dashboard-side modal. The skills list drives the marquee mini-
+  // composites + the "N TEMPLATES" chip + the descriptive blurb count.
   const visibilitySkills = useMemo(resolveVisibilitySkills, []);
 
   // Hydrating — show a minimal placeholder for the dynamic blocks.
@@ -338,7 +336,7 @@ export function DashboardClient({ agentProfile }: { agentProfile: AgentProfile }
         </div>
       </section>
 
-      {/* STAGE 03 — VISIBILITY (single flagship; modal lists all 10) */}
+      {/* STAGE 03 — VISIBILITY (single flagship; click → /social-animator) */}
       <section
         className="stage"
         id="stage-visibility"
@@ -350,25 +348,13 @@ export function DashboardClient({ agentProfile }: { agentProfile: AgentProfile }
           hint="Cadence content. One studio, ten formats."
           stage="visibility"
         />
-        <SocialStudioTile
-          skills={visibilitySkills}
-          onClick={() => setStudioOpen(true)}
-        />
+        <SocialStudioTile skills={visibilitySkills} />
       </section>
 
       {/* FOOTER */}
       <footer className="bottom">
         <span>SEP-S v1.47 · Lane A re-brand</span>
       </footer>
-
-      {/* MODAL — mounted near the dashboard root so the scrim covers
-          the whole viewport. Subtree unmounts on close, killing each
-          TemplatePreview's RAF loop via its effect cleanup. */}
-      <SocialStudioModal
-        open={studioOpen}
-        onClose={() => setStudioOpen(false)}
-        skills={visibilitySkills}
-      />
     </>
   );
 }

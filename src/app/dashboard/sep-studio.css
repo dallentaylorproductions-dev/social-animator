@@ -553,25 +553,9 @@
       color-mix(in oklch, var(--stage-visibility) 4%, transparent) 60px 61px
     ),
     var(--bg-2);
-  padding: 36px 0;
-  display: flex; align-items: center; justify-content: center;
+  padding: 28px 0;
+  display: flex; align-items: center;
 }
-
-/* Calm flagship feature — a single representative <SocialThumbnail>
- * centered inside the flagship poster (replaces the f3529e6 marquee).
- * The wrapper sets a fixed width; the canvas inside has its native
- * 4:5 aspect ratio (1080×1350), so height auto-derives to 250px. */
-.sep-studio .flagship-feature {
-  width: 200px;
-  border-radius: 12px;
-  overflow: hidden;
-  box-shadow:
-    0 0 0 1px color-mix(in oklch, var(--stage-visibility) 22%, transparent),
-    0 18px 36px -10px rgba(0,0,0,.55);
-  background: var(--bg);
-}
-.sep-studio .flagship-feature > div { display: block; width: 100%; height: 100%; }
-.sep-studio .flagship-feature canvas { width: 100%; height: 100%; display: block; }
 .sep-studio .marquee {
   width: 100%; overflow: hidden;
   -webkit-mask-image: linear-gradient(90deg, transparent 0, black 8%, black 92%, transparent 100%);

@@ -4,17 +4,15 @@ import { seedBrandProfile } from './fixtures/seed-helpers';
 /**
  * SEP-S Studio dashboard shell — structural proofs.
  *
- * Locks in the post-fix-it / post-restore shape:
+ * Current contract:
  *   - Tile content binds to ALL_SKILLS (skill.name / skill.purpose) —
- *     no hardcoded design literals. (Set in 397fc80.)
- *   - Stage 3 surfaces as a SINGLE flagship Social Studio tile; clicking
- *     it opens a modal listing all 10 social-animator templates as
- *     navigable cards. (Restored in this packet on top of 397fc80,
- *     which had over-expanded to a 10-tile grid.)
- *   - Each modal card renders a real looping <SocialThumbnail> preview
- *     (canvas-rendered TemplatePreview), not static SVG.
- *   - Topnav consolidated to Settings | Sign out (Library dropped in
- *     397fc80; Brand kit dropped this packet — redundant with Settings).
+ *     no design-literal overrides. (Set in 397fc80, preserved here.)
+ *   - Stage 3 surfaces as a SINGLE flagship Social Studio tile rendered
+ *     as a Next.js <Link href="/social-animator"> — clicking navigates
+ *     directly to the existing template-picker page; NO dashboard-side
+ *     modal. (Restored on top of 08a010d's calm-thumbnail variant.)
+ *   - Topnav consolidated to Settings + Sign out (Library dropped in
+ *     397fc80; Brand kit dropped in 08a010d — redundant with Settings).
  *   - A7f.2 entitlement wiring + ?testTier= URL knob still threaded.
  */
 
@@ -49,14 +47,18 @@ test.describe('SEP-S Studio dashboard shell (v1.47 Lane A)', () => {
     await expect(topbar).toContainText('SIMPLY EDIT');
     await expect(topbar).toContainText('PRO STUDIO');
     // Topnav has ONE link (Settings) + the sign-out form button.
-    // Library was dropped (no route). Brand kit was dropped (redundant
-    // with Settings — both pointed at /settings).
     await expect(topbar).not.toContainText(/library/i);
     await expect(topbar).not.toContainText(/brand kit/i);
     const navLinks = topbar.getByRole('link');
     await expect(navLinks).toHaveCount(1);
     await expect(navLinks.nth(0)).toHaveAttribute('href', '/settings');
     await expect(navLinks.nth(0)).toContainText(/^settings$/i);
+    // The two visible topnav affordances (Settings link + Sign out
+    // button) share the `.topnav-link` class so the styling stays
+    // consistent. Asserting on that count gives a single "two visible
+    // items" check decoupled from element semantics.
+    const navItems = topbar.locator('.topnav-link');
+    await expect(navItems).toHaveCount(2);
     await expect(page.getByTestId('sep-sign-out')).toBeVisible();
   });
 
@@ -110,18 +112,18 @@ test.describe('SEP-S Studio dashboard shell (v1.47 Lane A)', () => {
     for (const skillId of ['listing-flyer', 'open-house-promo']) {
       await expect(page.getByTestId(`sep-tile-${skillId}`)).toBeVisible();
     }
-    // Visibility = SINGLE flagship tile (not 10 individual tiles).
+    // Visibility = SINGLE flagship (no per-template tiles on the
+    // dashboard, no modal). The flagship is the only Stage 3 tile.
     await expect(page.getByTestId('sep-flagship-social')).toBeVisible();
     for (const id of SOCIAL_TEMPLATE_IDS) {
-      // Each social skill exists only inside the modal — never as a
-      // standalone Stage 3 tile.
       await expect(page.getByTestId(`sep-tile-${id}`)).toHaveCount(0);
     }
-    // Modal is closed at rest.
+    // No modal exists on the dashboard anymore — verify zero modal
+    // chrome rendered at rest OR on click (click navigates away).
     await expect(page.getByTestId('sep-studio-modal')).toHaveCount(0);
   });
 
-  test('every tile + the flagship carry an entitlement gate marker on the Tile path (resolver wiring proof)', async ({
+  test('every tile carries an entitlement gate marker (resolver wiring proof)', async ({
     page,
   }) => {
     await seedBrandProfile(page);
@@ -130,7 +132,10 @@ test.describe('SEP-S Studio dashboard shell (v1.47 Lane A)', () => {
       page.getByTestId('sep-tile-seller-presentation'),
     ).toBeVisible({ timeout: 10_000 });
 
-    // 4 Win + 2 Launch = 6 stage tiles all carry data-gate.
+    // 4 Win + 2 Launch = 6 stage tiles all carry data-gate. The
+    // flagship is a Link (not a registry-bound Tile), so it doesn't
+    // and shouldn't carry data-gate — Stage 3 gating, when it lands,
+    // attaches to the individual templates on /social-animator.
     const tiles = page.locator('[data-testid^="sep-tile-"]');
     const count = await tiles.count();
     expect(count).toBeGreaterThanOrEqual(6);
@@ -197,7 +202,7 @@ test.describe('SEP-S Studio dashboard shell (v1.47 Lane A)', () => {
     await expect(lp).toHaveAttribute('href', '/listing-presentation');
   });
 
-  test('Social Studio modal opens from flagship; cards render real <SocialThumbnail> canvases linking to /social-animator routes', async ({
+  test('Social Studio flagship is a marquee link that navigates to /social-animator', async ({
     page,
   }) => {
     await seedBrandProfile(page);
@@ -205,76 +210,18 @@ test.describe('SEP-S Studio dashboard shell (v1.47 Lane A)', () => {
 
     const flagship = page.getByTestId('sep-flagship-social');
     await expect(flagship).toBeVisible({ timeout: 10_000 });
-    // Flagship itself carries a single representative SocialThumbnail
-    // canvas (the calm at-rest preview) — proves the flagship-feature
-    // wire is live.
-    await expect(flagship.locator('canvas')).toHaveCount(1);
+    // Rendered as <a href="/social-animator"> — proves the click target
+    // skips the (removed) modal and routes straight to the existing
+    // template picker page.
+    await expect(flagship).toHaveAttribute('href', '/social-animator');
+    // f3529e6 marquee restored — static SVG mini-composites in a
+    // .marquee-track flex row, NOT a strip of <canvas> previews.
+    await expect(flagship.locator('.marquee-track')).toHaveCount(1);
+    await expect(flagship.locator('canvas')).toHaveCount(0);
 
-    // Modal is closed at rest.
-    await expect(page.getByTestId('sep-studio-modal')).toHaveCount(0);
-
+    // Click navigates to /social-animator (verifies the Link wiring
+    // end-to-end — no JS modal opens, the URL changes).
     await flagship.click();
-
-    const modal = page.getByTestId('sep-studio-modal');
-    await expect(modal).toBeVisible({ timeout: 10_000 });
-    await expect(modal).toContainText(/pick a template/i);
-
-    // All 10 social-animator templates surface as cards, each with a
-    // canvas-rendered <SocialThumbnail> (NOT static SVG). Routes
-    // derive from skillRoute(skill.id) = /social-animator/<template>.
-    for (const id of SOCIAL_TEMPLATE_IDS) {
-      const card = page.getByTestId(`sep-studio-modal-tile-${id}`);
-      await expect(card).toBeVisible();
-      // canvas presence — TemplatePreview's render target. A regression
-      // back to static SVG fails this assertion immediately.
-      await expect(card.locator('canvas')).toHaveCount(1);
-      const templateId = id.replace('social-animator-', '');
-      await expect(card).toHaveAttribute(
-        'href',
-        `/social-animator/${templateId}`,
-      );
-    }
-  });
-
-  test('Social Studio modal closes via Escape key (subtree unmounts → previews stop)', async ({
-    page,
-  }) => {
-    await seedBrandProfile(page);
-    await page.goto('/dashboard');
-
-    const flagship = page.getByTestId('sep-flagship-social');
-    await expect(flagship).toBeVisible({ timeout: 10_000 });
-    await flagship.click();
-    await expect(page.getByTestId('sep-studio-modal')).toBeVisible();
-
-    await page.keyboard.press('Escape');
-    // Modal subtree unmounts; the 10 canvases inside go with it.
-    await expect(page.getByTestId('sep-studio-modal')).toHaveCount(0);
-    await expect(
-      page.locator('[data-testid^="sep-studio-modal-tile-"]'),
-    ).toHaveCount(0);
-  });
-
-  test('Social Studio modal closes via scrim click and via the X button', async ({
-    page,
-  }) => {
-    await seedBrandProfile(page);
-    await page.goto('/dashboard');
-    await page.getByTestId('sep-flagship-social').click();
-    await expect(page.getByTestId('sep-studio-modal')).toBeVisible({
-      timeout: 10_000,
-    });
-
-    // X button closes.
-    await page.getByTestId('sep-studio-modal-close').click();
-    await expect(page.getByTestId('sep-studio-modal')).toHaveCount(0);
-
-    // Re-open + scrim-click.
-    await page.getByTestId('sep-flagship-social').click();
-    await expect(page.getByTestId('sep-studio-modal')).toBeVisible();
-    // Click the scrim directly (top-left corner of the viewport — the
-    // modal dialog itself stopPropagation's clicks).
-    await page.mouse.click(10, 10);
-    await expect(page.getByTestId('sep-studio-modal')).toHaveCount(0);
+    await expect(page).toHaveURL(/\/social-animator(?:$|\?)/);
   });
 });

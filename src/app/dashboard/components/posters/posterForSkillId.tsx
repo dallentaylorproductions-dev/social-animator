@@ -5,7 +5,6 @@ import { IntelPoster } from './IntelPoster';
 import { OpenHousePoster } from './OpenHousePoster';
 import { PrepPoster } from './PrepPoster';
 import { PresentationPoster } from './PresentationPoster';
-import { SocialThumbnail } from './SocialThumbnail';
 
 /**
  * Map a skill ID to the poster preview that represents its output on the
@@ -20,19 +19,15 @@ import { SocialThumbnail } from './SocialThumbnail';
  *   - open-house-prep: PrepPoster — agent's day-of prep checklist.
  *   - listing-flyer: FlyerPoster — printable single-listing flyer.
  *   - open-house-promo: OpenHousePoster — event-day flyer + QR sign-in.
- *   - social-animator-*: SocialThumbnail — the SAME canvas-looping
- *     preview the /social-animator picker page renders (no static SVG
- *     approximation). Routed via prefix-match so every new social
- *     template auto-surfaces with its live preview.
  *
- * Anything else (e.g. a future non-social skill that ships before its
- * poster does) renders the DocPoster fallback so the tile still has a
- * visual identity instead of an empty box.
+ * Anything else (e.g. a future skill that ships before its poster does)
+ * renders the DocPoster fallback so the tile still has a visual identity
+ * instead of an empty box. Social-animator skills don't appear in this
+ * map any longer — Stage 3 collapses behind a single flagship that
+ * navigates to /social-animator, so no per-template dashboard tile
+ * needs a poster.
  */
 export function posterForSkillId(skillId: string): ReactElement {
-  if (skillId.startsWith('social-animator-')) {
-    return <SocialThumbnail skillId={skillId} />;
-  }
   switch (skillId) {
     case 'seller-presentation':
       return <PresentationPoster />;
