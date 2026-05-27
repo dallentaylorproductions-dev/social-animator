@@ -9,6 +9,7 @@
     "lint": "eslint"
   },
   "dependencies": {
+    "@anthropic-ai/sdk": "^0.99.0",
     "@auth/core": "^0.41.2",
     "@auth/upstash-redis-adapter": "^2.11.2",
     "@ffmpeg/ffmpeg": "^0.12.15",

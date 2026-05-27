@@ -20,6 +20,7 @@ import { StepPitch } from "@/tools/seller-presentation/components/StepPitch";
 import { StepEditorial } from "@/tools/seller-presentation/components/StepEditorial";
 import { StepReview } from "@/tools/seller-presentation/components/StepReview";
 import { StepErrorBoundary } from "@/components/StepErrorBoundary";
+import { SPEntitlementProvider } from "@/tools/seller-presentation/components/SPEntitlementContext";
 
 /**
  * Seller Presentation — 5-step wizard shell (v1.47 / A5a).
@@ -241,6 +242,7 @@ export default function SellerPresentationPage() {
   }
 
   return (
+    <SPEntitlementProvider>
     <div className="mx-auto max-w-3xl px-4 py-8" data-testid="seller-presentation-wizard">
       <header className="mb-8">
         <div className="mb-4 flex items-center justify-between gap-4">
@@ -349,6 +351,7 @@ export default function SellerPresentationPage() {
         </div>
       )}
     </div>
+    </SPEntitlementProvider>
   );
 }
 

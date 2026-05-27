@@ -171,7 +171,7 @@ export function StepPitch({ draft, setDraft }: StepPitchProps) {
         </p>
       </header>
 
-      <AIPlugPoint type="copy-suggestion" />
+      <AIPlugPoint type="copy-suggestion" draft={draft} setDraft={setDraft} />
 
       <StrengthMeter
         filled={filledCount}

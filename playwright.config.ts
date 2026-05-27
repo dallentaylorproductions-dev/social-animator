@@ -58,6 +58,11 @@ export default defineConfig({
       // /dashboard) without a real auth session. The bypass also requires
       // NODE_ENV !== 'production' — production builds are never affected.
       E2E_TESTING: '1',
+      // v1.47 Lane C: enable the comp-import feature flag for the full
+      // suite. The feature-flag-OFF spec spawns its own request without
+      // toggling the env at runtime (it sends a header the route also
+      // accepts as a flag override — see comp-import.feature-flag.spec.ts).
+      COMP_IMPORT_ENABLED: 'true',
     },
   },
 });

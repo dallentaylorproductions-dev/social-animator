@@ -23,9 +23,10 @@ import { AIPlugPoint } from "./AIPlugPoint";
  * load-bearing — the inline label on the Notes field telegraphs it
  * to the agent so they know notes won't reach the seller.
  *
- * Lane C seam: `<AIPlugPoint type="photo-to-comp" />` at the top of
- * the step renders null today. Lane C (Prompt C) replaces it with
- * the photo-to-comp proposer per the contract on
+ * Lane C seam: `<AIPlugPoint type="import-to-comp" mode="csv" />` at
+ * the top of the step renders the Import-comps button (file picker +
+ * AI column-mapping review). Renamed from `photo-to-comp` in v1.1 per
+ * the import-family discriminator on the skill contract.
  * `SELLER_PRESENTATION_AI_PLUG_POINTS[0]` (proposes to `comps`,
  * requires review, falls back to manual entry).
  */
@@ -87,10 +88,16 @@ export function StepComps({ draft, setDraft }: StepCompsProps) {
         </p>
       </header>
 
-      {/* Lane C seam — renders null today. The skill contract declares
-          the photo-to-comp plug-point on this step; Lane C swaps in the
-          proposer UI without StepComps needing to change. */}
-      <AIPlugPoint type="photo-to-comp" />
+      {/* Lane C plug-point — Import comps from MLS export (CSV/TSV).
+          The button gates on the entitlement context's aiAccess and
+          mounts the file-picker + review-screen flow when clicked.
+          AIPlugPoint dispatches by `type` + `mode`. */}
+      <AIPlugPoint
+        type="import-to-comp"
+        mode="csv"
+        draft={draft}
+        setDraft={setDraft}
+      />
 
       {draft.comps.length === 0 && (
         <p className="text-sm italic text-gray-400">

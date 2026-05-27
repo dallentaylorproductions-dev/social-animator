@@ -1,43 +1,41 @@
 "use client";
 
-import type { SellerPresentationPlugPointType } from "../skill";
+import type {
+  ImportToCompMode,
+  SellerPresentationPlugPointType,
+} from "../skill";
+import type { SellerPresentationDraft } from "../engine/types";
+import { ImportCompsButton } from "./ImportCompsButton";
 
 /**
- * AI plug-point seam (v1.47 / A5b — null component).
+ * AI plug-point dispatcher (v1.47 Lane C — first plug-point lands here).
  *
- * Renders nothing. The component exists so wizard steps can declare
- * where Lane C's AI plug-points eventually land:
+ * Switches by (`type`, `mode`). Each step in the wizard mounts an
+ * `<AIPlugPoint>` at the top with its declared `type`; this component
+ * renders the right concrete proposer UI per the substrate §3.4
+ * plug-point catalog.
  *
- *   <AIPlugPoint type="photo-to-comp" /> at the top of StepComps
- *   <AIPlugPoint type="address-autofill" /> at the top of StepProperty
- *   <AIPlugPoint type="copy-suggestion" /> at the top of StepPitch
+ * Today only `import-to-comp` + `mode='csv'` (which also covers TSV —
+ * the route auto-detects delimiter) is wired. `address-autofill`,
+ * `copy-suggestion`, and the `mode='vision'` PDF/screenshot path
+ * render null until they ship.
  *
- * The contract for each plug-point is declared on the skill record
- * (src/tools/seller-presentation/skill.ts —
- * `SELLER_PRESENTATION_AI_PLUG_POINTS`). Lane C (Prompt C) replaces
- * this null implementation with the real proposer UI — typically a
- * dismissable suggestion card above the manual form, with confidence
- * badges per cell for `photo-to-comp` and a per-proposal Accept /
- * Reject control that writes the chosen subset into the draft.
- *
- * Keeping it local to the seller-presentation tool for v1.47 — Lane C
- * may promote it to `src/skills/components/AIPlugPoint.tsx` if other
- * skills (Buyer Tour, future Authority) declare plug-points too.
- *
- * `onProposal` is reserved for the future signature where Lane C
- * proposes a value the step can accept into the draft. It's typed
- * `unknown` to keep this commit additive; each plug-point type will
- * narrow the proposal shape in Lane C.
+ * Per substrate §5.3: every plug-point's manual-entry fallback is
+ * always available below the proposer. AIPlugPoint NEVER replaces
+ * manual entry — it only adds the AI affordance on top.
  */
 
 export interface AIPlugPointProps {
   type: SellerPresentationPlugPointType;
-  onProposal?: (proposal: unknown) => void;
+  mode?: ImportToCompMode;
+  draft: SellerPresentationDraft;
+  setDraft: (next: SellerPresentationDraft) => void;
 }
 
-// Destructure nothing — same lint-clean idiom A5a uses for the stub
-// step components when a prop is reserved but not yet consumed.
-// eslint-disable-next-line @typescript-eslint/no-empty-object-pattern
-export function AIPlugPoint({}: AIPlugPointProps): null {
+export function AIPlugPoint({ type, mode, draft, setDraft }: AIPlugPointProps) {
+  if (type === "import-to-comp" && (mode === "csv" || mode === "tsv")) {
+    return <ImportCompsButton draft={draft} setDraft={setDraft} />;
+  }
+  // Other plug-point types render null until they ship.
   return null;
 }

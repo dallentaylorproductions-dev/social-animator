@@ -83,7 +83,7 @@ export const SELLER_PRESENTATION_SKILL: CallableSkill = {
         key: "comps",
         type: "objectArray",
         description:
-          "Comparable recent sales (≤4); supports Lane C's photo-to-comp plug-point",
+          "Comparable recent sales (≤4); supports Lane C's import-to-comp plug-point",
         source: "user-input",
       },
       // Step 4 (A5b) — pitch points
@@ -214,10 +214,23 @@ export const SELLER_PRESENTATION_SKILL: CallableSkill = {
 
 // ---- AI plug-point declarations (Lane C consumes) ----
 
+/**
+ * Substrate v1.1 rename (v1.47 Lane C, 2026-05-27):
+ * The pre-v1.1 type `photo-to-comp` was too narrow — it implied a
+ * single input modality (a photo of a screen). The CSV/TSV import
+ * path that lands here (the agent's own MLS export) and the future
+ * PDF/screenshot vision path share the same shape: import →
+ * candidate-comp records → review screen → apply. Renamed to the
+ * neutral `import-to-comp` with a `mode` discriminator so the family
+ * carries cleanly.
+ */
 export type SellerPresentationPlugPointType =
-  | "photo-to-comp"
+  | "import-to-comp"
   | "address-autofill"
   | "copy-suggestion";
+
+/** Discriminator for `import-to-comp` plug-points (substrate v1.1). */
+export type ImportToCompMode = "csv" | "tsv" | "vision";
 
 export type SellerPresentationStepId =
   | "property"
@@ -231,11 +244,17 @@ export interface SellerPresentationAiPlugPoint {
   /** Wizard step the plug-point hangs off of. */
   at: SellerPresentationStepId;
   type: SellerPresentationPlugPointType;
+  /**
+   * Discriminator for `import-to-comp`. `csv` covers both comma- and
+   * tab-separated exports (the route auto-detects); `vision` is the
+   * future PDF/screenshot path. Other plug-point types ignore `mode`.
+   */
+  mode?: ImportToCompMode;
   /** Draft field the plug-point's accepted proposal writes into. */
   proposesTo: string;
   /** Whether the agent must review the proposal before it's accepted. v1 always true. */
   requiresReview: boolean;
-  /** Comp field carrying per-cell confidence — only meaningful for photo-to-comp. */
+  /** Comp field carrying per-cell confidence — meaningful for `import-to-comp`. */
   confidenceField?: "fieldConfidence";
   /** Human description of what the agent falls back to when the AI is unavailable. */
   fallbackBehavior: string;
@@ -245,7 +264,8 @@ export const SELLER_PRESENTATION_AI_PLUG_POINTS: SellerPresentationAiPlugPoint[]
   [
     {
       at: "comps",
-      type: "photo-to-comp",
+      type: "import-to-comp",
+      mode: "csv",
       proposesTo: "comps",
       requiresReview: true,
       confidenceField: "fieldConfidence",
