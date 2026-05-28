@@ -150,7 +150,7 @@ async function callModel(prompt: string): Promise<string> {
   }
 }
 
-function buildPrompt(header: string[], sampleRows: string[][]): string {
+export function buildPrompt(header: string[], sampleRows: string[][]): string {
   const headerLine = header.join('\t');
   const rowLines = sampleRows
     .map((row, i) => `Row ${i + 1}:\n${row.join('\t')}`)
@@ -185,8 +185,9 @@ Return ONLY a JSON object with this exact shape:
 }
 
 Rules:
-- If a target field clearly maps to a source column, confidence ≥ 0.9.
+- If a target field clearly maps to a source column AND the column's sample values are populated, confidence ≥ 0.9. If the column name matches but its sample values are all empty / 0 / null, drop confidence to ≤ 0.6 and prefer a populated alternative even if its name match is less direct.
 - If multiple source columns could match (e.g. "Selling Price" vs "Current Price"), pick the one that most directly matches the target's intent (sold = closed = Selling Price), confidence 0.7–0.9.
+- Inspect the sample row values, not just the column names. When two or more columns are plausible candidates for a target field, look at the values in the sample rows provided. If a candidate column's values are consistently empty / 0 / null across the sample rows, that column is NOT the headline value — prefer the populated alternative. Example: if "Finished Sqft" reads 0 across 3 sample rows but "Square Footage" reads 720, 848, 1100, then "Square Footage" is the right pick for sqft even though its name is more verbose.
 - If no source column matches, return { "column": null, "confidence": 0 } for that field.
 - Never invent column names. Only use names that appear verbatim in the header row.
 - For address_components, prefer the most granular set (Street Number, Modifier, Direction, Name, Suffix, Post Direction, Unit, City, State, Zip Code) when available. Skip components that are uniformly empty in the sample rows.

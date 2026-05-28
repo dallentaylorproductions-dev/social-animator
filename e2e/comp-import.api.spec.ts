@@ -1,6 +1,7 @@
 import { test, expect } from '@playwright/test';
 import { readFile } from 'node:fs/promises';
 import path from 'node:path';
+import { buildPrompt, mapColumnsWithAI } from '../src/lib/ai/comp-import-mapper';
 
 /**
  * /api/comp-import — server contract (v1.47 Lane C).
@@ -244,6 +245,67 @@ test.describe('/api/comp-import — calm failure modes', () => {
     expect(res.status()).toBe(400);
     const data = await res.json();
     expect(data.code).toBe('file-format');
+  });
+});
+
+test.describe('AI column-mapping prompt — sqft disambiguation (Lane C polish)', () => {
+  // Header carries BOTH the trap column ('Finished Sqft', reliably 0 for
+  // NWMLS condos) and the headline column ('Square Footage'). The prompt
+  // must steer Haiku to inspect sample VALUES, not just match names —
+  // 'Finished Sqft' is the closer name match but is empty in real exports.
+  const header = [
+    'Listing Number',
+    'Street Number',
+    'Street Name',
+    'Selling Price',
+    'Selling Date',
+    'Finished Sqft',
+    'Square Footage',
+    'Year Built',
+    'Bedrooms',
+    'Bathrooms',
+  ];
+  const sampleRows = [
+    ['2480166', '12505', 'NE 68th St', '258888.88', '3/17/2026 12:00:00 AM', '0', '720', '1968', '1', '1'],
+    ['2504697', '211', 'Kirkland Ave', '430000', '4/02/2026 12:00:00 AM', '0', '848', '1979', '2', '1.75'],
+    ['2491011', '300', '6th St', '999000', '4/20/2026 12:00:00 AM', '0', '1100', '2025', '3', '2.25'],
+  ];
+
+  test('prompt tells the model to inspect sample values, not just column names', () => {
+    const prompt = buildPrompt(header, sampleRows);
+
+    // The new generalizable sample-value-inspection rule is present...
+    expect(prompt).toMatch(/inspect the sample row values, not just the column names/i);
+    // ...anchored by the worked Finished Sqft → Square Footage example...
+    expect(prompt).toContain('"Finished Sqft" reads 0');
+    expect(prompt).toContain('"Square Footage" reads 720, 848, 1100');
+    // ...and the softened confidence guidance for name-match-but-empty.
+    expect(prompt).toMatch(/sample values are all empty \/ 0 \/ null/i);
+    expect(prompt).toContain('≤ 0.6');
+
+    // The sample VALUES must actually reach the model so it can SEE that
+    // Finished Sqft is 0 while Square Footage is populated.
+    expect(prompt).toContain('720');
+    expect(prompt).toContain('848');
+    expect(prompt).toContain('1100');
+  });
+
+  test('maps sqft to Square Footage, not Finished Sqft, when Finished Sqft is 0 in samples', async () => {
+    // Drive the fixture-mode bypass deterministically (no model call, no
+    // API key) so the offline suite stays free + repeatable. Mirrors the
+    // real NWMLS condo case: Finished Sqft = 0, Square Footage > 0.
+    const prev = process.env.E2E_TESTING;
+    process.env.E2E_TESTING = '1';
+    try {
+      const { mapping, source } = await mapColumnsWithAI({ header, sampleRows });
+      expect(source).toBe('fixture');
+      expect(mapping.sqft.column).toBe('Square Footage');
+      expect(mapping.sqft.column).not.toBe('Finished Sqft');
+      expect(mapping.sqft.confidence).toBeGreaterThanOrEqual(0.8);
+    } finally {
+      if (prev === undefined) delete process.env.E2E_TESTING;
+      else process.env.E2E_TESTING = prev;
+    }
   });
 });
 
