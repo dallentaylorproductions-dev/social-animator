@@ -47,6 +47,10 @@ import { projectCompRows } from "@/lib/ai/comp-import-project";
  */
 
 export const runtime = "nodejs";
+// Must exceed the internal 12s AI timeout (mapColumnsWithAI timeoutMs) so a
+// slow Anthropic call trips that timeout and returns the calm ai-unavailable
+// fallback, rather than Vercel killing the lambda first (silent 502, no log).
+export const maxDuration = 30;
 
 const MAX_BYTES = 5 * 1024 * 1024;
 const RATE_LIMIT_WINDOW_SECONDS = 3600;
@@ -329,6 +333,10 @@ export async function POST(req: Request): Promise<NextResponse<ApiOk | ApiErr>> 
         if (!e2eBypass) console.warn("[comp-import] cache write failed:", err);
       }
     } catch (err) {
+      console.error("[comp-import] AI mapping failure", {
+        message: err instanceof Error ? err.message : String(err),
+        stack: err instanceof Error ? err.stack : undefined,
+      });
       if (err instanceof MissingAnthropicKeyError) {
         return NextResponse.json(
           {
