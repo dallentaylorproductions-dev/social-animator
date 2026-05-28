@@ -1,7 +1,14 @@
 import { test, expect } from '@playwright/test';
 import { readFile } from 'node:fs/promises';
 import path from 'node:path';
-import { buildPrompt, mapColumnsWithAI } from '../src/lib/ai/comp-import-mapper';
+import {
+  buildPrompt,
+  mapColumnsWithAI,
+  applyCanonicalOverrides,
+  buildCacheKey,
+  PROMPT_VERSION,
+  type ColumnMapping,
+} from '../src/lib/ai/comp-import-mapper';
 
 /**
  * /api/comp-import — server contract (v1.47 Lane C).
@@ -271,19 +278,22 @@ test.describe('AI column-mapping prompt — sqft disambiguation (Lane C polish)'
     ['2491011', '300', '6th St', '999000', '4/20/2026 12:00:00 AM', '0', '1100', '2025', '3', '2.25'],
   ];
 
-  test('prompt tells the model to inspect sample values, not just column names', () => {
+  test('prompt carries the DISQUALIFY rule and the named NWMLS Square Footage gotcha (v3)', () => {
     const prompt = buildPrompt(header, sampleRows);
 
-    // The new generalizable sample-value-inspection rule is present...
-    expect(prompt).toMatch(/inspect the sample row values, not just the column names/i);
-    // ...anchored by the worked Finished Sqft → Square Footage example...
-    expect(prompt).toContain('"Finished Sqft" reads 0');
-    expect(prompt).toContain('"Square Footage" reads 720, 848, 1100');
-    // ...and the softened confidence guidance for name-match-but-empty.
+    // v3 replaces the gentle "prefer the populated alternative" worked
+    // example with an authoritative DISQUALIFY rule...
+    expect(prompt).toMatch(/DISQUALIFY columns whose sample values are consistently empty/i);
+    expect(prompt).toContain('This rule OVERRIDES the "direct name match = higher confidence" rule');
+    // ...plus a named NWMLS gotcha that steers Haiku directly for the cohort.
+    expect(prompt).toContain('MLS-schema gotcha');
+    expect(prompt).toContain('for the sqft target');
+    expect(prompt).toContain('headline finished-area value in NWMLS Matrix exports');
+    // The unchanged confidence-downgrade guidance for name-match-but-empty.
     expect(prompt).toMatch(/sample values are all empty \/ 0 \/ null/i);
     expect(prompt).toContain('≤ 0.6');
 
-    // The sample VALUES must actually reach the model so it can SEE that
+    // The sample VALUES must still reach the model so it can SEE that
     // Finished Sqft is 0 while Square Footage is populated.
     expect(prompt).toContain('720');
     expect(prompt).toContain('848');
@@ -306,6 +316,84 @@ test.describe('AI column-mapping prompt — sqft disambiguation (Lane C polish)'
       if (prev === undefined) delete process.env.E2E_TESTING;
       else process.env.E2E_TESTING = prev;
     }
+  });
+});
+
+test.describe('AI column-mapping — canonical override + cache versioning (Lane C polish)', () => {
+  // Header carries BOTH the trap ('Finished Sqft') and the canonical
+  // headline ('Square Footage'). The deterministic post-process overrides
+  // the AI when it falls for the trap on a KNOWN NWMLS schema.
+  const header = [
+    'Listing Number',
+    'Street Number',
+    'Street Name',
+    'Selling Price',
+    'Selling Date',
+    'Finished Sqft',
+    'Square Footage',
+    'Year Built',
+    'Bedrooms',
+    'Bathrooms',
+  ];
+
+  function baseMapping(sqftColumn: string): ColumnMapping {
+    return {
+      address_components: ['Street Number', 'Street Name'],
+      sold_price: { column: 'Selling Price', confidence: 0.95 },
+      sold_date: { column: 'Selling Date', confidence: 0.9 },
+      sqft: { column: sqftColumn, confidence: 0.92 },
+      year_built: { column: 'Year Built', confidence: 0.98 },
+      bedrooms: { column: 'Bedrooms', confidence: 0.95 },
+      bathrooms: { column: 'Bathrooms', confidence: 0.9 },
+    };
+  }
+
+  function captureOverrideLogs(fn: () => ColumnMapping): {
+    result: ColumnMapping;
+    logs: string[];
+  } {
+    const logs: string[] = [];
+    const orig = console.log;
+    console.log = (...args: unknown[]) => {
+      logs.push(args.map(String).join(' '));
+    };
+    try {
+      return { result: fn(), logs };
+    } finally {
+      console.log = orig;
+    }
+  }
+
+  test('override fires when the AI picks Finished Sqft and Square Footage exists', () => {
+    const { result, logs } = captureOverrideLogs(() =>
+      applyCanonicalOverrides(baseMapping('Finished Sqft'), header),
+    );
+
+    expect(result.sqft.column).toBe('Square Footage');
+    expect(result.sqft.confidence).toBeGreaterThanOrEqual(0.95);
+    expect(result.sqft.reasoning).toContain('Overridden');
+    // Every override is logged at info level (console.log).
+    expect(logs.some((l) => l.includes('canonical override'))).toBe(true);
+  });
+
+  test('override does NOT fire when the AI already picked Square Footage (no spurious log)', () => {
+    const { result, logs } = captureOverrideLogs(() =>
+      applyCanonicalOverrides(baseMapping('Square Footage'), header),
+    );
+
+    // Unchanged: same column, original confidence, no override reasoning.
+    expect(result.sqft.column).toBe('Square Footage');
+    expect(result.sqft.confidence).toBe(0.92);
+    expect(result.sqft.reasoning).toBeUndefined();
+    expect(logs.some((l) => l.includes('canonical override'))).toBe(false);
+  });
+
+  test('cache key is versioned: comp_import_mapping_cache:v3:<64-hex-sha>', () => {
+    expect(PROMPT_VERSION).toBe(3);
+    const fakeHash = 'a'.repeat(64);
+    const key = buildCacheKey(fakeHash);
+    expect(key).toBe(`comp_import_mapping_cache:v3:${fakeHash}`);
+    expect(key).toMatch(/^comp_import_mapping_cache:v3:[0-9a-f]{64}$/);
   });
 });
 

@@ -60,6 +60,81 @@ interface MapColumnsResult {
 const TIMEOUT_MS = 12_000;
 
 /**
+ * Bump every time the prompt template OR the mapping behavior (rules,
+ * canonical overrides) changes. The route folds this into the KV cache
+ * key so a behavior change auto-invalidates every prior cache entry —
+ * no manual flush, no stale mapping served against a smarter prompt.
+ *
+ * v1 → original prompt. v2 → a35ec44 sample-value-inspection rule
+ * (untracked constant). v3 → DISQUALIFY rule + NWMLS canonical override.
+ */
+export const PROMPT_VERSION = 3;
+
+/** KV cache key for a file's mapping, versioned by PROMPT_VERSION. */
+export function buildCacheKey(fileHash: string): string {
+  return `comp_import_mapping_cache:v${PROMPT_VERSION}:${fileHash}`;
+}
+
+/**
+ * Deterministic safety net for KNOWN canonical MLS schemas. The AI is the
+ * primary mapper for UNKNOWN schemas, but for column names we already
+ * recognize we prefer them in code rather than relying on Haiku's judgment.
+ *
+ * Each entry: if the AI picked `avoidColumn` for `target` AND the
+ * `preferredColumn` exists in the header, override to the preferred column.
+ * Narrow (only documented canonical cases), explicit (logs every override),
+ * additive (no effect on schemas not listed here).
+ */
+type FieldMappingKey =
+  | 'sold_price'
+  | 'sold_date'
+  | 'sqft'
+  | 'year_built'
+  | 'bedrooms'
+  | 'bathrooms';
+
+const KNOWN_CANONICAL_OVERRIDES: Array<{
+  target: FieldMappingKey;
+  preferredColumn: string;
+  avoidColumn: string;
+  reason: string;
+}> = [
+  {
+    target: 'sqft',
+    preferredColumn: 'Square Footage',
+    avoidColumn: 'Finished Sqft',
+    reason:
+      'NWMLS Matrix: Square Footage is the headline column; Finished Sqft is often 0 for condos',
+  },
+  // Future canonical overrides for other MLS systems land here.
+];
+
+/**
+ * Apply the KNOWN_CANONICAL_OVERRIDES to a mapping in place and return it.
+ * Logs (info level) every override it applies. No-op for any mapping that
+ * doesn't hit a documented mis-pick.
+ */
+export function applyCanonicalOverrides(
+  mapping: ColumnMapping,
+  header: string[],
+): ColumnMapping {
+  for (const override of KNOWN_CANONICAL_OVERRIDES) {
+    const aiPick = mapping[override.target]?.column;
+    if (aiPick === override.avoidColumn && header.includes(override.preferredColumn)) {
+      console.log(
+        `[comp-import] applying canonical override for ${override.target}: ${aiPick} → ${override.preferredColumn}. Reason: ${override.reason}`,
+      );
+      mapping[override.target] = {
+        column: override.preferredColumn,
+        confidence: 0.95,
+        reasoning: `Overridden from ${aiPick} to ${override.preferredColumn} per canonical NWMLS rule. AI's pick was disqualified because ${override.reason}.`,
+      };
+    }
+  }
+  return mapping;
+}
+
+/**
  * E2E test-mode bypass. Returns a canonical mapping for the NWMLS
  * Matrix "Full" header shape, derived from Appendix B.3 of the spec
  * packet. Production never sets E2E_TESTING.
@@ -119,6 +194,10 @@ export async function mapColumnsWithAI(
   if (!mapping) {
     throw new Error('ai-malformed-json');
   }
+
+  // Deterministic safety net for KNOWN canonical schemas (e.g. NWMLS
+  // Square Footage). Fires only on documented mis-picks; no-op otherwise.
+  mapping = applyCanonicalOverrides(mapping, args.header);
 
   return {
     mapping,
@@ -187,7 +266,8 @@ Return ONLY a JSON object with this exact shape:
 Rules:
 - If a target field clearly maps to a source column AND the column's sample values are populated, confidence ≥ 0.9. If the column name matches but its sample values are all empty / 0 / null, drop confidence to ≤ 0.6 and prefer a populated alternative even if its name match is less direct.
 - If multiple source columns could match (e.g. "Selling Price" vs "Current Price"), pick the one that most directly matches the target's intent (sold = closed = Selling Price), confidence 0.7–0.9.
-- Inspect the sample row values, not just the column names. When two or more columns are plausible candidates for a target field, look at the values in the sample rows provided. If a candidate column's values are consistently empty / 0 / null across the sample rows, that column is NOT the headline value — prefer the populated alternative. Example: if "Finished Sqft" reads 0 across 3 sample rows but "Square Footage" reads 720, 848, 1100, then "Square Footage" is the right pick for sqft even though its name is more verbose.
+- **DISQUALIFY columns whose sample values are consistently empty / 0 / null across the sample rows.** A column whose name matches the target perfectly but whose values are all 0 or empty is NOT a valid candidate for that target. Drop it from consideration entirely; pick the next-best populated alternative even if its name match is less direct. This rule OVERRIDES the "direct name match = higher confidence" rule above.
+- **MLS-schema gotcha (NWMLS-specific but general principle):** if the header contains both \`Square Footage\` and \`Finished Sqft\`, prefer \`Square Footage\` for the sqft target. The verbose-named \`Square Footage\` column is the headline finished-area value in NWMLS Matrix exports; \`Finished Sqft\` is a legacy sub-field that is often 0 or duplicative. The same logic applies when a schema has a "headline" vs a "sub-field" pair for any target — prefer the one whose sample values are populated AND look like the actual headline number for the property type.
 - If no source column matches, return { "column": null, "confidence": 0 } for that field.
 - Never invent column names. Only use names that appear verbatim in the header row.
 - For address_components, prefer the most granular set (Street Number, Modifier, Direction, Name, Suffix, Post Direction, Unit, City, State, Zip Code) when available. Skip components that are uniformly empty in the sample rows.

@@ -8,6 +8,7 @@ import { SELLER_PRESENTATION_SKILL } from "@/tools/seller-presentation/skill";
 import { parse as parseCsvTsv } from "@/lib/csv-tsv-parse";
 import {
   mapColumnsWithAI,
+  buildCacheKey,
   type ColumnMapping,
 } from "@/lib/ai/comp-import-mapper";
 import {
@@ -301,7 +302,8 @@ export async function POST(req: Request): Promise<NextResponse<ApiOk | ApiErr>> 
   //    encoding-stable). Cache lookup, 24h TTL.
   const hash = createHash("sha256").update(raw).digest("hex");
   raw = ""; // Drop the reference; not persisted anywhere else.
-  const cacheKey = `comp_import_mapping_cache:${hash}`;
+  // Versioned by PROMPT_VERSION — bumping it auto-invalidates prior entries.
+  const cacheKey = buildCacheKey(hash);
 
   let mapping: ColumnMapping | null = null;
   let cacheHit = false;
