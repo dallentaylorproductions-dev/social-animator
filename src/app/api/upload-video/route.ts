@@ -1,6 +1,13 @@
 import { NextResponse } from "next/server";
+import { kv } from "@vercel/kv";
 import { auth } from "@/lib/auth";
 import { getMediaStorage } from "@/lib/media-storage";
+import { loadAgentProfile } from "@/lib/entitlements/load-agent-profile";
+import { resolveEntitlements } from "@/lib/entitlements/resolver";
+import {
+  videoUploadCap30d,
+  VIDEO_UPLOAD_WINDOW_SECONDS,
+} from "@/lib/entitlements/usage-caps";
 
 /**
  * POST /api/upload-video (v1.47 / A7d.3.1 — client-direct).
@@ -96,6 +103,21 @@ function isE2EBypassActive(): boolean {
   );
 }
 
+/**
+ * The SDK posts a discriminated event: `blob.generate-client-token`
+ * before the upload, `blob.upload-completed` after. Defaults to the
+ * token event when the shape is unrecognized (matches the adapter's own
+ * default-to-token-issuance behavior).
+ */
+function readEventType(body: unknown): string {
+  return typeof body === "object" &&
+    body !== null &&
+    "type" in body &&
+    typeof (body as { type: unknown }).type === "string"
+    ? (body as { type: string }).type
+    : "blob.generate-client-token";
+}
+
 export async function POST(req: Request) {
   const e2e = isE2EBypassActive();
   const e2eAuthBypass = e2e && req.headers.get("x-e2e-bypass") === "1";
@@ -134,19 +156,58 @@ export async function POST(req: Request) {
     );
   }
 
+  const eventType = readEventType(body);
+
+  // --- Per-user video upload cap (rolling 30 days, by access mode) ---
+  // Counted on the token-generation event only — the upload-completed
+  // callback is a post-upload notification, not a new upload, so it must
+  // not double-count. The cap fires here, before token issuance, so a
+  // user at the limit never starts an upload. On KV failure the cap is
+  // skipped (mirrors /api/comp-import) — auth + folder/MIME/size gates
+  // still hold. Test-only override header lets the 429 path be asserted
+  // offline without an exhaustible KV (NODE_ENV-gated, inert in prod).
+  if (eventType === "blob.generate-client-token") {
+    const testForceVideoCap =
+      e2e && req.headers.get("x-e2e-force-video-cap") === "1";
+    if (testForceVideoCap) {
+      return NextResponse.json(
+        {
+          ok: false,
+          error:
+            "You've reached your video upload limit for the month. Reach out if you need more capacity.",
+        },
+        { status: 429, headers: { "Cache-Control": "no-store" } },
+      );
+    }
+    try {
+      const ent = resolveEntitlements(await loadAgentProfile(email));
+      const cap = videoUploadCap30d(ent.accessMode);
+      const capKey = `video_upload_count:${email}:rolling30d`;
+      const pipe = kv.pipeline();
+      pipe.incr(capKey);
+      pipe.expire(capKey, VIDEO_UPLOAD_WINDOW_SECONDS);
+      const [used] = (await pipe.exec()) as [number, number];
+      if (used > cap) {
+        return NextResponse.json(
+          {
+            ok: false,
+            error:
+              "You've reached your video upload limit for the month. Reach out if you need more capacity.",
+          },
+          { status: 429, headers: { "Cache-Control": "no-store" } },
+        );
+      }
+    } catch (err) {
+      if (!e2e) console.warn("[upload-video] cap KV unavailable:", err);
+    }
+  }
+
   // --- Test-only simulated handshake ---
   // Runs BEFORE the storage-configured check because simulate mode
   // never touches the adapter — it has to be reachable on dev boxes
   // that don't have BLOB_READ_WRITE_TOKEN set. Mirrors the SDK
   // response shape so the field treats the response identically.
   if (e2eSimulate) {
-    const eventType =
-      typeof body === "object" &&
-      body !== null &&
-      "type" in body &&
-      typeof (body as { type: unknown }).type === "string"
-        ? (body as { type: string }).type
-        : "blob.generate-client-token";
     if (eventType === "blob.upload-completed") {
       return NextResponse.json(
         { type: "blob.upload-completed", response: "ok" },
