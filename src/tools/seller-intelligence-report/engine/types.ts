@@ -39,6 +39,14 @@ export interface Comp {
   distanceMiles?: string;
   soldDate?: string;             // ISO YYYY-MM-DD or free-text
   notes?: string;                // agent's own commentary on why this comp matters
+  /**
+   * Build year of the comp (4-digit integer). Surfaced today in the
+   * Seller Presentation wizard + consumer page so buyers see the era
+   * signal next to the address/price/sqft. Field lives on the shared
+   * Comp primitive (not in SIR's render today) because comp-analyzer
+   * will map it automatically from MLS exports once that ships.
+   */
+  yearBuilt?: number;
 
   /**
    * V2 prep — never displayed in v1. Tracks how the comp was entered so
@@ -138,6 +146,10 @@ function clampComp(raw: Partial<Comp>): Comp {
     distanceMiles: typeof raw.distanceMiles === 'string' ? raw.distanceMiles : undefined,
     soldDate: typeof raw.soldDate === 'string' ? raw.soldDate : undefined,
     notes: typeof raw.notes === 'string' ? raw.notes : undefined,
+    yearBuilt:
+      typeof raw.yearBuilt === 'number' && Number.isFinite(raw.yearBuilt)
+        ? raw.yearBuilt
+        : undefined,
     source: validSources.includes(raw.source as CompSource) ? (raw.source as CompSource) : 'manual',
     fieldConfidence:
       raw.fieldConfidence && typeof raw.fieldConfidence === 'object' ? raw.fieldConfidence : undefined,

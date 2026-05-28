@@ -77,11 +77,18 @@ export function PhoneInput({
   };
 
   useLayoutEffect(() => {
-    if (pendingCaretRef.current !== null && inputRef.current) {
-      const c = pendingCaretRef.current;
-      inputRef.current.setSelectionRange(c, c);
+    // A7c.4.1: gate caret restoration on activeElement — same
+    // rationale as CurrencyInput. Keeps the focused-input caret
+    // preservation working without touching unfocused inputs when
+    // a sibling re-render runs through this effect.
+    if (pendingCaretRef.current === null || !inputRef.current) return;
+    if (document.activeElement !== inputRef.current) {
       pendingCaretRef.current = null;
+      return;
     }
+    const c = pendingCaretRef.current;
+    inputRef.current.setSelectionRange(c, c);
+    pendingCaretRef.current = null;
   });
 
   return (

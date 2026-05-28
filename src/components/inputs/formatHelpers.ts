@@ -9,17 +9,28 @@
  * reading the raw value exactly as before.
  */
 
-/** Strip all non-digit characters and return the resulting string. */
-export function stripToDigits(input: string): string {
+/**
+ * Strip all non-digit characters and return the resulting string.
+ *
+ * A7c.4.1 hardened: accepts `string | undefined | null` and returns
+ * "" for non-string input. Callers in the comp-row family pre-`??`
+ * their values to "" already; this is belts-and-braces so a future
+ * caller that forgets the coalesce can't take down the wizard with
+ * `undefined.replace(...)`.
+ */
+export function stripToDigits(input: string | undefined | null): string {
+  if (typeof input !== "string") return "";
   return input.replace(/\D/g, "");
 }
 
 /**
- * Format a raw integer-string as "$1,234,567". Empty input returns the
- * empty string (don't show "$0" or "$" for an empty field — placeholder
- * does that job). Non-numeric input is treated as empty.
+ * Format a raw integer-string as "$1,234,567". Empty / non-string input
+ * returns the empty string (don't show "$0" or "$" for an empty field
+ * — placeholder does that job). Non-numeric input is treated as empty.
+ *
+ * A7c.4.1: tolerant of `undefined | null` after the input layer hardening.
  */
-export function formatCurrency(raw: string): string {
+export function formatCurrency(raw: string | undefined | null): string {
   const digits = stripToDigits(raw);
   if (!digits) return "";
   const n = parseInt(digits, 10);
@@ -29,9 +40,13 @@ export function formatCurrency(raw: string): string {
 
 /**
  * Format a raw integer-string with thousands separators ("2,840").
- * Empty input returns empty string.
+ * Empty / non-string input returns empty string.
+ *
+ * A7c.4.1: tolerant of `undefined | null`.
  */
-export function formatNumberWithCommas(raw: string): string {
+export function formatNumberWithCommas(
+  raw: string | undefined | null,
+): string {
   const digits = stripToDigits(raw);
   if (!digits) return "";
   const n = parseInt(digits, 10);

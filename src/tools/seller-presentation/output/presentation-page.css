@@ -1,0 +1,1535 @@
+/* ============================================
+   STUDIO SEP — Seller Presentation (Consumer)
+   Warm paper register · mobile-first · editorial
+   v1.47 / A7b — ported from the locked design
+   (docs/design/seller-presentation-locked-design.reference.html)
+   ============================================
+
+   Scoping note: every selector in this file is prefixed with
+   `.sep-presentation` so the design's generic class names (.hero,
+   .agent, .reviews, …) don't leak into other tools' DOM trees.
+   The page root in presentation-page.tsx applies `sep-presentation`
+   to the outermost wrapper.
+
+   Font variables: the design's tokens map onto the project's
+   next/font CSS variables defined in src/app/layout.tsx —
+   --font-instrument-serif (display), --font-geist-sans (UI),
+   --font-geist-mono (mono).
+
+   Edge-to-edge on real phones: the reference renders inside a
+   "stage" frame with rounded corners + max-width 430. Production
+   strips the stage; the page goes edge-to-edge on mobile and grows
+   only to a sensible reading column on tablet+.
+============================================ */
+
+.sep-presentation {
+  /* ---- Color tokens ---- */
+  --paper: #f1ebe0;
+  --paper-deep: #e8e0d2;
+  --paper-raise: #fbf7ee;
+  --paper-card: #fcf9f2;
+  --paper-line: #e0d6c5;
+  --paper-line-soft: #eae1d0;
+  --ink: #1a1612;
+  --ink-2: #2a241f;
+  --ink-muted: #6e665b;
+  --ink-faint: #a29888;
+  --mint: #4ef2d9;
+  --mint-deep: #1f8f7c;
+  --gold: #c9a86a;
+  --gold-warm: #b8965a;
+  --brick: #c26a4e;
+  --brick-deep: #a85439;
+  --rose: #d29a9a;
+  --pos: #1d9e75;
+  --pos-bright: #6ee7a8;
+  --chart-blue: #3f6c8e;
+  --chart-blue-deep: #2c5474;
+
+  /* ---- Type tokens (map to next/font vars from layout.tsx) ---- */
+  --sep-display: var(--font-instrument-serif), "Iowan Old Style", Georgia, serif;
+  --sep-ui: var(--font-geist-sans), -apple-system, BlinkMacSystemFont,
+    "Segoe UI", system-ui, sans-serif;
+  --sep-mono: var(--font-geist-mono), ui-monospace, SFMono-Regular, Menlo,
+    monospace;
+
+  /* ---- Layout tokens ---- */
+  /* A7b.2: horizontal text-gutter for content sections. The locked
+     design was authored inside a 24px .stage frame that added cushion
+     ON TOP of each section's 28px inset (≈52px of felt gutter). The
+     native port (correctly) dropped the .stage chrome, so sections
+     had only their 28px inner inset and read tight at ~390px mobile.
+     30px gives back ~2px on each side as a uniform token applied to
+     EVERY content section's horizontal padding. Full-bleed elements
+     (hero photo, dark chapter backgrounds, editorial band, end-mark,
+     foot) keep their backgrounds edge-to-edge — only their TEXT
+     content gets the gutter, because background-color paints the
+     section box while padding insets the content. */
+  --sep-gutter: 30px;
+
+  /* ---- Radii ---- */
+  --r-md: 10px;
+  --r-lg: 14px;
+  --r-xl: 20px;
+  --r-2xl: 28px;
+  --r-pill: 999px;
+
+  /* ---- Motion tokens (CSS-first; the reveal triggers add `.in`) ---- */
+  --ease: cubic-bezier(0.2, 0.7, 0.1, 1);
+  --r-ease: cubic-bezier(0.16, 0.84, 0.3, 1);
+  --r-quick: 140ms;
+  --r-std: 220ms;
+  --r-slow: 360ms;
+  --r-rise: 640ms;
+
+  /* ---- Surfaces ---- */
+  --shadow-card: 0 1px 0 rgba(255, 255, 255, 0.7) inset,
+    0 18px 40px -26px rgba(40, 28, 16, 0.18);
+  --shadow-paper: 0 1px 0 rgba(255, 255, 255, 0.6) inset,
+    0 32px 80px -40px rgba(40, 28, 16, 0.22);
+
+  background: var(--paper-deep);
+  color: var(--ink);
+  min-height: 100vh;
+  -webkit-font-smoothing: antialiased;
+  text-rendering: optimizeLegibility;
+  font-feature-settings: "ss01", "cv11";
+}
+
+.sep-presentation,
+.sep-presentation * {
+  box-sizing: border-box;
+}
+
+.sep-presentation .page {
+  width: 100%;
+  background: var(--paper);
+  position: relative;
+  color: var(--ink);
+  margin: 0 auto;
+  font-family: var(--sep-ui);
+}
+
+@media (min-width: 540px) {
+  /* Reading-column treatment on tablet+. Mobile stays edge-to-edge. */
+  .sep-presentation {
+    padding: 40px 0;
+    background:
+      radial-gradient(60% 40% at 50% 0%, #f1e9da 0%, transparent 60%),
+      var(--paper-deep);
+  }
+  .sep-presentation .page {
+    max-width: 460px;
+    border-radius: 32px;
+    overflow: hidden;
+    box-shadow: var(--shadow-paper);
+  }
+}
+
+/* =====================================================================
+   APP BAR (inside the hero — over the photo)
+   ===================================================================== */
+.sep-presentation .appbar {
+  position: absolute;
+  top: 0;
+  left: 0;
+  right: 0;
+  padding: 18px 22px 14px;
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+  z-index: 5;
+  background: linear-gradient(180deg, rgba(0, 0, 0, 0.32) 0%, rgba(0, 0, 0, 0) 100%);
+  color: #fbf6ec;
+}
+.sep-presentation .appbar .prepared {
+  font-family: var(--sep-mono);
+  font-size: 9.5px;
+  letter-spacing: 0.18em;
+  text-transform: uppercase;
+  opacity: 0.9;
+}
+.sep-presentation .appbar .share {
+  width: 30px;
+  height: 30px;
+  border-radius: 50%;
+  background: rgba(255, 255, 255, 0.14);
+  backdrop-filter: blur(8px);
+  display: grid;
+  place-items: center;
+  border: 1px solid rgba(255, 255, 255, 0.18);
+  cursor: pointer;
+  padding: 0;
+  color: inherit;
+}
+.sep-presentation .appbar .share svg {
+  width: 14px;
+  height: 14px;
+  stroke: #fbf6ec;
+  stroke-width: 1.5;
+  fill: none;
+  stroke-linecap: round;
+  stroke-linejoin: round;
+}
+
+/* =====================================================================
+   HERO PHOTO (clean band — no text over the image)
+   ===================================================================== */
+.sep-presentation .hero {
+  position: relative;
+  height: 480px;
+  background: #1a1612;
+  color: #fbf6ec;
+  overflow: hidden;
+  margin-bottom: 0;
+}
+.sep-presentation .hero::after {
+  content: "";
+  position: absolute;
+  inset: 14px;
+  border: 1px solid rgba(255, 255, 255, 0.1);
+  pointer-events: none;
+  z-index: 4;
+}
+.sep-presentation .hero-photo {
+  position: absolute;
+  inset: -2%;
+  background-position: center 38%;
+  background-size: cover;
+  background-repeat: no-repeat;
+  background-color: #c8b69a;
+  z-index: 0;
+  animation: sepKenburns 22s cubic-bezier(0.4, 0, 0.6, 1) forwards;
+  transform-origin: 50% 45%;
+}
+.sep-presentation .hero-photo.monogram {
+  /* Fallback when heroPhotoUrl is null — same dimensions, a calm warm
+     tone so the caption-card still has visual contrast. */
+  background-image: linear-gradient(160deg, #ad927a 0%, #8c715b 100%);
+}
+.sep-presentation .hero .appbar {
+  position: relative;
+  z-index: 2;
+}
+
+/* =====================================================================
+   CAPTION CARD — dark ink card overlapping bottom of photo
+   ===================================================================== */
+.sep-presentation .caption-wrap {
+  position: relative;
+  margin: -44px 18px 0;
+  z-index: 3;
+}
+.sep-presentation .caption-card {
+  background: #16110d;
+  color: #f4efe4;
+  border-radius: 14px;
+  padding: 22px 26px 26px;
+  box-shadow:
+    0 1px 0 rgba(255, 255, 255, 0.05) inset,
+    0 22px 50px -28px rgba(20, 12, 4, 0.55),
+    0 6px 18px -10px rgba(20, 12, 4, 0.35);
+  border: 1px solid rgba(255, 255, 255, 0.04);
+}
+.sep-presentation .caption-card .for {
+  font-family: var(--sep-mono);
+  font-size: 9.5px;
+  letter-spacing: 0.22em;
+  text-transform: uppercase;
+  color: var(--mint);
+  display: flex;
+  align-items: center;
+  gap: 10px;
+  margin-bottom: 12px;
+}
+.sep-presentation .caption-card .for::before {
+  content: "";
+  width: 6px;
+  height: 6px;
+  background: var(--mint);
+  border-radius: 50%;
+}
+.sep-presentation .caption-card .kicker {
+  font-family: var(--sep-mono);
+  font-size: 10.5px;
+  letter-spacing: 0.18em;
+  text-transform: uppercase;
+  color: rgba(244, 239, 228, 0.65);
+  margin-bottom: 16px;
+  display: flex;
+  align-items: center;
+  gap: 10px;
+}
+.sep-presentation .caption-card .kicker::before {
+  content: "";
+  width: 18px;
+  height: 1px;
+  background: currentColor;
+  opacity: 0.55;
+}
+.sep-presentation .caption-card .addr {
+  font-family: var(--sep-display);
+  font-weight: 400;
+  font-size: 40px;
+  line-height: 1.02;
+  letter-spacing: -0.025em;
+  margin: 0;
+  color: #f4efe4;
+  text-wrap: balance;
+}
+.sep-presentation .caption-card .addr em {
+  font-style: italic;
+  display: block;
+  margin-top: 2px;
+}
+.sep-presentation .caption-card .city {
+  font-family: var(--sep-mono);
+  font-size: 10.5px;
+  letter-spacing: 0.14em;
+  text-transform: uppercase;
+  margin-top: 18px;
+  padding-top: 18px;
+  border-top: 1px solid rgba(244, 239, 228, 0.12);
+  color: rgba(244, 239, 228, 0.55);
+}
+
+/* =====================================================================
+   PRICE PANEL — hero value moment ($675k)
+   ===================================================================== */
+.sep-presentation .price-panel {
+  padding: 52px var(--sep-gutter) 40px;
+  margin-top: 0;
+  background: var(--paper-raise);
+  border-bottom: 1px solid var(--paper-line);
+  position: relative;
+}
+.sep-presentation .price-panel::before {
+  /* Brick vertical accent — its `left` value tracks the gutter so
+     the bar aligns with the section's text-edge. */
+  content: "";
+  position: absolute;
+  left: var(--sep-gutter);
+  top: 52px;
+  width: 3px;
+  height: calc(100% - 92px);
+  background: var(--brick);
+}
+.sep-presentation .price-panel .lbl {
+  font-family: var(--sep-mono);
+  font-size: 10.5px;
+  letter-spacing: 0.18em;
+  text-transform: uppercase;
+  color: var(--brick);
+  margin-bottom: 18px;
+  padding-left: 18px;
+  display: flex;
+  align-items: center;
+  gap: 10px;
+}
+.sep-presentation .price-panel .price {
+  border-bottom: 1px solid var(--paper-line-soft);
+  padding: 0 0 26px 18px;
+}
+.sep-presentation .price-panel .rationale {
+  padding-left: 18px;
+}
+.sep-presentation .price {
+  font-family: var(--sep-display);
+  font-weight: 400;
+  font-size: 108px;
+  line-height: 0.88;
+  letter-spacing: -0.04em;
+  color: var(--ink);
+  display: flex;
+  align-items: flex-start;
+  margin: 0;
+  /* A7c.8: tabular-nums keeps each digit on a uniform advance so the
+     scroll-triggered count-up climbs without sub-digit width jitter.
+     Paired with the start-value floor in motion.ts (10^(digits-1))
+     this guarantees no layout shift mid-animation. */
+  font-variant-numeric: tabular-nums;
+}
+.sep-presentation .price .dollar {
+  font-size: 42px;
+  line-height: 1;
+  margin: 10px 4px 0 0;
+  color: var(--brick);
+  letter-spacing: -0.02em;
+}
+.sep-presentation .price .sep {
+  color: var(--ink-muted);
+}
+.sep-presentation .rationale {
+  margin-top: 22px;
+  font-family: var(--sep-display);
+  font-style: italic;
+  font-size: 22px;
+  line-height: 1.28;
+  letter-spacing: -0.01em;
+  color: var(--ink-2);
+  max-width: 32ch;
+}
+.sep-presentation .rationale::before {
+  content: "";
+  display: block;
+  width: 28px;
+  height: 1px;
+  background: var(--brick);
+  margin-bottom: 18px;
+}
+
+/* =====================================================================
+   SECTION SCAFFOLDING — block, sec-label, sec-title, sec-body
+   ===================================================================== */
+.sep-presentation .block {
+  padding: 56px var(--sep-gutter);
+  border-bottom: 1px solid var(--paper-line);
+}
+.sep-presentation .block:last-of-type {
+  border-bottom: 0;
+}
+.sep-presentation .block.paper {
+  background: var(--paper);
+}
+.sep-presentation .block.raise {
+  background: var(--paper-raise);
+}
+.sep-presentation .block.card {
+  background: var(--paper-card);
+}
+
+.sep-presentation .sec-label {
+  font-family: var(--sep-mono);
+  font-size: 10.5px;
+  letter-spacing: 0.18em;
+  text-transform: uppercase;
+  color: var(--ink-faint);
+  margin-bottom: 22px;
+  display: flex;
+  align-items: center;
+  gap: 14px;
+}
+.sep-presentation .sec-label .num {
+  font-family: var(--sep-display);
+  font-style: italic;
+  font-size: 17px;
+  line-height: 1;
+  letter-spacing: -0.01em;
+  color: var(--brick);
+  text-transform: none;
+  position: relative;
+  padding-left: 14px;
+  font-weight: 400;
+}
+.sep-presentation .sec-label .num::before {
+  content: "";
+  position: absolute;
+  left: 0;
+  top: 50%;
+  width: 5px;
+  height: 5px;
+  background: var(--mint);
+  border-radius: 50%;
+  transform: translateY(-50%);
+}
+.sep-presentation .sec-label .lbl {
+  flex: 1;
+  height: 1px;
+  background: var(--paper-line);
+  align-self: center;
+}
+.sep-presentation .sec-label .name {
+  color: var(--ink-muted);
+  letter-spacing: 0.18em;
+  text-transform: uppercase;
+  font-family: var(--sep-mono);
+  font-size: 10.5px;
+}
+.sep-presentation .sec-title {
+  font-family: var(--sep-display);
+  font-weight: 400;
+  font-size: 44px;
+  line-height: 1;
+  letter-spacing: -0.025em;
+  margin: 0 0 22px;
+  color: var(--ink);
+  max-width: 12ch;
+}
+.sep-presentation .sec-title em {
+  font-style: italic;
+}
+.sep-presentation .sec-body {
+  font-size: 16px;
+  line-height: 1.55;
+  color: var(--ink-2);
+  margin: 0;
+  max-width: 38ch;
+  font-family: var(--sep-ui);
+}
+.sep-presentation .sec-body + .sec-body {
+  margin-top: 14px;
+}
+/* The drop-cap floats its ::first-letter left so the paragraph text
+   wraps around it (locked-design behavior). Without containment, a
+   short rationale (1–2 lines) leaves the ~58px-tall float extending
+   BELOW the paragraph's box; the next sibling block (.comps) then
+   has its first row's line boxes shortened by the still-active float
+   — visible as the FIRST comp row indented vs. row 2/3 on /h/[slug].
+   `display: flow-root` makes the paragraph establish its own BFC so
+   the float is sealed inside the rationale, regardless of how short
+   the text is. Every subsequent sibling starts cleanly at the left
+   edge — fixes the comp-row alignment for any number of comps. */
+.sep-presentation .sec-body.drop-cap {
+  display: flow-root;
+}
+.sep-presentation .sec-body.drop-cap::first-letter {
+  font-family: var(--sep-display);
+  font-size: 64px;
+  line-height: 0.85;
+  float: left;
+  color: var(--brick);
+  padding: 4px 12px 0 0;
+  margin-top: 4px;
+  font-style: italic;
+  letter-spacing: -0.02em;
+}
+
+/* =====================================================================
+   VIDEO BLOCK
+   ===================================================================== */
+.sep-presentation .video-block {
+  padding: 56px var(--sep-gutter);
+  background: var(--paper-card);
+  border-bottom: 1px solid var(--paper-line);
+}
+.sep-presentation .video-block .sec-title {
+  max-width: 14ch;
+}
+.sep-presentation .video-poster {
+  /* A7b.1 collapse fix preserved: the wrapper still owns the
+     aspect-ratio + min-height floor so the box never collapses to
+     0 before the poster image loads (the inner native <video>
+     element fills the box on load). A7d.3 swaps the inner content
+     from a poster <a> to an actual <video controls playsInline>
+     for inline playback; geometry + scrim + dark fallback are
+     unchanged so existing layout tests stay green. */
+  display: block;
+  margin-top: 28px;
+  position: relative;
+  aspect-ratio: 4 / 5;
+  min-height: 380px;
+  border-radius: var(--r-md);
+  overflow: hidden;
+  /* Solid fallback surface so the box is always filled, even
+     before the poster loads or when no posterUrl is set. */
+  background-color: var(--ink-2);
+  box-shadow: var(--shadow-card);
+  border: none;
+  padding: 0;
+  width: 100%;
+  color: inherit;
+  text-align: left;
+}
+.sep-presentation .video-poster .video-player {
+  /* Native <video> fills the poster box. `object-fit: cover` keeps
+     vertical phone-shot videos looking intentional inside the
+     editorial 4/5 box; native controls render on top. */
+  display: block;
+  width: 100%;
+  height: 100%;
+  object-fit: cover;
+  background: var(--ink-2);
+}
+
+/* A7d.12 — fullscreen-only override. The inline 4/5 frame uses
+   `object-fit: cover` so portrait phone clips look intentional in
+   the editorial box. That same `cover` persists when the buyer
+   presses the native fullscreen control: a portrait source covering
+   a landscape display crops top and bottom out of the picture
+   (Dallen's 2026-05-25 smoke: only the subject's chin visible). The
+   fix swaps to `contain` ONLY in native fullscreen — the whole
+   frame shows, letterboxed with black bars on a landscape display.
+   Inline appearance is untouched.
+
+   :fullscreen and :-webkit-full-screen are kept in SEPARATE rules
+   on purpose. Per CSS selector parsing, if any item in a
+   comma-separated selector list is unknown to the UA, the entire
+   rule is discarded. Splitting them guarantees Chrome applies its
+   rule even if it doesn't recognize the WebKit alias (and vice
+   versa on older Safari). */
+.sep-presentation .video-poster .video-player:fullscreen {
+  object-fit: contain;
+  width: 100%;
+  height: 100%;
+  border-radius: 0;
+  background: #000;
+}
+.sep-presentation .video-poster .video-player:-webkit-full-screen {
+  object-fit: contain;
+  width: 100%;
+  height: 100%;
+  border-radius: 0;
+  background: #000;
+}
+
+/* A7d.8.5 — branded fallback panel for the rare case where all three
+   poster slots are empty (capture failed on every path). The
+   posterless <video> on iOS Safari paints a solid black box; this
+   replaces it with a tasteful gradient using existing surface tokens
+   so the page never reads as "broken thumbnail". The primary
+   guarantee is reliable auto-capture upstream — this is the last-
+   ditch safety net the brief calls for. */
+.sep-presentation .video-poster[data-no-poster="true"] {
+  background:
+    linear-gradient(
+      135deg,
+      var(--paper-card) 0%,
+      var(--ink-2) 100%
+    );
+}
+.sep-presentation .video-poster[data-no-poster="true"] .video-player {
+  /* Let the wrapper's gradient show through wherever the paused
+     video would otherwise paint black. Once the buyer taps play
+     the decoder takes over and paints actual frames. */
+  background: transparent;
+}
+.sep-presentation .video-poster .meta {
+  position: absolute;
+  left: 22px;
+  bottom: 22px;
+  right: 22px;
+  color: #fbf6ec;
+  z-index: 2;
+  /* pointer-events: none — let clicks on the meta-overlay corner
+     reach the native video controls underneath. */
+  pointer-events: none;
+  text-shadow: 0 1px 1px rgba(0, 0, 0, 0.55), 0 2px 18px rgba(0, 0, 0, 0.45);
+}
+.sep-presentation .video-poster .meta .ttl {
+  font-family: var(--sep-display);
+  font-size: 24px;
+  line-height: 1.18;
+  letter-spacing: -0.015em;
+  text-shadow:
+    0 1px 1px rgba(0, 0, 0, 0.55),
+    0 2px 18px rgba(0, 0, 0, 0.45);
+  max-width: 22ch;
+}
+.sep-presentation .video-poster .meta .ttl em {
+  font-style: italic;
+}
+.sep-presentation .video-poster .meta .runtime {
+  font-family: var(--sep-mono);
+  font-size: 10px;
+  letter-spacing: 0.18em;
+  text-transform: uppercase;
+  opacity: 0.88;
+  margin-top: 10px;
+  display: flex;
+  align-items: center;
+  gap: 10px;
+}
+.sep-presentation .video-poster .meta .runtime::before {
+  content: "";
+  width: 18px;
+  height: 1px;
+  background: currentColor;
+  opacity: 0.55;
+}
+
+/* =====================================================================
+   COMPS (inside "Why this price")
+   ===================================================================== */
+.sep-presentation .comps {
+  margin-top: 36px;
+  border-top: 1px solid var(--paper-line-soft);
+}
+.sep-presentation .comp {
+  display: grid;
+  grid-template-columns: 28px 1fr auto;
+  align-items: baseline;
+  gap: 16px;
+  padding: 22px 0;
+  border-bottom: 1px solid var(--paper-line-soft);
+}
+.sep-presentation .comp .idx {
+  font-family: var(--sep-mono);
+  font-size: 10.5px;
+  color: var(--ink-faint);
+  letter-spacing: 0.12em;
+  line-height: 1.3;
+  padding-top: 4px;
+}
+.sep-presentation .comp .addr {
+  font-family: var(--sep-display);
+  font-size: 21px;
+  line-height: 1.18;
+  letter-spacing: -0.01em;
+  color: var(--ink);
+}
+.sep-presentation .comp .addr small {
+  display: block;
+  font-family: var(--sep-ui);
+  font-size: 11.5px;
+  color: var(--ink-muted);
+  letter-spacing: 0;
+  margin-top: 3px;
+  font-weight: 400;
+}
+.sep-presentation .comp .sold {
+  font-family: var(--sep-display);
+  font-size: 24px;
+  color: var(--ink);
+  letter-spacing: -0.015em;
+  text-align: right;
+  line-height: 1;
+}
+.sep-presentation .comp .sold small {
+  display: block;
+  font-family: var(--sep-mono);
+  font-size: 9.5px;
+  color: var(--ink-faint);
+  letter-spacing: 0.12em;
+  text-transform: uppercase;
+  margin-top: 6px;
+  font-weight: 400;
+}
+.sep-presentation .comps-note {
+  margin-top: 18px;
+  font-family: var(--sep-mono);
+  font-size: 10.5px;
+  color: var(--ink-faint);
+  letter-spacing: 0.06em;
+  line-height: 1.6;
+}
+
+/* =====================================================================
+   PITCH POINTS
+   ===================================================================== */
+.sep-presentation .pitch {
+  background: var(--paper-card);
+  margin: 0;
+  padding: 56px var(--sep-gutter);
+  border-bottom: 1px solid var(--paper-line);
+  position: relative;
+}
+.sep-presentation .pitch .sec-title {
+  max-width: 14ch;
+}
+.sep-presentation .pitches {
+  margin-top: 32px;
+  display: flex;
+  flex-direction: column;
+  gap: 28px;
+}
+.sep-presentation .pp {
+  display: grid;
+  grid-template-columns: 40px 1fr;
+  gap: 18px;
+  align-items: baseline;
+}
+.sep-presentation .pp .n {
+  font-family: var(--sep-display);
+  font-style: italic;
+  font-size: 30px;
+  color: var(--brick);
+  line-height: 1;
+  letter-spacing: -0.01em;
+  padding-top: 2px;
+}
+.sep-presentation .pp .t {
+  font-family: var(--sep-display);
+  font-size: 22px;
+  line-height: 1.22;
+  letter-spacing: -0.015em;
+  color: var(--ink);
+}
+.sep-presentation .pp .t small {
+  display: block;
+  font-family: var(--sep-ui);
+  font-size: 13.5px;
+  color: var(--ink-muted);
+  line-height: 1.5;
+  margin-top: 6px;
+  letter-spacing: 0;
+}
+
+/* =====================================================================
+   REVIEWS
+   ===================================================================== */
+.sep-presentation .reviews {
+  padding: 60px var(--sep-gutter) 56px;
+  background: var(--paper-raise);
+  border-bottom: 1px solid var(--paper-line);
+}
+.sep-presentation .reviews .sec-title {
+  max-width: 16ch;
+}
+.sep-presentation .reviews-list {
+  margin-top: 32px;
+  display: flex;
+  flex-direction: column;
+  gap: 0;
+  border-top: 1px solid var(--paper-line-soft);
+}
+.sep-presentation .review {
+  padding: 26px 0 24px;
+  border-bottom: 1px solid var(--paper-line-soft);
+  display: grid;
+  grid-template-columns: auto 1fr;
+  gap: 18px;
+  align-items: start;
+}
+.sep-presentation .review .qm {
+  font-family: var(--sep-display);
+  font-style: italic;
+  font-size: 32px;
+  line-height: 0.5;
+  color: var(--rose);
+  padding-top: 18px;
+  width: 18px;
+  text-align: center;
+}
+.sep-presentation .review .rv-body {
+  font-family: var(--sep-display);
+  font-size: 19px;
+  line-height: 1.36;
+  letter-spacing: -0.005em;
+  color: var(--ink);
+  margin: 0 0 14px;
+  max-width: 36ch;
+}
+.sep-presentation .review .rv-body em {
+  font-style: italic;
+}
+.sep-presentation .review .att {
+  font-family: var(--sep-mono);
+  font-size: 10px;
+  letter-spacing: 0.16em;
+  text-transform: uppercase;
+  color: var(--ink-faint);
+}
+.sep-presentation .review .att .nm {
+  color: var(--ink-muted);
+  font-weight: 500;
+}
+.sep-presentation .reviews-outlink {
+  margin-top: 24px;
+  display: inline-flex;
+  align-items: center;
+  gap: 10px;
+  font-family: var(--sep-ui);
+  font-size: 13px;
+  color: var(--ink);
+  text-decoration: none;
+  border-bottom: 1px solid var(--brick);
+  padding-bottom: 2px;
+  letter-spacing: -0.005em;
+  transition: gap var(--ease) 140ms;
+}
+.sep-presentation .reviews-outlink:hover {
+  gap: 14px;
+}
+.sep-presentation .reviews-outlink::after {
+  content: "→";
+  color: var(--brick);
+  font-size: 14px;
+}
+
+/* A7d.5 — outlink-only variant: no typed reviews, just the Zillow CTA.
+   Compact, calm card (1:1 trust note, not a banner). Pads less than the
+   full reviews block so the editorial rhythm stays even when the page is
+   shorter overall. */
+.sep-presentation .reviews--outlink-only {
+  padding: 44px var(--sep-gutter) 40px;
+}
+.sep-presentation .reviews-outlink-card {
+  margin-top: 18px;
+  display: flex;
+  flex-direction: column;
+  gap: 6px;
+  padding: 22px 24px;
+  border: 1px solid var(--paper-line);
+  border-radius: 4px;
+  background: var(--paper);
+  text-decoration: none;
+  color: var(--ink);
+  transition: border-color var(--ease) 180ms, transform var(--ease) 180ms;
+  max-width: 38ch;
+}
+.sep-presentation .reviews-outlink-card:hover {
+  border-color: var(--brick);
+}
+.sep-presentation .reviews-outlink-card-copy {
+  font-family: var(--sep-display);
+  font-size: 19px;
+  line-height: 1.3;
+  letter-spacing: -0.005em;
+  color: var(--ink);
+}
+.sep-presentation .reviews-outlink-card-meta {
+  font-family: var(--sep-mono);
+  font-size: 10px;
+  letter-spacing: 0.16em;
+  text-transform: uppercase;
+  color: var(--ink-faint);
+  display: inline-flex;
+  align-items: center;
+  gap: 8px;
+}
+.sep-presentation .reviews-outlink-card-meta::after {
+  content: "→";
+  color: var(--brick);
+  font-size: 12px;
+}
+
+/* =====================================================================
+   AREA STATS + CHART
+   ===================================================================== */
+.sep-presentation .area {
+  padding: 56px var(--sep-gutter);
+  background: var(--paper);
+  border-bottom: 1px solid var(--paper-line);
+}
+.sep-presentation .area-head {
+  display: flex;
+  justify-content: space-between;
+  align-items: baseline;
+  margin-bottom: 28px;
+}
+.sep-presentation .area-stats {
+  display: grid;
+  grid-template-columns: 1fr 1fr;
+  gap: 1px;
+  background: var(--paper-line);
+  border: 1px solid var(--paper-line);
+  border-radius: 10px;
+  overflow: hidden;
+}
+.sep-presentation .as {
+  padding: 22px 18px 20px;
+  background: var(--paper-raise);
+  display: flex;
+  flex-direction: column;
+  gap: 10px;
+}
+.sep-presentation .as .l {
+  font-family: var(--sep-mono);
+  font-size: 10px;
+  letter-spacing: 0.14em;
+  text-transform: uppercase;
+  color: var(--ink-faint);
+}
+.sep-presentation .as .v {
+  font-family: var(--sep-display);
+  font-size: 40px;
+  line-height: 1;
+  letter-spacing: -0.025em;
+  color: var(--gold-warm);
+}
+.sep-presentation .as .ctx {
+  font-family: var(--sep-mono);
+  font-size: 10px;
+  letter-spacing: 0.08em;
+  color: var(--ink-muted);
+  line-height: 1.4;
+  display: flex;
+  align-items: center;
+  gap: 6px;
+}
+.sep-presentation .as .ctx .pos {
+  color: var(--pos);
+  font-weight: 500;
+}
+.sep-presentation .as .ctx .neg {
+  color: var(--brick);
+  font-weight: 500;
+}
+
+.sep-presentation .chart-wrap {
+  margin-top: 36px;
+  padding: 44px 28px 40px;
+  background: linear-gradient(180deg, #fcf9f2 0%, #fbf6ea 100%);
+  border: 1px solid var(--paper-line);
+  border-radius: 14px;
+}
+.sep-presentation .chart-head {
+  display: flex;
+  justify-content: space-between;
+  align-items: flex-end;
+  margin-bottom: 44px;
+}
+.sep-presentation .chart-head .l {
+  font-family: var(--sep-mono);
+  font-size: 10px;
+  letter-spacing: 0.16em;
+  text-transform: uppercase;
+  color: var(--ink-faint);
+  line-height: 1.4;
+}
+.sep-presentation .chart-head .l strong {
+  display: block;
+  color: var(--ink-muted);
+  font-weight: 500;
+  margin-bottom: 4px;
+  font-size: 10px;
+  letter-spacing: 0.16em;
+}
+.sep-presentation .chart-head .pct {
+  font-family: var(--sep-display);
+  font-size: 28px;
+  line-height: 1;
+  letter-spacing: -0.02em;
+  color: var(--pos);
+  display: flex;
+  align-items: baseline;
+  gap: 8px;
+}
+.sep-presentation .chart-head .pct small {
+  font-family: var(--sep-mono);
+  font-size: 9.5px;
+  color: var(--ink-faint);
+  letter-spacing: 0.14em;
+  text-transform: uppercase;
+}
+.sep-presentation .chart {
+  width: 100%;
+  display: block;
+  overflow: visible;
+  font-family: var(--sep-mono);
+}
+.sep-presentation .chart .gridline {
+  stroke: var(--paper-line-soft);
+  stroke-width: 1;
+}
+.sep-presentation .chart .baseline {
+  stroke: var(--ink);
+  stroke-opacity: 0.22;
+  stroke-width: 1;
+}
+.sep-presentation .chart .y-label,
+.sep-presentation .chart .x-label {
+  font-size: 8.5px;
+  letter-spacing: 0.14em;
+  text-transform: uppercase;
+  fill: var(--ink-faint);
+}
+.sep-presentation .chart .area-fill {
+  fill: url(#sepChartFill);
+}
+.sep-presentation .chart .line-stroke {
+  fill: none;
+  stroke: var(--chart-blue);
+  stroke-width: 2.6;
+  stroke-linejoin: round;
+  stroke-linecap: round;
+}
+.sep-presentation .chart .point {
+  fill: var(--paper-card);
+  stroke: var(--chart-blue);
+  stroke-width: 1.4;
+}
+.sep-presentation .chart .point-current-ring {
+  fill: rgba(63, 108, 142, 0.22);
+  stroke: none;
+}
+.sep-presentation .chart .point-current {
+  fill: var(--chart-blue);
+  stroke: var(--paper-card);
+  stroke-width: 2.5;
+}
+.sep-presentation .chart .point-current-pulse {
+  fill: var(--chart-blue);
+  transform-origin: center;
+  transform-box: fill-box;
+  animation: sepSonar 2.6s cubic-bezier(0, 0, 0.2, 1) infinite;
+}
+.sep-presentation .chart .point-current-pulse.delay {
+  animation-delay: 1.3s;
+}
+.sep-presentation .chart .rec-line {
+  stroke: var(--brick);
+  stroke-opacity: 0.9;
+  stroke-width: 1;
+  stroke-dasharray: 4 4;
+}
+/* A7d.7 — opaque chip painted under the recommended-line labels so the
+   tag + price stay legible when the data polyline crosses under them.
+   Paper-tint fill keeps the chip on-brand; ~92% opacity softens the
+   block slightly so the dashed line beneath still feels continuous. */
+.sep-presentation .chart .rec-tag-bg {
+  fill: var(--paper);
+  fill-opacity: 0.92;
+}
+.sep-presentation .chart .rec-tag-text {
+  font-family: var(--sep-mono);
+  font-size: 8px;
+  letter-spacing: 0.16em;
+  text-transform: uppercase;
+  fill: var(--brick);
+  font-weight: 500;
+}
+.sep-presentation .chart .rec-tag-num {
+  font-family: var(--sep-display);
+  font-size: 16px;
+  letter-spacing: -0.02em;
+  fill: var(--brick);
+}
+.sep-presentation .chart .callout-sub {
+  font-family: var(--sep-mono);
+  font-size: 8px;
+  letter-spacing: 0.14em;
+  text-transform: uppercase;
+  fill: var(--ink-faint);
+}
+.sep-presentation .chart .callout-text {
+  font-family: var(--sep-display);
+  font-size: 22px;
+  fill: var(--chart-blue-deep);
+  letter-spacing: -0.02em;
+  font-weight: 500;
+}
+.sep-presentation .chart .line-group {
+  animation: sepChartSway 5.8s ease-in-out infinite;
+  transform-origin: 50% 100%;
+  transform-box: fill-box;
+}
+
+/* Graceful "snapshot coming soon" */
+.sep-presentation .area--empty .area-stats,
+.sep-presentation .area--empty .chart-wrap {
+  display: none;
+}
+.sep-presentation .area:not(.area--empty) .area-empty {
+  display: none;
+}
+.sep-presentation .area--empty .area-empty {
+  margin-top: 18px;
+  padding: 38px 28px;
+  border: 1px solid var(--paper-line);
+  border-radius: var(--r-md);
+  background: var(--paper-card);
+  text-align: center;
+}
+.sep-presentation .area--empty .area-empty .icon {
+  width: 26px;
+  height: 26px;
+  margin: 0 auto 14px;
+  border-radius: 50%;
+  border: 1px solid var(--paper-line);
+  display: grid;
+  place-items: center;
+  color: var(--ink-faint);
+}
+.sep-presentation .area--empty .area-empty .h {
+  font-family: var(--sep-display);
+  font-size: 22px;
+  line-height: 1.2;
+  letter-spacing: -0.01em;
+  color: var(--ink);
+  font-style: italic;
+}
+.sep-presentation .area--empty .area-empty .p {
+  font-family: var(--sep-ui);
+  font-size: 13px;
+  color: var(--ink-muted);
+  margin-top: 8px;
+  line-height: 1.55;
+}
+
+/* =====================================================================
+   AGENT — DARK CHAPTER
+   ===================================================================== */
+.sep-presentation .agent {
+  background: var(--ink);
+  color: #f4efe4;
+  padding: 56px var(--sep-gutter) 48px;
+  position: relative;
+}
+.sep-presentation .agent .sec-label {
+  color: rgba(244, 239, 228, 0.55);
+}
+.sep-presentation .agent .sec-label .num {
+  color: var(--gold);
+}
+.sep-presentation .agent .sec-label .num::before {
+  background: var(--mint);
+}
+.sep-presentation .agent .sec-label .lbl {
+  background: rgba(244, 239, 228, 0.16);
+}
+.sep-presentation .agent .sec-label .name {
+  color: rgba(244, 239, 228, 0.55);
+}
+.sep-presentation .agent .sec-title {
+  color: #f4efe4;
+}
+.sep-presentation .agent-card {
+  display: grid;
+  grid-template-columns: 92px 1fr;
+  gap: 20px;
+  align-items: center;
+  margin-top: 8px;
+  padding-bottom: 28px;
+  border-bottom: 1px solid rgba(244, 239, 228, 0.12);
+}
+.sep-presentation .agent-photo {
+  width: 92px;
+  height: 92px;
+  border-radius: 50%;
+  background-color: #5e544a;
+  background-size: cover;
+  background-position: center;
+  background-repeat: no-repeat;
+  position: relative;
+  border: 1px solid rgba(244, 239, 228, 0.18);
+}
+.sep-presentation .agent-photo.agent-photo--monogram {
+  background: linear-gradient(135deg, #2a241f 0%, #1a1612 100%);
+  display: grid;
+  place-items: center;
+}
+.sep-presentation .agent-photo.agent-photo--monogram::before {
+  content: attr(data-monogram);
+  font-family: var(--sep-display);
+  font-size: 36px;
+  color: #f4efe4;
+  letter-spacing: -0.02em;
+  line-height: 1;
+}
+.sep-presentation .agent-photo .verify {
+  position: absolute;
+  right: -2px;
+  bottom: -2px;
+  width: 22px;
+  height: 22px;
+  border-radius: 50%;
+  background: var(--mint);
+  color: #0a2a24;
+  display: grid;
+  place-items: center;
+  border: 2px solid var(--ink);
+}
+.sep-presentation .agent-photo .verify svg {
+  width: 11px;
+  height: 11px;
+  stroke: currentColor;
+  stroke-width: 2.2;
+  fill: none;
+  stroke-linecap: round;
+  stroke-linejoin: round;
+}
+.sep-presentation .agent-name {
+  font-family: var(--sep-display);
+  font-weight: 400;
+  font-size: 32px;
+  letter-spacing: -0.015em;
+  line-height: 1;
+  color: #f4efe4;
+}
+.sep-presentation .agent-role {
+  margin-top: 8px;
+  font-size: 13px;
+  color: rgba(244, 239, 228, 0.65);
+  line-height: 1.5;
+}
+.sep-presentation .agent-role em {
+  font-style: italic;
+  color: rgba(244, 239, 228, 0.85);
+  font-family: var(--sep-display);
+  font-size: 14px;
+}
+.sep-presentation .agent-bio {
+  padding: 26px 0 28px;
+  font-family: var(--sep-display);
+  font-style: italic;
+  font-size: 18px;
+  line-height: 1.4;
+  letter-spacing: -0.005em;
+  color: rgba(244, 239, 228, 0.82);
+  border-bottom: 1px solid rgba(244, 239, 228, 0.12);
+  max-width: 36ch;
+}
+.sep-presentation .agent-meta {
+  padding-top: 26px;
+  display: grid;
+  grid-template-columns: 1fr 1fr;
+  gap: 22px 18px;
+}
+.sep-presentation .am .l {
+  font-family: var(--sep-mono);
+  font-size: 9.5px;
+  letter-spacing: 0.16em;
+  text-transform: uppercase;
+  color: rgba(244, 239, 228, 0.45);
+  margin-bottom: 6px;
+}
+.sep-presentation .am .v {
+  font-size: 13.5px;
+  color: #f4efe4;
+  line-height: 1.45;
+  letter-spacing: -0.005em;
+}
+.sep-presentation .am .v.mono {
+  font-family: var(--sep-mono);
+  font-size: 12.5px;
+  letter-spacing: 0.02em;
+}
+.sep-presentation .agent-ctas {
+  margin-top: 32px;
+  display: flex;
+  flex-direction: column;
+  gap: 10px;
+}
+.sep-presentation .cta {
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+  padding: 18px 22px;
+  border-radius: var(--r-pill);
+  font-family: var(--sep-ui);
+  font-size: 15px;
+  font-weight: 500;
+  text-decoration: none;
+  letter-spacing: -0.005em;
+  transition: transform 0.14s var(--ease), background 0.14s var(--ease);
+}
+.sep-presentation .cta:hover {
+  transform: translateY(-1px);
+}
+.sep-presentation .cta.primary {
+  background: #f4efe4;
+  color: var(--ink);
+}
+.sep-presentation .cta.outline {
+  background: transparent;
+  color: #f4efe4;
+  border: 1px solid rgba(244, 239, 228, 0.32);
+}
+.sep-presentation .cta .ar {
+  width: 22px;
+  height: 22px;
+  border-radius: 50%;
+  background: var(--ink);
+  color: #f4efe4;
+  display: grid;
+  place-items: center;
+  transition: transform var(--r-quick) var(--r-ease), background var(--r-quick) var(--r-ease);
+}
+.sep-presentation .cta.outline .ar {
+  background: #f4efe4;
+  color: var(--ink);
+}
+.sep-presentation .cta:hover .ar {
+  transform: translateX(3px);
+}
+.sep-presentation .cta.primary:hover {
+  background: #fffcf4;
+}
+.sep-presentation .cta.outline:hover {
+  background: rgba(244, 239, 228, 0.08);
+  border-color: rgba(244, 239, 228, 0.55);
+}
+.sep-presentation .cta .ar svg {
+  width: 11px;
+  height: 11px;
+  stroke: currentColor;
+  stroke-width: 1.8;
+  fill: none;
+  stroke-linecap: round;
+  stroke-linejoin: round;
+}
+.sep-presentation .cta-reassure {
+  margin: 14px 22px 0;
+  font-family: var(--sep-ui);
+  font-size: 12.5px;
+  line-height: 1.55;
+  color: rgba(244, 239, 228, 0.55);
+  font-style: italic;
+  letter-spacing: -0.005em;
+  text-align: center;
+}
+
+/* =====================================================================
+   END MARK + FOOTER
+   ===================================================================== */
+.sep-presentation .end-mark {
+  text-align: center;
+  padding: 36px var(--sep-gutter) 18px;
+  background: var(--ink);
+}
+.sep-presentation .end-mark .dot {
+  display: inline-block;
+  width: 5px;
+  height: 5px;
+  background: var(--mint);
+  border-radius: 50%;
+  margin: 0 6px;
+  vertical-align: middle;
+}
+.sep-presentation .end-mark .rule {
+  display: inline-block;
+  width: 18px;
+  height: 1px;
+  background: rgba(244, 239, 228, 0.18);
+  vertical-align: middle;
+}
+.sep-presentation .foot {
+  padding: 34px var(--sep-gutter) 40px;
+  background: var(--ink);
+  color: rgba(244, 239, 228, 0.45);
+  border-top: 1px solid rgba(244, 239, 228, 0.08);
+  font-family: var(--sep-mono);
+  font-size: 10px;
+  letter-spacing: 0.14em;
+  text-transform: uppercase;
+  line-height: 1.7;
+}
+.sep-presentation .foot .row {
+  display: flex;
+  justify-content: space-between;
+  align-items: center;
+  gap: 12px;
+}
+.sep-presentation .foot .brand {
+  display: flex;
+  align-items: center;
+  gap: 8px;
+  color: rgba(244, 239, 228, 0.65);
+}
+.sep-presentation .foot .brand .glyph {
+  width: 16px;
+  height: 16px;
+  border-radius: 4px;
+  background: var(--mint);
+  color: #0a2a24;
+  display: grid;
+  place-items: center;
+  font-family: var(--sep-display);
+  font-size: 12px;
+  font-style: italic;
+  line-height: 1;
+  letter-spacing: -0.02em;
+}
+.sep-presentation .foot .brand .wm {
+  font-family: var(--sep-display);
+  font-size: 13px;
+  color: rgba(244, 239, 228, 0.85);
+  text-transform: none;
+  letter-spacing: -0.01em;
+}
+.sep-presentation .foot .brand .wm em {
+  font-style: italic;
+  color: var(--mint);
+}
+.sep-presentation .foot .small {
+  margin-top: 18px;
+  color: rgba(244, 239, 228, 0.32);
+  line-height: 1.7;
+}
+
+/* =====================================================================
+   MOTION LAYER (CSS-first — paired with motion.ts adding .in)
+   ===================================================================== */
+@keyframes sepKenburns {
+  from {
+    transform: scale(1) translate3d(0, 0, 0);
+  }
+  to {
+    transform: scale(1.035) translate3d(-1.2%, 0.8%, 0);
+  }
+}
+@keyframes sepSonar {
+  0% {
+    transform: scale(1);
+    opacity: 0.55;
+  }
+  80% {
+    opacity: 0;
+  }
+  100% {
+    transform: scale(5);
+    opacity: 0;
+  }
+}
+@keyframes sepChartSway {
+  0%,
+  100% {
+    transform: translateY(0);
+  }
+  50% {
+    transform: translateY(-1.6px);
+  }
+}
+
+.sep-presentation .reveal {
+  opacity: 0;
+  transform: translateY(16px);
+  transition:
+    opacity 600ms ease-out,
+    transform 600ms ease-out;
+  will-change: opacity, transform;
+}
+.sep-presentation .reveal.in {
+  opacity: 1;
+  transform: translateY(0);
+}
+
+.sep-presentation .agent-photo .verify {
+  transform: scale(0.3);
+  opacity: 0;
+  transition:
+    transform 420ms var(--r-ease) 220ms,
+    opacity 240ms ease-out 220ms;
+}
+.sep-presentation .agent-photo.in .verify {
+  transform: scale(1);
+  opacity: 1;
+}
+
+.sep-presentation .chart .area-fill {
+  opacity: 0;
+  transition: opacity 520ms var(--r-ease) 120ms;
+}
+.sep-presentation .chart .line-stroke {
+  stroke-dasharray: 600;
+  stroke-dashoffset: 600;
+  transition: stroke-dashoffset 1100ms var(--r-ease) 80ms;
+}
+.sep-presentation .chart .point {
+  opacity: 0;
+  transform: scale(0.5);
+  transform-origin: center;
+  transition: opacity 240ms var(--r-ease) 900ms, transform 320ms var(--r-ease) 900ms;
+}
+.sep-presentation .chart.in .area-fill {
+  opacity: 1;
+}
+.sep-presentation .chart.in .line-stroke {
+  stroke-dashoffset: 0;
+}
+.sep-presentation .chart.in .point {
+  opacity: 1;
+  transform: scale(1);
+}
+
+/* =====================================================================
+   REDUCED MOTION — single source of truth, disables everything
+   ===================================================================== */
+@media (prefers-reduced-motion: reduce) {
+  .sep-presentation .reveal,
+  .sep-presentation .agent-photo .verify,
+  .sep-presentation .chart .line-stroke,
+  .sep-presentation .chart .area-fill,
+  .sep-presentation .chart .point {
+    opacity: 1 !important;
+    transform: none !important;
+    transition: none !important;
+    stroke-dashoffset: 0 !important;
+  }
+  .sep-presentation .hero-photo,
+  .sep-presentation .chart .line-group,
+  .sep-presentation .chart .point-current-pulse {
+    animation: none !important;
+  }
+}

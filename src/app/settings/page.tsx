@@ -41,7 +41,7 @@ export default async function SettingsPage() {
         <section className="mb-12">
           <h2 className="text-lg font-semibold mb-1">Brand profile</h2>
           <p className="text-xs text-neutral-500 mb-6">
-            Used across every Studio tool — logo watermark on Social Animator
+            Used across every Studio tool. Logo watermark on Social Animator
             exports, header on flyers and presentations as those tools ship.
           </p>
           <BrandProfileForm />

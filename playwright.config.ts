@@ -23,6 +23,24 @@ export default defineConfig({
     {
       name: 'chromium',
       use: { ...devices['Desktop Chrome'] },
+      // Exclude the mobile-only regression specs — they have their own
+      // device-emulated project below. Without this filter chromium
+      // would re-run them with a desktop UA, which both wastes time
+      // and weakens the signal (the spec is designed to fail only
+      // under touch/mobile-WebKit conditions).
+      testIgnore: /.*\.mobile\.spec\.ts/,
+    },
+    // Mobile-WebKit project — narrowly scoped to the A7c.4.1 phone-only
+    // regression spec. Runs in addition to chromium so the per-test
+    // device emulation (touchscreen + mobile UA + small viewport)
+    // matches Dallen's iOS smoke without forcing the rest of the suite
+    // to recompile against WebKit. Add more specs to `testMatch` only
+    // when they're meaningfully mobile-shaped — otherwise the
+    // chromium project is the default home.
+    {
+      name: 'mobile-webkit',
+      use: { ...devices['iPhone 14'] },
+      testMatch: /.*\.mobile\.spec\.ts/,
     },
   ],
   webServer: {
@@ -40,6 +58,11 @@ export default defineConfig({
       // /dashboard) without a real auth session. The bypass also requires
       // NODE_ENV !== 'production' — production builds are never affected.
       E2E_TESTING: '1',
+      // v1.47 Lane C: enable the comp-import feature flag for the full
+      // suite. The feature-flag-OFF spec spawns its own request without
+      // toggling the env at runtime (it sends a header the route also
+      // accepts as a flag override — see comp-import.feature-flag.spec.ts).
+      COMP_IMPORT_ENABLED: 'true',
     },
   },
 });

@@ -1,5 +1,5 @@
 import type { Metadata, Viewport } from "next";
-import { Geist, Geist_Mono, Inter } from "next/font/google";
+import { Geist, Geist_Mono, Inter, Instrument_Serif } from "next/font/google";
 import "./globals.css";
 import { PerfToast } from "@/components/PerfToast";
 
@@ -17,6 +17,17 @@ const inter = Inter({
   variable: "--font-inter",
   subsets: ["latin"],
   weight: ["400", "500", "600", "700", "800", "900"],
+});
+
+// Display serif for the locked Seller Presentation consumer page
+// (v1.47 / A7b). Tokenized as `--font-instrument-serif` so only the
+// pages that opt in via the CSS variable actually use it; other pages
+// keep the Geist/Inter stack unchanged.
+const instrumentSerif = Instrument_Serif({
+  variable: "--font-instrument-serif",
+  subsets: ["latin"],
+  weight: ["400"],
+  style: ["normal", "italic"],
 });
 
 export const metadata: Metadata = {
@@ -45,7 +56,7 @@ export default function RootLayout({
         // grows past 100vw — keeps mobile pages from showing a horizontal
         // scrollbar even if a transform/animation extends a bounding box
         // past the viewport (e.g., gallery card 3D rotateY).
-        className={`${geistSans.variable} ${geistMono.variable} ${inter.variable} antialiased overflow-x-hidden`}
+        className={`${geistSans.variable} ${geistMono.variable} ${inter.variable} ${instrumentSerif.variable} antialiased overflow-x-hidden`}
       >
         {children}
         {/* H-7.14: gated behind ?perf=1 — renders null otherwise so the

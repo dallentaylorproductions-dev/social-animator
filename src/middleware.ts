@@ -54,12 +54,13 @@ export default auth(async (req) => {
 
   const email = req.auth?.user?.email;
   if (email) {
-    // v1.45.3 dev-access bypass: invited beta cohort members who
-    // signed up via /access + access code skip the Stripe paywall.
-    // The dev_access:[email] KV record is written by the signIn
-    // callback in src/lib/auth.ts after the user clicked their
-    // magic link (proves email control). Reversible at paid launch
-    // by deleting this branch + /access route + /api/access/grant.
+    // Beta cohort bypass: invited members who signed in via the
+    // beta-code Credentials provider on /login skip the Stripe
+    // paywall. The dev_access:[email] KV record is written by that
+    // provider's authorize() in src/lib/auth.ts (v1.47 Lane A polish:
+    // direct sign-in — knowledge of the code is the verification, no
+    // magic-link loop). Reversible at paid launch by deleting this
+    // branch + the beta-code provider + the /login code field.
     if (await isDevAccessGranted(email)) {
       return NextResponse.next();
     }

@@ -1,0 +1,1125 @@
+/* sep-studio.css — Dashboard re-brand (v1.47 Lane A).
+ *
+ * Ported from docs/design/dashboard-rebrand/styles.css. EVERY selector is
+ * scoped under `.sep-studio` so the warm-dark palette, ambient orbs, tile
+ * styling, and the Tweaks-panel-free shell never leak into /login,
+ * /h/[slug], the seller-presentation wizard, or any other route. The
+ * presentation page intentionally uses `.hero` / `.tile` style names of
+ * its own; the descendant combinator walls those off completely.
+ *
+ * Fonts: references the existing `--font-geist-sans` + `--font-geist-mono`
+ * CSS variables loaded by src/app/layout.tsx via next/font/google. No
+ * additional font import lives here, so the dashboard doesn't ship raw
+ * <link> tags or duplicate-load the family.
+ *
+ * data-attrs on the root: `data-bg="warm|cool|true"`,
+ * `data-density="tight|comfy|roomy"`, `data-stagedots="on|off"`. Defaults
+ * (warm / comfy / on) are set in DashboardClient and never toggled at
+ * runtime — the TweaksPanel UI is intentionally not ported (theme picker
+ * = A7f.3). Variants stay in the tokens so A7f.3 can wire the picker
+ * without a CSS reshuffle.
+ */
+
+/* ─── scoped reset ──────────────────────────────────────────────────────── */
+.sep-studio,
+.sep-studio *,
+.sep-studio *::before,
+.sep-studio *::after { box-sizing: border-box; }
+.sep-studio button { font: inherit; color: inherit; background: none; border: 0; cursor: pointer; }
+.sep-studio a { color: inherit; text-decoration: none; }
+
+/* ─── root: tokens + base type/background ───────────────────────────────── */
+.sep-studio {
+  /* Tweakable */
+  --accent: #5BF5C9;
+  --marquee-dur: 40s;
+
+  /* Background variants (data-bg) */
+  --bg:      oklch(0.165 0.008 80);
+  --bg-2:    oklch(0.205 0.008 80);
+  --surface: oklch(0.215 0.009 80);
+  --surface-hi: oklch(0.245 0.010 80);
+  --border:  oklch(0.30 0.009 80);
+  --border-hi: oklch(0.40 0.010 80);
+
+  /* Text */
+  --fg:      oklch(0.97 0.005 80);
+  --fg-mute: oklch(0.72 0.005 80);
+  --fg-dim:  oklch(0.50 0.005 80);
+  --fg-faint:oklch(0.38 0.005 80);
+
+  /* Stage hues — all share C/L, only hue shifts */
+  --stage-win:        oklch(0.78 0.13 65);   /* amber */
+  --stage-launch:     oklch(0.85 0.16 175);  /* mint (matches accent feel) */
+  --stage-visibility: oklch(0.78 0.13 285);  /* periwinkle */
+
+  /* Density */
+  --pad-section: 88px;
+  --gap-grid:    20px;
+  --radius-lg:   20px;
+  --radius-md:   14px;
+  --radius-sm:   10px;
+
+  background: var(--bg);
+  color: var(--fg);
+  font-family: var(--font-geist-sans), ui-sans-serif, system-ui, -apple-system, sans-serif;
+  font-feature-settings: 'ss01', 'cv11';
+  -webkit-font-smoothing: antialiased;
+  -moz-osx-font-smoothing: grayscale;
+  min-height: 100vh;
+  overflow-x: hidden;
+  position: relative;
+  isolation: isolate;   /* scope z-index stacking inside the dashboard */
+}
+
+.sep-studio[data-bg="cool"] {
+  --bg:      oklch(0.165 0.010 250);
+  --bg-2:    oklch(0.205 0.010 250);
+  --surface: oklch(0.215 0.011 250);
+  --surface-hi: oklch(0.245 0.012 250);
+  --border:  oklch(0.30 0.012 250);
+  --border-hi: oklch(0.40 0.013 250);
+}
+.sep-studio[data-bg="true"] {
+  --bg:      oklch(0.12 0.001 0);
+  --bg-2:    oklch(0.17 0.002 0);
+  --surface: oklch(0.18 0.002 0);
+  --surface-hi: oklch(0.22 0.003 0);
+  --border:  oklch(0.28 0.003 0);
+  --border-hi: oklch(0.38 0.004 0);
+}
+
+.sep-studio[data-density="tight"]  { --pad-section: 56px; --gap-grid: 14px; }
+.sep-studio[data-density="roomy"]  { --pad-section: 128px; --gap-grid: 28px; }
+
+.sep-studio[data-stagedots="off"] .stage-dot { display: none; }
+
+.sep-studio .mono { font-family: var(--font-geist-mono), ui-monospace, SFMono-Regular, monospace; }
+
+/* ─── app shell ─────────────────────────────────────────────────────────── */
+.sep-studio .app {
+  position: relative;
+  max-width: 1360px;
+  margin: 0 auto;
+  padding: 28px 40px 80px;
+  display: flex;
+  flex-direction: column;
+  gap: 24px;
+  z-index: 1;
+}
+
+.sep-studio .ambient {
+  position: absolute; inset: 0; pointer-events: none; z-index: 0;
+  overflow: hidden;
+}
+.sep-studio .orb {
+  position: absolute; width: 720px; height: 720px; border-radius: 50%;
+  filter: blur(120px); opacity: 0.22;
+}
+.sep-studio .orb-1 {
+  top: -200px; right: -200px;
+  background: radial-gradient(circle, var(--accent) 0%, transparent 70%);
+}
+.sep-studio .orb-2 {
+  bottom: -300px; left: -200px; width: 900px; height: 900px;
+  background: radial-gradient(circle, oklch(0.55 0.12 285) 0%, transparent 70%);
+  opacity: 0.15;
+}
+
+/* ─── topbar ────────────────────────────────────────────────────────────── */
+.sep-studio .topbar {
+  display: flex; align-items: center; justify-content: space-between;
+  padding: 8px 0;
+}
+.sep-studio .brand {
+  display: flex; align-items: center; gap: 10px;
+  font-family: var(--font-geist-mono), monospace;
+  font-size: 11.5px; letter-spacing: 0.14em;
+}
+.sep-studio .brand-mark {
+  width: 22px; height: 22px; border-radius: 6px;
+  background: var(--surface);
+  border: 1px solid var(--border-hi);
+  display: grid; place-items: center;
+  position: relative;
+}
+.sep-studio .brand-dot {
+  width: 8px; height: 8px; border-radius: 50%;
+  background: var(--accent);
+  box-shadow: 0 0 10px var(--accent);
+}
+.sep-studio .brand-name { color: var(--fg); }
+.sep-studio .brand-pro { color: var(--accent); }
+
+.sep-studio .topnav {
+  display: flex; align-items: center; gap: 22px;
+  font-size: 12.5px;
+  color: var(--fg-mute);
+}
+.sep-studio .topnav-link { transition: color .15s; }
+.sep-studio .topnav-link:hover { color: var(--fg); }
+.sep-studio .topnav-quiet { color: var(--fg-dim); }
+.sep-studio .topnav-sep {
+  width: 1px; height: 14px; background: var(--border);
+}
+
+/* ─── welcome ───────────────────────────────────────────────────────────── */
+.sep-studio .welcome {
+  display: flex; align-items: flex-end; justify-content: space-between;
+  gap: 40px;
+  padding: 24px 0 16px;
+}
+.sep-studio .welcome-eyebrow {
+  display: inline-flex; align-items: center; gap: 8px;
+  font-family: var(--font-geist-mono), monospace;
+  font-size: 11px; letter-spacing: 0.12em;
+  color: var(--fg-dim);
+  margin-bottom: 18px;
+}
+.sep-studio .live-dot {
+  width: 6px; height: 6px; border-radius: 50%;
+  background: var(--accent);
+  box-shadow: 0 0 8px var(--accent);
+  animation: sep-pulse 2.6s ease-in-out infinite;
+}
+@keyframes sep-pulse {
+  0%, 100% { opacity: 1; }
+  50% { opacity: 0.35; }
+}
+.sep-studio .welcome-title {
+  font-size: 56px; line-height: 1.02; font-weight: 600; letter-spacing: -0.025em;
+  margin: 0; text-wrap: balance;
+}
+.sep-studio .welcome-name {
+  font-weight: 500;
+  color: var(--fg-mute);
+  font-style: italic;
+  font-family: var(--font-geist-sans), serif;
+}
+.sep-studio .welcome-sub {
+  margin: 18px 0 0;
+  color: var(--fg-mute);
+  font-size: 14.5px;
+}
+
+.sep-studio .welcome-stats {
+  display: flex; gap: 36px;
+  padding-bottom: 8px;
+}
+.sep-studio .stat {
+  display: flex; flex-direction: column; gap: 6px;
+  min-width: 90px;
+}
+.sep-studio .stat-num {
+  font-size: 38px; font-weight: 500;
+  font-feature-settings: 'tnum';
+  letter-spacing: -0.02em;
+  color: var(--fg);
+  line-height: 1;
+}
+.sep-studio .stat-lbl {
+  font-family: var(--font-geist-mono), monospace;
+  font-size: 10.5px; letter-spacing: 0.08em;
+  color: var(--fg-dim);
+  text-transform: uppercase;
+}
+
+/* ─── hero "up next" card ───────────────────────────────────────────────── */
+.sep-studio .hero-card {
+  display: grid;
+  grid-template-columns: minmax(0, 1.15fr) minmax(0, 1fr);
+  gap: 0;
+  background:
+    radial-gradient(ellipse at top right, color-mix(in oklch, var(--accent) 14%, transparent) 0%, transparent 55%),
+    linear-gradient(180deg, var(--surface-hi), var(--surface));
+  border: 1px solid var(--border-hi);
+  border-radius: var(--radius-lg);
+  overflow: hidden;
+  position: relative;
+  box-shadow:
+    0 0 0 1px color-mix(in oklch, var(--accent) 18%, transparent) inset,
+    0 30px 60px -30px rgba(0, 0, 0, 0.6);
+}
+.sep-studio .hero-card::before {
+  content: '';
+  position: absolute; inset: 0;
+  background:
+    linear-gradient(135deg, color-mix(in oklch, var(--accent) 4%, transparent) 0%, transparent 50%);
+  pointer-events: none;
+}
+
+.sep-studio .hero-left {
+  padding: 40px 44px 38px;
+  display: flex; flex-direction: column; gap: 18px;
+  position: relative;
+}
+.sep-studio .hero-eyebrow {
+  display: inline-flex; align-items: center; gap: 8px;
+  font-family: var(--font-geist-mono), monospace;
+  font-size: 11px; letter-spacing: 0.12em;
+  color: var(--accent);
+}
+.sep-studio .hero-dot {
+  width: 6px; height: 6px; border-radius: 50%;
+  background: var(--accent);
+  box-shadow: 0 0 8px var(--accent);
+}
+.sep-studio .hero-title {
+  font-size: 34px; line-height: 1.1; font-weight: 600; letter-spacing: -0.02em;
+  margin: 0;
+  text-wrap: balance;
+}
+.sep-studio .hero-sub {
+  margin: 0;
+  color: var(--fg-mute);
+  font-size: 15px; line-height: 1.55;
+  max-width: 480px;
+}
+.sep-studio .hero-actions {
+  display: flex; gap: 12px; align-items: center;
+  margin-top: 8px;
+  flex-wrap: wrap;
+}
+.sep-studio .btn {
+  display: inline-flex; align-items: center; gap: 8px;
+  padding: 13px 20px;
+  border-radius: 999px;
+  font-size: 14px; font-weight: 500;
+  transition: transform .15s, background .15s, color .15s;
+}
+.sep-studio .btn:active { transform: translateY(1px); }
+.sep-studio .btn-primary {
+  background: var(--accent);
+  color: oklch(0.18 0.02 175);
+  font-weight: 600;
+  box-shadow: 0 8px 24px -8px color-mix(in oklch, var(--accent) 60%, transparent);
+}
+.sep-studio .btn-primary:hover {
+  background: color-mix(in oklch, var(--accent) 92%, white);
+}
+.sep-studio .btn-arrow {
+  display: inline-block; transition: transform .2s;
+}
+.sep-studio .btn-primary:hover .btn-arrow { transform: translateX(3px); }
+.sep-studio .btn-ghost {
+  color: var(--fg-mute);
+  padding: 13px 18px;
+}
+.sep-studio .btn-ghost:hover { color: var(--fg); }
+
+.sep-studio .hero-after {
+  margin-top: 16px;
+  padding-top: 18px;
+  border-top: 1px dashed var(--border);
+  display: flex; align-items: center; gap: 10px; flex-wrap: wrap;
+}
+.sep-studio .hero-after-label {
+  font-family: var(--font-geist-mono), monospace;
+  font-size: 11px; letter-spacing: 0.1em;
+  color: var(--fg-dim);
+}
+.sep-studio .hero-chip {
+  display: inline-flex; align-items: center;
+  padding: 6px 12px;
+  border-radius: 999px;
+  background: var(--bg-2);
+  border: 1px solid var(--border);
+  font-size: 12px;
+  color: var(--fg-mute);
+  transition: color .15s, border-color .15s;
+}
+.sep-studio .hero-chip:hover { color: var(--fg); border-color: var(--border-hi); }
+
+.sep-studio .hero-right {
+  position: relative;
+  background:
+    repeating-linear-gradient(
+      135deg,
+      transparent 0 22px,
+      color-mix(in oklch, var(--accent) 3%, transparent) 22px 23px
+    ),
+    linear-gradient(180deg, oklch(0.22 0.008 80), oklch(0.18 0.008 80));
+  display: grid; place-items: center;
+  padding: 40px;
+  border-left: 1px solid var(--border);
+}
+.sep-studio .hero-poster-wrap {
+  position: relative;
+  width: 100%; max-width: 320px;
+  aspect-ratio: 3 / 4;
+  transform: rotate(-3deg);
+  transition: transform .4s cubic-bezier(.2,.8,.2,1);
+}
+.sep-studio .hero-card:hover .hero-poster-wrap { transform: rotate(-1deg) scale(1.02); }
+.sep-studio .hero-poster-tag {
+  position: absolute;
+  bottom: -34px; right: 0;
+  font-family: var(--font-geist-mono), monospace;
+  font-size: 10px; letter-spacing: 0.14em;
+  color: var(--fg-dim);
+}
+
+/* ─── stage sections ────────────────────────────────────────────────────── */
+.sep-studio .stage {
+  padding-top: calc(var(--pad-section) - 32px);
+  display: flex; flex-direction: column; gap: 22px;
+}
+
+.sep-studio .stage-head {
+  display: flex; align-items: center; gap: 16px;
+  padding-bottom: 4px;
+}
+.sep-studio .stage-num {
+  font-family: var(--font-geist-mono), monospace;
+  font-size: 11px; letter-spacing: 0.1em;
+  color: var(--fg-faint);
+  padding: 6px 10px;
+  border: 1px solid var(--border);
+  border-radius: 6px;
+}
+.sep-studio .stage-text {
+  display: flex; align-items: baseline; gap: 14px;
+  flex-wrap: wrap;
+}
+.sep-studio .stage-label {
+  font-size: 22px; font-weight: 600; letter-spacing: -0.015em;
+}
+.sep-studio .stage-hint {
+  color: var(--fg-dim);
+  font-size: 13.5px;
+}
+.sep-studio .stage-rule {
+  flex: 1; height: 1px;
+  background: linear-gradient(90deg, var(--border) 0%, transparent 100%);
+  margin-left: 12px;
+  min-width: 40px;
+}
+.sep-studio .stage-head[data-stage="win"]        .stage-num { color: var(--stage-win); border-color: color-mix(in oklch, var(--stage-win) 25%, var(--border)); }
+.sep-studio .stage-head[data-stage="launch"]     .stage-num { color: var(--stage-launch); border-color: color-mix(in oklch, var(--stage-launch) 25%, var(--border)); }
+.sep-studio .stage-head[data-stage="visibility"] .stage-num { color: var(--stage-visibility); border-color: color-mix(in oklch, var(--stage-visibility) 25%, var(--border)); }
+
+/* ─── grids ─────────────────────────────────────────────────────────────── */
+.sep-studio .grid {
+  display: grid;
+  gap: var(--gap-grid);
+}
+.sep-studio .grid-4 { grid-template-columns: repeat(4, minmax(0, 1fr)); }
+.sep-studio .grid-2 { grid-template-columns: repeat(2, minmax(0, 1fr)); }
+
+/* ─── tile (common) ─────────────────────────────────────────────────────── */
+.sep-studio .tile {
+  position: relative;
+  text-align: left;
+  background: var(--surface);
+  border: 1px solid var(--border);
+  border-radius: var(--radius-lg);
+  overflow: hidden;
+  display: flex; flex-direction: column;
+  transition: border-color .2s, transform .2s, background .2s;
+  min-width: 0;
+  /* Tile is rendered as an <a> link — strip the underline default. */
+  color: inherit;
+  text-decoration: none;
+  width: 100%;
+}
+.sep-studio .tile:hover {
+  border-color: var(--border-hi);
+  background: var(--surface-hi);
+  transform: translateY(-2px);
+}
+.sep-studio .tile:hover .tile-cta { opacity: 1; transform: translateX(0); }
+.sep-studio .tile:hover .tile-poster > * { transform: scale(1.02); }
+
+.sep-studio .tile-poster {
+  position: relative;
+  background: var(--bg-2);
+  border-bottom: 1px solid var(--border);
+  overflow: hidden;
+  aspect-ratio: 16 / 11;
+}
+.sep-studio .tile-poster > * {
+  position: absolute; inset: 0;
+  transition: transform .4s cubic-bezier(.2,.8,.2,1);
+}
+
+.sep-studio .tile-body {
+  padding: 18px 18px 50px;
+  display: flex; flex-direction: column; gap: 8px;
+  flex: 1;
+}
+.sep-studio .tile-meta {
+  display: flex; align-items: center; gap: 8px;
+  margin-bottom: 2px;
+}
+.sep-studio .stage-dot {
+  width: 6px; height: 6px; border-radius: 50%;
+  flex-shrink: 0;
+  box-shadow: 0 0 6px currentColor;
+}
+.sep-studio .fmt-row {
+  display: flex; gap: 4px; flex-wrap: wrap;
+}
+.sep-studio .fmt-chip {
+  font-family: var(--font-geist-mono), monospace;
+  font-size: 9.5px; letter-spacing: 0.08em;
+  padding: 3px 7px;
+  border-radius: 4px;
+  background: var(--bg);
+  color: var(--fg-dim);
+  border: 1px solid var(--border);
+}
+.sep-studio .tile-title {
+  margin: 0;
+  font-size: 16px; font-weight: 600; letter-spacing: -0.01em;
+  color: var(--fg);
+}
+.sep-studio .tile-blurb {
+  margin: 0;
+  font-size: 12.5px; line-height: 1.5;
+  color: var(--fg-mute);
+  text-wrap: pretty;
+}
+.sep-studio .tile-cta {
+  position: absolute;
+  bottom: 16px; left: 18px;
+  font-family: var(--font-geist-mono), monospace;
+  font-size: 11px; letter-spacing: 0.08em;
+  color: var(--accent);
+  opacity: 0;
+  transform: translateX(-4px);
+  transition: opacity .2s, transform .2s;
+}
+
+/* sized variants */
+.sep-studio .tile-md .tile-poster { aspect-ratio: 16 / 10; }
+.sep-studio .tile-md .tile-body   { padding: 22px 22px 54px; }
+.sep-studio .tile-md .tile-title  { font-size: 18px; }
+.sep-studio .tile-md .tile-blurb  { font-size: 13.5px; }
+
+
+/* preview-but-lock gate state (preview-only / upgrade-required). The
+ * polished lock UX is A7f.3; here we just dim the tile + surface a tiny
+ * lock indicator. The link still navigates (the wizard / consumer page
+ * is responsible for the calm upgrade copy inside). */
+.sep-studio .tile[data-gate="locked"] {
+  opacity: 0.65;
+}
+.sep-studio .tile[data-gate="locked"] .tile-poster::after {
+  content: '';
+  position: absolute; inset: 0;
+  background: linear-gradient(135deg, transparent 40%, rgba(0,0,0,.35) 100%);
+  pointer-events: none;
+}
+.sep-studio .tile-lock {
+  position: absolute;
+  top: 12px; right: 12px;
+  width: 26px; height: 26px;
+  border-radius: 50%;
+  background: var(--bg);
+  border: 1px solid var(--border-hi);
+  color: var(--fg-mute);
+  display: grid; place-items: center;
+  font-size: 12px;
+  z-index: 2;
+}
+
+/* ─── flagship (Social Studio) ──────────────────────────────────────────── */
+.sep-studio .tile-flagship {
+  position: relative;
+  text-align: left;
+  background:
+    radial-gradient(ellipse at bottom left, color-mix(in oklch, var(--stage-visibility) 12%, transparent) 0%, transparent 60%),
+    linear-gradient(180deg, var(--surface-hi), var(--surface));
+  border: 1px solid var(--border-hi);
+  border-radius: var(--radius-lg);
+  overflow: hidden;
+  display: grid;
+  grid-template-rows: minmax(0, 1fr) auto;
+  min-height: 380px;
+  transition: border-color .2s, transform .2s;
+  width: 100%;
+}
+.sep-studio .tile-flagship:hover {
+  border-color: color-mix(in oklch, var(--stage-visibility) 40%, var(--border-hi));
+  transform: translateY(-2px);
+}
+.sep-studio .flagship-poster {
+  position: relative;
+  overflow: hidden;
+  border-bottom: 1px solid var(--border);
+  background:
+    repeating-linear-gradient(
+      90deg, transparent 0 60px,
+      color-mix(in oklch, var(--stage-visibility) 4%, transparent) 60px 61px
+    ),
+    var(--bg-2);
+  padding: 28px 0;
+  display: flex; align-items: center;
+}
+.sep-studio .marquee {
+  width: 100%; overflow: hidden;
+  -webkit-mask-image: linear-gradient(90deg, transparent 0, black 8%, black 92%, transparent 100%);
+          mask-image: linear-gradient(90deg, transparent 0, black 8%, black 92%, transparent 100%);
+}
+.sep-studio .marquee-track {
+  display: flex; gap: 14px;
+  width: max-content;
+  animation: sep-marquee var(--marquee-dur) linear infinite;
+}
+.sep-studio .tile-flagship:hover .marquee-track { animation-play-state: paused; }
+@keyframes sep-marquee {
+  0%   { transform: translateX(0); }
+  100% { transform: translateX(-50%); }
+}
+
+.sep-studio .flagship-body {
+  padding: 24px 28px 26px;
+  display: flex; flex-direction: column; gap: 8px;
+}
+.sep-studio .flagship-headline {
+  display: flex; align-items: baseline; justify-content: space-between; gap: 16px;
+  flex-wrap: wrap;
+}
+.sep-studio .flagship-title {
+  font-size: 26px; letter-spacing: -0.02em;
+}
+.sep-studio .flagship-cta {
+  position: static;
+  opacity: 1; transform: none;
+  font-size: 12.5px;
+  color: var(--stage-visibility);
+}
+.sep-studio .flagship-blurb {
+  font-size: 14px; line-height: 1.55;
+  max-width: 720px;
+}
+
+/* ─── social mini (template tile inside marquee) ────────────────────────── */
+.sep-studio .social-mini {
+  width: 160px;
+  flex-shrink: 0;
+  background: var(--surface);
+  border: 1px solid var(--border);
+  border-radius: 10px;
+  overflow: hidden;
+  display: flex; flex-direction: column;
+}
+.sep-studio .social-mini-inner {
+  aspect-ratio: 1 / 1;
+  position: relative;
+  background: var(--bg);
+  overflow: hidden;
+}
+.sep-studio .social-mini-name {
+  padding: 8px 10px 10px;
+  font-family: var(--font-geist-mono), monospace;
+  font-size: 9.5px; letter-spacing: 0.06em;
+  color: var(--fg-mute);
+  text-transform: uppercase;
+  border-top: 1px solid var(--border);
+}
+.sep-studio .tint-cool .social-mini-inner { background: linear-gradient(135deg, oklch(0.28 0.04 240), oklch(0.20 0.03 230)); }
+.sep-studio .tint-warm .social-mini-inner { background: linear-gradient(135deg, oklch(0.30 0.05 50), oklch(0.21 0.04 35)); }
+.sep-studio .tint-mint .social-mini-inner { background: linear-gradient(135deg, oklch(0.32 0.06 175), oklch(0.22 0.05 185)); }
+.sep-studio .tint-rose .social-mini-inner { background: linear-gradient(135deg, oklch(0.30 0.05 15), oklch(0.21 0.04 10)); }
+
+/* mini compositions */
+.sep-studio .mini-qa,
+.sep-studio .mini-listing,
+.sep-studio .mini-showcase,
+.sep-studio .mini-carousel,
+.sep-studio .mini-ba,
+.sep-studio .mini-test,
+.sep-studio .mini-num,
+.sep-studio .mini-grid,
+.sep-studio .mini-stat,
+.sep-studio .mini-market {
+  position: absolute; inset: 12px;
+  display: flex; flex-direction: column; gap: 8px;
+}
+.sep-studio .mini-q {
+  font-family: var(--font-geist-sans), serif;
+  font-size: 38px; font-weight: 600;
+  color: var(--accent);
+  line-height: 1;
+}
+.sep-studio .mini-bars { display: flex; flex-direction: column; gap: 4px; margin-top: auto; }
+.sep-studio .mini-bars > span {
+  display: block; height: 4px; border-radius: 2px;
+  background: rgba(255,255,255,.55);
+  width: 100%;
+}
+.sep-studio .mini-listing > .photo-block { position: relative; inset: auto; border-radius: 4px; flex: 1; }
+.sep-studio .mini-price {
+  font-family: var(--font-geist-mono), monospace;
+  font-size: 13px; color: white; font-weight: 600;
+  margin-top: auto;
+}
+.sep-studio .mini-showcase { inset: 0; }
+.sep-studio .mini-play {
+  position: absolute; top: 50%; left: 50%;
+  width: 0; height: 0;
+  border-style: solid;
+  border-width: 14px 0 14px 22px;
+  border-color: transparent transparent transparent rgba(255,255,255,.9);
+  transform: translate(-30%, -50%);
+  filter: drop-shadow(0 2px 8px rgba(0,0,0,.5));
+}
+.sep-studio .mini-carousel { flex-direction: row; align-items: stretch; gap: 6px; }
+.sep-studio .mini-carousel > span {
+  flex: 1; border-radius: 4px;
+  background: rgba(255,255,255,.18);
+}
+.sep-studio .mini-carousel > span:first-child { background: rgba(255,255,255,.35); }
+.sep-studio .mini-ba {
+  position: absolute; inset: 0;
+  flex-direction: row; gap: 0;
+}
+.sep-studio .mini-ba-l, .sep-studio .mini-ba-r { flex: 1; height: 100%; }
+.sep-studio .mini-ba-l { background: linear-gradient(135deg, oklch(0.40 0.04 30), oklch(0.30 0.03 30)); }
+.sep-studio .mini-ba-r { background: linear-gradient(135deg, oklch(0.55 0.08 175), oklch(0.42 0.06 185)); }
+.sep-studio .mini-ba-line {
+  position: absolute;
+  top: 0; bottom: 0; left: 50%;
+  width: 2px;
+  background: rgba(255,255,255,.7);
+  transform: translateX(-50%);
+}
+.sep-studio .mini-test {
+  justify-content: space-between;
+}
+.sep-studio .mini-stars {
+  font-size: 16px;
+  color: var(--accent);
+  letter-spacing: 1px;
+}
+.sep-studio .mini-num {
+  flex-direction: row; flex-wrap: wrap;
+  align-items: center; justify-content: space-between;
+}
+.sep-studio .mini-num > span {
+  display: grid; place-items: center;
+  width: 28%; aspect-ratio: 1;
+  border-radius: 50%;
+  background: rgba(255,255,255,.10);
+  border: 1px solid rgba(255,255,255,.18);
+  font-family: var(--font-geist-mono), monospace;
+  font-size: 12px; font-weight: 600;
+  color: rgba(255,255,255,.85);
+}
+.sep-studio .mini-grid {
+  display: grid !important;
+  grid-template-columns: 1fr 1fr;
+  grid-template-rows: 1fr 1fr;
+  gap: 4px;
+}
+.sep-studio .mini-grid > span { background: rgba(255,255,255,.14); border-radius: 4px; }
+.sep-studio .mini-grid > span:first-child { background: rgba(255,255,255,.30); }
+.sep-studio .mini-stat {
+  justify-content: center; align-items: flex-start;
+}
+.sep-studio .mini-stat-num {
+  font-size: 42px; font-weight: 600;
+  letter-spacing: -0.02em;
+  color: white;
+  font-feature-settings: 'tnum';
+  line-height: 1;
+}
+.sep-studio .mini-market { justify-content: space-between; }
+.sep-studio .mini-spark { color: var(--accent); height: 60%; }
+.sep-studio .mini-spark svg { width: 100%; height: 100%; }
+
+/* ─── posters (full-size, inside .tile-poster) ──────────────────────────── */
+.sep-studio .poster {
+  position: absolute; inset: 0;
+  display: grid; place-items: center;
+  padding: 16px;
+}
+
+/* flyer (also reused in hero) */
+.sep-studio .flyer-page {
+  width: 100%; max-width: 240px;
+  height: 100%; max-height: 100%;
+  background: oklch(0.96 0.005 80);
+  color: oklch(0.20 0.005 80);
+  border-radius: 4px;
+  padding: 14px;
+  display: flex; flex-direction: column; gap: 10px;
+  box-shadow:
+    0 1px 0 rgba(255,255,255,.7) inset,
+    0 20px 40px -10px rgba(0,0,0,.5),
+    0 2px 4px rgba(0,0,0,.3);
+  font-family: var(--font-geist-sans), sans-serif;
+}
+.sep-studio .hero-poster-wrap .flyer-page { max-width: none; }
+.sep-studio .flyer-header {
+  display: flex; align-items: center; justify-content: space-between;
+}
+.sep-studio .flyer-eyebrow {
+  font-family: var(--font-geist-mono), monospace;
+  font-size: 8px; letter-spacing: 0.16em;
+  padding: 4px 8px;
+  background: oklch(0.20 0.005 80);
+  color: oklch(0.96 0.005 80);
+  border-radius: 2px;
+}
+.sep-studio .flyer-eyebrow.oh { background: oklch(0.65 0.18 30); }
+.sep-studio .flyer-price {
+  font-size: 16px; font-weight: 700;
+  letter-spacing: -0.01em;
+  font-feature-settings: 'tnum';
+}
+.sep-studio .flyer-foot {
+  display: flex; align-items: center; justify-content: space-between;
+  gap: 8px;
+}
+.sep-studio .flyer-addr { font-size: 12px; font-weight: 600; letter-spacing: -0.01em; }
+.sep-studio .flyer-sub { font-size: 9px; color: oklch(0.50 0.005 80); margin-top: 2px; }
+.sep-studio .flyer-agent {
+  width: 28px; height: 28px; border-radius: 50%;
+  background: linear-gradient(135deg, oklch(0.55 0.08 30), oklch(0.40 0.06 20));
+}
+.sep-studio .qr-block {
+  padding: 3px; background: oklch(0.96 0.005 80);
+  border: 1px solid oklch(0.85 0.005 80);
+}
+.sep-studio .qr-grid {
+  width: 36px; height: 36px;
+  display: grid;
+  grid-template-columns: repeat(5, 1fr);
+  grid-template-rows: repeat(5, 1fr);
+  gap: 1px;
+}
+
+/* photo-block (placeholder image) */
+.sep-studio .photo-block {
+  position: relative;
+  border-radius: 3px;
+  overflow: hidden;
+  display: grid; place-items: center;
+  flex-shrink: 0;
+}
+.sep-studio .photo-stripes {
+  position: absolute; inset: 0;
+  background:
+    repeating-linear-gradient(
+      135deg, transparent 0 12px,
+      rgba(255,255,255,.05) 12px 13px
+    );
+}
+.sep-studio .photo-label {
+  font-family: var(--font-geist-mono), monospace;
+  font-size: 8px; letter-spacing: 0.12em;
+  color: rgba(255,255,255,.65);
+  position: relative;
+}
+
+/* doc poster */
+.sep-studio .poster-doc, .sep-studio .poster-intel, .sep-studio .poster-prep { padding: 14px; }
+.sep-studio .doc-page {
+  width: 100%; max-width: 200px; height: 100%;
+  background: oklch(0.96 0.005 80);
+  color: oklch(0.20 0.005 80);
+  border-radius: 3px;
+  padding: 14px;
+  display: flex; flex-direction: column; gap: 8px;
+  box-shadow:
+    0 20px 40px -10px rgba(0,0,0,.5),
+    0 2px 4px rgba(0,0,0,.3);
+  position: relative;
+  overflow: hidden;
+}
+.sep-studio .doc-corner {
+  position: absolute;
+  top: 0; right: 0;
+  width: 28px; height: 28px;
+  background: oklch(0.88 0.005 80);
+  clip-path: polygon(100% 0, 0 0, 100% 100%);
+}
+.sep-studio .doc-eyebrow {
+  font-family: var(--font-geist-mono), monospace;
+  font-size: 7.5px; letter-spacing: 0.16em;
+  color: oklch(0.50 0.005 80);
+}
+.sep-studio .doc-title {
+  font-size: 11px; font-weight: 700; letter-spacing: -0.01em;
+  line-height: 1.2;
+  margin-top: 2px;
+}
+
+.sep-studio .line-group { display: flex; flex-direction: column; gap: 3px; margin-top: 4px; }
+.sep-studio .line {
+  height: 3px; border-radius: 1px;
+  background: oklch(0.80 0.005 80);
+}
+
+/* intel chart */
+.sep-studio .intel-chart {
+  display: flex; align-items: flex-end; gap: 3px;
+  height: 50px; margin-top: 4px;
+  padding-bottom: 4px;
+  border-bottom: 1px solid oklch(0.85 0.005 80);
+}
+.sep-studio .bar {
+  flex: 1; background: linear-gradient(180deg, oklch(0.40 0.08 175), oklch(0.50 0.10 180));
+  border-radius: 1px 1px 0 0;
+}
+.sep-studio .intel-table {
+  display: flex; flex-direction: column; gap: 4px;
+  margin-top: 4px;
+}
+.sep-studio .intel-row {
+  display: flex; gap: 4px;
+}
+.sep-studio .intel-row > span {
+  height: 4px; background: oklch(0.85 0.005 80);
+  border-radius: 1px;
+  flex: 1;
+}
+.sep-studio .intel-row > span:first-child { flex: 0.5; background: oklch(0.65 0.005 80); }
+
+/* prep checklist */
+.sep-studio .checklist {
+  margin: 0; padding: 0; list-style: none;
+  display: flex; flex-direction: column; gap: 6px;
+  margin-top: 4px;
+}
+.sep-studio .checklist li {
+  display: flex; align-items: center; gap: 8px;
+  font-size: 9px;
+  color: oklch(0.30 0.005 80);
+}
+.sep-studio .check {
+  width: 10px; height: 10px;
+  border: 1px solid oklch(0.60 0.005 80);
+  border-radius: 2px;
+  flex-shrink: 0;
+}
+.sep-studio .check.done {
+  background: oklch(0.55 0.13 175);
+  border-color: oklch(0.55 0.13 175);
+  position: relative;
+}
+.sep-studio .check.done::after {
+  content: '✓';
+  position: absolute; inset: 0;
+  display: grid; place-items: center;
+  color: white; font-size: 8px; font-weight: 700;
+}
+.sep-studio .check-label { font-size: 9px; }
+
+/* slide stack (Seller Presentation) */
+.sep-studio .poster-pres { padding: 20px; }
+.sep-studio .slide-stack {
+  position: relative;
+  width: 100%; height: 100%;
+  max-width: 220px;
+}
+.sep-studio .slide {
+  position: absolute;
+  border-radius: 4px;
+  background: oklch(0.96 0.005 80);
+  color: oklch(0.20 0.005 80);
+  padding: 10px;
+  box-shadow: 0 8px 24px -6px rgba(0,0,0,.5);
+  overflow: hidden;
+}
+.sep-studio .slide-back  {
+  inset: 14px 28px -14px -14px;
+  transform: rotate(-4deg);
+  background: oklch(0.88 0.005 80);
+  padding: 0;
+}
+.sep-studio .slide-mid   {
+  inset: 6px 14px 6px -6px;
+  transform: rotate(-2deg);
+  background: oklch(0.92 0.005 80);
+}
+.sep-studio .slide-front {
+  inset: -4px 4px -4px 14px;
+  transform: rotate(2deg);
+  display: flex; flex-direction: column; gap: 6px;
+}
+.sep-studio .slide-mini-head { display: flex; align-items: center; gap: 6px; }
+.sep-studio .slide-mini-dot {
+  width: 6px; height: 6px; border-radius: 50%;
+  background: oklch(0.55 0.13 175);
+}
+.sep-studio .slide-mini-bar {
+  flex: 1; height: 3px; border-radius: 1px;
+  background: oklch(0.75 0.005 80);
+}
+.sep-studio .slide-front-head {
+  display: flex; align-items: center; justify-content: space-between;
+}
+.sep-studio .slide-eyebrow {
+  font-family: var(--font-geist-mono), monospace;
+  font-size: 7.5px; letter-spacing: 0.14em;
+  color: oklch(0.55 0.005 80);
+}
+.sep-studio .slide-num {
+  font-family: var(--font-geist-mono), monospace;
+  font-size: 8px; color: oklch(0.55 0.005 80);
+}
+.sep-studio .slide-front-title {
+  font-size: 13px; font-weight: 700;
+  letter-spacing: -0.015em;
+  line-height: 1.1;
+  text-wrap: balance;
+}
+
+/* ─── modal (Social Studio) ─────────────────────────────────────────────── */
+.sep-studio .modal-scrim {
+  position: fixed; inset: 0;
+  background: rgba(0,0,0,.65);
+  backdrop-filter: blur(8px);
+  -webkit-backdrop-filter: blur(8px);
+  display: grid; place-items: center;
+  z-index: 100;
+  animation: sep-scrim-fade .2s ease;
+  padding: 24px;
+}
+@keyframes sep-scrim-fade { from { opacity: 0; } to { opacity: 1; } }
+
+.sep-studio .modal {
+  background: var(--surface-hi);
+  border: 1px solid var(--border-hi);
+  border-radius: 24px;
+  padding: 32px;
+  width: 100%; max-width: 1080px;
+  max-height: 90vh;
+  display: flex; flex-direction: column; gap: 24px;
+  box-shadow: 0 40px 80px -20px rgba(0,0,0,.5);
+  animation: sep-modal-in .25s cubic-bezier(.2,.8,.2,1);
+  overflow: hidden;
+}
+@keyframes sep-modal-in {
+  from { opacity: 0; transform: translateY(10px) scale(.98); }
+  to   { opacity: 1; transform: none; }
+}
+.sep-studio .modal-head {
+  display: flex; align-items: flex-start; justify-content: space-between;
+  gap: 16px;
+}
+.sep-studio .modal-eyebrow {
+  font-family: var(--font-geist-mono), monospace;
+  font-size: 11px; letter-spacing: 0.12em;
+  color: var(--stage-visibility);
+}
+.sep-studio .modal-title {
+  margin: 8px 0 4px;
+  font-size: 32px; font-weight: 600; letter-spacing: -0.02em;
+}
+.sep-studio .modal-sub {
+  margin: 0;
+  color: var(--fg-mute);
+  font-size: 14px;
+}
+.sep-studio .modal-x {
+  width: 36px; height: 36px;
+  border-radius: 10px;
+  background: var(--surface);
+  border: 1px solid var(--border);
+  color: var(--fg-mute);
+  display: grid; place-items: center;
+  font-size: 14px;
+  transition: color .15s, background .15s;
+  flex-shrink: 0;
+}
+.sep-studio .modal-x:hover { background: var(--bg-2); color: var(--fg); }
+
+.sep-studio .modal-grid {
+  display: grid;
+  grid-template-columns: repeat(5, minmax(0, 1fr));
+  grid-auto-rows: max-content;
+  align-content: start;
+  gap: 14px;
+  overflow-y: auto;
+  margin: 0 -8px;
+  padding: 4px 8px;
+  min-height: 0;
+}
+
+.sep-studio .tmpl-card {
+  text-align: left;
+  background: var(--surface);
+  border: 1px solid var(--border);
+  border-radius: 12px;
+  overflow: hidden;
+  transition: border-color .15s, transform .15s;
+  color: inherit;
+  text-decoration: none;
+  display: block;
+}
+.sep-studio .tmpl-card:hover {
+  border-color: var(--stage-visibility);
+  transform: translateY(-2px);
+}
+.sep-studio .tmpl-preview {
+  /* 4:5 matches the canvas <TemplatePreview> renders into (1080×1350)
+   * so the looping thumbnail fills the card without letterboxing. */
+  aspect-ratio: 4 / 5;
+  position: relative;
+  overflow: hidden;
+  background: var(--bg);
+}
+.sep-studio .tmpl-preview > div { display: block; width: 100%; height: 100%; }
+.sep-studio .tmpl-preview canvas { width: 100%; height: 100%; display: block; }
+.sep-studio .tmpl-foot {
+  display: flex; align-items: center; justify-content: space-between;
+  padding: 10px 12px;
+  border-top: 1px solid var(--border);
+}
+.sep-studio .tmpl-name {
+  font-size: 12px; font-weight: 500;
+}
+.sep-studio .tmpl-tag {
+  font-family: var(--font-geist-mono), monospace;
+  font-size: 9.5px; letter-spacing: 0.08em;
+  color: var(--fg-dim);
+}
+
+/* ─── footer ────────────────────────────────────────────────────────────── */
+.sep-studio .bottom {
+  margin-top: 48px;
+  padding-top: 28px;
+  border-top: 1px solid var(--border);
+  display: flex; align-items: center; justify-content: space-between;
+  font-family: var(--font-geist-mono), monospace;
+  font-size: 11px; letter-spacing: 0.08em;
+  color: var(--fg-faint);
+  flex-wrap: wrap;
+  gap: 12px;
+}
+.sep-studio .bottom-link:hover { color: var(--fg-mute); }
+
+/* ─── responsive trims ──────────────────────────────────────────────────── */
+@media (max-width: 1100px) {
+  .sep-studio .grid-4 { grid-template-columns: repeat(2, 1fr); }
+  .sep-studio .welcome { flex-direction: column; align-items: flex-start; }
+  .sep-studio .welcome-stats { width: 100%; justify-content: flex-start; }
+  .sep-studio .modal-grid { grid-template-columns: repeat(3, 1fr); }
+}
+@media (max-width: 760px) {
+  .sep-studio .app { padding: 20px 20px 60px; }
+  .sep-studio .hero-card { grid-template-columns: 1fr; }
+  .sep-studio .hero-right { display: none; }
+  .sep-studio .grid-4, .sep-studio .grid-2 { grid-template-columns: 1fr; }
+  .sep-studio .welcome-title { font-size: 40px; }
+  .sep-studio .modal-grid { grid-template-columns: repeat(2, 1fr); }
+}
+
+/* ─── reduced motion ────────────────────────────────────────────────────── */
+@media (prefers-reduced-motion: reduce) {
+  .sep-studio .marquee-track,
+  .sep-studio .live-dot {
+    animation: none;
+  }
+  .sep-studio .tile,
+  .sep-studio .tile-flagship,
+  .sep-studio .tile-poster > *,
+  .sep-studio .hero-poster-wrap {
+    transition: none;
+    transform: none !important;
+  }
+}

@@ -2,6 +2,7 @@
 
 import { useEffect, useState } from "react";
 import { drawImageContain } from "@/engine/draw";
+import type { Review } from "@/tools/seller-presentation/engine/types";
 
 export interface BrandSettings {
   logoDataUrl: string | null;
@@ -18,6 +19,29 @@ export interface BrandSettings {
   contactPhone: string;
   licenseNumber: string;
   brokerage: string;
+  /**
+   * A7c — Seller Presentation agent-profile extensions. All optional;
+   * the SP wizard flows these through `agentContact` to the publish
+   * route via the same path the existing brand fields use, so the
+   * page renderer's `agent.{areasServed, photoUrl, bioShort,
+   * yearsInArea, ctaReassurance}` can read them without a per-
+   * presentation override. Set-once, reused across presentations.
+   */
+  agentPhotoUrl?: string;
+  agentBioShort?: string;
+  agentAreasServed?: string;
+  agentYearsInArea?: string;
+  agentCtaReassurance?: string;
+  /**
+   * A7d.2 — curated reviews. AGENT-CONSTANT: entered once in Settings,
+   * surfaced on every Seller Presentation. The wizard's editorial step
+   * no longer captures per-presentation reviews; the projector reads
+   * from these via the publish route's `brandReviews` arg. Soft cap is
+   * enforced in the form; persistence is permissive.
+   */
+  agentReviews?: Review[];
+  /** A7d.2 — outlink URL for the reviews block (renderer pairs with a fixed "See all reviews on Zillow" label). */
+  reviewsOutlinkUrl?: string;
 }
 
 // Storage key kept as `socanim_*` for backwards compatibility with users who
@@ -180,10 +204,71 @@ export function loadBrandSettings(): BrandSettings {
       contactPhone: extractPhoneDigits(str(parsed.contactPhone)),
       licenseNumber: str(parsed.licenseNumber),
       brokerage: str(parsed.brokerage),
+      agentPhotoUrl:
+        typeof parsed.agentPhotoUrl === "string" && parsed.agentPhotoUrl.length > 0
+          ? parsed.agentPhotoUrl
+          : undefined,
+      agentBioShort:
+        typeof parsed.agentBioShort === "string" && parsed.agentBioShort.length > 0
+          ? parsed.agentBioShort
+          : undefined,
+      agentAreasServed:
+        typeof parsed.agentAreasServed === "string" && parsed.agentAreasServed.length > 0
+          ? parsed.agentAreasServed
+          : undefined,
+      agentYearsInArea:
+        typeof parsed.agentYearsInArea === "string" && parsed.agentYearsInArea.length > 0
+          ? parsed.agentYearsInArea
+          : undefined,
+      agentCtaReassurance:
+        typeof parsed.agentCtaReassurance === "string" &&
+        parsed.agentCtaReassurance.length > 0
+          ? parsed.agentCtaReassurance
+          : undefined,
+      agentReviews: clampStoredReviews(parsed.agentReviews),
+      reviewsOutlinkUrl:
+        typeof parsed.reviewsOutlinkUrl === "string" &&
+        parsed.reviewsOutlinkUrl.length > 0
+          ? parsed.reviewsOutlinkUrl
+          : undefined,
     };
   } catch {
     return DEFAULT_BRAND;
   }
+}
+
+/**
+ * Defense-at-boundary clamp for stored reviews. Mirrors the public-
+ * payload Review shape (body + attributionName + optional year/street).
+ * Strings only, no nested junk, no rows missing the required body or
+ * attributionName. Returns undefined when nothing usable survives so
+ * the consumer side can treat "no reviews" as a single state.
+ */
+function clampStoredReviews(raw: unknown): Review[] | undefined {
+  if (!Array.isArray(raw)) return undefined;
+  const out: Review[] = [];
+  for (const r of raw) {
+    if (!r || typeof r !== "object") continue;
+    const rec = r as Record<string, unknown>;
+    const body = typeof rec.body === "string" ? rec.body : "";
+    const attributionName =
+      typeof rec.attributionName === "string" ? rec.attributionName : "";
+    if (!body.trim() || !attributionName.trim()) continue;
+    out.push({
+      body,
+      attributionName,
+      attributionYear:
+        typeof rec.attributionYear === "string" && rec.attributionYear.length > 0
+          ? rec.attributionYear
+          : undefined,
+      attributionStreet:
+        typeof rec.attributionStreet === "string" &&
+        rec.attributionStreet.length > 0
+          ? rec.attributionStreet
+          : undefined,
+    });
+  }
+  return out.length ? out : undefined;
 }
 
 export function saveBrandSettings(settings: BrandSettings): void {

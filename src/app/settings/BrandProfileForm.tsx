@@ -7,7 +7,16 @@ import {
   saveBrandSettings,
   extractPhoneDigits,
 } from "@/lib/brand";
+import type { Review } from "@/tools/seller-presentation/engine/types";
 import { PhoneInput } from "@/components/inputs";
+import { ImageUploadField } from "@/components/ImageUploadField";
+
+/**
+ * Soft cap on the curated reviews list. Six rows is enough to cover the
+ * "From families like yours" block on every published Seller Presentation
+ * without inviting agents to dump every Zillow testimonial into Settings.
+ */
+const MAX_REVIEWS = 6;
 
 /**
  * Brand profile form. All values persist to localStorage on every change —
@@ -156,11 +165,246 @@ export function BrandProfileForm() {
         />
       </Field>
 
+      {/* A7c — Seller Presentation agent-profile extensions. Set-once,
+          flows through StepReview's `agentContact` to the SP page
+          renderer's `agent.{areasServed, photoUrl, bioShort,
+          yearsInArea, ctaReassurance}` block. All optional. */}
+      <div className="space-y-6 border-t border-neutral-900 pt-6">
+        <h3 className="text-xs uppercase tracking-[0.18em] text-neutral-500">
+          Seller Presentation: agent profile
+        </h3>
+        <p className="-mt-3 text-[11px] text-neutral-600 leading-relaxed">
+          These appear on the published seller page&apos;s &ldquo;Your
+          agent&rdquo; section. Set once; reused across every
+          presentation.
+        </p>
+
+        <Field label="Areas served">
+          <TextInput
+            value={s.agentAreasServed ?? ""}
+            onChange={(v) => update("agentAreasServed", v || undefined)}
+            placeholder="Tacoma · Gig Harbor · Federal Way"
+          />
+        </Field>
+
+        {/* A7c.2 — replaces the URL-only headshot input with the
+            shared <ImageUploadField>, so agents can pick a photo
+            from their phone's camera roll. Uploads to Vercel Blob;
+            we store the hosted URL in agentPhotoUrl (no data URLs
+            in the brand settings or in the published agent block). */}
+        <ImageUploadField
+          label="Headshot"
+          value={s.agentPhotoUrl ?? ""}
+          onChange={(url) => update("agentPhotoUrl", url || undefined)}
+          previewAspect="aspect-square"
+          folder="agent-headshots"
+          testIdPrefix="brand-headshot"
+          helpText="Square crops read best. Leave blank for a monogram fallback."
+          urlPlaceholder="https://… (or paste a URL)"
+        />
+
+        <Field label="Short bio (one sentence, italic)">
+          <TextAreaInput
+            value={s.agentBioShort ?? ""}
+            onChange={(v) => update("agentBioShort", v || undefined)}
+            placeholder="I work with eight families a year, on purpose. It means your sale gets the time and attention I'd want for my own."
+          />
+        </Field>
+
+        <Field label="Years in your area">
+          <TextInput
+            value={s.agentYearsInArea ?? ""}
+            onChange={(v) => {
+              // A7c.6 — numeric field. Strip to digits so the stored
+              // value is a clean numeric string (consistent with the
+              // downstream text render on /h/[slug] and the JSON shape
+              // on the publish payload).
+              const digits = v.replace(/\D/g, "");
+              update("agentYearsInArea", digits || undefined);
+            }}
+            placeholder="11"
+            inputMode="numeric"
+          />
+        </Field>
+
+        <Field label="CTA reassurance line">
+          <TextInput
+            value={s.agentCtaReassurance ?? ""}
+            onChange={(v) => update("agentCtaReassurance", v || undefined)}
+            placeholder="No pressure. Reach out whenever you're ready."
+          />
+        </Field>
+      </div>
+
+      {/* A7d.2 — curated reviews. Entered ONCE here; the wizard's
+          editorial step no longer captures per-presentation reviews.
+          Flows through the publish route's `brandReviews` payload to
+          the projector, which emits them as `payload.reviews` +
+          `payload.reviewsOutlink` (top-level), so every Seller
+          Presentation renders the "From families like yours" block
+          from this source. */}
+      <ReviewsSection
+        reviews={s.agentReviews ?? []}
+        outlinkUrl={s.reviewsOutlinkUrl ?? ""}
+        onReviewsChange={(next) =>
+          update("agentReviews", next.length ? next : undefined)
+        }
+        onOutlinkChange={(v) => update("reviewsOutlinkUrl", v || undefined)}
+      />
+
       <p className="text-[11px] text-neutral-600 leading-relaxed pt-4 border-t border-neutral-900">
-        Saved automatically. Stored in your browser only — never uploaded to
+        Saved automatically. Stored in your browser only. Never uploaded to
         any server.
       </p>
     </div>
+  );
+}
+
+function ReviewsSection({
+  reviews,
+  outlinkUrl,
+  onReviewsChange,
+  onOutlinkChange,
+}: {
+  reviews: Review[];
+  outlinkUrl: string;
+  onReviewsChange: (next: Review[]) => void;
+  onOutlinkChange: (next: string) => void;
+}) {
+  const addReview = () => {
+    if (reviews.length >= MAX_REVIEWS) return;
+    onReviewsChange([...reviews, { body: "", attributionName: "" }]);
+  };
+  const updateReview = (idx: number, patch: Partial<Review>) => {
+    onReviewsChange(
+      reviews.map((r, i) => (i === idx ? { ...r, ...patch } : r)),
+    );
+  };
+  const removeReview = (idx: number) => {
+    onReviewsChange(reviews.filter((_, i) => i !== idx));
+  };
+
+  return (
+    <div className="space-y-4 border-t border-neutral-900 pt-6">
+      <h3 className="text-xs uppercase tracking-[0.18em] text-neutral-500">
+        Seller Presentation: reviews
+      </h3>
+      <p className="-mt-2 text-[11px] text-neutral-600 leading-relaxed">
+        Reviews you&apos;ve collected — entered once here, shown on every
+        seller page.
+      </p>
+
+      <div className="space-y-3">
+        {reviews.length === 0 && (
+          <p className="text-xs text-neutral-500">
+            No reviews yet. Add one to start.
+          </p>
+        )}
+        {reviews.map((rev, idx) => (
+          <div
+            key={idx}
+            className="space-y-2 rounded border border-neutral-800 bg-neutral-900/40 p-3"
+            data-testid={`brand-review-${idx}`}
+          >
+            <div className="flex items-center justify-between">
+              <span className="text-[10px] uppercase tracking-wider text-neutral-500">
+                Review {idx + 1}
+              </span>
+              <button
+                type="button"
+                onClick={() => removeReview(idx)}
+                className="text-xs text-neutral-500 hover:text-red-400"
+                data-testid={`brand-review-remove-${idx}`}
+              >
+                Remove
+              </button>
+            </div>
+            <textarea
+              value={rev.body}
+              onChange={(e) => updateReview(idx, { body: e.target.value })}
+              placeholder="She walked us through every offer in plain English and never made us feel rushed."
+              rows={3}
+              data-testid={`brand-review-body-${idx}`}
+              className="w-full bg-neutral-900 border border-neutral-800 rounded-md px-3 py-2 text-base lg:text-sm focus:outline-none focus:border-mint resize-y"
+            />
+            <div className="grid grid-cols-1 gap-2 sm:grid-cols-3">
+              <input
+                type="text"
+                value={rev.attributionName}
+                onChange={(e) =>
+                  updateReview(idx, { attributionName: e.target.value })
+                }
+                placeholder="The Halloran family"
+                data-testid={`brand-review-name-${idx}`}
+                className="w-full bg-neutral-900 border border-neutral-800 rounded-md px-3 py-2 text-base lg:text-sm focus:outline-none focus:border-mint"
+              />
+              <input
+                type="text"
+                value={rev.attributionYear ?? ""}
+                onChange={(e) =>
+                  updateReview(idx, {
+                    attributionYear: e.target.value || undefined,
+                  })
+                }
+                placeholder="2025"
+                data-testid={`brand-review-year-${idx}`}
+                className="w-full bg-neutral-900 border border-neutral-800 rounded-md px-3 py-2 text-base lg:text-sm focus:outline-none focus:border-mint"
+              />
+              <input
+                type="text"
+                value={rev.attributionStreet ?? ""}
+                onChange={(e) =>
+                  updateReview(idx, {
+                    attributionStreet: e.target.value || undefined,
+                  })
+                }
+                placeholder="Tremont"
+                data-testid={`brand-review-street-${idx}`}
+                className="w-full bg-neutral-900 border border-neutral-800 rounded-md px-3 py-2 text-base lg:text-sm focus:outline-none focus:border-mint"
+              />
+            </div>
+          </div>
+        ))}
+        {reviews.length < MAX_REVIEWS && (
+          <button
+            type="button"
+            onClick={addReview}
+            data-testid="brand-review-add"
+            className="rounded border border-neutral-700 px-3 py-1.5 text-xs text-text-primary hover:bg-neutral-800"
+          >
+            + Add a review
+          </button>
+        )}
+      </div>
+
+      <Field label="See all reviews on Zillow — link URL">
+        <TextInput
+          value={outlinkUrl}
+          onChange={onOutlinkChange}
+          placeholder="https://www.zillow.com/profile/your-handle"
+        />
+      </Field>
+    </div>
+  );
+}
+
+function TextAreaInput({
+  value,
+  onChange,
+  placeholder,
+}: {
+  value: string;
+  onChange: (v: string) => void;
+  placeholder?: string;
+}) {
+  return (
+    <textarea
+      value={value}
+      onChange={(e) => onChange(e.target.value)}
+      placeholder={placeholder}
+      rows={3}
+      className="w-full bg-neutral-900 border border-neutral-800 rounded-md px-3 py-2 text-base lg:text-sm focus:outline-none focus:border-mint resize-y"
+    />
   );
 }
 
@@ -186,15 +430,18 @@ function TextInput({
   onChange,
   placeholder,
   type = "text",
+  inputMode,
 }: {
   value: string;
   onChange: (v: string) => void;
   placeholder?: string;
   type?: string;
+  inputMode?: React.HTMLAttributes<HTMLInputElement>["inputMode"];
 }) {
   return (
     <input
       type={type}
+      inputMode={inputMode}
       value={value}
       onChange={(e) => onChange(e.target.value)}
       placeholder={placeholder}

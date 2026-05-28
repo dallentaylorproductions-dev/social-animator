@@ -97,28 +97,31 @@ test.describe('Seller Intelligence Report — wizard', () => {
 
 test.describe('Seller Intelligence Report — dashboard discovery', () => {
   test('SIR is visible in the dashboard All Skills section', async ({ page }) => {
-    // v1.44 shipped SIR but missed adding it to the dashboard's All Skills
-    // categorization map — agents could only reach it by typing the URL.
-    // This test asserts SIR is rendered as a discoverable tile.
+    // v1.44 shipped SIR but missed adding it to the dashboard's tile
+    // discovery — agents could only reach it by typing the URL. v1.47
+    // Lane A re-brand reorganized the dashboard into three named stages
+    // (Win → Launch → Stay visible); SIR lives under "Win the listing"
+    // because its `category` is 'Seller pitch'. This test asserts the
+    // tile still surfaces post-rebrand and routes correctly.
     //
-    // Brand profile must be seeded so the dashboard renders past its
-    // empty-state CTA (gated by hasBrandProfileConfigured() in
-    // src/app/dashboard/state-detection.ts). No listing/SIR drafts needed —
-    // All Skills always renders once brand profile is configured.
+    // Brand profile seeded so the dashboard isn't in its empty-state
+    // hero (HeroEmptyState replaces the hero card when no brand exists).
+    // Stage tiles always render once brand is configured.
     await seedBrandProfile(page);
 
     await page.goto('/dashboard');
     await expect(page).not.toHaveURL(/\/login/i);
 
-    // All Skills section header — match against the actual copy ("All skills",
-    // case-insensitive against any future capitalization shift).
-    await expect(page.getByText(/^All skills$/i)).toBeVisible({ timeout: 10_000 });
+    // Win stage header — the rebrand's new SkillCategory → stage mapping
+    // routes 'Seller pitch' skills here.
+    await expect(page.getByTestId('sep-stage-win')).toBeVisible({
+      timeout: 10_000,
+    });
 
-    // SIR's SkillTile is a Link element. Its accessible name is composed of
-    // the skill's name plus its output-format badge (per SkillTile's render
-    // shape from W-1 Half B impl 2). Anchor on the skill name with a leading
-    // match so we hit the tile, then assert it points at the SIR route.
-    const sirTile = page.getByRole('link', { name: /^Seller Intelligence Report/i });
+    // Tile testid is stable across cosmetic copy changes; href is the
+    // load-bearing routing contract (SkillRoute('seller-intelligence-report')
+    // → '/seller-intelligence-report').
+    const sirTile = page.getByTestId('sep-tile-seller-intelligence-report');
     await expect(sirTile).toBeVisible();
     await expect(sirTile).toHaveAttribute('href', '/seller-intelligence-report');
   });

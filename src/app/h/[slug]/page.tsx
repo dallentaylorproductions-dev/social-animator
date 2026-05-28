@@ -3,6 +3,7 @@ import { notFound } from 'next/navigation';
 import { fetchHandout } from '@/lib/share-urls';
 import { Card, StatLabel } from '@/components/ui';
 import { OpenHouseHandoutPage } from '@/tools/open-house-prep/output/handout-page';
+import { SellerPresentationPage } from '@/tools/seller-presentation/output/presentation-page';
 
 /**
  * Public visitor-facing handout route (OH Prep Commit 2 / Audit 1B).
@@ -36,9 +37,16 @@ export async function generateMetadata({
     return { title: 'Handout not available' };
   }
   const data = record.data as { propertyAddress?: string };
+  // Type-specific titles. The metadata is the only place this page
+  // peeks at record.type before the body's dispatch — keeps the title
+  // honest about which surface is rendering.
+  const titleSuffix =
+    record.type === 'seller-presentation'
+      ? 'Seller Presentation'
+      : 'Open House';
   const title = data.propertyAddress
-    ? `${data.propertyAddress} · Open House`
-    : 'Open House';
+    ? `${data.propertyAddress} · ${titleSuffix}`
+    : titleSuffix;
   const description = 'Your agent shared this with you.';
   const ogUrl = `/api/og/${slug}`;
   return {
@@ -64,8 +72,13 @@ export default async function HandoutPage({ params }: PageProps) {
   const record = await fetchHandout(slug);
   if (!record) notFound();
 
-  // Commit 5 type dispatch — render the OH Prep visitor surface when the
-  // record's type matches. New handout types add a new arm here.
+  // Type dispatch — each handout type owns its own renderer. New
+  // handout types add a new arm here; the typed dispatch is the
+  // place to thread the per-type privacy posture (e.g. SP renders
+  // from PublicPayload, not the raw draft).
+  if (record.type === 'seller-presentation') {
+    return <SellerPresentationPage handout={record} />;
+  }
   if (record.type === 'open-house-handout') {
     return <OpenHouseHandoutPage handout={record} />;
   }
