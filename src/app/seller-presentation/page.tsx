@@ -21,6 +21,10 @@ import { StepEditorial } from "@/tools/seller-presentation/components/StepEditor
 import { StepReview } from "@/tools/seller-presentation/components/StepReview";
 import { StepErrorBoundary } from "@/components/StepErrorBoundary";
 import { SPEntitlementProvider } from "@/tools/seller-presentation/components/SPEntitlementContext";
+import {
+  COHORT_EXAMPLE_URL,
+  COHORT_EXAMPLE_LABEL,
+} from "@/lib/config/cohort-example";
 
 /**
  * Seller Presentation — 5-step wizard shell (v1.47 / A5a).
@@ -271,6 +275,22 @@ export default function SellerPresentationPage() {
           Listing-appointment prep + premium seller-facing page. Step{" "}
           {STEPS.findIndex((s) => s.id === currentStep) + 1} of {STEPS.length}.
         </p>
+        {/* Anticipation Layer (v1.47) — a calm, always-available link to
+            the canonical cohort example seller page. Lives in the header
+            so it renders on every step (the chore-dread hits mid-flow, so
+            the polished destination needs to be one tap away throughout,
+            not only at the start). target="_blank" so clicking never
+            costs the agent their in-progress draft. URL routes through the
+            single swappable constant in @/lib/config/cohort-example. */}
+        <a
+          href={COHORT_EXAMPLE_URL}
+          target="_blank"
+          rel="noopener noreferrer"
+          data-testid="cohort-example-link"
+          className="mt-3 inline-flex items-center text-sm text-neutral-400 transition-colors hover:text-mint"
+        >
+          {COHORT_EXAMPLE_LABEL} →
+        </a>
       </header>
 
       <StepIndicator currentStep={currentStep} />

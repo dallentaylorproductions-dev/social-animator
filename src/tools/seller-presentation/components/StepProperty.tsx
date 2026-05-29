@@ -4,6 +4,7 @@ import { useEffect } from "react";
 import { useListingProfile } from "@/lib/listing-profile";
 import { CurrencyInput } from "@/components/inputs/CurrencyInput";
 import { ImageUploadField } from "@/components/ImageUploadField";
+import { COHORT_EXAMPLE_URL } from "@/lib/config/cohort-example";
 import type { SellerPresentationDraft } from "../engine/types";
 
 /**
@@ -141,6 +142,28 @@ export function StepProperty({ draft, setDraft }: StepPropertyProps) {
         <p className="mt-1 text-xs text-gray-500">
           The home you&apos;re presenting. This sets the address and the
           headline photo buyers see first.
+        </p>
+        {/* Anticipation Layer (v1.47) — reinforced at-start anchor. A
+            slightly more prominent, aspirationally framed link so the
+            agent begins with the destination in mind. Personalizes with
+            preparedFor when present; falls back to a generic phrasing
+            otherwise. Same swappable URL constant as the wizard chrome;
+            target="_blank" preserves the in-progress draft. */}
+        <p className="mt-3 text-sm text-neutral-400">
+          {draft.preparedFor
+            ? `Building ${draft.preparedFor}'s presentation. `
+            : null}
+          <a
+            href={COHORT_EXAMPLE_URL}
+            target="_blank"
+            rel="noopener noreferrer"
+            data-testid="cohort-example-link-step1"
+            className="text-mint underline-offset-2 transition-opacity hover:underline hover:opacity-90"
+          >
+            {draft.preparedFor
+              ? "Here's what they'll receive →"
+              : "Here's what your seller receives →"}
+          </a>
         </p>
       </header>
 
