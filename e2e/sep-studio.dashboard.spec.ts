@@ -123,7 +123,7 @@ test.describe('SEP-S Studio dashboard shell (v1.47 Lane A)', () => {
     await expect(page.getByTestId('sep-studio-modal')).toHaveCount(0);
   });
 
-  test('every tile carries an entitlement gate marker (resolver wiring proof)', async ({
+  test('live tile carries an entitlement gate marker; cohort-gated tiles carry the coming-soon marker (wiring proof)', async ({
     page,
   }) => {
     await seedBrandProfile(page);
@@ -132,16 +132,28 @@ test.describe('SEP-S Studio dashboard shell (v1.47 Lane A)', () => {
       page.getByTestId('sep-tile-seller-presentation'),
     ).toBeVisible({ timeout: 10_000 });
 
-    // 4 Win + 2 Launch = 6 stage tiles all carry data-gate. The
-    // flagship is a Link (not a registry-bound Tile), so it doesn't
-    // and shouldn't carry data-gate — Stage 3 gating, when it lands,
-    // attaches to the individual templates on /social-animator.
-    const tiles = page.locator('[data-testid^="sep-tile-"]');
-    const count = await tiles.count();
-    expect(count).toBeGreaterThanOrEqual(6);
-    for (let i = 0; i < count; i++) {
-      const gate = await tiles.nth(i).getAttribute('data-gate');
-      expect(gate === 'available' || gate === 'locked').toBe(true);
+    // v1.47 cohort gating (COHORT_LIVE_SKILLS): only seller-presentation
+    // is live. The live tile still flows through the entitlement resolver
+    // (Link + data-gate). Every other Win/Launch tile is dimmed + rendered
+    // as a non-interactive "Coming soon" <div> (data-coming-soon, no
+    // data-gate, no href). The flagship is a Link (not a registry-bound
+    // Tile) so it carries neither marker.
+    const live = page.getByTestId('sep-tile-seller-presentation');
+    const gate = await live.getAttribute('data-gate');
+    expect(gate === 'available' || gate === 'locked').toBe(true);
+    await expect(live).not.toHaveAttribute('data-coming-soon', 'true');
+
+    // 4 Win + 2 Launch = 6 stage tiles; the 5 non-live ones are coming-soon.
+    const all = page.locator('[data-testid^="sep-tile-"]');
+    expect(await all.count()).toBeGreaterThanOrEqual(6);
+
+    const soon = page.locator('[data-testid^="sep-tile-"][data-coming-soon="true"]');
+    expect(await soon.count()).toBe(5);
+    const soonCount = await soon.count();
+    for (let i = 0; i < soonCount; i++) {
+      // Non-interactive: no href (it's a <div>, not a Link) + aria-disabled.
+      await expect(soon.nth(i)).not.toHaveAttribute('href');
+      await expect(soon.nth(i)).toHaveAttribute('aria-disabled', 'true');
     }
   });
 
@@ -159,7 +171,7 @@ test.describe('SEP-S Studio dashboard shell (v1.47 Lane A)', () => {
     await expect(page.getByTestId('sep-stage-visibility')).toBeVisible();
   });
 
-  test('?testTier=pro renders the same tile set as default — wiring stable across tiers', async ({
+  test('?testTier=pro renders the same tile set as default — cohort gate is independent of tier', async ({
     page,
   }) => {
     await seedBrandProfile(page);
@@ -167,8 +179,17 @@ test.describe('SEP-S Studio dashboard shell (v1.47 Lane A)', () => {
     await expect(page.getByTestId('sep-studio-root')).toBeVisible({
       timeout: 10_000,
     });
+
+    // The live tile is clickable + entitlement-resolved regardless of tier.
+    const live = page.getByTestId('sep-tile-seller-presentation');
+    await expect(live).toBeVisible();
+    await expect(live).toHaveAttribute('data-gate', 'available');
+    await expect(live).toHaveAttribute('href', '/seller-presentation');
+
+    // The cohort "Coming soon" gate is presentational and tier-independent
+    // — even a pro tier sees the non-live tools as Coming soon during the
+    // cohort window (it's COHORT_LIVE_SKILLS, not the entitlement resolver).
     for (const skillId of [
-      'seller-presentation',
       'seller-intelligence-report',
       'listing-presentation',
       'open-house-prep',
@@ -177,7 +198,7 @@ test.describe('SEP-S Studio dashboard shell (v1.47 Lane A)', () => {
     ]) {
       const tile = page.getByTestId(`sep-tile-${skillId}`);
       await expect(tile).toBeVisible();
-      await expect(tile).toHaveAttribute('data-gate', 'available');
+      await expect(tile).toHaveAttribute('data-coming-soon', 'true');
     }
   });
 
@@ -196,10 +217,49 @@ test.describe('SEP-S Studio dashboard shell (v1.47 Lane A)', () => {
     // literal blurb.
     await expect(sp).not.toContainText(/full seller-facing deck/i);
 
+    // listing-presentation is cohort-gated to "Coming soon" (a non-
+    // interactive <div>, no href) — but its title/blurb still bind to the
+    // registry record, NOT a design-literal override. The binding contract
+    // is what this test guards; routing is covered by the tool's own spec.
     const lp = page.getByTestId('sep-tile-listing-presentation');
     await expect(lp).toBeVisible();
     await expect(lp).toContainText('Listing Presentation One-Pager');
-    await expect(lp).toHaveAttribute('href', '/listing-presentation');
+    await expect(lp).toHaveAttribute('data-coming-soon', 'true');
+    await expect(lp).not.toHaveAttribute('href');
+  });
+
+  test('cohort gate: Seller Presentation is clickable; a non-live skill renders as a non-clickable "Coming soon" tile', async ({
+    page,
+  }) => {
+    await seedBrandProfile(page);
+    await page.goto('/dashboard');
+
+    // LIVE: Seller Presentation is a clickable Link to the wizard, with no
+    // dim/badge/disabled treatment.
+    const live = page.getByTestId('sep-tile-seller-presentation');
+    await expect(live).toBeVisible({ timeout: 10_000 });
+    await expect(live).toHaveAttribute('href', '/seller-presentation');
+    await expect(live).not.toHaveAttribute('data-coming-soon', 'true');
+    await expect(live).not.toHaveAttribute('aria-disabled', 'true');
+    await expect(
+      page.getByTestId('sep-tile-soon-seller-presentation'),
+    ).toHaveCount(0);
+
+    // NON-LIVE (seller-intelligence-report): dimmed + "Coming soon" badge +
+    // non-interactive. It still surfaces (discoverable roadmap) and keeps
+    // its registry name, but it must not navigate and must not be a tab stop
+    // (a plain <div>, no href, aria-disabled).
+    const soon = page.getByTestId('sep-tile-seller-intelligence-report');
+    await expect(soon).toBeVisible();
+    await expect(soon).toHaveAttribute('data-coming-soon', 'true');
+    await expect(soon).toHaveAttribute('aria-disabled', 'true');
+    await expect(soon).not.toHaveAttribute('href');
+    await expect(
+      page.getByTestId('sep-tile-soon-seller-intelligence-report'),
+    ).toHaveText('Coming soon');
+    // Clicking the greyed tile does nothing — URL stays on /dashboard.
+    await soon.click();
+    await expect(page).toHaveURL(/\/dashboard(?:$|\?)/);
   });
 
   test('Social Studio flagship is a marquee link that navigates to /social-animator', async ({

@@ -7,6 +7,7 @@ import {
 } from './state-detection';
 import { getActiveWorkflows, getWorkflowPrimarySkill } from './workflows';
 import { ALL_SKILLS, getSkillsByCategory } from '@/skills/registry';
+import { COHORT_LIVE_SKILLS } from '@/lib/config/cohort-live-skills';
 import { findLatestInProgress } from '@/skills/workflow-instance-storage';
 import { resolveEntitlements, resolveSkill } from '@/lib/entitlements/resolver';
 import type {
@@ -306,6 +307,7 @@ export function DashboardClient({ agentProfile }: { agentProfile: AgentProfile }
               resolved={resolved}
               stage="win"
               poster={posterForSkillId(skill.id)}
+              comingSoon={!COHORT_LIVE_SKILLS.includes(skill.id)}
             />
           ))}
         </div>
@@ -331,6 +333,7 @@ export function DashboardClient({ agentProfile }: { agentProfile: AgentProfile }
               stage={'launch' satisfies TileStage}
               poster={posterForSkillId(skill.id)}
               size="md"
+              comingSoon={!COHORT_LIVE_SKILLS.includes(skill.id)}
             />
           ))}
         </div>
