@@ -3,7 +3,6 @@
 import { useEffect, useRef } from "react";
 import { ALL_TEMPLATES } from "@/templates";
 import {
-  EXTRA_BACKGROUND_FIELDS,
   getDefaultState,
   type TemplateAssets,
   type TemplateState,
@@ -96,14 +95,8 @@ export function TemplatePreview({
     ctx.fillStyle = SKELETON_BG;
     ctx.fillRect(0, 0, canvas.width, canvas.height);
 
-    // Merged state, mirroring TemplateEditor's layering so the gallery
-    // preview matches what the editor renders: shared background-style
-    // defaults (incl. the gradient default + backgroundColor2) → template
-    // defaults → sampleState (preview-only).
-    const extraDefaults: TemplateState = {};
-    for (const f of EXTRA_BACKGROUND_FIELDS) extraDefaults[f.key] = f.default;
+    // Merged state: template defaults overridden by sampleState (preview-only)
     const state: TemplateState = {
-      ...extraDefaults,
       ...getDefaultState(template),
       ...(template.sampleState ?? {}),
     };
