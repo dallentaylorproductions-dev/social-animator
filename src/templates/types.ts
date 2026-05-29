@@ -132,7 +132,10 @@ export const EXTRA_BACKGROUND_FIELDS: FieldDef[] = [
     key: "backgroundStyle",
     label: "Background style",
     type: "select",
-    default: "solid",
+    // Gradient is the default out-of-box look (v1.47 cohort polish). Solid
+    // stays selectable below. The gradient runs from the template's
+    // `background` color to `backgroundColor2`; see makePaintBackground.
+    default: "gradient",
     options: [
       { value: "solid", label: "Solid color" },
       { value: "gradient", label: "Gradient" },
