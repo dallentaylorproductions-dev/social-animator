@@ -4,6 +4,7 @@ import { kv } from "@vercel/kv";
 import { auth } from "@/lib/auth";
 import { loadAgentProfile } from "@/lib/entitlements/load-agent-profile";
 import { resolveEntitlements, resolveSkill } from "@/lib/entitlements/resolver";
+import { dailyCompImportCap } from "@/lib/entitlements/usage-caps";
 import { SELLER_PRESENTATION_SKILL } from "@/tools/seller-presentation/skill";
 import { parse as parseCsvTsv } from "@/lib/csv-tsv-parse";
 import {
@@ -30,7 +31,9 @@ import { projectCompRows } from "@/lib/ai/comp-import-project";
  *   - Auth + tier gate. aiAccess.state must be 'available'.
  *   - Rate limit. rate_limit_comp_import:<email> 10/hr, mirrors the
  *     /login pattern in src/lib/auth.ts.
- *   - Daily cap. ai_comp_import_count:<email>:<YYYY-MM-DD> 10/day.
+ *   - Daily cap. ai_comp_import_count:<email>:<YYYY-MM-DD>, per access
+ *     mode (internal-test 100 / team-invite 50 / trial 15 / paid 25,
+ *     fallback 10) — see DAILY_COMP_IMPORT_CAPS.
  *   - Raw upload never persisted. Bytes read into memory, hashed for
  *     cache, fed to parser, discarded. (kv.set / blob writes do NOT
  *     touch the raw upload — only the AI MAPPING is cached, keyed by
@@ -56,7 +59,6 @@ export const maxDuration = 30;
 const MAX_BYTES = 5 * 1024 * 1024;
 const RATE_LIMIT_WINDOW_SECONDS = 3600;
 const RATE_LIMIT_MAX_PER_HOUR = 10;
-const DAILY_CAP = 10;
 const CACHE_TTL_SECONDS = 24 * 3600;
 const MAX_CANDIDATES_RETURNED = 50;
 
@@ -195,13 +197,31 @@ export async function POST(req: Request): Promise<NextResponse<ApiOk | ApiErr>> 
     if (!e2eBypass) console.warn("[comp-import] rate-limit KV unavailable:", err);
   }
 
-  // 5) Daily cap. ai_comp_import_count:<email>:<YYYY-MM-DD>, 10/day.
+  // 5) Daily cap. ai_comp_import_count:<email>:<YYYY-MM-DD>, per access mode.
+  // Test-only header forces the daily-cap 429 so its calm copy is
+  // e2e-asserted without a live KV that can be exhausted — mirrors the
+  // x-comp-import-test-force-rate-limit pattern above. Inert in prod.
+  const dailyCap = dailyCompImportCap(ent.accessMode);
+  const testForceDailyCap =
+    process.env.NODE_ENV !== "production" &&
+    req.headers.get("x-comp-import-test-force-daily-cap") === "1";
+  if (testForceDailyCap) {
+    return NextResponse.json(
+      {
+        ok: false,
+        code: "daily-cap-hit",
+        message:
+          "You've hit today's import limit. Add comps by hand below or try again tomorrow.",
+      } satisfies ApiErr,
+      { status: 429 },
+    );
+  }
   try {
     const today = new Date().toISOString().slice(0, 10);
     const capKey = `ai_comp_import_count:${kvKeyEmail}:${today}`;
     const used = (await kv.incr(capKey)) as number;
     if (used === 1) await kv.expire(capKey, 2 * 24 * 3600);
-    if (used > DAILY_CAP) {
+    if (used > dailyCap) {
       return NextResponse.json(
         {
           ok: false,
