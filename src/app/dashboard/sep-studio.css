@@ -523,6 +523,34 @@
   z-index: 2;
 }
 
+/* cohort "Coming soon" gate (presentational, cohort-phase only — see
+ * COHORT_LIVE_SKILLS). Dimmed so it reads "resting" not "broken", and
+ * rendered as a non-interactive <div>, so the hover lift / poster zoom /
+ * CTA reveal are all suppressed. Scoped to .tile-coming-soon ONLY — the
+ * live tiles keep their exact at-rest + hover behavior. */
+.sep-studio .tile-coming-soon {
+  opacity: 0.42;
+  cursor: default;
+}
+.sep-studio .tile-coming-soon:hover {
+  border-color: var(--border);
+  background: var(--surface);
+  transform: none;
+}
+.sep-studio .tile-coming-soon:hover .tile-poster > * { transform: none; }
+.sep-studio .tile-soon {
+  position: absolute;
+  top: 12px; right: 12px;
+  z-index: 2;
+  font-family: var(--font-geist-mono), monospace;
+  font-size: 9.5px; letter-spacing: 0.08em;
+  padding: 3px 7px;
+  border-radius: 4px;
+  background: var(--bg);
+  color: var(--fg-dim);
+  border: 1px solid var(--border);
+}
+
 /* ─── flagship (Social Studio) ──────────────────────────────────────────── */
 .sep-studio .tile-flagship {
   position: relative;

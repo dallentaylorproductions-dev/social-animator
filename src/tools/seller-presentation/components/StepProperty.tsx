@@ -144,15 +144,16 @@ export function StepProperty({ draft, setDraft }: StepPropertyProps) {
           headline photo buyers see first.
         </p>
         {/* Anticipation Layer (v1.47) — reinforced at-start anchor. A
-            slightly more prominent, aspirationally framed link so the
-            agent begins with the destination in mind. Personalizes with
-            preparedFor when present; falls back to a generic phrasing
-            otherwise. Same swappable URL constant as the wizard chrome;
+            slightly more prominent link so the agent begins with the
+            destination in mind. Deliberately framed as an EXAMPLE
+            someone else already made (NOT personalized with preparedFor):
+            the canonical example shows a real agent's listing/photos/video,
+            and the old "your seller receives" phrasing made agents read it
+            as a live preview of THEIR draft. "example" removes that
+            ambiguity. Same swappable URL constant as the wizard chrome;
             target="_blank" preserves the in-progress draft. */}
         <p className="mt-3 text-sm text-neutral-400">
-          {draft.preparedFor
-            ? `Building ${draft.preparedFor}'s presentation. `
-            : null}
+          Curious where this ends up?{" "}
           <a
             href={COHORT_EXAMPLE_URL}
             target="_blank"
@@ -160,9 +161,7 @@ export function StepProperty({ draft, setDraft }: StepPropertyProps) {
             data-testid="cohort-example-link-step1"
             className="text-mint underline-offset-2 transition-opacity hover:underline hover:opacity-90"
           >
-            {draft.preparedFor
-              ? "Here's what they'll receive →"
-              : "Here's what your seller receives →"}
+            See an example finished page →
           </a>
         </p>
       </header>

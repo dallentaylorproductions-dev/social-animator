@@ -15,4 +15,4 @@
  * must be pinned no-expire.
  */
 export const COHORT_EXAMPLE_URL = "https://studio.simplyeditpro.com/h/zgasxyb2";
-export const COHORT_EXAMPLE_LABEL = "See what your seller receives";
+export const COHORT_EXAMPLE_LABEL = "See an example seller page";

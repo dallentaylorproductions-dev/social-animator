@@ -76,7 +76,7 @@ test.describe('Seller Presentation — Anticipation Layer cohort link', () => {
     }
   });
 
-  test('Step 1 reinforced anchor resolves to the same URL and opens a new tab', async ({
+  test('Step 1 reinforced anchor frames the destination as an EXAMPLE (never personalized)', async ({
     page,
   }) => {
     await page.goto('/seller-presentation');
@@ -88,18 +88,22 @@ test.describe('Seller Presentation — Anticipation Layer cohort link', () => {
     await expect(step1Link).toHaveAttribute('target', '_blank');
     await expect(step1Link).toHaveAttribute('rel', /noopener/);
 
-    // Generic (no preparedFor) phrasing on a fresh draft.
-    await expect(step1Link).toContainText("Here's what your seller receives");
+    // v1.47 cohort copy fix: the canonical link opens a REAL agent's
+    // example page, so it MUST read as someone else's finished example —
+    // not as a preview of the agent's own in-progress draft. The old
+    // "your seller receives" / preparedFor-personalized phrasing caused
+    // exactly that confusion (Dallen's 2026-05-28 smoke).
+    await expect(step1Link).toContainText('See an example finished page');
+    await expect(step1Link).not.toContainText(/your seller receives/i);
 
-    // Personalizes once preparedFor is filled — the link still points at
-    // the same canonical URL, only the lead-in/copy changes.
+    // The anchor must NOT personalize off preparedFor. Filling it changes
+    // nothing about the example link's framing (the example is not the
+    // agent's seller), and no "Building …'s presentation." lead-in appears.
     await page
       .getByTestId('step-property-prepared-for')
       .fill('the Halloran family');
-    await expect(
-      page.getByText("Building the Halloran family's presentation."),
-    ).toBeVisible();
-    await expect(step1Link).toContainText("Here's what they'll receive");
+    await expect(step1Link).toContainText('See an example finished page');
+    await expect(page.getByText(/Building .+ presentation\./)).toHaveCount(0);
     await expect(step1Link).toHaveAttribute('href', COHORT_EXAMPLE_URL);
   });
 });

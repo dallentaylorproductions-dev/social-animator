@@ -75,6 +75,14 @@ interface TileProps {
   stage: TileStage;
   poster: ReactElement;
   size?: TileSize;
+  /**
+   * Cohort-phase gate (NOT an entitlement gate). When true the tile is
+   * dimmed, badged "Coming soon", and rendered as a plain non-interactive
+   * <div> (no href, no tab stop) so the cohort sees the roadmap without a
+   * dead-end click. Driven by COHORT_LIVE_SKILLS at the dashboard. The
+   * tool's route still exists — this is presentational only.
+   */
+  comingSoon?: boolean;
 }
 
 /**
@@ -84,12 +92,49 @@ interface TileProps {
  * initial port carried so the design's literal copy could never drift
  * from the skill's actual `name` / `purpose`.
  */
-export function Tile({ resolved, stage, poster, size = 'sm' }: TileProps) {
+export function Tile({ resolved, stage, poster, size = 'sm', comingSoon = false }: TileProps) {
   const { skill, coreAccess } = resolved;
   const locked = coreAccess.state !== 'available';
   const title = skill.name;
   const blurb = skill.purpose;
   const formats = formatsForOutputs(skill.outputs);
+
+  // Body is identical in both modes — only the wrapper element and the
+  // corner indicator / CTA differ. Shared so the visual card stays
+  // pixel-identical whether it's clickable or "Coming soon".
+  const body = (
+    <>
+      <div className="tile-poster">{poster}</div>
+      <div className="tile-body">
+        <div className="tile-meta">
+          <StageDot stage={stage} />
+          <FormatChips formats={formats} />
+        </div>
+        <h3 className="tile-title">{title}</h3>
+        <p className="tile-blurb">{blurb}</p>
+      </div>
+    </>
+  );
+
+  // Cohort "Coming soon" tile: a plain <div> (not a Link/button) so it
+  // never navigates and is skipped by keyboard focus, dimmed + badged.
+  if (comingSoon) {
+    return (
+      <div
+        className={`tile tile-${size} tile-coming-soon`}
+        data-testid={`sep-tile-${skill.id}`}
+        data-coming-soon="true"
+        data-stage={stage}
+        aria-disabled="true"
+        aria-label={`${title} — coming soon`}
+      >
+        <span className="tile-soon" data-testid={`sep-tile-soon-${skill.id}`}>
+          Coming soon
+        </span>
+        {body}
+      </div>
+    );
+  }
 
   return (
     <Link
@@ -110,15 +155,7 @@ export function Tile({ resolved, stage, poster, size = 'sm' }: TileProps) {
           ▣
         </span>
       )}
-      <div className="tile-poster">{poster}</div>
-      <div className="tile-body">
-        <div className="tile-meta">
-          <StageDot stage={stage} />
-          <FormatChips formats={formats} />
-        </div>
-        <h3 className="tile-title">{title}</h3>
-        <p className="tile-blurb">{blurb}</p>
-      </div>
+      {body}
       <span className="tile-cta" aria-hidden>
         Open →
       </span>

@@ -118,11 +118,14 @@ test.describe('Seller Intelligence Report — dashboard discovery', () => {
       timeout: 10_000,
     });
 
-    // Tile testid is stable across cosmetic copy changes; href is the
-    // load-bearing routing contract (SkillRoute('seller-intelligence-report')
-    // → '/seller-intelligence-report').
+    // SIR still surfaces as a discoverable tile, but during the v1.47
+    // cohort it's gated to "Coming soon" (COHORT_LIVE_SKILLS = only
+    // seller-presentation) — rendered as a non-interactive <div>, so it no
+    // longer carries an href. The tool's route still exists and is covered
+    // by this file's functional tests (page.goto('/seller-intelligence-report')).
     const sirTile = page.getByTestId('sep-tile-seller-intelligence-report');
     await expect(sirTile).toBeVisible();
-    await expect(sirTile).toHaveAttribute('href', '/seller-intelligence-report');
+    await expect(sirTile).toHaveAttribute('data-coming-soon', 'true');
+    await expect(sirTile).not.toHaveAttribute('href');
   });
 });
