@@ -3,6 +3,7 @@
 import Link from 'next/link';
 import type { CallableSkill } from '@/skills/types';
 import { getRecommendedNextSkills } from '@/skills/registry';
+import { isLiveSkillForCohort } from '@/lib/config/cohort-live-skills';
 import type { Workflow } from '../workflows';
 import { skillRoute } from './skill-route';
 import { posterForSkillId } from './posters/posterForSkillId';
@@ -32,7 +33,13 @@ export function HeroNextAction({
   primarySkill: CallableSkill;
   resumeAvailable?: boolean;
 }) {
-  const nextSkills = getRecommendedNextSkills(primarySkill.id);
+  // v1.47 cohort polish: queue chips are gated through the same
+  // live-for-cohort filter as the primary CTA so a chip never points to
+  // a Coming-soon tool. When nothing live remains the whole "Then queue"
+  // row drops out rather than rendering an empty label.
+  const nextSkills = getRecommendedNextSkills(primarySkill.id).filter((s) =>
+    isLiveSkillForCohort(s.id),
+  );
   const primaryLabel = resumeAvailable ? 'Resume your draft' : primarySkill.name;
 
   return (

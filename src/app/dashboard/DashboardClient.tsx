@@ -7,7 +7,10 @@ import {
 } from './state-detection';
 import { getActiveWorkflows, getWorkflowPrimarySkill } from './workflows';
 import { ALL_SKILLS, getSkillsByCategory } from '@/skills/registry';
-import { COHORT_LIVE_SKILLS } from '@/lib/config/cohort-live-skills';
+import {
+  COHORT_LIVE_SKILLS,
+  isLiveSkillForCohort,
+} from '@/lib/config/cohort-live-skills';
 import { findLatestInProgress } from '@/skills/workflow-instance-storage';
 import { resolveEntitlements, resolveSkill } from '@/lib/entitlements/resolver';
 import type {
@@ -128,7 +131,10 @@ interface WelcomeSnapshot {
 function readWelcomeSnapshot(): WelcomeSnapshot {
   const brand = readJson<{ agentName?: string }>('socanim_brand_settings');
   const fullName = brand?.agentName?.trim() ?? '';
-  const firstName = fullName ? fullName.split(/\s+/)[0] : 'there';
+  // Fallback "Agent" (not "there") when no brand/agent name is set, so the
+  // greeting reads "Welcome back, Agent." instead of "Welcome back, there."
+  // (v1.47 cohort polish — surfaced in production smoke 2026-05-29).
+  const firstName = fullName ? fullName.split(/\s+/)[0] : 'Agent';
 
   const parts: string[] = [];
   const listing = readJson<{ address?: string }>('socanim_listing_profile');
@@ -161,7 +167,7 @@ export function DashboardClient({ agentProfile }: { agentProfile: AgentProfile }
   const [activeStates, setActiveStates] = useState<WorkflowState[]>([]);
   const [brandConfigured, setBrandConfigured] = useState<boolean | null>(null);
   const [welcome, setWelcome] = useState<WelcomeSnapshot>({
-    firstName: 'there',
+    firstName: 'Agent',
     subtitle: 'Ready when you are.',
   });
   const [resumableSkillIds, setResumableSkillIds] = useState<Set<string>>(
@@ -203,11 +209,18 @@ export function DashboardClient({ agentProfile }: { agentProfile: AgentProfile }
   );
 
   // First active workflow (priority-ordered) drives the hero card.
+  // v1.47 cohort polish: candidates are restricted to live-for-cohort
+  // skills BEFORE the priority pick, so a workflow whose primary CTA
+  // would point to a Coming-soon tool (e.g. listing-launch → listing-flyer)
+  // is skipped and the next live-priority workflow wins. If nothing
+  // matches, heroPair is null and the HeroEmptyState renders (the same
+  // calm "Ready when you are." fallback shown to a fresh agent).
   const activeWorkflows = getActiveWorkflows(activeStates);
   const heroPair = useMemo(() => {
     for (const w of activeWorkflows) {
       const skill = getWorkflowPrimarySkill(w);
       if (!skill) continue;
+      if (!isLiveSkillForCohort(skill.id)) continue;
       const resolved = resolveSkill(skill, entitlement);
       if (resolved.coreAccess.state !== 'available') continue;
       return { workflow: w, primarySkill: skill };

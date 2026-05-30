@@ -35,9 +35,16 @@ test.describe('Dashboard — state-aware navigation', () => {
     ).toHaveAttribute('href', '/settings');
   });
 
-  test('renders Listing Launch hero when a listing profile is populated', async ({
+  test('with listing populated, hero skips the cohort-gated Listing Launch workflow and falls through to a live workflow', async ({
     page,
   }) => {
+    // v1.47 cohort polish: listing-launch's primary CTA is listing-flyer,
+    // which is NOT in COHORT_LIVE_SKILLS for the cohort window. The hero
+    // candidate set is filtered to live-for-cohort skills before priority
+    // pick, so the next live workflow wins (here: 'content' →
+    // social-animator-market-update, always matched via visibility_gap_state).
+    // The fallback path is HeroEmptyState; the live-Stay-Visible path is
+    // what production hits because visibility_gap_state is always on.
     await seedBrandProfile(page);
     await seedListingProfile(page, {
       address: '1234 Test Drive NE',
@@ -48,18 +55,28 @@ test.describe('Dashboard — state-aware navigation', () => {
     await page.goto('/dashboard');
     await expect(page).not.toHaveURL(/\/login/i);
 
-    // Hero card surfaces the listing-launch workflow as a heading.
+    const primary = page.getByTestId('sep-hero-primary');
+    await expect(primary).toBeVisible({ timeout: 10_000 });
+
+    // Never points to the gated tool (was 'Listing Flyer Generator' /
+    // /listing-flyer in production prior to the cohort polish).
+    await expect(primary).not.toContainText(/listing flyer/i);
+    const href = await primary.getAttribute('href');
+    expect(href).not.toBe('/listing-flyer');
+
+    // Must point to a live destination — either the empty-state CTA
+    // (/settings) or a live skill route (/seller-presentation, or
+    // /social-animator/*). Nothing else qualifies.
+    expect(
+      href === '/settings' ||
+        href === '/seller-presentation' ||
+        (href ?? '').startsWith('/social-animator/'),
+    ).toBe(true);
+
+    // The launch heading must not appear (its primary is gated).
     await expect(
       page.getByRole('heading', { name: /launch your listing/i }),
-    ).toBeVisible({ timeout: 10_000 });
-
-    // Primary CTA → Listing Flyer Generator. The new shell renders the
-    // skill name + an arrow span; matching the substring "Listing Flyer
-    // Generator" on the link is the portable contract (the arrow span
-    // contributes "→" to the accessible name).
-    const primary = page.getByTestId('sep-hero-primary');
-    await expect(primary).toContainText('Listing Flyer Generator');
-    await expect(primary).toHaveAttribute('href', '/listing-flyer');
+    ).toHaveCount(0);
   });
 });
 
@@ -99,9 +116,16 @@ test.describe('Dashboard — Seller Presentation discovery (A7f.1)', () => {
     await expect(primary).not.toContainText(/resume your draft/i);
   });
 
-  test('Hero stays on Listing Launch when no seller state is active', async ({
+  test('Hero does NOT surface Seller Win System when no seller state is active', async ({
     page,
   }) => {
+    // Pre-v1.47-cohort-polish this test asserted Listing Launch's hero
+    // copy; that workflow's primary (listing-flyer) is now cohort-gated,
+    // so the hero either skips to the next live workflow or falls back
+    // to the empty state. The portable contract this test still owns is
+    // that without a seller-appointment trigger, Seller Win System never
+    // wins the hero (priority ordering proof, independent of which live
+    // workflow ends up filling the slot).
     await seedBrandProfile(page);
     await seedListingProfile(page, {
       address: '1234 Test Drive NE',
@@ -111,10 +135,12 @@ test.describe('Dashboard — Seller Presentation discovery (A7f.1)', () => {
 
     await page.goto('/dashboard');
 
-    // Listing Launch wins priority order, surfaces in hero.
-    await expect(
-      page.getByRole('heading', { name: /launch your listing/i }),
-    ).toBeVisible({ timeout: 10_000 });
+    // Some hero variant must render (live workflow or empty state).
+    const hero = page.locator(
+      '[data-testid="sep-hero"], [data-testid="sep-hero-empty"]',
+    );
+    await expect(hero.first()).toBeVisible({ timeout: 10_000 });
+
     // Seller Win System must NOT surface in the hero — its triggers
     // (seller_appointment_state etc.) aren't active here.
     await expect(
