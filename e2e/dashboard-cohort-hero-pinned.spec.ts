@@ -28,6 +28,30 @@ import { seedBrandProfile } from './fixtures/seed-helpers';
  */
 
 test.describe('Dashboard — cohort-pinned hero', () => {
+  test('with brand kit NOT configured, HeroEmptyState wins over the pinned hero', async ({
+    page,
+  }) => {
+    // No seedBrandProfile — socanim_brand_settings is absent so the
+    // brand-kit gate fires and "Open brand kit" must claim the hero,
+    // even though COHORT_HERO_PINNED_SKILL is set to "seller-presentation".
+    // The brand kit personalizes every downstream tool (Seller
+    // Presentation included), so it has to be the first onboarding
+    // action — pinned hero must defer.
+    await page.goto('/dashboard');
+
+    const primary = page.getByTestId('sep-hero-primary');
+    await expect(primary).toBeVisible({ timeout: 10_000 });
+    await expect(primary).toContainText('Open brand kit');
+    await expect(primary).toHaveAttribute('href', '/settings');
+
+    // The pinned hero's title must NOT appear.
+    await expect(page.getByTestId('sep-hero-title')).toHaveCount(0);
+    await expect(page.locator('text=Build your seller presentation')).toHaveCount(0);
+
+    // The empty-state hero testid IS present.
+    await expect(page.getByTestId('sep-hero-empty')).toBeVisible();
+  });
+
   test('renders the pinned single-CTA hero with no Skip and no queue chips', async ({
     page,
   }) => {

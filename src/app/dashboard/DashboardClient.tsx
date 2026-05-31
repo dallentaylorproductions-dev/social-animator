@@ -296,22 +296,26 @@ export function DashboardClient({ agentProfile }: { agentProfile: AgentProfile }
             is a phase-2 ticket; "0 / 0 / 0" reads worse than nothing. */}
       </section>
 
-      {/* HERO "UP NEXT" — three branches:
-            (1) COHORT_HERO_PINNED_SKILL set → pinned single-CTA hero
-                (suppresses the activity engine for the cohort window).
-            (2) brand configured + heroPair → activity-based hero.
-            (3) fallback → empty-state hero (brand-not-configured wins
-                over any matched workflow, since cadence states like
-                visibility_gap_state are always on and would otherwise
-                jump a fresh account straight to a Social-template
-                recommendation before brand setup).
-          Setting COHORT_HERO_PINNED_SKILL back to null restores the
-          old two-branch behavior byte-for-byte. */}
-      {COHORT_HERO_PINNED_SKILL === 'seller-presentation' ? (
+      {/* HERO "UP NEXT" — brand-kit gate wins first.
+            (1) !brandConfigured → HeroEmptyState ("Open brand kit").
+                The brand kit personalizes every downstream tool, so the
+                empty-state CTA always wins until the kit is filled —
+                even when COHORT_HERO_PINNED_SKILL is set.
+            (2) brand configured + COHORT_HERO_PINNED_SKILL → HeroPinned
+                (slim single-CTA Seller Presentation hero for the
+                cohort window).
+            (3) brand configured + heroPair → activity-based hero.
+            (4) fallback → HeroEmptyState (brand configured but no
+                matching workflow — calm "Ready when you are." surface).
+          Setting COHORT_HERO_PINNED_SKILL back to null collapses (1)+
+          (3)+(4) into the v1.47 two-branch behavior byte-for-byte. */}
+      {!brandConfigured ? (
+        <HeroEmptyState />
+      ) : COHORT_HERO_PINNED_SKILL === 'seller-presentation' ? (
         <HeroPinned
           resumeAvailable={resumableSkillIds.has('seller-presentation')}
         />
-      ) : brandConfigured && heroPair ? (
+      ) : heroPair ? (
         <HeroNextAction
           workflow={heroPair.workflow}
           primarySkill={heroPair.primarySkill}
