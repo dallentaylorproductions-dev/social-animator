@@ -35,6 +35,10 @@ interface Props {
   mappingNotes: MappingNote[];
   totalRows: number;
   returnedCount: number;
+  /** Input mode that produced these candidates. Drives the optional
+   *  "PDF parsed via vision — verify the numbers" hint at the top of
+   *  the modal. Defaults to "csv" (the legacy path). */
+  mode?: "csv" | "pdf";
   onApply: (selected: ImportedComp[]) => void;
   onCancel: () => void;
 }
@@ -48,6 +52,7 @@ export function ImportCompsReview({
   mappingNotes,
   totalRows,
   returnedCount,
+  mode = "csv",
   onApply,
   onCancel,
 }: Props) {
@@ -129,6 +134,16 @@ export function ImportCompsReview({
             ✕
           </button>
         </header>
+
+        {mode === "pdf" && (
+          <p
+            className="rounded border border-amber-700/50 bg-amber-950/40 p-3 text-xs leading-relaxed text-amber-200"
+            data-testid="sep-comps-import-review-vision-hint"
+          >
+            <span className="font-semibold">PDF parsed via vision —</span>{" "}
+            verify the numbers carefully. CSV/TSV is the most accurate path.
+          </p>
+        )}
 
         {/* Mapping meta — surface what the AI matched, one tap away from a fix. */}
         <MappingMeta notes={mappingNotes} />

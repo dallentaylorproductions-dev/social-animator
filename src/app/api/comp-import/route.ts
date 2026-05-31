@@ -16,6 +16,12 @@ import {
   MissingAnthropicKeyError,
 } from "@/lib/ai/anthropic-client";
 import { projectCompRows } from "@/lib/ai/comp-import-project";
+import type { ImportedComp, MappingNote } from "@/lib/ai/comp-import-project";
+import {
+  extractCompsFromPdf,
+  buildPdfCacheKey,
+  LOW_CONFIDENCE_ROW_FRACTION,
+} from "@/lib/ai/comp-import-pdf-mapper";
 
 /**
  * POST /api/comp-import (v1.47 Lane C friction-AI).
@@ -51,10 +57,12 @@ import { projectCompRows } from "@/lib/ai/comp-import-project";
  */
 
 export const runtime = "nodejs";
-// Must exceed the internal 12s AI timeout (mapColumnsWithAI timeoutMs) so a
-// slow Anthropic call trips that timeout and returns the calm ai-unavailable
-// fallback, rather than Vercel killing the lambda first (silent 502, no log).
-export const maxDuration = 30;
+// Must exceed the internal AI timeouts so a slow Anthropic call trips its own
+// timeout (and surfaces the calm ai-unavailable fallback) rather than Vercel
+// killing the lambda first (silent 502, no log). PDF extraction is meaningfully
+// slower than CSV column-mapping (~25s budget vs 12s) so the outer headroom
+// bumps from 30s to 60s.
+export const maxDuration = 60;
 
 const MAX_BYTES = 5 * 1024 * 1024;
 const RATE_LIMIT_WINDOW_SECONDS = 3600;
@@ -62,17 +70,23 @@ const RATE_LIMIT_MAX_PER_HOUR = 10;
 const CACHE_TTL_SECONDS = 24 * 3600;
 const MAX_CANDIDATES_RETURNED = 50;
 
-const ALLOWED_EXTENSIONS = new Set([".csv", ".tsv", ".txt"]);
+const CSV_EXTENSIONS = new Set([".csv", ".tsv", ".txt"]);
+const PDF_EXTENSIONS = new Set([".pdf"]);
+
+type InputMode = "csv" | "pdf";
 
 interface ApiOk {
   ok: true;
-  candidates: ReturnType<typeof projectCompRows>["comps"];
-  mappingNotes: ReturnType<typeof projectCompRows>["mappingNotes"];
+  candidates: ImportedComp[];
+  mappingNotes: MappingNote[];
   totalRows: number;
   returnedCount: number;
   skippedRowCount: number;
   cacheHit: boolean;
-  delimiter: "tab" | "comma";
+  /** "tab"/"comma" for the CSV path; "pdf" for the vision path. */
+  delimiter: "tab" | "comma" | "pdf";
+  /** Which input mode produced the candidates. UI surfaces a vision-mode hint when "pdf". */
+  mode: InputMode;
   /** Diagnostic — never PII. Useful for the handoff cost table. */
   ai?: { source: "live" | "fixture" | "cache"; latencyMs: number; retried: boolean };
 }
@@ -237,7 +251,12 @@ export async function POST(req: Request): Promise<NextResponse<ApiOk | ApiErr>> 
   }
 
   // 6) Read the upload. multipart/form-data with one File field.
-  let raw: string;
+  //    Mode is decided here by file extension — CSV/TSV/TXT goes through
+  //    the column-mapping path, PDF goes through the vision-extraction
+  //    path. Anything else returns the calm "wrong file type" error.
+  let mode: InputMode;
+  let csvText: string = "";
+  let pdfBytes: Buffer | null = null;
   try {
     const form = await req.formData();
     const file = form.get("file");
@@ -265,18 +284,24 @@ export async function POST(req: Request): Promise<NextResponse<ApiOk | ApiErr>> 
     const ext = lower.includes(".")
       ? lower.slice(lower.lastIndexOf("."))
       : "";
-    if (!ALLOWED_EXTENSIONS.has(ext)) {
+    if (CSV_EXTENSIONS.has(ext)) {
+      mode = "csv";
+      csvText = await file.text();
+    } else if (PDF_EXTENSIONS.has(ext)) {
+      mode = "pdf";
+      const ab = await file.arrayBuffer();
+      pdfBytes = Buffer.from(ab);
+    } else {
       return NextResponse.json(
         {
           ok: false,
           code: "file-format",
           message:
-            "Please upload a CSV, TSV, or TXT file from your MLS export.",
+            "Please upload a CSV, TSV, TXT, or PDF file from your MLS export.",
         } satisfies ApiErr,
         { status: 400 },
       );
     }
-    raw = await file.text();
   } catch (err) {
     if (!e2eBypass) console.warn("[comp-import] upload read failed:", err);
     return NextResponse.json(
@@ -289,11 +314,15 @@ export async function POST(req: Request): Promise<NextResponse<ApiOk | ApiErr>> 
     );
   }
 
+  if (mode === "pdf" && pdfBytes) {
+    return handlePdf(pdfBytes, e2eBypass);
+  }
+
   // 7) Parse delimiter + rows. Raw is discarded after this block —
   //    everything downstream operates on string[][].
   let parsed: ReturnType<typeof parseCsvTsv>;
   try {
-    parsed = parseCsvTsv(raw);
+    parsed = parseCsvTsv(csvText);
   } catch {
     return NextResponse.json(
       {
@@ -320,8 +349,8 @@ export async function POST(req: Request): Promise<NextResponse<ApiOk | ApiErr>> 
   // 8) Hash the FILE CONTENT (not the bytes that just rode through —
   //    they're identical, but hashing the typed string keeps it
   //    encoding-stable). Cache lookup, 24h TTL.
-  const hash = createHash("sha256").update(raw).digest("hex");
-  raw = ""; // Drop the reference; not persisted anywhere else.
+  const hash = createHash("sha256").update(csvText).digest("hex");
+  csvText = ""; // Drop the reference; not persisted anywhere else.
   // Versioned by PROMPT_VERSION — bumping it auto-invalidates prior entries.
   const cacheKey = buildCacheKey(hash);
 
@@ -401,6 +430,135 @@ export async function POST(req: Request): Promise<NextResponse<ApiOk | ApiErr>> 
     skippedRowCount: result.skippedRowCount,
     cacheHit,
     delimiter: delimiter === "\t" ? "tab" : "comma",
+    mode: "csv",
     ai: { source: aiSource, latencyMs: aiLatencyMs, retried: aiRetried },
+  } satisfies ApiOk);
+}
+
+/**
+ * PDF dispatch path — vision-mode extraction via the AIPlugPoint's
+ * already-declared `vision` mode. The model returns a flat ImportedComp
+ * shape directly (no column-mapping intermediate), and the response
+ * shape matches the CSV path so the review modal renders unchanged.
+ */
+async function handlePdf(
+  pdfBytes: Buffer,
+  e2eBypass: boolean,
+): Promise<NextResponse<ApiOk | ApiErr>> {
+  const hash = createHash("sha256").update(pdfBytes).digest("hex");
+  const cacheKey = buildPdfCacheKey(hash);
+
+  interface PdfCached {
+    candidates: ImportedComp[];
+    mappingNotes: MappingNote[];
+    totalRows: number;
+    skippedRowCount: number;
+  }
+  let cached: PdfCached | null = null;
+  try {
+    cached = (await kv.get(cacheKey)) as PdfCached | null;
+  } catch (err) {
+    if (!e2eBypass) console.warn("[comp-import] pdf cache read failed:", err);
+  }
+
+  if (cached) {
+    const trimmedCandidates = cached.candidates.slice(0, MAX_CANDIDATES_RETURNED);
+    return NextResponse.json({
+      ok: true,
+      candidates: trimmedCandidates,
+      mappingNotes: cached.mappingNotes,
+      totalRows: cached.totalRows,
+      returnedCount: trimmedCandidates.length,
+      skippedRowCount: cached.skippedRowCount,
+      cacheHit: true,
+      delimiter: "pdf",
+      mode: "pdf",
+      ai: { source: "cache", latencyMs: 0, retried: false },
+    } satisfies ApiOk);
+  }
+
+  let result;
+  try {
+    result = await extractCompsFromPdf(pdfBytes.toString("base64"));
+  } catch (err) {
+    console.error("[comp-import] PDF extraction failure", {
+      message: err instanceof Error ? err.message : String(err),
+      stack: err instanceof Error ? err.stack : undefined,
+    });
+    if (err instanceof MissingAnthropicKeyError) {
+      return NextResponse.json(
+        {
+          ok: false,
+          code: "ai-unavailable",
+          message:
+            "I couldn't read that PDF clearly. For the cleanest results, try the CSV or TSV export from your MLS — or add comps by hand below.",
+        } satisfies ApiErr,
+        { status: 502 },
+      );
+    }
+    const malformed = err instanceof Error && err.message === "ai-malformed-json";
+    return NextResponse.json(
+      {
+        ok: false,
+        code: malformed ? "ai-malformed" : "ai-unavailable",
+        message:
+          "I couldn't read that PDF clearly. For the cleanest results, try the CSV or TSV export from your MLS — or add comps by hand below.",
+      } satisfies ApiErr,
+      { status: 502 },
+    );
+  }
+
+  // Fallback gate: if the model couldn't extract any rows, OR more than
+  // LOW_CONFIDENCE_ROW_FRACTION of returned rows were low-confidence, the
+  // PDF wasn't a good fit — surface the calm "try CSV" copy rather than
+  // render a bad modal that wastes the agent's confirmation budget.
+  const tooFewRows = result.comps.length === 0;
+  const lowConfFrac =
+    result.comps.length === 0
+      ? 1
+      : result.lowConfidenceRowCount / result.comps.length;
+  if (tooFewRows || lowConfFrac > LOW_CONFIDENCE_ROW_FRACTION) {
+    return NextResponse.json(
+      {
+        ok: false,
+        code: "ai-unavailable",
+        message:
+          "PDF parsing wasn't confident on this file — for the cleanest results, try the CSV or TSV export from your MLS.",
+      } satisfies ApiErr,
+      { status: 502 },
+    );
+  }
+
+  try {
+    await kv.set(
+      cacheKey,
+      {
+        candidates: result.comps,
+        mappingNotes: result.mappingNotes,
+        totalRows: result.totalRows,
+        skippedRowCount: result.skippedRowCount,
+      },
+      { ex: CACHE_TTL_SECONDS },
+    );
+  } catch (err) {
+    if (!e2eBypass) console.warn("[comp-import] pdf cache write failed:", err);
+  }
+
+  const trimmedCandidates = result.comps.slice(0, MAX_CANDIDATES_RETURNED);
+  return NextResponse.json({
+    ok: true,
+    candidates: trimmedCandidates,
+    mappingNotes: result.mappingNotes,
+    totalRows: result.totalRows,
+    returnedCount: trimmedCandidates.length,
+    skippedRowCount: result.skippedRowCount,
+    cacheHit: false,
+    delimiter: "pdf",
+    mode: "pdf",
+    ai: {
+      source: result.source,
+      latencyMs: result.latencyMs,
+      retried: result.retried,
+    },
   } satisfies ApiOk);
 }

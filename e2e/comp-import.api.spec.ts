@@ -9,6 +9,11 @@ import {
   PROMPT_VERSION,
   type ColumnMapping,
 } from '../src/lib/ai/comp-import-mapper';
+import {
+  buildPdfCacheKey,
+  buildPdfPrompt,
+  PROMPT_VERSION_PDF,
+} from '../src/lib/ai/comp-import-pdf-mapper';
 
 /**
  * /api/comp-import — server contract (v1.47 Lane C).
@@ -32,9 +37,17 @@ const FIXTURE_PATH = path.resolve(
   __dirname,
   'fixtures/comp-import/nwmls-kirkland-sample.tsv',
 );
+const PDF_FIXTURE_PATH = path.resolve(
+  __dirname,
+  'fixtures/comp-import/nwmls-resi-agent-detail-synthetic.pdf',
+);
 
 async function loadFixture(): Promise<Buffer> {
   return readFile(FIXTURE_PATH);
+}
+
+async function loadPdfFixture(): Promise<Buffer> {
+  return readFile(PDF_FIXTURE_PATH);
 }
 
 test.describe('/api/comp-import — happy path', () => {
@@ -227,7 +240,7 @@ test.describe('/api/comp-import — calm failure modes', () => {
     expect(res.status()).toBe(400);
     const data = await res.json();
     expect(data.code).toBe('file-format');
-    expect(data.message).toMatch(/csv, tsv, or txt/i);
+    expect(data.message).toMatch(/csv, tsv, txt, or pdf/i);
   });
 
   test('empty CSV body → 400', async ({ request }) => {
@@ -394,6 +407,130 @@ test.describe('AI column-mapping — canonical override + cache versioning (Lane
     const key = buildCacheKey(fakeHash);
     expect(key).toBe(`comp_import_mapping_cache:v3:${fakeHash}`);
     expect(key).toMatch(/^comp_import_mapping_cache:v3:[0-9a-f]{64}$/);
+  });
+});
+
+test.describe('/api/comp-import — PDF (vision-mode) dispatch (v1.48)', () => {
+  test('uploads a .pdf and returns candidates with mode=pdf + delimiter=pdf', async ({
+    request,
+  }) => {
+    const bytes = await loadPdfFixture();
+    const res = await request.post('/api/comp-import?testTier=pro', {
+      multipart: {
+        file: {
+          name: 'resi-agent-detail.pdf',
+          mimeType: 'application/pdf',
+          buffer: bytes,
+        },
+      },
+    });
+    expect(res.ok()).toBe(true);
+    const data = await res.json();
+    expect(data.ok).toBe(true);
+    expect(data.mode).toBe('pdf');
+    expect(data.delimiter).toBe('pdf');
+    // Fixture short-circuits to a 2-comp PDF_FIXTURE.
+    expect(data.candidates).toHaveLength(2);
+    expect(data.totalRows).toBe(2);
+    expect(data.returnedCount).toBe(2);
+    expect(data.skippedRowCount).toBe(0);
+
+    // Mirrors the v1.48 calibration-audited row 1 — ASF override
+    // (2,742 > SFF 2,472), MM/DD/YYYY date conversion, BR single total.
+    const first = data.candidates[0];
+    expect(first.address).toContain('Tacoma');
+    expect(first.address).toContain('WA');
+    expect(first.soldPrice).toBe('$591,000');
+    expect(first.soldDate).toBe('2026-03-04');
+    expect(first.squareFeet).toBe('2,742');
+    expect(first.yearBuilt).toBe(1951);
+    expect(first.bedrooms).toBe('5');
+    expect(first.source).toBe('imported');
+
+    // Synthetic PDF mappingNotes surface field provenance (no source columns).
+    const notesByField = Object.fromEntries(
+      data.mappingNotes.map((n: { schemaField: string; sourceColumn: string | null }) => [
+        n.schemaField,
+        n.sourceColumn,
+      ]),
+    );
+    expect(notesByField.squareFeet).toBe('ASF');
+    expect(notesByField.soldPrice).toBe('SP');
+    expect(notesByField.soldDate).toBe('SLDT');
+
+    // E2E bypass routes the AI to the fixture branch, no live call.
+    expect(data.ai?.source).toBe('fixture');
+  });
+
+  test('PDF cache key is its own namespace: comp_import_mapping_cache:v1:pdf:<64-hex-sha>', () => {
+    expect(PROMPT_VERSION_PDF).toBe(1);
+    const fakeHash = 'a'.repeat(64);
+    const key = buildPdfCacheKey(fakeHash);
+    expect(key).toBe(`comp_import_mapping_cache:v1:pdf:${fakeHash}`);
+    expect(key).toMatch(/^comp_import_mapping_cache:v1:pdf:[0-9a-f]{64}$/);
+
+    // Cross-mode collision check: CSV key with the same hash has no `:pdf:` discriminator.
+    expect(buildCacheKey(fakeHash)).not.toContain(':pdf:');
+  });
+
+  test('PDF prompt embeds the NWMLS-specific cues (ASF override, %% normalization, MM/DD/YYYY)', () => {
+    const prompt = buildPdfPrompt();
+    expect(prompt).toContain('ASF');
+    expect(prompt).toContain('SFF');
+    // The override is the single biggest correctness lever — assert it's in the prompt.
+    expect(prompt).toMatch(/ALWAYS prefer .?ASF.?/i);
+    // BBC %% typo robustness.
+    expect(prompt).toContain('%%');
+    // Date format.
+    expect(prompt).toContain('MM/DD/YYYY');
+    // Sold-only filter (cohort guidance).
+    expect(prompt).toMatch(/STAT.*Sold/);
+    // Header / footer ignore directives (template chrome). The prompt
+    // spans both header and footer in one bullet — match across the
+    // newline rather than requiring the directive on a single line.
+    expect(prompt).toMatch(/IGNORE the page header/i);
+    expect(prompt).toMatch(/IGNORE[\s\S]*footer/i);
+    // Per-comp boundary cue.
+    expect(prompt).toMatch(/Listing #/);
+  });
+
+  test('PDF upload counts against the daily cap (header-forced 429)', async ({
+    request,
+  }) => {
+    const bytes = await loadPdfFixture();
+    const res = await request.post('/api/comp-import?testTier=pro', {
+      headers: { 'X-Comp-Import-Test-Force-Daily-Cap': '1' },
+      multipart: {
+        file: {
+          name: 'resi-agent-detail.pdf',
+          mimeType: 'application/pdf',
+          buffer: bytes,
+        },
+      },
+    });
+    expect(res.status()).toBe(429);
+    const data = await res.json();
+    expect(data.code).toBe('daily-cap-hit');
+    expect(data.message).toMatch(/today's import limit/i);
+  });
+
+  test('PDF upload counts against the rate limit (header-forced 429)', async ({
+    request,
+  }) => {
+    const bytes = await loadPdfFixture();
+    const res = await request.post('/api/comp-import?testTier=pro', {
+      headers: { 'X-Comp-Import-Test-Force-Rate-Limit': '1' },
+      multipart: {
+        file: {
+          name: 'resi-agent-detail.pdf',
+          mimeType: 'application/pdf',
+          buffer: bytes,
+        },
+      },
+    });
+    expect(res.status()).toBe(429);
+    const data = await res.json();
+    expect(data.code).toBe('rate-limited');
   });
 });
 
