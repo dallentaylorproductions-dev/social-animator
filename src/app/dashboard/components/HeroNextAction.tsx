@@ -160,7 +160,7 @@ export function HeroPinned({
  */
 export function HeroEmptyState() {
   return (
-    <div className="hero-card" data-testid="sep-hero-empty">
+    <div className="hero-card hero-card-empty" data-testid="sep-hero-empty">
       <div className="hero-left">
         <div className="hero-eyebrow">
           <span className="hero-dot" />
