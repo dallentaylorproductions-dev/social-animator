@@ -391,6 +391,25 @@
   margin-top: 4px;
 }
 
+/* ─── hero card — empty-state variant (HeroEmptyState polaroid cap) ──────── */
+/* The empty-state hero renders the FlyerPoster, whose .flyer-page drops its
+ * max-width inside .hero-poster-wrap (the `.hero-poster-wrap .flyer-page {
+ * max-width: none }` rule below). Because .poster is position:absolute, the
+ * wrap's `width: 100%` contributes ~0 to the `auto` hero grid track, so
+ * .hero-right collapses to its padding and the flyer renders at its own
+ * content width — overflowing and clipping at the card's right edge (v1.48
+ * desktop bug). Pinning the wrap to a definite 165px (its existing
+ * max-width; aspect-ratio 3/4 then resolves the 220px height) anchors the
+ * absolute poster and bounds the grid track, so the polaroid sits fully
+ * inside the column the way the pinned hero's does. Scoped to
+ * .hero-card-empty only — HeroPinned (.poster-pres) and the activity-engine
+ * HeroNextAction are untouched. Mobile still hides .hero-right (≤760px), so
+ * the polaroid never appears on narrow screens. */
+.sep-studio .hero-card-empty .hero-poster-wrap {
+  width: 165px;
+  flex: 0 0 auto;
+}
+
 /* ─── stage sections ────────────────────────────────────────────────────── */
 .sep-studio .stage {
   padding-top: calc(var(--pad-section) - 32px);
