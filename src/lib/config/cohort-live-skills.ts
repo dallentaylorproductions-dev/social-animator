@@ -15,3 +15,23 @@
  * not a registry-bound grid tile, so it's never gated by this list.
  */
 export const COHORT_LIVE_SKILLS: readonly string[] = ["seller-presentation"];
+
+/**
+ * True when a skill id is recommendable to a cohort agent — i.e. live as
+ * a Coming-soon-free destination. The dashboard hero "Up next" filters
+ * its candidate workflows (primary CTA) and chains (queue chips) through
+ * this so a cohort agent is never sent to a gated tool.
+ *
+ * Two live buckets:
+ *   1. Skills in COHORT_LIVE_SKILLS (the registry-bound grid gate).
+ *   2. Social Studio templates — id prefix "social-animator-". Social
+ *      Studio is the live flagship marquee (linked from /social-animator);
+ *      the individual templates aren't rendered as gated grid tiles, so
+ *      recommending one for the hero counts as routing into the live
+ *      Social Studio surface, not into a Coming-soon tool.
+ */
+export function isLiveSkillForCohort(skillId: string): boolean {
+  if (COHORT_LIVE_SKILLS.includes(skillId)) return true;
+  if (skillId.startsWith("social-animator-")) return true;
+  return false;
+}

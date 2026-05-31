@@ -35,9 +35,16 @@ test.describe('Dashboard — state-aware navigation', () => {
     ).toHaveAttribute('href', '/settings');
   });
 
-  test('renders Listing Launch hero when a listing profile is populated', async ({
+  test('with listing populated, hero skips the cohort-gated Listing Launch workflow and falls through to a live workflow', async ({
     page,
   }) => {
+    // v1.47 cohort polish: listing-launch's primary CTA is listing-flyer,
+    // which is NOT in COHORT_LIVE_SKILLS for the cohort window. The hero
+    // candidate set is filtered to live-for-cohort skills before priority
+    // pick, so the next live workflow wins (here: 'content' →
+    // social-animator-market-update, always matched via visibility_gap_state).
+    // The fallback path is HeroEmptyState; the live-Stay-Visible path is
+    // what production hits because visibility_gap_state is always on.
     await seedBrandProfile(page);
     await seedListingProfile(page, {
       address: '1234 Test Drive NE',
@@ -48,18 +55,28 @@ test.describe('Dashboard — state-aware navigation', () => {
     await page.goto('/dashboard');
     await expect(page).not.toHaveURL(/\/login/i);
 
-    // Hero card surfaces the listing-launch workflow as a heading.
+    const primary = page.getByTestId('sep-hero-primary');
+    await expect(primary).toBeVisible({ timeout: 10_000 });
+
+    // Never points to the gated tool (was 'Listing Flyer Generator' /
+    // /listing-flyer in production prior to the cohort polish).
+    await expect(primary).not.toContainText(/listing flyer/i);
+    const href = await primary.getAttribute('href');
+    expect(href).not.toBe('/listing-flyer');
+
+    // Must point to a live destination — either the empty-state CTA
+    // (/settings) or a live skill route (/seller-presentation, or
+    // /social-animator/*). Nothing else qualifies.
+    expect(
+      href === '/settings' ||
+        href === '/seller-presentation' ||
+        (href ?? '').startsWith('/social-animator/'),
+    ).toBe(true);
+
+    // The launch heading must not appear (its primary is gated).
     await expect(
       page.getByRole('heading', { name: /launch your listing/i }),
-    ).toBeVisible({ timeout: 10_000 });
-
-    // Primary CTA → Listing Flyer Generator. The new shell renders the
-    // skill name + an arrow span; matching the substring "Listing Flyer
-    // Generator" on the link is the portable contract (the arrow span
-    // contributes "→" to the accessible name).
-    const primary = page.getByTestId('sep-hero-primary');
-    await expect(primary).toContainText('Listing Flyer Generator');
-    await expect(primary).toHaveAttribute('href', '/listing-flyer');
+    ).toHaveCount(0);
   });
 });
 
@@ -68,9 +85,16 @@ test.describe('Dashboard — state-aware navigation', () => {
  * the new shell). Same trigger states, new tile / hero assertions.
  */
 test.describe('Dashboard — Seller Presentation discovery (A7f.1)', () => {
-  test('Hero surfaces Seller Win System with Seller Presentation primary when SIR draft exists', async ({
+  test('Hero pins to Seller Presentation with "Get started" CTA when SIR draft exists but no SP workflow instance', async ({
     page,
   }) => {
+    // Cohort window (COHORT_HERO_PINNED_SKILL = "seller-presentation"):
+    // the activity-based "Seller Win System" hero is suppressed and the
+    // pinned hero claims the slot. SIR draft alone (no Seller Presentation
+    // workflowInstance) leaves resumableSkillIds empty for SP, so the CTA
+    // reads "Get started →". Post-cohort (constant → null), this test
+    // should be restored to its prior activity-engine assertions
+    // (heading "Seller Win System", CTA "Seller Presentation").
     await seedBrandProfile(page);
     await page.addInitScript(() => {
       window.localStorage.setItem(
@@ -89,19 +113,26 @@ test.describe('Dashboard — Seller Presentation discovery (A7f.1)', () => {
     await page.goto('/dashboard');
     await expect(page).not.toHaveURL(/\/login/i);
 
-    await expect(
-      page.getByRole('heading', { name: /seller win system/i }),
-    ).toBeVisible({ timeout: 10_000 });
+    await expect(page.getByTestId('sep-hero-title')).toHaveText(
+      'Build your seller presentation',
+      { timeout: 10_000 },
+    );
     const primary = page.getByTestId('sep-hero-primary');
-    await expect(primary).toContainText('Seller Presentation');
     await expect(primary).toHaveAttribute('href', '/seller-presentation');
-    // No resume affordance — no in-flight WorkflowInstance.
-    await expect(primary).not.toContainText(/resume your draft/i);
+    await expect(primary).toContainText('Get started');
+    await expect(primary).not.toContainText(/continue/i);
   });
 
-  test('Hero stays on Listing Launch when no seller state is active', async ({
+  test('Hero does NOT surface Seller Win System when no seller state is active', async ({
     page,
   }) => {
+    // Pre-v1.47-cohort-polish this test asserted Listing Launch's hero
+    // copy; that workflow's primary (listing-flyer) is now cohort-gated,
+    // so the hero either skips to the next live workflow or falls back
+    // to the empty state. The portable contract this test still owns is
+    // that without a seller-appointment trigger, Seller Win System never
+    // wins the hero (priority ordering proof, independent of which live
+    // workflow ends up filling the slot).
     await seedBrandProfile(page);
     await seedListingProfile(page, {
       address: '1234 Test Drive NE',
@@ -111,10 +142,12 @@ test.describe('Dashboard — Seller Presentation discovery (A7f.1)', () => {
 
     await page.goto('/dashboard');
 
-    // Listing Launch wins priority order, surfaces in hero.
-    await expect(
-      page.getByRole('heading', { name: /launch your listing/i }),
-    ).toBeVisible({ timeout: 10_000 });
+    // Some hero variant must render (live workflow or empty state).
+    const hero = page.locator(
+      '[data-testid="sep-hero"], [data-testid="sep-hero-empty"]',
+    );
+    await expect(hero.first()).toBeVisible({ timeout: 10_000 });
+
     // Seller Win System must NOT surface in the hero — its triggers
     // (seller_appointment_state etc.) aren't active here.
     await expect(
@@ -142,9 +175,19 @@ test.describe('Dashboard — Seller Presentation discovery (A7f.1)', () => {
     await expect(tile).toHaveAttribute('href', '/seller-presentation');
   });
 
-  test('Resume your draft affordance surfaces when a Seller Presentation WorkflowInstance exists', async ({
+  test('Hero CTA reads "Continue seller presentation" when a Seller Presentation WorkflowInstance exists', async ({
     page,
   }) => {
+    // Cohort window (COHORT_HERO_PINNED_SKILL = "seller-presentation"):
+    // the activity-based "Seller Win System → Resume your draft" hero is
+    // suppressed and the pinned hero claims the slot. An in-flight SP
+    // workflowInstance puts seller-presentation into resumableSkillIds,
+    // so the pinned CTA toggles from "Get started →" to
+    // "Continue seller presentation →" (both still link to
+    // /seller-presentation; the wizard resolves resume vs. fresh
+    // internally per A6.1). Post-cohort (constant → null), this test
+    // should be restored to its prior activity-engine assertions
+    // (heading "Seller Win System", CTA "Resume your draft").
     await seedBrandProfile(page);
     await page.addInitScript(() => {
       const now = new Date().toISOString();
@@ -167,13 +210,12 @@ test.describe('Dashboard — Seller Presentation discovery (A7f.1)', () => {
 
     await page.goto('/dashboard');
 
-    // In-flight instance triggers seller_appointment_state → Seller Win
-    // hero with the resume label baked into the primary CTA.
-    await expect(
-      page.getByRole('heading', { name: /seller win system/i }),
-    ).toBeVisible({ timeout: 10_000 });
+    await expect(page.getByTestId('sep-hero-title')).toHaveText(
+      'Build your seller presentation',
+      { timeout: 10_000 },
+    );
     const primary = page.getByTestId('sep-hero-primary');
-    await expect(primary).toContainText(/resume your draft/i);
+    await expect(primary).toContainText('Continue seller presentation');
     await expect(primary).toHaveAttribute('href', '/seller-presentation');
   });
 });

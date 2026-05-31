@@ -225,9 +225,16 @@
 }
 
 /* ─── hero "up next" card ───────────────────────────────────────────────── */
+/* Layout rule (v1.47 cohort polish): card height is driven by left-column
+ * content, not the polaroid. Right column sizes to its content (`auto`)
+ * so the polaroid never carves out empty space the left can't use; both
+ * columns vertically center inside the card so a short left side leaves
+ * no top-anchored dead zone. Same rules apply to the slim pinned variant
+ * and the post-cohort activity variant — only paddings/gaps differ. */
 .sep-studio .hero-card {
   display: grid;
-  grid-template-columns: minmax(0, 1.15fr) minmax(0, 1fr);
+  grid-template-columns: minmax(0, 1fr) auto;
+  align-items: stretch;
   gap: 0;
   background:
     radial-gradient(ellipse at top right, color-mix(in oklch, var(--accent) 14%, transparent) 0%, transparent 55%),
@@ -251,6 +258,7 @@
 .sep-studio .hero-left {
   padding: 40px 44px 38px;
   display: flex; flex-direction: column; gap: 18px;
+  justify-content: center;
   position: relative;
 }
 .sep-studio .hero-eyebrow {
@@ -339,13 +347,16 @@
       color-mix(in oklch, var(--accent) 3%, transparent) 22px 23px
     ),
     linear-gradient(180deg, oklch(0.22 0.008 80), oklch(0.18 0.008 80));
-  display: grid; place-items: center;
-  padding: 40px;
+  display: flex; align-items: center; justify-content: center;
+  padding: 28px;
   border-left: 1px solid var(--border);
+  min-height: 0;
 }
 .sep-studio .hero-poster-wrap {
   position: relative;
-  width: 100%; max-width: 320px;
+  width: 100%;
+  max-width: 165px;
+  max-height: 220px;
   aspect-ratio: 3 / 4;
   transform: rotate(-3deg);
   transition: transform .4s cubic-bezier(.2,.8,.2,1);
@@ -357,6 +368,27 @@
   font-family: var(--font-geist-mono), monospace;
   font-size: 10px; letter-spacing: 0.14em;
   color: var(--fg-dim);
+}
+
+/* ─── hero card — slim variant (cohort-pinned mode) ─────────────────────── */
+/* Cohort polish (v1.47): when the hero is pinned to a single CTA via
+ * COHORT_HERO_PINNED_SKILL, drop subtitle + Skip + Then-queue and trim
+ * the card's vertical paddings. The flex-to-content layout (max-height
+ * cap on the polaroid + columns vertically centered) is shared with the
+ * default variant — slim only tightens the inter-element gap and
+ * paddings so the card resolves into the ~240-280px-tall band the
+ * pinned single-action frame is designed for. Setting
+ * COHORT_HERO_PINNED_SKILL back to null suppresses .hero-card-slim and
+ * the default hero card paddings + activity-based render return. */
+.sep-studio .hero-card-slim .hero-left {
+  padding: 28px 44px 26px;
+  gap: 14px;
+}
+.sep-studio .hero-card-slim .hero-right {
+  padding: 22px;
+}
+.sep-studio .hero-card-slim .hero-actions {
+  margin-top: 4px;
 }
 
 /* ─── stage sections ────────────────────────────────────────────────────── */

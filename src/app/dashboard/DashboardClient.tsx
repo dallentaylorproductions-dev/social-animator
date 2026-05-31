@@ -7,7 +7,11 @@ import {
 } from './state-detection';
 import { getActiveWorkflows, getWorkflowPrimarySkill } from './workflows';
 import { ALL_SKILLS, getSkillsByCategory } from '@/skills/registry';
-import { COHORT_LIVE_SKILLS } from '@/lib/config/cohort-live-skills';
+import {
+  COHORT_LIVE_SKILLS,
+  isLiveSkillForCohort,
+} from '@/lib/config/cohort-live-skills';
+import { COHORT_HERO_PINNED_SKILL } from '@/lib/config/cohort-hero';
 import { findLatestInProgress } from '@/skills/workflow-instance-storage';
 import { resolveEntitlements, resolveSkill } from '@/lib/entitlements/resolver';
 import type {
@@ -15,7 +19,11 @@ import type {
   EntitlementContext,
 } from '@/lib/entitlements/types';
 import type { CallableSkill, WorkflowState } from '@/skills/types';
-import { HeroNextAction, HeroEmptyState } from './components/HeroNextAction';
+import {
+  HeroNextAction,
+  HeroPinned,
+  HeroEmptyState,
+} from './components/HeroNextAction';
 import { StageHeader } from './components/StageHeader';
 import { Tile, type TileStage } from './components/Tile';
 import { posterForSkillId } from './components/posters/posterForSkillId';
@@ -128,7 +136,10 @@ interface WelcomeSnapshot {
 function readWelcomeSnapshot(): WelcomeSnapshot {
   const brand = readJson<{ agentName?: string }>('socanim_brand_settings');
   const fullName = brand?.agentName?.trim() ?? '';
-  const firstName = fullName ? fullName.split(/\s+/)[0] : 'there';
+  // Fallback "Agent" (not "there") when no brand/agent name is set, so the
+  // greeting reads "Welcome back, Agent." instead of "Welcome back, there."
+  // (v1.47 cohort polish — surfaced in production smoke 2026-05-29).
+  const firstName = fullName ? fullName.split(/\s+/)[0] : 'Agent';
 
   const parts: string[] = [];
   const listing = readJson<{ address?: string }>('socanim_listing_profile');
@@ -161,7 +172,7 @@ export function DashboardClient({ agentProfile }: { agentProfile: AgentProfile }
   const [activeStates, setActiveStates] = useState<WorkflowState[]>([]);
   const [brandConfigured, setBrandConfigured] = useState<boolean | null>(null);
   const [welcome, setWelcome] = useState<WelcomeSnapshot>({
-    firstName: 'there',
+    firstName: 'Agent',
     subtitle: 'Ready when you are.',
   });
   const [resumableSkillIds, setResumableSkillIds] = useState<Set<string>>(
@@ -203,11 +214,18 @@ export function DashboardClient({ agentProfile }: { agentProfile: AgentProfile }
   );
 
   // First active workflow (priority-ordered) drives the hero card.
+  // v1.47 cohort polish: candidates are restricted to live-for-cohort
+  // skills BEFORE the priority pick, so a workflow whose primary CTA
+  // would point to a Coming-soon tool (e.g. listing-launch → listing-flyer)
+  // is skipped and the next live-priority workflow wins. If nothing
+  // matches, heroPair is null and the HeroEmptyState renders (the same
+  // calm "Ready when you are." fallback shown to a fresh agent).
   const activeWorkflows = getActiveWorkflows(activeStates);
   const heroPair = useMemo(() => {
     for (const w of activeWorkflows) {
       const skill = getWorkflowPrimarySkill(w);
       if (!skill) continue;
+      if (!isLiveSkillForCohort(skill.id)) continue;
       const resolved = resolveSkill(skill, entitlement);
       if (resolved.coreAccess.state !== 'available') continue;
       return { workflow: w, primarySkill: skill };
@@ -278,11 +296,26 @@ export function DashboardClient({ agentProfile }: { agentProfile: AgentProfile }
             is a phase-2 ticket; "0 / 0 / 0" reads worse than nothing. */}
       </section>
 
-      {/* HERO "UP NEXT" — brand-not-configured wins over any matched
-          workflow (cadence states like visibility_gap_state are always
-          on, so without this gate a fresh account would jump straight
-          to a Social-template recommendation before brand setup). */}
-      {brandConfigured && heroPair ? (
+      {/* HERO "UP NEXT" — brand-kit gate wins first.
+            (1) !brandConfigured → HeroEmptyState ("Open brand kit").
+                The brand kit personalizes every downstream tool, so the
+                empty-state CTA always wins until the kit is filled —
+                even when COHORT_HERO_PINNED_SKILL is set.
+            (2) brand configured + COHORT_HERO_PINNED_SKILL → HeroPinned
+                (slim single-CTA Seller Presentation hero for the
+                cohort window).
+            (3) brand configured + heroPair → activity-based hero.
+            (4) fallback → HeroEmptyState (brand configured but no
+                matching workflow — calm "Ready when you are." surface).
+          Setting COHORT_HERO_PINNED_SKILL back to null collapses (1)+
+          (3)+(4) into the v1.47 two-branch behavior byte-for-byte. */}
+      {!brandConfigured ? (
+        <HeroEmptyState />
+      ) : COHORT_HERO_PINNED_SKILL === 'seller-presentation' ? (
+        <HeroPinned
+          resumeAvailable={resumableSkillIds.has('seller-presentation')}
+        />
+      ) : heroPair ? (
         <HeroNextAction
           workflow={heroPair.workflow}
           primarySkill={heroPair.primarySkill}
