@@ -29,6 +29,41 @@ import type { ImportedComp } from "@/lib/ai/comp-import-project";
 
 const TIMEOUT_MS = 15_000;
 
+// PDF uploads bypass Vercel's multipart parser (v1.48 hotfix v3): the parser
+// corrupts binary File bodies on Lambda before any server read runs, so the
+// client base64-encodes the PDF (browser File-API bytes are intact) and POSTs
+// a JSON body instead. The base64 of a 1 MB PDF is ~1.4 MB — well under
+// Vercel's 4.5 MB request-body cap. Cap the raw PDF at 3 MB so the encoded
+// body (~4 MB) stays under that platform limit; larger PDFs get the calm
+// "try CSV/TSV" nudge rather than a silent 413 from the edge.
+const PDF_JSON_MAX_BYTES = 3 * 1024 * 1024;
+
+/**
+ * Read a File as raw base64 (no `data:` prefix, no whitespace) in the browser.
+ * FileReader.readAsDataURL is the cleanest path — it never spreads the byte
+ * array onto the call stack (which `btoa(String.fromCharCode(...bytes))` does,
+ * blowing up on ~1 MB inputs) and yields a canonical base64 payload we can
+ * decode server-side with Buffer.from(b64, 'base64').
+ */
+function fileToBase64(file: File): Promise<string> {
+  return new Promise((resolve, reject) => {
+    const reader = new FileReader();
+    reader.onerror = () =>
+      reject(reader.error ?? new Error("file read failed"));
+    reader.onload = () => {
+      const result = reader.result;
+      if (typeof result !== "string") {
+        reject(new Error("unexpected FileReader result"));
+        return;
+      }
+      // Strip the "data:application/pdf;base64," prefix.
+      const comma = result.indexOf(",");
+      resolve(comma >= 0 ? result.slice(comma + 1) : result);
+    };
+    reader.readAsDataURL(file);
+  });
+}
+
 type State =
   | { phase: "idle" }
   | { phase: "reading" }
@@ -91,15 +126,29 @@ export function ImportCompsButton({
 
   const onFile = async (file: File | null) => {
     if (!file) return;
+
+    const isPdf =
+      /\.pdf$/i.test(file.name) || file.type === "application/pdf";
+
+    // PDF-only client guard: a raw PDF over 3 MB would base64-encode past
+    // Vercel's 4.5 MB request-body cap on the JSON path. Surface the calm
+    // CSV nudge here rather than letting the edge reject the body silently.
+    if (isPdf && file.size > PDF_JSON_MAX_BYTES) {
+      setState({
+        phase: "failed",
+        message:
+          "That PDF is a bit large to read directly. For the cleanest results, try the CSV or TSV export from your MLS — or add comps by hand below.",
+      });
+      if (inputRef.current) inputRef.current.value = "";
+      return;
+    }
+
     setState({ phase: "reading" });
     const url = new URL("/api/comp-import", window.location.origin);
     const testTier = new URLSearchParams(window.location.search).get(
       "testTier",
     );
     if (testTier) url.searchParams.set("testTier", testTier);
-
-    const form = new FormData();
-    form.append("file", file);
 
     const ctrl = new AbortController();
     const timer = setTimeout(() => ctrl.abort(), TIMEOUT_MS);
@@ -110,12 +159,29 @@ export function ImportCompsButton({
     }, 400);
 
     try {
-      const res = await fetch(url.toString(), {
-        method: "POST",
-        body: form,
-        credentials: "same-origin",
-        signal: ctrl.signal,
-      });
+      // PDF → JSON+base64 (bypasses the multipart parser that mangles binary
+      // on Lambda). CSV/TSV stays on multipart — it's valid UTF-8, survives
+      // the parser, and there's no reason to touch the working path.
+      let res: Response;
+      if (isPdf) {
+        const base64 = await fileToBase64(file);
+        res = await fetch(url.toString(), {
+          method: "POST",
+          headers: { "Content-Type": "application/json" },
+          body: JSON.stringify({ mode: "pdf", filename: file.name, base64 }),
+          credentials: "same-origin",
+          signal: ctrl.signal,
+        });
+      } else {
+        const form = new FormData();
+        form.append("file", file);
+        res = await fetch(url.toString(), {
+          method: "POST",
+          body: form,
+          credentials: "same-origin",
+          signal: ctrl.signal,
+        });
+      }
       const data = (await res.json()) as ApiResponse;
       if (!res.ok || !data.ok || !data.candidates) {
         setState({

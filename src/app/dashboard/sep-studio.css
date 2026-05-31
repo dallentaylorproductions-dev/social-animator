@@ -408,6 +408,28 @@
   width: 165px;
   flex: 0 0 auto;
 }
+/* v1.48 hotfix v3 — vertically center the polaroid + caption as one stack.
+ * .hero-right is already a flex center box; the empty state stacks the
+ * caption as a FLOW sibling below the wrap (HeroNextAction.tsx) and turns
+ * the box into a centered column. The default .hero-poster-tag is
+ * position:absolute bottom:-34px — that pins the caption below the centered
+ * wrap and makes the stack bottom-heavy (empty space above, caption kissing
+ * the bottom edge). Resetting it to static here folds the caption back into
+ * the flow so justify-content:center balances the breathing room above and
+ * below. No fixed margins — the stack stays centered as the tile height
+ * flexes (empty-state, slim-pinned, future taller activity hero). Scoped to
+ * .hero-card-empty only; HeroPinned + the activity HeroNextAction keep the
+ * absolute bottom-right caption. */
+.sep-studio .hero-card-empty .hero-right {
+  flex-direction: column;
+  gap: 20px;
+}
+.sep-studio .hero-card-empty .hero-poster-tag {
+  position: static;
+  right: auto;
+  bottom: auto;
+  text-align: center;
+}
 
 /* ─── stage sections ────────────────────────────────────────────────────── */
 .sep-studio .stage {

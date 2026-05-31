@@ -250,10 +250,82 @@ export async function POST(req: Request): Promise<NextResponse<ApiOk | ApiErr>> 
     if (!e2eBypass) console.warn("[comp-import] daily-cap KV unavailable:", err);
   }
 
-  // 6) Read the upload. multipart/form-data with one File field.
-  //    Mode is decided here by file extension — CSV/TSV/TXT goes through
-  //    the column-mapping path, PDF goes through the vision-extraction
-  //    path. Anything else returns the calm "wrong file type" error.
+  // 6) Read the upload. Two transports:
+  //    - application/json  → PDF base64 (v1.48 hotfix v3). The diagnostic
+  //      ladder confirmed Vercel/Next's multipart parser corrupts binary
+  //      File bodies on Lambda (file.size wrong, bytes mangled) BEFORE any
+  //      server read runs — no read method can recover them. The client
+  //      base64-encodes the PDF in the browser (File-API bytes are intact)
+  //      and POSTs JSON; base64 is text, so nothing mangles it in transit.
+  //      We decode here and feed the existing PDF vision mapper.
+  //    - multipart/form-data → CSV/TSV/TXT (valid UTF-8, survives the
+  //      parser) — and, defensively, PDF-via-multipart from any older
+  //      client still on the form path.
+  const contentType = (req.headers.get("content-type") ?? "").toLowerCase();
+  if (contentType.includes("application/json")) {
+    let body: { mode?: unknown; filename?: unknown; base64?: unknown };
+    try {
+      body = (await req.json()) as typeof body;
+    } catch {
+      return NextResponse.json(
+        {
+          ok: false,
+          code: "file-format",
+          message: "I couldn't read that file clearly.",
+        } satisfies ApiErr,
+        { status: 400 },
+      );
+    }
+    if (
+      body.mode !== "pdf" ||
+      typeof body.base64 !== "string" ||
+      body.base64.length === 0
+    ) {
+      return NextResponse.json(
+        {
+          ok: false,
+          code: "file-format",
+          message:
+            "Please upload a CSV, TSV, TXT, or PDF file from your MLS export.",
+        } satisfies ApiErr,
+        { status: 400 },
+      );
+    }
+    const decoded = Buffer.from(body.base64, "base64");
+    // base64 → Buffer.from never throws (it drops invalid chars), so an
+    // empty/garbage payload surfaces as an empty buffer here. The byte cap
+    // mirrors the multipart path; the %PDF guard inside handlePdf catches a
+    // payload that decoded to non-PDF bytes.
+    if (decoded.byteLength > MAX_BYTES) {
+      return NextResponse.json(
+        {
+          ok: false,
+          code: "file-too-large",
+          message:
+            "That PDF is larger than 5 MB. For the cleanest results, try the CSV or TSV export from your MLS.",
+        } satisfies ApiErr,
+        { status: 413 },
+      );
+    }
+    // [comp-import] PDF read diag — adapted to the JSON transport. The
+    // multipart-path diag (readPdfBytesResilient) logged which File->bytes
+    // method won; here the read is deterministic (base64 → Buffer), so we
+    // log the incoming/decoded sizes + magic so the smoke stays decidable.
+    if (!e2eBypass) {
+      console.log("[comp-import] PDF read diag (json)", {
+        transport: "json-base64",
+        base64Length: body.base64.length,
+        byteLength: decoded.byteLength,
+        first8: decoded.subarray(0, 5).toString("latin1"),
+        hasPdfMagic: decoded.subarray(0, 5).toString("latin1") === "%PDF-",
+      });
+    }
+    return handlePdf(decoded, e2eBypass);
+  }
+
+  //    multipart/form-data with one File field. Mode is decided by file
+  //    extension — CSV/TSV/TXT → column-mapping path, PDF → vision path.
+  //    Anything else returns the calm "wrong file type" error.
   let mode: InputMode;
   let csvText: string = "";
   let pdfBytes: Buffer | null = null;

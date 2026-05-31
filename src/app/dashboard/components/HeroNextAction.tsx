@@ -198,8 +198,14 @@ export function HeroEmptyState() {
               sits cleanly inside the column. Representative-mock parity —
               both read "your output goes here." */}
           {posterForSkillId('seller-presentation')}
-          <div className="hero-poster-tag">PREVIEW · YOUR OUTPUT</div>
         </div>
+        {/* v1.48 hotfix v3: the caption is a FLOW sibling of the wrap (not
+            the absolute bottom: -34px tag HeroPinned uses), so the empty-
+            state column flex-centers the polaroid + caption as one stack —
+            equal breathing room above and below at any hero tile height.
+            See .hero-card-empty .hero-right / .hero-poster-tag in
+            sep-studio.css. */}
+        <div className="hero-poster-tag">PREVIEW · YOUR OUTPUT</div>
       </div>
     </div>
   );

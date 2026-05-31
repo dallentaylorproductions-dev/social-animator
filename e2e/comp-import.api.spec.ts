@@ -415,14 +415,14 @@ test.describe('/api/comp-import — PDF (vision-mode) dispatch (v1.48)', () => {
   test('uploads a .pdf and returns candidates with mode=pdf + delimiter=pdf', async ({
     request,
   }) => {
+    // v1.48 hotfix v3: PDF now uploads as a JSON body with a client-side
+    // base64 payload (bypasses Vercel's binary-mangling multipart parser).
     const bytes = await loadPdfFixture();
     const res = await request.post('/api/comp-import?testTier=pro', {
-      multipart: {
-        file: {
-          name: 'resi-agent-detail.pdf',
-          mimeType: 'application/pdf',
-          buffer: bytes,
-        },
+      data: {
+        mode: 'pdf',
+        filename: 'resi-agent-detail.pdf',
+        base64: bytes.toString('base64'),
       },
     });
     expect(res.ok()).toBe(true);
@@ -526,12 +526,10 @@ test.describe('/api/comp-import — PDF (vision-mode) dispatch (v1.48)', () => {
     const bytes = await loadPdfFixture();
     const res = await request.post('/api/comp-import?testTier=pro', {
       headers: { 'X-Comp-Import-Test-Force-Daily-Cap': '1' },
-      multipart: {
-        file: {
-          name: 'resi-agent-detail.pdf',
-          mimeType: 'application/pdf',
-          buffer: bytes,
-        },
+      data: {
+        mode: 'pdf',
+        filename: 'resi-agent-detail.pdf',
+        base64: bytes.toString('base64'),
       },
     });
     expect(res.status()).toBe(429);
@@ -546,12 +544,10 @@ test.describe('/api/comp-import — PDF (vision-mode) dispatch (v1.48)', () => {
     const bytes = await loadPdfFixture();
     const res = await request.post('/api/comp-import?testTier=pro', {
       headers: { 'X-Comp-Import-Test-Force-Rate-Limit': '1' },
-      multipart: {
-        file: {
-          name: 'resi-agent-detail.pdf',
-          mimeType: 'application/pdf',
-          buffer: bytes,
-        },
+      data: {
+        mode: 'pdf',
+        filename: 'resi-agent-detail.pdf',
+        base64: bytes.toString('base64'),
       },
     });
     expect(res.status()).toBe(429);
