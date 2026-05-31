@@ -191,7 +191,13 @@ export function HeroEmptyState() {
       </div>
       <div className="hero-right">
         <div className="hero-poster-wrap">
-          {posterForSkillId('listing-flyer')}
+          {/* v1.48: render the same PresentationPoster (.poster-pres) that
+              HeroPinned uses. FlyerPoster's .flyer-page drops its max-width
+              inside the hero wrap and its address text overflowed even the
+              pinned 165px wrap; .poster-pres has no long-text content and
+              sits cleanly inside the column. Representative-mock parity —
+              both read "your output goes here." */}
+          {posterForSkillId('seller-presentation')}
           <div className="hero-poster-tag">PREVIEW · YOUR OUTPUT</div>
         </div>
       </div>

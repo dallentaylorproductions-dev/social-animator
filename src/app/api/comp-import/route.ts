@@ -290,13 +290,12 @@ export async function POST(req: Request): Promise<NextResponse<ApiOk | ApiErr>> 
     } else if (PDF_EXTENSIONS.has(ext)) {
       mode = "pdf";
       // Read raw bytes — NEVER file.text() (UTF-8 decode mangles binary).
-      // Buffer.from(arrayBuffer) returns a *view* over the ArrayBuffer; wrap
-      // in Uint8Array first to force a contiguous, offset-0 copy. This
-      // defends against runtime-specific ArrayBuffer pooling/offset quirks
-      // (the v1.48 prod 502 was Anthropic rejecting a corrupt base64 PDF
-      // that read cleanly under local Node — see handlePdf instrumentation).
-      const ab = await file.arrayBuffer();
-      pdfBytes = Buffer.from(new Uint8Array(ab));
+      // The v1.48 prod 502 was a corrupt PDF read on Vercel's Lambda
+      // (instrumentation: hasPdfMagic=false, byteLength != file size) while
+      // local Node read it cleanly. readPdfBytesResilient tries three
+      // File->bytes paths and uses the first that yields valid %PDF magic,
+      // and logs which one (and why the others failed) for the smoke.
+      pdfBytes = await readPdfBytesResilient(file, !e2eBypass);
     } else {
       return NextResponse.json(
         {
@@ -447,6 +446,91 @@ export async function POST(req: Request): Promise<NextResponse<ApiOk | ApiErr>> 
  * shape directly (no column-mapping intermediate), and the response
  * shape matches the CSV path so the review modal renders unchanged.
  */
+/**
+ * Resilient PDF byte read (v1.48 prod-502 read-path fix).
+ *
+ * The prod 502 was Anthropic rejecting a corrupt base64 PDF: on Vercel's
+ * Lambda the multipart File read returned non-PDF bytes (instrumentation:
+ * hasPdfMagic=false, byteLength != the real file size) while local Node read
+ * it cleanly. CSV (UTF-8-safe) survived; binary PDF did not.
+ *
+ * Rather than bet on one read method, try the three File->bytes paths in
+ * order and use the FIRST whose bytes start with the "%PDF-" magic. Each
+ * stresses a different layer:
+ *   - arrayBuffer: the canonical path (what was failing in prod).
+ *   - bytes():     Uint8Array straight from undici, skips the ArrayBuffer.
+ *   - stream():    re-reads through a fresh Response, sidestepping whatever
+ *                  mangled the File's own buffer.
+ *
+ * Logs file.size/type + each method's length/first8/magic, so a single smoke
+ * tells us which path is intact — or, if none is (the File is corrupt at
+ * parse time, e.g. file.size is already wrong), that the client-base64
+ * escalation is the next step. Falls back to the first successful read so the
+ * downstream %PDF guard in handlePdf still fires the calm CSV fallback.
+ */
+async function readPdfBytesResilient(
+  file: File,
+  log: boolean,
+): Promise<Buffer> {
+  const attempts: Array<[string, () => Promise<Buffer>]> = [
+    [
+      "arrayBuffer",
+      async () => Buffer.from(new Uint8Array(await file.arrayBuffer())),
+    ],
+    [
+      "bytes",
+      async () => {
+        const f = file as unknown as { bytes?: () => Promise<Uint8Array> };
+        if (typeof f.bytes !== "function") {
+          throw new Error("file.bytes() unavailable on this runtime");
+        }
+        return Buffer.from(await f.bytes());
+      },
+    ],
+    [
+      "stream",
+      async () => Buffer.from(await new Response(file.stream()).arrayBuffer()),
+    ],
+  ];
+
+  const diag: Record<string, unknown> = {
+    fileSize: file.size,
+    fileType: file.type,
+    fileName: file.name,
+  };
+  let chosen: { bytes: Buffer; method: string } | null = null;
+  let fallback: Buffer | null = null;
+
+  for (const [name, read] of attempts) {
+    try {
+      const bytes = await read();
+      fallback ??= bytes;
+      const magic = bytes.subarray(0, 5).toString("latin1") === "%PDF-";
+      diag[name] = {
+        len: bytes.length,
+        first8: bytes.toString("base64").slice(0, 8),
+        magic,
+      };
+      if (magic && !chosen) chosen = { bytes, method: name };
+    } catch (err) {
+      diag[name] = { error: err instanceof Error ? err.message : String(err) };
+    }
+  }
+
+  if (log) {
+    console.log("[comp-import] PDF read diag", {
+      chosen: chosen?.method ?? "none",
+      ...diag,
+    });
+  }
+
+  if (chosen) return chosen.bytes;
+  // No method produced valid magic — hand back the first successful read (or
+  // an empty buffer if every read threw) so the %PDF guard surfaces the calm
+  // fallback rather than crashing.
+  return fallback ?? Buffer.alloc(0);
+}
+
 async function handlePdf(
   pdfBytes: Buffer,
   e2eBypass: boolean,
