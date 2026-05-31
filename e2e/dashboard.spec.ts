@@ -85,9 +85,16 @@ test.describe('Dashboard — state-aware navigation', () => {
  * the new shell). Same trigger states, new tile / hero assertions.
  */
 test.describe('Dashboard — Seller Presentation discovery (A7f.1)', () => {
-  test('Hero surfaces Seller Win System with Seller Presentation primary when SIR draft exists', async ({
+  test('Hero pins to Seller Presentation with "Get started" CTA when SIR draft exists but no SP workflow instance', async ({
     page,
   }) => {
+    // Cohort window (COHORT_HERO_PINNED_SKILL = "seller-presentation"):
+    // the activity-based "Seller Win System" hero is suppressed and the
+    // pinned hero claims the slot. SIR draft alone (no Seller Presentation
+    // workflowInstance) leaves resumableSkillIds empty for SP, so the CTA
+    // reads "Get started →". Post-cohort (constant → null), this test
+    // should be restored to its prior activity-engine assertions
+    // (heading "Seller Win System", CTA "Seller Presentation").
     await seedBrandProfile(page);
     await page.addInitScript(() => {
       window.localStorage.setItem(
@@ -106,14 +113,14 @@ test.describe('Dashboard — Seller Presentation discovery (A7f.1)', () => {
     await page.goto('/dashboard');
     await expect(page).not.toHaveURL(/\/login/i);
 
-    await expect(
-      page.getByRole('heading', { name: /seller win system/i }),
-    ).toBeVisible({ timeout: 10_000 });
+    await expect(page.getByTestId('sep-hero-title')).toHaveText(
+      'Build your seller presentation',
+      { timeout: 10_000 },
+    );
     const primary = page.getByTestId('sep-hero-primary');
-    await expect(primary).toContainText('Seller Presentation');
     await expect(primary).toHaveAttribute('href', '/seller-presentation');
-    // No resume affordance — no in-flight WorkflowInstance.
-    await expect(primary).not.toContainText(/resume your draft/i);
+    await expect(primary).toContainText('Get started');
+    await expect(primary).not.toContainText(/continue/i);
   });
 
   test('Hero does NOT surface Seller Win System when no seller state is active', async ({
@@ -168,9 +175,19 @@ test.describe('Dashboard — Seller Presentation discovery (A7f.1)', () => {
     await expect(tile).toHaveAttribute('href', '/seller-presentation');
   });
 
-  test('Resume your draft affordance surfaces when a Seller Presentation WorkflowInstance exists', async ({
+  test('Hero CTA reads "Continue seller presentation" when a Seller Presentation WorkflowInstance exists', async ({
     page,
   }) => {
+    // Cohort window (COHORT_HERO_PINNED_SKILL = "seller-presentation"):
+    // the activity-based "Seller Win System → Resume your draft" hero is
+    // suppressed and the pinned hero claims the slot. An in-flight SP
+    // workflowInstance puts seller-presentation into resumableSkillIds,
+    // so the pinned CTA toggles from "Get started →" to
+    // "Continue seller presentation →" (both still link to
+    // /seller-presentation; the wizard resolves resume vs. fresh
+    // internally per A6.1). Post-cohort (constant → null), this test
+    // should be restored to its prior activity-engine assertions
+    // (heading "Seller Win System", CTA "Resume your draft").
     await seedBrandProfile(page);
     await page.addInitScript(() => {
       const now = new Date().toISOString();
@@ -193,13 +210,12 @@ test.describe('Dashboard — Seller Presentation discovery (A7f.1)', () => {
 
     await page.goto('/dashboard');
 
-    // In-flight instance triggers seller_appointment_state → Seller Win
-    // hero with the resume label baked into the primary CTA.
-    await expect(
-      page.getByRole('heading', { name: /seller win system/i }),
-    ).toBeVisible({ timeout: 10_000 });
+    await expect(page.getByTestId('sep-hero-title')).toHaveText(
+      'Build your seller presentation',
+      { timeout: 10_000 },
+    );
     const primary = page.getByTestId('sep-hero-primary');
-    await expect(primary).toContainText(/resume your draft/i);
+    await expect(primary).toContainText('Continue seller presentation');
     await expect(primary).toHaveAttribute('href', '/seller-presentation');
   });
 });
