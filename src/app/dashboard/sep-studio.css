@@ -359,6 +359,25 @@
   color: var(--fg-dim);
 }
 
+/* ─── hero card — slim variant (cohort-pinned mode) ─────────────────────── */
+/* Cohort polish (v1.47): when the hero is pinned to a single CTA via
+ * COHORT_HERO_PINNED_SKILL, drop subtitle + Skip + Then-queue and trim
+ * the card's vertical footprint by ~30%. Right-column poster centers
+ * against the slimmer left column via the reduced hero-right padding.
+ * Applied to .hero-card via an additional .hero-card-slim class so the
+ * default activity-based hero is unaffected — toggling the constant
+ * back to null restores the full-height card. */
+.sep-studio .hero-card-slim .hero-left {
+  padding: 28px 44px 26px;
+  gap: 14px;
+}
+.sep-studio .hero-card-slim .hero-right {
+  padding: 28px;
+}
+.sep-studio .hero-card-slim .hero-actions {
+  margin-top: 4px;
+}
+
 /* ─── stage sections ────────────────────────────────────────────────────── */
 .sep-studio .stage {
   padding-top: calc(var(--pad-section) - 32px);

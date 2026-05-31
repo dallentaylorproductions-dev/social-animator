@@ -98,6 +98,61 @@ export function HeroNextAction({
 }
 
 /**
+ * Cohort-pinned hero (v1.47 cohort polish — COHORT_HERO_PINNED_SKILL).
+ *
+ * Single-CTA Seller Presentation pin: eyebrow without the activity
+ * suffix, title-only (no subtitle), one button, no Skip link, no Then-
+ * queue chips. The card itself opts in to .hero-card-slim so the
+ * vertical footprint matches the calmer "single next action" frame.
+ *
+ * `resumeAvailable` toggles CTA copy only — the route is the same
+ * `/seller-presentation` either way; the wizard page resolves resume vs.
+ * create-fresh internally (see src/app/seller-presentation/page.tsx).
+ *
+ * Activated by DashboardClient when COHORT_HERO_PINNED_SKILL is non-null
+ * (`@/lib/config/cohort-hero`). Setting that constant back to null
+ * suppresses this component byte-for-byte and the activity-based
+ * HeroNextAction reappears — no other change required.
+ */
+export function HeroPinned({
+  resumeAvailable = false,
+}: {
+  resumeAvailable?: boolean;
+}) {
+  const ctaLabel = resumeAvailable ? 'Continue seller presentation' : 'Get started';
+
+  return (
+    <div className="hero-card hero-card-slim" data-testid="sep-hero">
+      <div className="hero-left">
+        <div className="hero-eyebrow">
+          <span className="hero-dot" />
+          UP NEXT
+        </div>
+        <h2 className="hero-title" data-testid="sep-hero-title">
+          Build your seller presentation
+        </h2>
+        <div className="hero-actions">
+          <Link
+            href="/seller-presentation"
+            className="btn btn-primary"
+            data-testid="sep-hero-primary"
+          >
+            {ctaLabel}
+            <span className="btn-arrow">→</span>
+          </Link>
+        </div>
+      </div>
+      <div className="hero-right">
+        <div className="hero-poster-wrap">
+          {posterForSkillId('seller-presentation')}
+          <div className="hero-poster-tag">PREVIEW · YOUR OUTPUT</div>
+        </div>
+      </div>
+    </div>
+  );
+}
+
+/**
  * Empty-state hero — surfaced when no workflow is active (fresh account,
  * brand profile configured but no listing / open house / SIR draft yet).
  * Calm CTA that points the agent at the next thing that always makes

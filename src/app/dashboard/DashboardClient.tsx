@@ -11,6 +11,7 @@ import {
   COHORT_LIVE_SKILLS,
   isLiveSkillForCohort,
 } from '@/lib/config/cohort-live-skills';
+import { COHORT_HERO_PINNED_SKILL } from '@/lib/config/cohort-hero';
 import { findLatestInProgress } from '@/skills/workflow-instance-storage';
 import { resolveEntitlements, resolveSkill } from '@/lib/entitlements/resolver';
 import type {
@@ -18,7 +19,11 @@ import type {
   EntitlementContext,
 } from '@/lib/entitlements/types';
 import type { CallableSkill, WorkflowState } from '@/skills/types';
-import { HeroNextAction, HeroEmptyState } from './components/HeroNextAction';
+import {
+  HeroNextAction,
+  HeroPinned,
+  HeroEmptyState,
+} from './components/HeroNextAction';
 import { StageHeader } from './components/StageHeader';
 import { Tile, type TileStage } from './components/Tile';
 import { posterForSkillId } from './components/posters/posterForSkillId';
@@ -291,11 +296,22 @@ export function DashboardClient({ agentProfile }: { agentProfile: AgentProfile }
             is a phase-2 ticket; "0 / 0 / 0" reads worse than nothing. */}
       </section>
 
-      {/* HERO "UP NEXT" — brand-not-configured wins over any matched
-          workflow (cadence states like visibility_gap_state are always
-          on, so without this gate a fresh account would jump straight
-          to a Social-template recommendation before brand setup). */}
-      {brandConfigured && heroPair ? (
+      {/* HERO "UP NEXT" — three branches:
+            (1) COHORT_HERO_PINNED_SKILL set → pinned single-CTA hero
+                (suppresses the activity engine for the cohort window).
+            (2) brand configured + heroPair → activity-based hero.
+            (3) fallback → empty-state hero (brand-not-configured wins
+                over any matched workflow, since cadence states like
+                visibility_gap_state are always on and would otherwise
+                jump a fresh account straight to a Social-template
+                recommendation before brand setup).
+          Setting COHORT_HERO_PINNED_SKILL back to null restores the
+          old two-branch behavior byte-for-byte. */}
+      {COHORT_HERO_PINNED_SKILL === 'seller-presentation' ? (
+        <HeroPinned
+          resumeAvailable={resumableSkillIds.has('seller-presentation')}
+        />
+      ) : brandConfigured && heroPair ? (
         <HeroNextAction
           workflow={heroPair.workflow}
           primarySkill={heroPair.primarySkill}
