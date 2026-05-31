@@ -289,8 +289,14 @@ export async function POST(req: Request): Promise<NextResponse<ApiOk | ApiErr>> 
       csvText = await file.text();
     } else if (PDF_EXTENSIONS.has(ext)) {
       mode = "pdf";
+      // Read raw bytes — NEVER file.text() (UTF-8 decode mangles binary).
+      // Buffer.from(arrayBuffer) returns a *view* over the ArrayBuffer; wrap
+      // in Uint8Array first to force a contiguous, offset-0 copy. This
+      // defends against runtime-specific ArrayBuffer pooling/offset quirks
+      // (the v1.48 prod 502 was Anthropic rejecting a corrupt base64 PDF
+      // that read cleanly under local Node — see handlePdf instrumentation).
       const ab = await file.arrayBuffer();
-      pdfBytes = Buffer.from(ab);
+      pdfBytes = Buffer.from(new Uint8Array(ab));
     } else {
       return NextResponse.json(
         {
@@ -477,9 +483,45 @@ async function handlePdf(
     } satisfies ApiOk);
   }
 
+  const pdfBase64 = pdfBytes.toString("base64");
+
+  // Defensive instrumentation + early guard (v1.48 prod-502 fix).
+  // Anthropic rejected the prod request with invalid_request_error
+  // "The PDF specified was not valid" at messages.0.content.0...source.base64.data
+  // — i.e. the decoded bytes weren't a valid PDF. That read cleanly under
+  // local Node, so the corruption is runtime-specific. A valid PDF's bytes
+  // begin with "%PDF" (base64 prefix "JVBERi0"). If the magic bytes are
+  // wrong here, the byte read corrupted the binary — fail fast with the calm
+  // fallback (and a greppable log) rather than burn a paid Anthropic call on
+  // a payload we already know it will reject.
+  const hasPdfMagic = pdfBytes.subarray(0, 5).toString("latin1") === "%PDF-";
+  if (!e2eBypass) {
+    console.log("[comp-import] PDF bytes check", {
+      byteLength: pdfBytes.length,
+      base64Length: pdfBase64.length,
+      base64First8: pdfBase64.slice(0, 8),
+      hasPdfMagic,
+    });
+  }
+  if (!hasPdfMagic) {
+    console.error("[comp-import] PDF read corrupted before extraction", {
+      byteLength: pdfBytes.length,
+      base64First8: pdfBase64.slice(0, 8),
+    });
+    return NextResponse.json(
+      {
+        ok: false,
+        code: "ai-unavailable",
+        message:
+          "I couldn't read that PDF clearly. For the cleanest results, try the CSV or TSV export from your MLS — or add comps by hand below.",
+      } satisfies ApiErr,
+      { status: 502 },
+    );
+  }
+
   let result;
   try {
-    result = await extractCompsFromPdf(pdfBytes.toString("base64"));
+    result = await extractCompsFromPdf(pdfBase64);
   } catch (err) {
     console.error("[comp-import] PDF extraction failure", {
       message: err instanceof Error ? err.message : String(err),
