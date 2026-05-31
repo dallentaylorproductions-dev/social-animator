@@ -39,6 +39,7 @@ type State =
       mappingNotes: MappingNote[];
       totalRows: number;
       returnedCount: number;
+      mode: "csv" | "pdf";
     }
   | { phase: "failed"; message: string };
 
@@ -54,6 +55,8 @@ interface ApiResponse {
   mappingNotes?: MappingNote[];
   totalRows?: number;
   returnedCount?: number;
+  /** "csv" | "pdf" — surfaces a "PDF parsed via vision — verify the numbers" hint in the review modal when "pdf". */
+  mode?: "csv" | "pdf";
   code?: string;
   message?: string;
 }
@@ -129,6 +132,7 @@ export function ImportCompsButton({
         mappingNotes: data.mappingNotes ?? [],
         totalRows: data.totalRows ?? data.candidates.length,
         returnedCount: data.returnedCount ?? data.candidates.length,
+        mode: data.mode ?? "csv",
       });
     } catch (err) {
       const message =
@@ -190,10 +194,21 @@ export function ImportCompsButton({
           {state.message}
         </p>
       )}
+      {/* Format hint — CSV/TSV stays the documented "best accuracy" path
+          (the column-aware mapper sees richer headers). PDF is the
+          convenience path for agents who default to a Print → PDF export
+          from their MLS. The review modal's row-by-row confirmation is
+          the safety net for any miss on the PDF side. */}
+      <p
+        className="mt-1 text-xs text-neutral-500"
+        data-testid="sep-comps-import-format-hint"
+      >
+        CSV or TSV gives the cleanest read; PDF works too.
+      </p>
       <input
         ref={inputRef}
         type="file"
-        accept=".csv,.tsv,.txt,text/csv,text/tab-separated-values,text/plain"
+        accept=".csv,.tsv,.txt,.pdf,text/csv,text/tab-separated-values,text/plain,application/pdf"
         className="hidden"
         data-testid="sep-comps-import-input"
         onChange={(e) => onFile(e.target.files?.[0] ?? null)}
@@ -204,6 +219,7 @@ export function ImportCompsButton({
           mappingNotes={state.mappingNotes}
           totalRows={state.totalRows}
           returnedCount={state.returnedCount}
+          mode={state.mode}
           onApply={onApply}
           onCancel={onCancel}
         />

@@ -15,10 +15,11 @@ import { ImportCompsButton } from "./ImportCompsButton";
  * renders the right concrete proposer UI per the substrate §3.4
  * plug-point catalog.
  *
- * Today only `import-to-comp` + `mode='csv'` (which also covers TSV —
- * the route auto-detects delimiter) is wired. `address-autofill`,
- * `copy-suggestion`, and the `mode='vision'` PDF/screenshot path
- * render null until they ship.
+ * `import-to-comp` (csv | tsv | vision) all dispatch to ImportCompsButton
+ * — that one button drives the file picker for every accepted format
+ * (CSV/TSV/PDF) and routes to the right mapper server-side by extension.
+ * `address-autofill` and `copy-suggestion` still render null until they
+ * ship.
  *
  * Per substrate §5.3: every plug-point's manual-entry fallback is
  * always available below the proposer. AIPlugPoint NEVER replaces
@@ -33,7 +34,10 @@ export interface AIPlugPointProps {
 }
 
 export function AIPlugPoint({ type, mode, draft, setDraft }: AIPlugPointProps) {
-  if (type === "import-to-comp" && (mode === "csv" || mode === "tsv")) {
+  if (
+    type === "import-to-comp" &&
+    (mode === "csv" || mode === "tsv" || mode === "vision")
+  ) {
     return <ImportCompsButton draft={draft} setDraft={setDraft} />;
   }
   // Other plug-point types render null until they ship.
