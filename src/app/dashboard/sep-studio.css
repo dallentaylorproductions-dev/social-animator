@@ -390,6 +390,23 @@
 .sep-studio .hero-card-slim .hero-actions {
   margin-top: 4px;
 }
+/* v1.48 micro-hotfix — render HeroPinned's polaroid (regression parity with
+ * HeroEmptyState). HeroPinned already renders PresentationPoster
+ * (posterForSkillId('seller-presentation') in HeroNextAction.tsx), but the
+ * same collapse the empty-state fix below describes hit it too: .poster is
+ * position:absolute, so .hero-poster-wrap's `width: 100%` contributes ~0 to
+ * the `auto` hero grid track, the right column collapses to its padding, and
+ * the polaroid renders at ~0 width — leaving only the absolute caption
+ * stretched down the right edge. PR #16 pinned the wrap to a definite 165px
+ * for .hero-card-empty only; HeroPinned uses .hero-card-slim, so it never got
+ * the cap. Same fix, same 165px (aspect-ratio 3/4 resolves the 220px height),
+ * scoped to .hero-card-slim — HeroEmptyState's scope and the activity-engine
+ * HeroNextAction (plain .hero-card) are both untouched, and mobile still hides
+ * .hero-right (≤760px) so the polaroid never appears on narrow screens. */
+.sep-studio .hero-card-slim .hero-poster-wrap {
+  width: 165px;
+  flex: 0 0 auto;
+}
 
 /* ─── hero card — empty-state variant (HeroEmptyState polaroid cap) ──────── */
 /* Because .poster is position:absolute, .hero-poster-wrap's `width: 100%`
