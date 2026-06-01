@@ -160,7 +160,7 @@ export function HeroPinned({
  */
 export function HeroEmptyState() {
   return (
-    <div className="hero-card" data-testid="sep-hero-empty">
+    <div className="hero-card hero-card-empty" data-testid="sep-hero-empty">
       <div className="hero-left">
         <div className="hero-eyebrow">
           <span className="hero-dot" />
@@ -191,9 +191,21 @@ export function HeroEmptyState() {
       </div>
       <div className="hero-right">
         <div className="hero-poster-wrap">
-          {posterForSkillId('listing-flyer')}
-          <div className="hero-poster-tag">PREVIEW · YOUR OUTPUT</div>
+          {/* v1.48: render the same PresentationPoster (.poster-pres) that
+              HeroPinned uses. FlyerPoster's .flyer-page drops its max-width
+              inside the hero wrap and its address text overflowed even the
+              pinned 165px wrap; .poster-pres has no long-text content and
+              sits cleanly inside the column. Representative-mock parity —
+              both read "your output goes here." */}
+          {posterForSkillId('seller-presentation')}
         </div>
+        {/* v1.48 hotfix v3: the caption is a FLOW sibling of the wrap (not
+            the absolute bottom: -34px tag HeroPinned uses), so the empty-
+            state column flex-centers the polaroid + caption as one stack —
+            equal breathing room above and below at any hero tile height.
+            See .hero-card-empty .hero-right / .hero-poster-tag in
+            sep-studio.css. */}
+        <div className="hero-poster-tag">PREVIEW · YOUR OUTPUT</div>
       </div>
     </div>
   );

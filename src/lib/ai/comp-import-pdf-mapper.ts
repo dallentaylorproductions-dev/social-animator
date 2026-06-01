@@ -168,6 +168,27 @@ export async function extractCompsFromPdf(
   };
 }
 
+/**
+ * Builds the base64 PDF `document` content block sent to Anthropic.
+ * Exported so the structural shape can be asserted in a unit test WITHOUT
+ * a network call — the v1.48 production 502 ("The PDF specified was not
+ * valid") proved the real call path is the only place this shape is
+ * exercised, and routine specs mock it. The shape MUST match Anthropic's
+ * documented PDF-input format:
+ *   { type: "document", source: { type: "base64", media_type: "application/pdf", data } }
+ * (https://docs.anthropic.com/en/docs/build-with-claude/pdf-support)
+ */
+export function buildPdfDocumentBlock(pdfBase64: string) {
+  return {
+    type: "document" as const,
+    source: {
+      type: "base64" as const,
+      media_type: "application/pdf" as const,
+      data: pdfBase64,
+    },
+  };
+}
+
 async function callModelWithPdf(
   pdfBase64: string,
   prompt: string,
@@ -184,14 +205,7 @@ async function callModelWithPdf(
           {
             role: "user",
             content: [
-              {
-                type: "document",
-                source: {
-                  type: "base64",
-                  media_type: "application/pdf",
-                  data: pdfBase64,
-                },
-              },
+              buildPdfDocumentBlock(pdfBase64),
               { type: "text", text: prompt },
             ],
           },

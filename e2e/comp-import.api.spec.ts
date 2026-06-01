@@ -11,6 +11,7 @@ import {
 } from '../src/lib/ai/comp-import-mapper';
 import {
   buildPdfCacheKey,
+  buildPdfDocumentBlock,
   buildPdfPrompt,
   PROMPT_VERSION_PDF,
 } from '../src/lib/ai/comp-import-pdf-mapper';
@@ -414,14 +415,14 @@ test.describe('/api/comp-import — PDF (vision-mode) dispatch (v1.48)', () => {
   test('uploads a .pdf and returns candidates with mode=pdf + delimiter=pdf', async ({
     request,
   }) => {
+    // v1.48 hotfix v3: PDF now uploads as a JSON body with a client-side
+    // base64 payload (bypasses Vercel's binary-mangling multipart parser).
     const bytes = await loadPdfFixture();
     const res = await request.post('/api/comp-import?testTier=pro', {
-      multipart: {
-        file: {
-          name: 'resi-agent-detail.pdf',
-          mimeType: 'application/pdf',
-          buffer: bytes,
-        },
+      data: {
+        mode: 'pdf',
+        filename: 'resi-agent-detail.pdf',
+        base64: bytes.toString('base64'),
       },
     });
     expect(res.ok()).toBe(true);
@@ -494,18 +495,41 @@ test.describe('/api/comp-import — PDF (vision-mode) dispatch (v1.48)', () => {
     expect(prompt).toMatch(/Listing #/);
   });
 
+  test('PDF document block matches Anthropic\'s documented base64 shape (v1.48 prod-502 structural guard)', async () => {
+    // Routine specs mock the Anthropic call (E2E_TESTING=1), so the real
+    // document-block shape is otherwise only exercised in production. This
+    // pins it byte-for-byte to the format Anthropic accepts — the v1.48 502
+    // was Anthropic rejecting the bytes inside `data`, NOT the wrapper, so
+    // this asserts the wrapper can never silently drift.
+    // https://docs.anthropic.com/en/docs/build-with-claude/pdf-support
+    const bytes = await loadPdfFixture();
+    const base64 = bytes.toString('base64');
+    const block = buildPdfDocumentBlock(base64);
+
+    expect(block.type).toBe('document');
+    expect(block.source.type).toBe('base64');
+    expect(block.source.media_type).toBe('application/pdf');
+    // data is the exact base64 we hand in — non-empty, no whitespace, no
+    // data: URI prefix. A real PDF's base64 begins with "JVBERi0" ("%PDF-").
+    expect(block.source.data).toBe(base64);
+    expect(block.source.data.length).toBeGreaterThan(0);
+    expect(block.source.data).not.toMatch(/\s/);
+    expect(block.source.data.startsWith('data:')).toBe(false);
+    expect(block.source.data.startsWith('JVBERi0')).toBe(true);
+    // Round-trips back to the exact source bytes (encode is lossless).
+    expect(Buffer.from(block.source.data, 'base64').equals(bytes)).toBe(true);
+  });
+
   test('PDF upload counts against the daily cap (header-forced 429)', async ({
     request,
   }) => {
     const bytes = await loadPdfFixture();
     const res = await request.post('/api/comp-import?testTier=pro', {
       headers: { 'X-Comp-Import-Test-Force-Daily-Cap': '1' },
-      multipart: {
-        file: {
-          name: 'resi-agent-detail.pdf',
-          mimeType: 'application/pdf',
-          buffer: bytes,
-        },
+      data: {
+        mode: 'pdf',
+        filename: 'resi-agent-detail.pdf',
+        base64: bytes.toString('base64'),
       },
     });
     expect(res.status()).toBe(429);
@@ -520,12 +544,10 @@ test.describe('/api/comp-import — PDF (vision-mode) dispatch (v1.48)', () => {
     const bytes = await loadPdfFixture();
     const res = await request.post('/api/comp-import?testTier=pro', {
       headers: { 'X-Comp-Import-Test-Force-Rate-Limit': '1' },
-      multipart: {
-        file: {
-          name: 'resi-agent-detail.pdf',
-          mimeType: 'application/pdf',
-          buffer: bytes,
-        },
+      data: {
+        mode: 'pdf',
+        filename: 'resi-agent-detail.pdf',
+        base64: bytes.toString('base64'),
       },
     });
     expect(res.status()).toBe(429);

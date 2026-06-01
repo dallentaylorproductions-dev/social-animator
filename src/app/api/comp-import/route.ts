@@ -250,10 +250,82 @@ export async function POST(req: Request): Promise<NextResponse<ApiOk | ApiErr>> 
     if (!e2eBypass) console.warn("[comp-import] daily-cap KV unavailable:", err);
   }
 
-  // 6) Read the upload. multipart/form-data with one File field.
-  //    Mode is decided here by file extension — CSV/TSV/TXT goes through
-  //    the column-mapping path, PDF goes through the vision-extraction
-  //    path. Anything else returns the calm "wrong file type" error.
+  // 6) Read the upload. Two transports:
+  //    - application/json  → PDF base64 (v1.48 hotfix v3). The diagnostic
+  //      ladder confirmed Vercel/Next's multipart parser corrupts binary
+  //      File bodies on Lambda (file.size wrong, bytes mangled) BEFORE any
+  //      server read runs — no read method can recover them. The client
+  //      base64-encodes the PDF in the browser (File-API bytes are intact)
+  //      and POSTs JSON; base64 is text, so nothing mangles it in transit.
+  //      We decode here and feed the existing PDF vision mapper.
+  //    - multipart/form-data → CSV/TSV/TXT (valid UTF-8, survives the
+  //      parser) — and, defensively, PDF-via-multipart from any older
+  //      client still on the form path.
+  const contentType = (req.headers.get("content-type") ?? "").toLowerCase();
+  if (contentType.includes("application/json")) {
+    let body: { mode?: unknown; filename?: unknown; base64?: unknown };
+    try {
+      body = (await req.json()) as typeof body;
+    } catch {
+      return NextResponse.json(
+        {
+          ok: false,
+          code: "file-format",
+          message: "I couldn't read that file clearly.",
+        } satisfies ApiErr,
+        { status: 400 },
+      );
+    }
+    if (
+      body.mode !== "pdf" ||
+      typeof body.base64 !== "string" ||
+      body.base64.length === 0
+    ) {
+      return NextResponse.json(
+        {
+          ok: false,
+          code: "file-format",
+          message:
+            "Please upload a CSV, TSV, TXT, or PDF file from your MLS export.",
+        } satisfies ApiErr,
+        { status: 400 },
+      );
+    }
+    const decoded = Buffer.from(body.base64, "base64");
+    // base64 → Buffer.from never throws (it drops invalid chars), so an
+    // empty/garbage payload surfaces as an empty buffer here. The byte cap
+    // mirrors the multipart path; the %PDF guard inside handlePdf catches a
+    // payload that decoded to non-PDF bytes.
+    if (decoded.byteLength > MAX_BYTES) {
+      return NextResponse.json(
+        {
+          ok: false,
+          code: "file-too-large",
+          message:
+            "That PDF is larger than 5 MB. For the cleanest results, try the CSV or TSV export from your MLS.",
+        } satisfies ApiErr,
+        { status: 413 },
+      );
+    }
+    // [comp-import] PDF read diag — adapted to the JSON transport. The
+    // multipart-path diag (readPdfBytesResilient) logged which File->bytes
+    // method won; here the read is deterministic (base64 → Buffer), so we
+    // log the incoming/decoded sizes + magic so the smoke stays decidable.
+    if (!e2eBypass) {
+      console.log("[comp-import] PDF read diag (json)", {
+        transport: "json-base64",
+        base64Length: body.base64.length,
+        byteLength: decoded.byteLength,
+        first8: decoded.subarray(0, 5).toString("latin1"),
+        hasPdfMagic: decoded.subarray(0, 5).toString("latin1") === "%PDF-",
+      });
+    }
+    return handlePdf(decoded, e2eBypass);
+  }
+
+  //    multipart/form-data with one File field. Mode is decided by file
+  //    extension — CSV/TSV/TXT → column-mapping path, PDF → vision path.
+  //    Anything else returns the calm "wrong file type" error.
   let mode: InputMode;
   let csvText: string = "";
   let pdfBytes: Buffer | null = null;
@@ -289,8 +361,13 @@ export async function POST(req: Request): Promise<NextResponse<ApiOk | ApiErr>> 
       csvText = await file.text();
     } else if (PDF_EXTENSIONS.has(ext)) {
       mode = "pdf";
-      const ab = await file.arrayBuffer();
-      pdfBytes = Buffer.from(ab);
+      // Read raw bytes — NEVER file.text() (UTF-8 decode mangles binary).
+      // The v1.48 prod 502 was a corrupt PDF read on Vercel's Lambda
+      // (instrumentation: hasPdfMagic=false, byteLength != file size) while
+      // local Node read it cleanly. readPdfBytesResilient tries three
+      // File->bytes paths and uses the first that yields valid %PDF magic,
+      // and logs which one (and why the others failed) for the smoke.
+      pdfBytes = await readPdfBytesResilient(file, !e2eBypass);
     } else {
       return NextResponse.json(
         {
@@ -441,6 +518,91 @@ export async function POST(req: Request): Promise<NextResponse<ApiOk | ApiErr>> 
  * shape directly (no column-mapping intermediate), and the response
  * shape matches the CSV path so the review modal renders unchanged.
  */
+/**
+ * Resilient PDF byte read (v1.48 prod-502 read-path fix).
+ *
+ * The prod 502 was Anthropic rejecting a corrupt base64 PDF: on Vercel's
+ * Lambda the multipart File read returned non-PDF bytes (instrumentation:
+ * hasPdfMagic=false, byteLength != the real file size) while local Node read
+ * it cleanly. CSV (UTF-8-safe) survived; binary PDF did not.
+ *
+ * Rather than bet on one read method, try the three File->bytes paths in
+ * order and use the FIRST whose bytes start with the "%PDF-" magic. Each
+ * stresses a different layer:
+ *   - arrayBuffer: the canonical path (what was failing in prod).
+ *   - bytes():     Uint8Array straight from undici, skips the ArrayBuffer.
+ *   - stream():    re-reads through a fresh Response, sidestepping whatever
+ *                  mangled the File's own buffer.
+ *
+ * Logs file.size/type + each method's length/first8/magic, so a single smoke
+ * tells us which path is intact — or, if none is (the File is corrupt at
+ * parse time, e.g. file.size is already wrong), that the client-base64
+ * escalation is the next step. Falls back to the first successful read so the
+ * downstream %PDF guard in handlePdf still fires the calm CSV fallback.
+ */
+async function readPdfBytesResilient(
+  file: File,
+  log: boolean,
+): Promise<Buffer> {
+  const attempts: Array<[string, () => Promise<Buffer>]> = [
+    [
+      "arrayBuffer",
+      async () => Buffer.from(new Uint8Array(await file.arrayBuffer())),
+    ],
+    [
+      "bytes",
+      async () => {
+        const f = file as unknown as { bytes?: () => Promise<Uint8Array> };
+        if (typeof f.bytes !== "function") {
+          throw new Error("file.bytes() unavailable on this runtime");
+        }
+        return Buffer.from(await f.bytes());
+      },
+    ],
+    [
+      "stream",
+      async () => Buffer.from(await new Response(file.stream()).arrayBuffer()),
+    ],
+  ];
+
+  const diag: Record<string, unknown> = {
+    fileSize: file.size,
+    fileType: file.type,
+    fileName: file.name,
+  };
+  let chosen: { bytes: Buffer; method: string } | null = null;
+  let fallback: Buffer | null = null;
+
+  for (const [name, read] of attempts) {
+    try {
+      const bytes = await read();
+      fallback ??= bytes;
+      const magic = bytes.subarray(0, 5).toString("latin1") === "%PDF-";
+      diag[name] = {
+        len: bytes.length,
+        first8: bytes.toString("base64").slice(0, 8),
+        magic,
+      };
+      if (magic && !chosen) chosen = { bytes, method: name };
+    } catch (err) {
+      diag[name] = { error: err instanceof Error ? err.message : String(err) };
+    }
+  }
+
+  if (log) {
+    console.log("[comp-import] PDF read diag", {
+      chosen: chosen?.method ?? "none",
+      ...diag,
+    });
+  }
+
+  if (chosen) return chosen.bytes;
+  // No method produced valid magic — hand back the first successful read (or
+  // an empty buffer if every read threw) so the %PDF guard surfaces the calm
+  // fallback rather than crashing.
+  return fallback ?? Buffer.alloc(0);
+}
+
 async function handlePdf(
   pdfBytes: Buffer,
   e2eBypass: boolean,
@@ -477,9 +639,45 @@ async function handlePdf(
     } satisfies ApiOk);
   }
 
+  const pdfBase64 = pdfBytes.toString("base64");
+
+  // Defensive instrumentation + early guard (v1.48 prod-502 fix).
+  // Anthropic rejected the prod request with invalid_request_error
+  // "The PDF specified was not valid" at messages.0.content.0...source.base64.data
+  // — i.e. the decoded bytes weren't a valid PDF. That read cleanly under
+  // local Node, so the corruption is runtime-specific. A valid PDF's bytes
+  // begin with "%PDF" (base64 prefix "JVBERi0"). If the magic bytes are
+  // wrong here, the byte read corrupted the binary — fail fast with the calm
+  // fallback (and a greppable log) rather than burn a paid Anthropic call on
+  // a payload we already know it will reject.
+  const hasPdfMagic = pdfBytes.subarray(0, 5).toString("latin1") === "%PDF-";
+  if (!e2eBypass) {
+    console.log("[comp-import] PDF bytes check", {
+      byteLength: pdfBytes.length,
+      base64Length: pdfBase64.length,
+      base64First8: pdfBase64.slice(0, 8),
+      hasPdfMagic,
+    });
+  }
+  if (!hasPdfMagic) {
+    console.error("[comp-import] PDF read corrupted before extraction", {
+      byteLength: pdfBytes.length,
+      base64First8: pdfBase64.slice(0, 8),
+    });
+    return NextResponse.json(
+      {
+        ok: false,
+        code: "ai-unavailable",
+        message:
+          "I couldn't read that PDF clearly. For the cleanest results, try the CSV or TSV export from your MLS — or add comps by hand below.",
+      } satisfies ApiErr,
+      { status: 502 },
+    );
+  }
+
   let result;
   try {
-    result = await extractCompsFromPdf(pdfBytes.toString("base64"));
+    result = await extractCompsFromPdf(pdfBase64);
   } catch (err) {
     console.error("[comp-import] PDF extraction failure", {
       message: err instanceof Error ? err.message : String(err),
