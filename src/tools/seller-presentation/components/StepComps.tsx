@@ -9,7 +9,7 @@ import { AIPlugPoint } from "./AIPlugPoint";
 /**
  * Seller Presentation Step 2 — Comparable sales (v1.47 / A5b LIVE).
  *
- * ≤4 comps editor over the substrate-shape `Comp` (re-exported from
+ * ≤5 comps editor over the substrate-shape `Comp` (re-exported from
  * SIR's engine). Address + Sold Price are required for export per the
  * skill contract (`comps: 'required'`); everything else is optional.
  *
@@ -36,7 +36,7 @@ interface StepCompsProps {
   setDraft: (next: SellerPresentationDraft) => void;
 }
 
-const MAX_COMPS = 4;
+const MAX_COMPS = 5;
 
 const inputCls =
   "w-full px-3 py-2 bg-neutral-900 border border-neutral-700 rounded text-sm focus:outline-none focus:border-mint";
