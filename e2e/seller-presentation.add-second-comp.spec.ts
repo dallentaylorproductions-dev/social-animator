@@ -1,22 +1,23 @@
 import { test, expect } from '@playwright/test';
 
 /**
- * A7c.4.1 — regression: adding a SECOND (blank) comp must not freeze
- * the wizard.
+ * A7c.4.1 → Phase B2 — regression: adding multiple comps must not
+ * freeze the wizard.
  *
- * Repro Dallen's A7c.4 phone smoke: the user enters Comp 1 with
- * formatted values, then taps "Add comp" again. Before the fix, the
- * new blank Comp 2 row crashed during render, halting React event
- * delegation so EVERY button on the page (Add comp / Next / Previous /
- * Dashboard / Start new) stopped responding to taps.
+ * Original repro (A7c.4): the old editor added a BLANK comp row on
+ * every "Add comp" tap, and the blank row crashed during render,
+ * halting React event delegation so EVERY button on the page went
+ * dead (page still painted, handlers were not).
  *
- * The page still rendered after the crash — only event handlers were
- * dead. So the assertion is: after adding the second comp, both the
- * Add-comp button AND the wizard nav remain clickable, AND no uncaught
- * exception was logged to the console.
+ * Phase B2 replaced the blank-row model with an inline add form
+ * (fill-then-commit) — so the original blank-render path no longer
+ * exists — but the interactivity guarantee still matters: after
+ * committing several comps the whole wizard (add row, nav, top-nav
+ * affordances) must stay clickable with no uncaught exceptions. This
+ * spec exercises the new flow and asserts the same invariants.
  */
-test.describe('SellerPresentation - Add second comp interactivity', () => {
-  test('adding a second blank comp keeps the wizard fully interactive', async ({
+test.describe('SellerPresentation - Add multiple comps interactivity', () => {
+  test('committing several comps keeps the wizard fully interactive', async ({
     page,
   }) => {
     const consoleErrors: string[] = [];
@@ -37,49 +38,52 @@ test.describe('SellerPresentation - Add second comp interactivity', () => {
     const nextButton = page.getByTestId('wizard-next');
     await nextButton.click();
 
-    // Step 2: Comps.
+    // Step 2: empty state. Enter the manual add path.
     await expect(page.getByTestId('step-comps')).toBeVisible();
+    await page.getByTestId('step-comps-manual-link').click();
 
-    // Add Comp 1 + fill all the A7c.1 inputs (currency, decimal %,
-    // numeric integer, decimal miles, native date, sqft NumberInput,
-    // notes). This is the on-phone shape that surfaced the freeze.
-    await page.getByTestId('step-comps-add').click();
+    // Comp 1 — fill the inline form (currency formats live) + commit.
+    await expect(page.getByTestId('step-comps-add-form')).toBeVisible();
+    await page.getByTestId('step-comps-add-address').fill('5678 Elm Ave NE');
+    await page.getByLabel('comp-add-sold-price').fill('685000');
+    await expect(page.getByLabel('comp-add-sold-price')).toHaveValue('$685,000');
+    await page.getByTestId('step-comps-add-submit').click();
     await expect(page.getByTestId('step-comps-card-0')).toBeVisible();
-    await page.getByTestId('step-comps-address-0').fill('5678 Elm Ave NE');
-    await page.getByLabel('comp-1-sold-price').fill('685000');
-    await expect(page.getByLabel('comp-1-sold-price')).toHaveValue('$685,000');
 
-    // Add Comp 2 — THIS is the click that froze the page in A7c.4.
+    // Comp 2 — "+ Add a comp" row is the gesture that must not freeze.
     await page.getByTestId('step-comps-add').click();
-
-    // 1) The new blank row renders.
+    await page.getByTestId('step-comps-add-address').fill('9012 Oak Pl NE');
+    await page.getByLabel('comp-add-sold-price').fill('699000');
+    await page.getByTestId('step-comps-add-submit').click();
     await expect(page.getByTestId('step-comps-card-1')).toBeVisible();
 
-    // 2) Add-comp button is still clickable (the page didn't freeze).
-    //    Click it again to add Comp 3 and watch the same blank-render
-    //    path a second time.
+    // Comp 3 — same path a second time.
     await page.getByTestId('step-comps-add').click();
+    await page.getByTestId('step-comps-add-address').fill('311 Birch Ln NE');
+    await page.getByLabel('comp-add-sold-price').fill('672000');
+    await page.getByTestId('step-comps-add-submit').click();
     await expect(page.getByTestId('step-comps-card-2')).toBeVisible();
 
-    // 3) Wizard nav at the BOTTOM still responds.
+    // Wizard nav at the BOTTOM still responds.
     await page.getByTestId('wizard-prev').click();
     await expect(page.getByTestId('step-property')).toBeVisible();
     await nextButton.click();
     await expect(page.getByTestId('step-comps')).toBeVisible();
 
-    // 4) "Start a new presentation" affordance at the TOP still responds
-    //    (it's the same React tree — if the freeze were real, this would
-    //    be dead too).
+    // "Start a new presentation" affordance at the TOP still responds.
     await expect(page.getByTestId('wizard-start-new')).toBeEnabled();
 
-    // 5) Removing a comp + adding again still works post-freeze-window.
+    // Removing a comp (via its edit panel) + adding again still works.
+    await page.getByTestId('step-comps-edit-2').click();
     await page.getByTestId('step-comps-remove-2').click();
     await expect(page.getByTestId('step-comps-card-2')).toHaveCount(0);
     await page.getByTestId('step-comps-add').click();
+    await page.getByTestId('step-comps-add-address').fill('44 Maple Ct NE');
+    await page.getByLabel('comp-add-sold-price').fill('690000');
+    await page.getByTestId('step-comps-add-submit').click();
     await expect(page.getByTestId('step-comps-card-2')).toBeVisible();
 
-    // 6) No uncaught exceptions during the whole flow. (An error
-    //    boundary catch would also surface as a console error in dev.)
+    // No uncaught exceptions during the whole flow.
     expect(pageErrors, `unhandled page errors: ${pageErrors.join(' | ')}`)
       .toEqual([]);
     expect(consoleErrors, `console errors: ${consoleErrors.join(' | ')}`)

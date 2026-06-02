@@ -321,7 +321,14 @@ export function toPublicPayload(
   const recommendedPrice = draft.recommendedPrice ?? "";
   const priceRationale = draft.priceRationale;
 
-  const publicComps = draft.comps.map(projectComp);
+  // Phase B2 — set-aside comps (counted === false) stay on the prep
+  // draft for the agent's reference but never reach the seller page.
+  // Default-to-counted: undefined/true comps are included. Filter
+  // BEFORE projection so the `counted` authoring flag never even
+  // reaches projectComp (which emits the allowlisted public shape).
+  const publicComps = draft.comps
+    .filter((c) => c.counted !== false)
+    .map(projectComp);
   const publicCards = draft.pitchPoints
     .filter((p) => p.visibility === "public")
     .map(projectPitchCard)

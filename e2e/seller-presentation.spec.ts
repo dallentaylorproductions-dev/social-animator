@@ -1,4 +1,35 @@
-import { test, expect } from '@playwright/test';
+import { test, expect, type Page } from '@playwright/test';
+
+/**
+ * Phase B2 — Step 2 (Comps) interaction changed from blank-card-then-fill
+ * to an inline fill-then-commit add form (apply-then-set-aside redesign).
+ * These helpers keep the many multi-step flows below readable and
+ * consistent with the new interaction. The persisted draft shape +
+ * round-trip + publish behaviors are unchanged — only the DOM gesture to
+ * enter a comp moved.
+ *
+ *   - addFirstComp:    from the empty Step 2 state → one committed comp.
+ *   - expectFirstComp: open the comp's editor and assert its persisted
+ *                      field values (a comp resumes as a CARD now, so its
+ *                      inputs only exist while editing).
+ */
+async function addFirstComp(page: Page, address: string, price: string) {
+  await page.getByTestId('step-comps-manual-link').click();
+  await page.getByTestId('step-comps-add-address').fill(address);
+  await page.getByLabel('comp-add-sold-price').fill(price);
+  await page.getByTestId('step-comps-add-submit').click();
+  await expect(page.getByTestId('step-comps-card-0')).toBeVisible();
+}
+async function expectFirstComp(
+  page: Page,
+  address: string,
+  formattedPrice: string,
+) {
+  await page.getByTestId('step-comps-edit-0').click();
+  await expect(page.getByTestId('step-comps-address-0')).toHaveValue(address);
+  await expect(page.getByLabel('comp-1-sold-price')).toHaveValue(formattedPrice);
+  await page.getByTestId('step-comps-edit-0').click(); // close the editor
+}
 
 /**
  * Seller Presentation — A5a spine + Step 1 + reload-by-?id= persistence.
@@ -170,13 +201,7 @@ test.describe('Seller Presentation — A5b per-step content', () => {
 
     // ---------- Step 2: Comps ----------
     await expect(page.getByTestId('step-comps')).toBeVisible();
-    await page.getByTestId('step-comps-add').click();
-    await expect(page.getByTestId('step-comps-card-0')).toBeVisible();
-    await page.getByTestId('step-comps-address-0').fill('5678 Elm Ave NE');
-    // CurrencyInput uses aria-label rather than data-testid (it doesn't
-    // accept arbitrary HTML attributes per its typed props).
-    await page.getByLabel('comp-1-sold-price').fill('685000');
-    await expect(page.getByLabel('comp-1-sold-price')).toHaveValue('$685,000');
+    await addFirstComp(page, '5678 Elm Ave NE', '685000');
     await nextButton.click();
 
     // ---------- Step 3: Strategy ----------
@@ -293,10 +318,7 @@ test.describe('Seller Presentation — A5b per-step content', () => {
     ).toBeChecked();
     await prevButton.click(); // → Step 2 Comps
     await expect(page.getByTestId('step-comps')).toBeVisible();
-    await expect(page.getByTestId('step-comps-address-0')).toHaveValue(
-      '5678 Elm Ave NE',
-    );
-    await expect(page.getByLabel('comp-1-sold-price')).toHaveValue('$685,000');
+    await expectFirstComp(page, '5678 Elm Ave NE', '$685,000');
     await prevButton.click(); // → Step 1 Property
     await expect(page.getByTestId('step-property-address')).toHaveValue(
       '1234 Test Drive NE',
@@ -348,9 +370,7 @@ test.describe('Seller Presentation — A5b per-step content', () => {
     await page.getByTestId('step-property-address').fill('1234 Test Drive NE');
     const nextButton = page.getByTestId('wizard-next');
     await nextButton.click();
-    await page.getByTestId('step-comps-add').click();
-    await page.getByTestId('step-comps-address-0').fill('5678 Elm Ave NE');
-    await page.getByLabel('comp-1-sold-price').fill('685000');
+    await addFirstComp(page, '5678 Elm Ave NE', '685000');
     await nextButton.click();
     await page.getByLabel('recommended-price').fill('700000');
     await nextButton.click();
@@ -529,9 +549,7 @@ test.describe('Seller Presentation — A5b per-step content', () => {
 
     const nextButton = page.getByTestId('wizard-next');
     await nextButton.click();
-    await page.getByTestId('step-comps-add').click();
-    await page.getByTestId('step-comps-address-0').fill('5678 Elm Ave NE');
-    await page.getByLabel('comp-1-sold-price').fill('685000');
+    await addFirstComp(page, '5678 Elm Ave NE', '685000');
     await nextButton.click();
     await page.getByLabel('recommended-price').fill('700000');
     await nextButton.click();
@@ -590,9 +608,7 @@ test.describe('Seller Presentation — A5b per-step content', () => {
     // Intentionally skip city + preparedFor.
     const nextButton = page.getByTestId('wizard-next');
     await nextButton.click();
-    await page.getByTestId('step-comps-add').click();
-    await page.getByTestId('step-comps-address-0').fill('5678 Elm Ave NE');
-    await page.getByLabel('comp-1-sold-price').fill('685000');
+    await addFirstComp(page, '5678 Elm Ave NE', '685000');
     await nextButton.click();
     await page.getByLabel('recommended-price').fill('700000');
     await nextButton.click();
@@ -645,9 +661,7 @@ test.describe('Seller Presentation — A6.1 resume-on-open', () => {
     await page.getByTestId('step-property-address').fill('1234 Test Drive NE');
     const nextButton = page.getByTestId('wizard-next');
     await nextButton.click();
-    await page.getByTestId('step-comps-add').click();
-    await page.getByTestId('step-comps-address-0').fill('5678 Elm Ave NE');
-    await page.getByLabel('comp-1-sold-price').fill('685000');
+    await addFirstComp(page, '5678 Elm Ave NE', '685000');
     await nextButton.click();
     await page.getByLabel('recommended-price').fill('700000');
     await nextButton.click();
@@ -706,10 +720,7 @@ test.describe('Seller Presentation — A6.1 resume-on-open', () => {
     await prevButton.click(); // → Strategy
     await expect(page.getByLabel('recommended-price')).toHaveValue('$700,000');
     await prevButton.click(); // → Comps
-    await expect(page.getByTestId('step-comps-address-0')).toHaveValue(
-      '5678 Elm Ave NE',
-    );
-    await expect(page.getByLabel('comp-1-sold-price')).toHaveValue('$685,000');
+    await expectFirstComp(page, '5678 Elm Ave NE', '$685,000');
   });
 
   test('"Start a new presentation" creates a fresh empty instance', async ({
@@ -721,8 +732,7 @@ test.describe('Seller Presentation — A6.1 resume-on-open', () => {
     const originalId = new URL(page.url()).searchParams.get('id')!;
     await page.getByTestId('step-property-address').fill('1234 Test Drive NE');
     await page.getByTestId('wizard-next').click();
-    await page.getByTestId('step-comps-add').click();
-    await page.getByTestId('step-comps-address-0').fill('5678 Elm Ave NE');
+    await addFirstComp(page, '5678 Elm Ave NE', '685000');
 
     // Click "Start a new presentation".
     await page.getByTestId('wizard-start-new').click();
@@ -758,8 +768,7 @@ test.describe('Seller Presentation — A6.1 resume-on-open', () => {
     const completedId = new URL(page.url()).searchParams.get('id')!;
     await page.getByTestId('step-property-address').fill('1234 Test Drive NE');
     await page.getByTestId('wizard-next').click();
-    await page.getByTestId('step-comps-add').click();
-    await page.getByTestId('step-comps-address-0').fill('5678 Elm Ave NE');
+    await addFirstComp(page, '5678 Elm Ave NE', '685000');
 
     // Wait for the save effect to flush before we patch the record.
     await page.waitForFunction(
@@ -899,9 +908,7 @@ test.describe('Seller Presentation — A7c wizard input round-trip', () => {
     // can pass when we mock publish later. Then Strategy (price).
     const nextButton = page.getByTestId('wizard-next');
     await nextButton.click();
-    await page.getByTestId('step-comps-add').click();
-    await page.getByTestId('step-comps-address-0').fill('2218 W 14th Street');
-    await page.getByLabel('comp-1-sold-price').fill('648000');
+    await addFirstComp(page, '2218 W 14th Street', '648000');
     await nextButton.click();
     await page.getByLabel('recommended-price').fill('675000');
     await nextButton.click(); // → Pitch
@@ -1456,9 +1463,7 @@ test.describe('Seller Presentation — A7d editorial extras', () => {
     await page.getByTestId('step-property-zip').fill('44113');
     const nextButton = page.getByTestId('wizard-next');
     await nextButton.click();
-    await page.getByTestId('step-comps-add').click();
-    await page.getByTestId('step-comps-address-0').fill('2218 W 14th Street');
-    await page.getByLabel('comp-1-sold-price').fill('648000');
+    await addFirstComp(page, '2218 W 14th Street', '648000');
     await nextButton.click();
     await page.getByLabel('recommended-price').fill('675000');
     await nextButton.click();
@@ -1718,9 +1723,7 @@ test.describe('Seller Presentation — A7d editorial extras', () => {
     await page.getByTestId('step-property-address').fill('1234 Test Drive NE');
     const nextButton = page.getByTestId('wizard-next');
     await nextButton.click();
-    await page.getByTestId('step-comps-add').click();
-    await page.getByTestId('step-comps-address-0').fill('5678 Elm Ave NE');
-    await page.getByLabel('comp-1-sold-price').fill('685000');
+    await addFirstComp(page, '5678 Elm Ave NE', '685000');
     await nextButton.click();
     await page.getByLabel('recommended-price').fill('700000');
     await nextButton.click();
@@ -1827,9 +1830,7 @@ test.describe('Seller Presentation — A7d editorial extras', () => {
     await page.getByTestId('step-property-address').fill('1742 Kenilworth Avenue');
     const nextButton = page.getByTestId('wizard-next');
     await nextButton.click();
-    await page.getByTestId('step-comps-add').click();
-    await page.getByTestId('step-comps-address-0').fill('2218 W 14th Street');
-    await page.getByLabel('comp-1-sold-price').fill('648000');
+    await addFirstComp(page, '2218 W 14th Street', '648000');
     await nextButton.click();
     await page.getByLabel('recommended-price').fill('675000');
     await nextButton.click();
@@ -1921,9 +1922,7 @@ test.describe('Seller Presentation — A7d editorial extras', () => {
     await page.getByTestId('step-property-address').fill('1234 Test Drive NE');
     const nextButton = page.getByTestId('wizard-next');
     await nextButton.click();
-    await page.getByTestId('step-comps-add').click();
-    await page.getByTestId('step-comps-address-0').fill('5678 Elm Ave NE');
-    await page.getByLabel('comp-1-sold-price').fill('685000');
+    await addFirstComp(page, '5678 Elm Ave NE', '685000');
     await nextButton.click();
     await page.getByLabel('recommended-price').fill('700000');
     await nextButton.click();

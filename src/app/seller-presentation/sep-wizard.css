@@ -35,6 +35,8 @@
   --mint-line: rgba(110, 231, 199, 0.32);
   --mint-glow: rgba(110, 231, 199, 0.18);
   --amber: #e8c37a;
+  --amber-soft: rgba(232, 195, 122, 0.1);
+  --amber-line: rgba(232, 195, 122, 0.28);
   --radius: 20px;
   --sans: var(--font-hanken), "Hanken Grotesk", system-ui, sans-serif;
   --mono: var(--font-jetbrains-mono), "JetBrains Mono", ui-monospace, monospace;
@@ -479,6 +481,700 @@
   padding-top: 24px;
 }
 
+/* ============================================================== *
+ *  Step 2 — "Your comps" (Phase B2). Ported from the Claude
+ *  Design source-of-truth (comps_app.jsx + "Your Comps - Step 2.html"),
+ *  scoped under .sep-wizard. Reuses B1's .input / .field-label /
+ *  .ghostbtn / .mintbtn bases; only adds comp-specific selectors and
+ *  the size modifiers the comp surface needs.
+ * ============================================================== */
+
+/* keyframes (names are global; referenced by the scoped classes below) */
+@keyframes sep-bump {
+  0% { color: var(--mint); transform: scale(1.07); }
+  100% { color: var(--text); transform: scale(1); }
+}
+@keyframes sep-pill-bump {
+  0% { border-color: var(--mint); color: var(--mint); }
+  100% {}
+}
+@keyframes sep-shimmer {
+  from { background-position: 200% 0; }
+  to { background-position: -200% 0; }
+}
+@keyframes sep-spin {
+  to { transform: rotate(360deg); }
+}
+
+/* import row (populated header) */
+.sep-wizard .import-row {
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+  gap: 14px;
+  margin-top: 16px;
+  flex-wrap: wrap;
+}
+.sep-wizard .import-note {
+  display: inline-flex;
+  align-items: center;
+  gap: 9px;
+  font-size: 13px;
+  color: var(--muted);
+}
+
+/* summary band (live median) */
+.sep-wizard .summary {
+  background: linear-gradient(180deg, var(--mint-soft), transparent 120%),
+    var(--panel);
+  border: 1px solid var(--mint-line);
+  border-radius: var(--radius);
+  padding: 20px 24px;
+  margin-bottom: 16px;
+}
+.sep-wizard .summary.empty {
+  border-color: var(--border-strong);
+  background: var(--panel);
+  border-style: dashed;
+}
+.sep-wizard .summary.empty.slim {
+  padding: 15px 20px;
+}
+.sep-wizard .empty-placeholder {
+  margin: 8px 0 0;
+  font-size: 14px;
+  color: var(--faint);
+  line-height: 1.5;
+}
+.sep-wizard .ph-dot {
+  color: var(--border-strong);
+  margin: 0 5px;
+}
+.sep-wizard .summary-med {
+  display: flex;
+  align-items: baseline;
+  gap: 14px;
+  flex-wrap: wrap;
+}
+.sep-wizard .med-label {
+  font-family: var(--mono);
+  font-size: 11px;
+  letter-spacing: 0.12em;
+  text-transform: uppercase;
+  color: var(--mint);
+}
+.sep-wizard .summary.empty .med-label {
+  color: var(--faint);
+}
+.sep-wizard .med-value {
+  font-size: 32px;
+  font-weight: 800;
+  letter-spacing: -0.02em;
+  color: var(--text);
+  transform-origin: left center;
+}
+.sep-wizard .med-value.bump {
+  animation: sep-bump 0.65s var(--ease);
+}
+.sep-wizard .summary-line {
+  margin: 10px 0 0;
+  font-size: 14.5px;
+  color: var(--muted);
+}
+.sep-wizard .summary-line strong {
+  color: var(--text);
+  font-weight: 700;
+}
+.sep-wizard .summary-meta {
+  display: flex;
+  align-items: center;
+  gap: 10px;
+  margin-top: 11px;
+  flex-wrap: wrap;
+}
+.sep-wizard .spread-pill {
+  font-family: var(--mono);
+  font-size: 11px;
+  letter-spacing: 0.04em;
+  color: var(--text);
+  background: var(--panel-2);
+  border: 1px solid var(--border-strong);
+  border-radius: 999px;
+  padding: 4px 11px;
+}
+.sep-wizard .spread-pill.bump {
+  animation: sep-pill-bump 0.65s var(--ease);
+}
+.sep-wizard .conf-feeds {
+  font-size: 13px;
+  color: var(--faint);
+}
+.sep-wizard .conf-feeds strong {
+  font-weight: 700;
+}
+.sep-wizard .conf-high {
+  color: var(--mint);
+}
+.sep-wizard .conf-medium {
+  color: var(--amber);
+}
+.sep-wizard .conf-low {
+  color: #d98a82;
+}
+.sep-wizard .summary-foot {
+  margin: 11px 0 0;
+  font-size: 13px;
+  color: var(--faint);
+}
+.sep-wizard .foot-strong {
+  color: var(--muted);
+}
+
+/* importing skeleton */
+.sep-wizard .summary.skeleton {
+  border-style: dashed;
+  border-color: var(--border-strong);
+  background: var(--panel);
+  display: flex;
+  flex-direction: column;
+  gap: 12px;
+}
+.sep-wizard .sk-line {
+  height: 30px;
+  width: 220px;
+  border-radius: 8px;
+  background: linear-gradient(
+    90deg,
+    var(--panel-2) 0%,
+    rgba(255, 255, 255, 0.06) 50%,
+    var(--panel-2) 100%
+  );
+  background-size: 200% 100%;
+  animation: sep-shimmer 1.3s linear infinite;
+}
+
+/* comp list + card */
+.sep-wizard .comp-list {
+  display: flex;
+  flex-direction: column;
+  gap: 10px;
+}
+.sep-wizard .comp {
+  background: var(--panel);
+  border: 1px solid var(--border);
+  border-radius: var(--radius);
+  transition: border-color 0.22s var(--ease), box-shadow 0.22s var(--ease),
+    opacity 0.22s;
+  overflow: hidden;
+}
+.sep-wizard .comp:hover {
+  border-color: var(--border-strong);
+}
+.sep-wizard .comp.editing {
+  border-color: var(--mint-line);
+  box-shadow: 0 0 0 1px var(--mint-line), 0 18px 50px -28px rgba(0, 0, 0, 0.9);
+}
+.sep-wizard .comp.out {
+  opacity: 0.55;
+}
+.sep-wizard .comp.out:hover {
+  opacity: 0.78;
+}
+.sep-wizard .comp.flagged {
+  border-color: var(--amber-line, rgba(232, 195, 122, 0.28));
+}
+.sep-wizard .comp.flagged.editing {
+  border-color: var(--amber);
+  box-shadow: 0 0 0 1px var(--amber-line, rgba(232, 195, 122, 0.28)),
+    0 18px 50px -28px rgba(0, 0, 0, 0.9);
+}
+.sep-wizard .comp-face {
+  display: flex;
+  align-items: flex-start;
+  gap: 14px;
+  padding: 14px 18px;
+}
+.sep-wizard .count-toggle {
+  flex: none;
+  width: 22px;
+  height: 22px;
+  margin-top: 1px;
+  border-radius: 7px;
+  border: 1.8px solid var(--faint);
+  background: transparent;
+  color: #08120f;
+  cursor: pointer;
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  transition: all 0.16s var(--ease);
+}
+.sep-wizard .count-toggle:hover {
+  border-color: var(--muted);
+}
+.sep-wizard .count-toggle.on {
+  background: var(--mint);
+  border-color: var(--mint);
+}
+.sep-wizard .count-toggle.on:hover {
+  filter: brightness(1.05);
+}
+.sep-wizard .comp-body {
+  flex: 1 1 auto;
+  min-width: 0;
+}
+.sep-wizard .comp-titlerow {
+  display: flex;
+  align-items: center;
+  gap: 9px;
+  flex-wrap: wrap;
+}
+.sep-wizard .comp-addr {
+  margin: 0;
+  font-size: 16px;
+  font-weight: 600;
+  letter-spacing: -0.01em;
+  white-space: nowrap;
+  overflow: hidden;
+  text-overflow: ellipsis;
+}
+.sep-wizard .aside-chip {
+  font-family: var(--mono);
+  font-size: 10px;
+  letter-spacing: 0.08em;
+  text-transform: uppercase;
+  color: var(--faint);
+  border: 1px solid var(--border-strong);
+  border-radius: 999px;
+  padding: 2px 9px;
+}
+.sep-wizard .check-chip {
+  display: inline-flex;
+  align-items: center;
+  gap: 5px;
+  font-size: 11px;
+  font-weight: 600;
+  letter-spacing: 0.02em;
+  color: var(--amber);
+  background: var(--amber-soft, rgba(232, 195, 122, 0.1));
+  border: 1px solid var(--amber-line, rgba(232, 195, 122, 0.28));
+  border-radius: 999px;
+  padding: 2px 9px;
+}
+.sep-wizard .check-chip svg {
+  stroke: var(--amber);
+}
+.sep-wizard .comp-meta {
+  display: flex;
+  align-items: center;
+  gap: 8px;
+  margin-top: 5px;
+  font-size: 13px;
+  color: var(--muted);
+  flex-wrap: wrap;
+}
+.sep-wizard .comp-meta > span:not(.sep) {
+  white-space: nowrap;
+}
+.sep-wizard .comp-meta .sep {
+  width: 3px;
+  height: 3px;
+  border-radius: 50%;
+  background: var(--faint);
+}
+.sep-wizard .comp-meta .sep.dim {
+  background: var(--border-strong);
+}
+.sep-wizard .comp-meta .meta-trust {
+  display: inline-flex;
+  align-items: center;
+  gap: 4px;
+  color: var(--faint);
+}
+.sep-wizard .comp-meta .meta-trust svg {
+  color: var(--faint);
+}
+.sep-wizard .comp-meta .miss {
+  color: var(--amber);
+}
+.sep-wizard .comp-right {
+  flex: none;
+  display: flex;
+  flex-direction: column;
+  align-items: flex-end;
+  gap: 6px;
+  white-space: nowrap;
+}
+.sep-wizard .comp-price {
+  font-size: 18px;
+  font-weight: 700;
+  letter-spacing: -0.01em;
+}
+
+/* button size modifiers used on the comp surface (extend B1 bases) */
+.sep-wizard .ghostbtn.xs {
+  padding: 6px 10px;
+  font-size: 13px;
+  border-color: transparent;
+  border-radius: 10px;
+}
+.sep-wizard .ghostbtn.xs:hover {
+  background: var(--panel-2);
+}
+.sep-wizard .ghostbtn.xs.confirm {
+  color: var(--amber);
+}
+.sep-wizard .ghostbtn.xs.confirm:hover {
+  background: var(--amber-soft, rgba(232, 195, 122, 0.1));
+}
+.sep-wizard .ghostbtn.sm {
+  padding: 8px 13px;
+  font-size: 13px;
+  border-radius: 10px;
+  flex: none;
+  white-space: nowrap;
+}
+.sep-wizard .ghostbtn.pad {
+  padding: 10px 16px;
+}
+.sep-wizard .mintbtn.sm {
+  padding: 9px 16px;
+  font-size: 14px;
+}
+
+/* comp editor + add form */
+.sep-wizard .comp-editor {
+  padding: 2px 20px 20px;
+  display: flex;
+  flex-direction: column;
+  gap: 14px;
+}
+.sep-wizard .comp-editor.pad-top {
+  padding-top: 20px;
+}
+.sep-wizard .comp-editor .input {
+  background: var(--bg);
+  border-radius: 11px;
+  font-size: 15.5px;
+  padding: 12px 14px;
+}
+.sep-wizard textarea.input {
+  resize: vertical;
+  min-height: 56px;
+  line-height: 1.5;
+}
+.sep-wizard .field {
+  display: flex;
+  flex-direction: column;
+  gap: 7px;
+}
+.sep-wizard .field-note-priv {
+  text-transform: none;
+  letter-spacing: 0;
+  font-family: var(--sans);
+  font-size: 11px;
+  color: var(--faint);
+}
+.sep-wizard .editor-grid {
+  display: grid;
+  grid-template-columns: repeat(2, minmax(0, 1fr));
+  gap: 12px;
+}
+.sep-wizard .confirm-hint {
+  display: flex;
+  align-items: center;
+  gap: 8px;
+  margin: 0;
+  font-size: 13px;
+  color: var(--amber);
+  background: var(--amber-soft, rgba(232, 195, 122, 0.1));
+  border: 1px solid var(--amber-line, rgba(232, 195, 122, 0.28));
+  border-radius: 11px;
+  padding: 10px 13px;
+}
+.sep-wizard .confirm-hint svg {
+  stroke: var(--amber);
+  flex: none;
+}
+.sep-wizard .add-eyebrow {
+  font-family: var(--mono);
+  font-size: 10.5px;
+  letter-spacing: 0.12em;
+  text-transform: uppercase;
+  color: var(--mint);
+}
+.sep-wizard .field.need .input {
+  border-color: var(--amber-line, rgba(232, 195, 122, 0.28));
+}
+.sep-wizard .editor-foot {
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+  gap: 12px;
+  margin-top: 2px;
+}
+.sep-wizard .editor-foot-right {
+  display: flex;
+  gap: 8px;
+}
+.sep-wizard .editor-hint {
+  font-size: 12.5px;
+  color: var(--faint);
+}
+.sep-wizard .link-danger {
+  background: none;
+  border: none;
+  color: #d98a82;
+  font-family: var(--sans);
+  font-size: 13.5px;
+  font-weight: 500;
+  cursor: pointer;
+  padding: 6px 0;
+  transition: color 0.18s;
+}
+.sep-wizard .link-danger:hover {
+  color: #e8a39c;
+}
+
+/* import zone (empty state) */
+.sep-wizard .importzone-wrap {
+  display: flex;
+  flex-direction: column;
+  align-items: center;
+  gap: 16px;
+}
+.sep-wizard .importzone {
+  display: flex;
+  flex-direction: column;
+  align-items: center;
+  justify-content: center;
+  gap: 8px;
+  text-align: center;
+  width: 100%;
+  min-height: 168px;
+  padding: 28px;
+  border: 1.5px dashed var(--border-strong);
+  border-radius: var(--radius);
+  background: var(--panel);
+  cursor: pointer;
+  transition: all 0.2s var(--ease);
+}
+.sep-wizard .importzone:hover {
+  border-color: var(--mint-line);
+  background: var(--mint-soft);
+}
+.sep-wizard .importzone.drag {
+  border-color: var(--mint);
+  background: var(--mint-soft);
+  transform: scale(1.004);
+}
+.sep-wizard .iz-icon {
+  display: flex;
+  color: var(--mint);
+  margin-bottom: 2px;
+}
+.sep-wizard .iz-main {
+  font-size: 16.5px;
+  font-weight: 500;
+  color: var(--text);
+}
+.sep-wizard .iz-link {
+  color: var(--mint);
+  font-weight: 600;
+}
+.sep-wizard .iz-sub {
+  font-size: 13.5px;
+  color: var(--muted);
+  max-width: 46ch;
+  line-height: 1.55;
+}
+.sep-wizard .iz-formats {
+  font-family: var(--mono);
+  font-size: 10.5px;
+  letter-spacing: 0.08em;
+  text-transform: uppercase;
+  color: var(--faint);
+  margin-top: 4px;
+}
+.sep-wizard .manual-link {
+  background: none;
+  border: none;
+  color: var(--muted);
+  font-family: var(--sans);
+  font-size: 14px;
+  font-weight: 500;
+  cursor: pointer;
+  padding: 4px 8px;
+  transition: color 0.18s;
+}
+.sep-wizard .manual-link:hover {
+  color: var(--text);
+}
+.sep-wizard .import-error {
+  margin: 14px 0 0;
+  font-size: 13.5px;
+  color: var(--muted);
+  text-align: center;
+}
+.sep-wizard .next-hint-inline {
+  margin: 22px 0 0;
+  font-size: 13px;
+  color: var(--faint);
+  text-align: center;
+  line-height: 1.5;
+}
+.sep-wizard .visually-hidden-input {
+  position: absolute;
+  width: 1px;
+  height: 1px;
+  padding: 0;
+  margin: -1px;
+  overflow: hidden;
+  clip: rect(0, 0, 0, 0);
+  white-space: nowrap;
+  border: 0;
+}
+
+/* importing state */
+.sep-wizard .importing {
+  border: 1px solid var(--border);
+  border-radius: var(--radius);
+  padding: 26px 24px;
+  background: var(--panel);
+}
+.sep-wizard .importing-head {
+  display: flex;
+  align-items: center;
+  gap: 12px;
+}
+.sep-wizard .importing-title {
+  font-size: 16px;
+  font-weight: 600;
+}
+.sep-wizard .spinner {
+  width: 20px;
+  height: 20px;
+  border-radius: 50%;
+  border: 2.4px solid var(--border-strong);
+  border-top-color: var(--mint);
+  animation: sep-spin 0.7s linear infinite;
+  flex: none;
+}
+.sep-wizard .progress {
+  height: 6px;
+  border-radius: 999px;
+  background: var(--panel-2);
+  margin: 16px 0 12px;
+  overflow: hidden;
+}
+.sep-wizard .progress-bar {
+  display: block;
+  height: 100%;
+  border-radius: 999px;
+  background: var(--mint);
+  box-shadow: 0 0 12px var(--mint-glow);
+  transition: width 0.7s var(--ease);
+}
+.sep-wizard .importing-sub {
+  margin: 0;
+  font-size: 13.5px;
+  color: var(--muted);
+}
+
+/* confirm banner (messy) */
+.sep-wizard .confirm-banner {
+  display: flex;
+  align-items: flex-start;
+  gap: 12px;
+  background: var(--amber-soft, rgba(232, 195, 122, 0.1));
+  border: 1px solid var(--amber-line, rgba(232, 195, 122, 0.28));
+  border-radius: 14px;
+  padding: 14px 16px;
+  margin-bottom: 14px;
+}
+.sep-wizard .cb-icon {
+  flex: none;
+  display: flex;
+  color: var(--amber);
+  margin-top: 1px;
+}
+.sep-wizard .cb-icon svg {
+  stroke: var(--amber);
+}
+.sep-wizard .cb-text {
+  font-size: 14px;
+  color: var(--muted);
+  line-height: 1.5;
+}
+.sep-wizard .cb-text strong {
+  color: var(--text);
+  font-weight: 700;
+}
+.sep-wizard .cb-text em {
+  color: var(--amber);
+  font-style: normal;
+  font-weight: 600;
+}
+
+/* add row */
+.sep-wizard .add-row {
+  display: flex;
+  align-items: center;
+  gap: 11px;
+  width: 100%;
+  margin-top: 14px;
+  background: transparent;
+  border: 1px dashed var(--border-strong);
+  border-radius: var(--radius);
+  color: var(--muted);
+  font-family: var(--sans);
+  font-size: 15px;
+  font-weight: 500;
+  padding: 17px 20px;
+  cursor: pointer;
+  transition: all 0.2s var(--ease);
+}
+.sep-wizard .add-row:hover {
+  border-color: var(--mint-line);
+  color: var(--text);
+  background: var(--mint-soft);
+}
+.sep-wizard .add-row:disabled {
+  opacity: 0.4;
+  cursor: not-allowed;
+}
+.sep-wizard .add-row:disabled:hover {
+  border-color: var(--border-strong);
+  color: var(--muted);
+  background: transparent;
+}
+.sep-wizard .add-plus {
+  display: inline-flex;
+  align-items: center;
+  justify-content: center;
+  width: 26px;
+  height: 26px;
+  border-radius: 50%;
+  background: var(--panel-2);
+  color: var(--mint);
+  transition: all 0.2s;
+}
+.sep-wizard .add-row:hover .add-plus {
+  background: var(--mint);
+  color: #08120f;
+}
+.sep-wizard .add-hint {
+  margin-left: auto;
+  font-family: var(--mono);
+  font-size: 10.5px;
+  letter-spacing: 0.1em;
+  text-transform: uppercase;
+  color: var(--faint);
+}
+.sep-wizard .comp.add {
+  margin-top: 14px;
+}
+
 /* The wizard loading placeholder (pre-instance hydration) lives on the
    same warm canvas so the agent never sees a flash of the light body. */
 .sep-wizard-loading {
@@ -529,5 +1225,31 @@
   }
   .sep-wizard .subject-grid {
     grid-template-columns: 1fr 1fr;
+  }
+  .sep-wizard .med-value {
+    font-size: 27px;
+  }
+  .sep-wizard .comp-face {
+    flex-wrap: wrap;
+  }
+  .sep-wizard .comp-right {
+    flex-direction: row;
+    align-items: center;
+    gap: 12px;
+    width: 100%;
+    justify-content: space-between;
+    padding-left: 36px;
+    margin-top: 2px;
+  }
+  .sep-wizard .editor-grid {
+    grid-template-columns: 1fr 1fr;
+  }
+  .sep-wizard .editor-foot {
+    flex-direction: column;
+    align-items: stretch;
+    gap: 14px;
+  }
+  .sep-wizard .editor-foot-right {
+    justify-content: flex-end;
   }
 }

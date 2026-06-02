@@ -49,6 +49,18 @@ export interface Comp {
   yearBuilt?: number;
 
   /**
+   * Seller-Presentation Phase B2 — per-comp "counted vs set-aside"
+   * authoring flag. `true`/undefined = counted toward the comp-based
+   * median; `false` = the agent set it aside (stays on the prep doc for
+   * reference but does NOT feed the median and is filtered OUT of the
+   * public payload by `toPublicPayload`). Optional + defaults-to-counted
+   * so legacy drafts and SIR (which never sets it) are unaffected. This
+   * is an AUTHORING concern only — it never appears in the public emit
+   * (the serializer reads it to decide inclusion, then drops it).
+   */
+  counted?: boolean;
+
+  /**
    * V2 prep — never displayed in v1. Tracks how the comp was entered so
    * Screenshot Import (v2) can badge AI-extracted comps and surface
    * per-field confidence for agent review.
