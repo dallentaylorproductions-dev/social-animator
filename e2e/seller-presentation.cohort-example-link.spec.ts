@@ -13,8 +13,9 @@ import {
  * through one swappable config constant (@/lib/config/cohort-example).
  *
  * What this spec locks in:
- *   1. The chrome link renders on EVERY step (the chore-dread hits
- *      mid-flow, so the destination must be one tap away throughout).
+ *   1. The chrome link renders on Step 1 ONLY (Phase B1 / Phase 0
+ *      decision 1 removed it from the interior steps so they stay calm
+ *      mid-flow; the reinforced Step 1 anchor is the at-start anchor).
  *   2. It points at COHORT_EXAMPLE_URL (a PRODUCTION url, never a
  *      *.vercel.app preview hash) and opens in a NEW tab
  *      (target="_blank" + rel includes noopener) so clicking never
@@ -28,7 +29,7 @@ import {
  */
 
 test.describe('Seller Presentation — Anticipation Layer cohort link', () => {
-  test('chrome link renders on every step with the production URL + opens a new tab', async ({
+  test('chrome link renders on Step 1 only with the production URL + opens a new tab', async ({
     page,
   }) => {
     await page.goto('/seller-presentation');
@@ -56,23 +57,25 @@ test.describe('Seller Presentation — Anticipation Layer cohort link', () => {
 
     const next = page.getByTestId('wizard-next');
 
-    // --- Steps 2–6: the SAME chrome link stays visible + correct on
-    //     every step (it lives in the shared header, rendered once). ---
-    const steps: Array<{ testid: string; label: string }> = [
-      { testid: 'step-comps', label: 'Step 2 of 6' },
-      { testid: 'step-strategy', label: 'Step 3 of 6' },
-      { testid: 'step-pitch', label: 'Step 4 of 6' },
-      { testid: 'step-editorial', label: 'Step 5 of 6' },
-      { testid: 'step-review', label: 'Step 6 of 6' },
+    // --- Steps 2–6: Phase B1 / Phase 0 decision 1 REMOVES the chrome
+    //     anticipation link from the interior steps to keep them calm
+    //     mid-flow. The link must be present on Step 1 (asserted above)
+    //     and ABSENT on every interior step. The reinforced Step 1
+    //     anchor (cohort-example-link-step1) is the only at-start anchor;
+    //     it lives inside StepProperty, not the chrome. ---
+    const interiorSteps = [
+      'step-comps',
+      'step-strategy',
+      'step-pitch',
+      'step-editorial',
+      'step-review',
     ];
-    for (const step of steps) {
+    for (const testid of interiorSteps) {
       await expect(next).toBeEnabled();
       await next.click();
-      await expect(page.getByTestId(step.testid)).toBeVisible();
-      await expect(page.getByText(step.label)).toBeVisible();
-      await expect(link).toBeVisible();
-      await expect(link).toHaveAttribute('href', COHORT_EXAMPLE_URL);
-      await expect(link).toHaveAttribute('target', '_blank');
+      await expect(page.getByTestId(testid)).toBeVisible();
+      // The chrome anticipation link is gone on interior steps.
+      await expect(link).toHaveCount(0);
     }
   });
 

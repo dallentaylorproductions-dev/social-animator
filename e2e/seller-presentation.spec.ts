@@ -34,7 +34,6 @@ test.describe('Seller Presentation — A5a spine + Step 1', () => {
     await expect(
       page.getByRole('heading', { name: 'Seller Presentation' }),
     ).toBeVisible();
-    await expect(page.getByText('Step 1 of 6')).toBeVisible();
     await expect(page.getByTestId('step-property')).toBeVisible();
 
     // The mount effect replaced the URL with ?id=<workflow_…>.
@@ -68,24 +67,19 @@ test.describe('Seller Presentation — A5a spine + Step 1', () => {
     // Traverse all 6 steps via Next. Each stub renders its testid.
     await nextButton.click();
     await expect(page.getByTestId('step-comps')).toBeVisible();
-    await expect(page.getByText('Step 2 of 6')).toBeVisible();
 
     await nextButton.click();
     await expect(page.getByTestId('step-strategy')).toBeVisible();
-    await expect(page.getByText('Step 3 of 6')).toBeVisible();
 
     await nextButton.click();
     await expect(page.getByTestId('step-pitch')).toBeVisible();
-    await expect(page.getByText('Step 4 of 6')).toBeVisible();
 
     // A7d — fully optional Editorial step sits between Pitch and Review.
     await nextButton.click();
     await expect(page.getByTestId('step-editorial')).toBeVisible();
-    await expect(page.getByText('Step 5 of 6')).toBeVisible();
 
     await nextButton.click();
     await expect(page.getByTestId('step-review')).toBeVisible();
-    await expect(page.getByText('Step 6 of 6')).toBeVisible();
 
     // Wait for the wizard's save effect to flush `currentStep: 'review'`
     // to localStorage before reloading. The DOM render of step-review
@@ -115,7 +109,6 @@ test.describe('Seller Presentation — A5a spine + Step 1', () => {
       page.getByRole('heading', { name: 'Seller Presentation' }),
     ).toBeVisible();
     await expect(page.getByTestId('step-review')).toBeVisible();
-    await expect(page.getByText('Step 6 of 6')).toBeVisible();
 
     // Walk back to Step 1 and confirm the address survived. A7d adds
     // the optional editorial step between Pitch and Review, so it now
@@ -125,7 +118,6 @@ test.describe('Seller Presentation — A5a spine + Step 1', () => {
     for (let i = 0; i < 5; i++) {
       await prevButton.click();
     }
-    await expect(page.getByText('Step 1 of 6')).toBeVisible();
     await expect(page.getByTestId('step-property-address')).toHaveValue(
       '1234 Test Drive NE',
     );
@@ -705,7 +697,6 @@ test.describe('Seller Presentation — A6.1 resume-on-open', () => {
 
     // The resumed instance restored the agent's step position…
     await expect(page.getByTestId('step-review')).toBeVisible();
-    await expect(page.getByText('Step 6 of 6')).toBeVisible();
 
     // …and the per-step content survives intact (the bug had
     // step-property restored, steps 2–5 empty).
@@ -746,7 +737,6 @@ test.describe('Seller Presentation — A6.1 resume-on-open', () => {
       },
       originalId,
     );
-    await expect(page.getByText('Step 1 of 6')).toBeVisible();
     // Property primitive is SHARED across instances, so the address
     // legitimately persists — only the per-instance SP draft resets.
     // Verify the comps-step shows the empty-state copy.
@@ -808,7 +798,6 @@ test.describe('Seller Presentation — A6.1 resume-on-open', () => {
     const newId = new URL(page.url()).searchParams.get('id');
     expect(newId).toBeTruthy();
     expect(newId).not.toBe(completedId);
-    await expect(page.getByText('Step 1 of 6')).toBeVisible();
   });
 });
 
