@@ -18,8 +18,8 @@ import { ImportCompsButton } from "./ImportCompsButton";
  * `import-to-comp` (csv | tsv | vision) all dispatch to ImportCompsButton
  * — that one button drives the file picker for every accepted format
  * (CSV/TSV/PDF) and routes to the right mapper server-side by extension.
- * `address-autofill` and `copy-suggestion` still render null until they
- * ship.
+ * The address-fill and copy-suggestion plug-points still render null
+ * until they ship (see SellerPresentationPlugPointType in ../skill).
  *
  * Per substrate §5.3: every plug-point's manual-entry fallback is
  * always available below the proposer. AIPlugPoint NEVER replaces

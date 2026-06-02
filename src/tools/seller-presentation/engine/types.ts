@@ -156,6 +156,18 @@ export interface SellerPresentationDraft {
   /** A7a — hero photo (data URL or external URL). Nullable → renderer falls back to monogram. */
   heroPhotoUrl?: string;
 
+  // ---- Phase A foundation: optional subject-property details ----
+  // String | undefined (consistent with the other optional Step 1
+  // fields) and clamped through clampString. These feed Step 4 Tier 2
+  // drafts (specific-claim drafts gated on data signals) when Phase B4+
+  // lands; the capture UI ships in Phase B1, not now. Not required for
+  // publish — getMissingRequiredInputs / validateForExport ignore them.
+  subjectBedrooms?: string;
+  subjectBaths?: string;
+  subjectSqft?: string;
+  subjectYearBuilt?: string;
+  subjectLotSqft?: string;
+
   // ---- Step 3 (A5b): Pricing & strategy ----
   recommendedPrice?: string;
   /** Short public-safe rationale (≠ pricingStrategyId / confidence, which are private). */
@@ -319,13 +331,18 @@ export function clampDraft(
     propertyState: clampString(raw.propertyState),
     propertyZip: clampString(raw.propertyZip),
     heroPhotoUrl: clampString(raw.heroPhotoUrl),
+    subjectBedrooms: clampString(raw.subjectBedrooms),
+    subjectBaths: clampString(raw.subjectBaths),
+    subjectSqft: clampString(raw.subjectSqft),
+    subjectYearBuilt: clampString(raw.subjectYearBuilt),
+    subjectLotSqft: clampString(raw.subjectLotSqft),
     recommendedPrice: clampString(raw.recommendedPrice),
     priceRationale: clampString(raw.priceRationale),
     pricingStrategyId: clampString(raw.pricingStrategyId),
     confidence: VALID_CONFIDENCE.includes(raw.confidence as ConfidenceLevel)
       ? (raw.confidence as ConfidenceLevel)
       : undefined,
-    comps: Array.isArray(raw.comps) ? raw.comps.slice(0, 4) : [],
+    comps: Array.isArray(raw.comps) ? raw.comps.slice(0, 5) : [],
     pitchPoints: Array.isArray(raw.pitchPoints)
       ? raw.pitchPoints
           .map(clampPitchPoint)

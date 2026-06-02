@@ -83,7 +83,7 @@ export const SELLER_PRESENTATION_SKILL: CallableSkill = {
         key: "comps",
         type: "objectArray",
         description:
-          "Comparable recent sales (≤4); supports Lane C's import-to-comp plug-point",
+          "Comparable recent sales (≤5); supports Lane C's import-to-comp plug-point",
         source: "user-input",
       },
       // Step 4 (A5b) — pitch points

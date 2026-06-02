@@ -185,19 +185,23 @@ test.describe('A7d.11 — walk-through video upload survives parent re-renders',
     );
   });
 
-  test('page.tsx setDraft accepts a functional updater', () => {
-    const pageSrc = readFileSync(
-      resolve(process.cwd(), 'src/app/seller-presentation/page.tsx'),
+  test('useSellerPresentationState setDraft accepts a functional updater', () => {
+    // Phase A moved the WorkflowInstance state (incl. the functional
+    // setDraft) out of page.tsx into this hook. The protective intent is
+    // unchanged: the signature must stay value-or-function so the
+    // VideoEditor's `setDraft((prev) => ...)` call type-checks and a
+    // future "fix" can't revert to the value-only stale-closure shape.
+    const hookSrc = readFileSync(
+      resolve(
+        process.cwd(),
+        'src/tools/seller-presentation/hooks/useSellerPresentationState.ts',
+      ),
       'utf8',
     );
 
-    // The signature widened to value-or-function. Without this, the
-    // VideoEditor's `setDraft((prev) => ...)` call wouldn't type-
-    // check and a future "fix" might revert to the value-only form
-    // — which is the stale-closure shape this commit is closing.
-    expect(pageSrc).toMatch(
+    expect(hookSrc).toMatch(
       /\(prev:\s*SellerPresentationDraft\)\s*=>\s*SellerPresentationDraft/,
     );
-    expect(pageSrc).toMatch(/typeof\s+next\s*===\s*["']function["']/);
+    expect(hookSrc).toMatch(/typeof\s+next\s*===\s*["']function["']/);
   });
 });

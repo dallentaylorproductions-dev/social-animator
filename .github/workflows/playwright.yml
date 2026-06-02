@@ -54,6 +54,13 @@ jobs:
       - name: Checkout
         uses: actions/checkout@v4
 
+      # Truthful-copy gate (Phase A). Fails fast — no Node needed — if any
+      # user-facing Seller Presentation TSX claims content was AI-written,
+      # auto-filled, or fetched on the agent's behalf. See
+      # scripts/check-truthful-copy.sh + Phase 0 Section 4.
+      - name: Truthful-copy check
+        run: bash scripts/check-truthful-copy.sh
+
       - name: Setup Node.js
         uses: actions/setup-node@v4
         with:
