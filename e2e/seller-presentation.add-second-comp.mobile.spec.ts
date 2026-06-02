@@ -1,17 +1,19 @@
 import { test, expect, devices } from '@playwright/test';
 
 /**
- * Mobile-Safari repro of Dallen's A7c.4 phone smoke. Same shape as
- * the desktop add-second-comp spec, but with iPhone WebKit emulation
- * (touchscreen, mobile UA, mobile viewport) — that combination is
- * what triggered the freeze on a real device.
+ * Mobile-Safari repro of Dallen's A7c.4 phone smoke, updated for the
+ * Phase B2 inline-add flow. Same shape as the desktop add-comp spec but
+ * with iPhone WebKit emulation (touchscreen, mobile UA, mobile viewport)
+ * — that combination is what triggered the original freeze on a real
+ * device. Asserts the wizard stays fully interactive after committing
+ * several comps via touch, with no uncaught exceptions.
  *
  * Kept as a parallel file (not folded into the desktop spec) so it can
  * be opted-out independently if Mobile WebKit ever becomes flaky in CI.
  */
 test.use({ ...devices['iPhone 14'] });
 
-test('mobile: adding a second blank comp keeps the wizard fully interactive', async ({
+test('mobile: committing several comps keeps the wizard fully interactive', async ({
   page,
 }) => {
   const consoleErrors: string[] = [];
@@ -31,19 +33,27 @@ test('mobile: adding a second blank comp keeps the wizard fully interactive', as
 
   await expect(page.getByTestId('step-comps')).toBeVisible();
 
-  await page.getByTestId('step-comps-add').tap();
+  // Enter the manual add path + commit Comp 1.
+  await page.getByTestId('step-comps-manual-link').tap();
+  await expect(page.getByTestId('step-comps-add-form')).toBeVisible();
+  await page.getByTestId('step-comps-add-address').fill('5678 Elm Ave NE');
+  await page.getByLabel('comp-add-sold-price').fill('685000');
+  await page.getByTestId('step-comps-add-submit').tap();
   await expect(page.getByTestId('step-comps-card-0')).toBeVisible();
-  await page.getByTestId('step-comps-address-0').fill('5678 Elm Ave NE');
-  await page.getByLabel('comp-1-sold-price').fill('685000');
 
-  // Add second blank comp via tap (touch) — the exact gesture that froze
-  // the page on Dallen's phone.
+  // Comp 2 via touch — the exact gesture path that froze the page.
   await page.getByTestId('step-comps-add').tap();
+  await page.getByTestId('step-comps-add-address').fill('9012 Oak Pl NE');
+  await page.getByLabel('comp-add-sold-price').fill('699000');
+  await page.getByTestId('step-comps-add-submit').tap();
   await expect(page.getByTestId('step-comps-card-1')).toBeVisible();
 
-  // The page should remain interactive — Add comp clickable again,
-  // wizard nav clickable, top-of-page Start-new clickable.
+  // The page should remain interactive — Add comp tappable again,
+  // wizard nav tappable, top-of-page Start-new clickable.
   await page.getByTestId('step-comps-add').tap();
+  await page.getByTestId('step-comps-add-address').fill('311 Birch Ln NE');
+  await page.getByLabel('comp-add-sold-price').fill('672000');
+  await page.getByTestId('step-comps-add-submit').tap();
   await expect(page.getByTestId('step-comps-card-2')).toBeVisible();
 
   await page.getByTestId('wizard-prev').tap();

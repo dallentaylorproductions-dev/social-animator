@@ -138,11 +138,13 @@ test.describe('Seller Presentation — A7d.8 video poster', () => {
       await page.getByTestId('step-property-zip').fill('44113');
       const nextButton = page.getByTestId('wizard-next');
       await nextButton.click();
-      await page.getByTestId('step-comps-add').click();
+      await page.getByTestId('step-comps-manual-link').click();
       await page
-        .getByTestId('step-comps-address-0')
+        .getByTestId('step-comps-add-address')
         .fill('2218 W 14th Street');
-      await page.getByLabel('comp-1-sold-price').fill('648000');
+      await page.getByLabel('comp-add-sold-price').fill('648000');
+      await page.getByTestId('step-comps-add-submit').click();
+      await expect(page.getByTestId('step-comps-card-0')).toBeVisible();
       await nextButton.click();
       await page.getByLabel('recommended-price').fill('675000');
       await nextButton.click();

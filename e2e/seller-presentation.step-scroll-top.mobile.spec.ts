@@ -24,8 +24,14 @@ test('mobile: Comps → Strategy opens with recommended price visible at the top
   await page.getByTestId('wizard-next').tap();
 
   await expect(page.getByTestId('step-comps')).toBeVisible();
+  await page.getByTestId('step-comps-manual-link').tap();
   for (let i = 0; i < 3; i += 1) {
-    await page.getByTestId('step-comps-add').tap();
+    if (i > 0) await page.getByTestId('step-comps-add').tap();
+    await page
+      .getByTestId('step-comps-add-address')
+      .fill(`${1000 + i} Test Ave NE`);
+    await page.getByLabel('comp-add-sold-price').fill(`${600000 + i * 5000}`);
+    await page.getByTestId('step-comps-add-submit').tap();
     await expect(page.getByTestId(`step-comps-card-${i}`)).toBeVisible();
   }
 

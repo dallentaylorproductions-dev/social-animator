@@ -82,9 +82,11 @@ async function reachEditorialStep(page: import('@playwright/test').Page) {
   await page.getByTestId('step-property-zip').fill('44113');
   const next = page.getByTestId('wizard-next');
   await next.click();
-  await page.getByTestId('step-comps-add').click();
-  await page.getByTestId('step-comps-address-0').fill('2218 W 14th Street');
-  await page.getByLabel('comp-1-sold-price').fill('648000');
+  await page.getByTestId('step-comps-manual-link').click();
+  await page.getByTestId('step-comps-add-address').fill('2218 W 14th Street');
+  await page.getByLabel('comp-add-sold-price').fill('648000');
+  await page.getByTestId('step-comps-add-submit').click();
+  await expect(page.getByTestId('step-comps-card-0')).toBeVisible();
   await next.click();
   await page.getByLabel('recommended-price').fill('675000');
   await next.click();

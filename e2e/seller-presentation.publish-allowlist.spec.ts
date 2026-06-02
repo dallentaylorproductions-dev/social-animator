@@ -599,6 +599,59 @@ test.describe('toPublicPayload — privacy allowlist (R-1 proof)', () => {
     }
   });
 
+  test('Phase B2 — set-aside comps (counted === false) are filtered OUT of the public payload', () => {
+    // The B2 per-comp "counted vs set-aside" toggle is an AUTHORING
+    // concern: a set-aside comp stays on the prep draft for the agent's
+    // reference but must NOT reach the seller page. The serializer
+    // filters `counted === false` BEFORE projection; default-to-counted
+    // means undefined/true comps still project.
+    const draft = {
+      comps: [
+        {
+          address: '111 COUNTED Ave NE',
+          soldPrice: '$700,000',
+          counted: true,
+        },
+        {
+          // Explicit set-aside — must NOT appear in the payload.
+          address: 'SETASIDE_SENTINEL 222 Hidden St NE',
+          soldPrice: '$999,999',
+          counted: false,
+        },
+        {
+          // counted omitted → defaults to counted → must appear.
+          address: '333 Default Pl NE',
+          soldPrice: '$680,000',
+        },
+      ],
+      pitchPoints: [],
+      commitments: [],
+      asks: [],
+    } as unknown as SellerPresentationDraft;
+
+    const payload = toPublicPayload(draft, FIXTURE_AGENT_CONTACT);
+    const serialized = JSON.stringify(payload);
+
+    // The set-aside comp is gone — by address sentinel AND by count.
+    expect(serialized).not.toContain('SETASIDE_SENTINEL');
+    expect(payload.comps).toHaveLength(2);
+    expect(payload.whyPrice.comps).toHaveLength(2);
+
+    // The counted comps survive.
+    const addresses = payload.comps.map((c) => c.address);
+    expect(addresses).toContain('111 COUNTED Ave NE');
+    expect(addresses).toContain('333 Default Pl NE');
+
+    // The `counted` authoring flag itself never leaks into the emit.
+    expect(serialized).not.toContain('"counted":');
+    for (const comp of payload.comps) {
+      expect(
+        Object.prototype.hasOwnProperty.call(comp, 'counted'),
+        'public comp leaked the counted authoring flag',
+      ).toBe(false);
+    }
+  });
+
   test('A7a — every emitted comp has keys subset of {address, soldPrice, soldDate, sqft}', () => {
     const draft = maxedDraft();
     const payload = toPublicPayload(

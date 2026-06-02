@@ -25,8 +25,16 @@ test.describe('SellerPresentation - Comp yearBuilt input', () => {
     await expect(page.getByTestId('step-property-saved-hint')).toBeVisible();
     await page.getByTestId('wizard-next').click();
     await expect(page.getByTestId('step-comps')).toBeVisible();
-    await page.getByTestId('step-comps-add').click();
+    // Phase B2: commit a comp via the inline add form, then open its
+    // editor — the year-built input (with the 4-digit strip + on-blur
+    // range clamp) lives on the comp's editor now, not a blank card.
+    await page.getByTestId('step-comps-manual-link').click();
+    await page.getByTestId('step-comps-add-address').fill('5678 Elm Ave NE');
+    await page.getByLabel('comp-add-sold-price').fill('685000');
+    await page.getByTestId('step-comps-add-submit').click();
     await expect(page.getByTestId('step-comps-card-0')).toBeVisible();
+    await page.getByTestId('step-comps-edit-0').click();
+    await expect(page.getByTestId('step-comps-year-built-0')).toBeVisible();
   }
 
   test('accepts 4-digit input, strips non-digits, and renders the typed value', async ({
