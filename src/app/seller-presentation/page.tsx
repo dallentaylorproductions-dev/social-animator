@@ -23,6 +23,7 @@ import {
   COHORT_EXAMPLE_URL,
   COHORT_EXAMPLE_LABEL,
 } from "@/lib/config/cohort-example";
+import "./sep-wizard.css";
 
 /**
  * Seller Presentation — 5-step wizard shell.
@@ -76,61 +77,70 @@ export default function SellerPresentationPage() {
 
   if (!instance) {
     return (
-      <div className="p-8 text-sm text-gray-400" data-testid="wizard-loading">
+      <div className="sep-wizard-loading" data-testid="wizard-loading">
         Loading…
       </div>
     );
   }
 
+  // Phase 0 decision 1: the Anticipation chrome link now appears on
+  // Step 1 ONLY. It used to render on every step's chrome; B1 removes it
+  // from the interior steps to keep them calm mid-flow. The reinforced
+  // anchor inside StepProperty itself (cohort-example-link-step1) stays.
+  const isStep1 = currentStep === "property";
+
   return (
     <SPEntitlementProvider>
-    <div className="mx-auto max-w-3xl px-4 py-8" data-testid="seller-presentation-wizard">
-      <header className="mb-8">
-        <div className="mb-4 flex items-center justify-between gap-4">
-          <a
-            href="/dashboard"
-            className="inline-flex items-center text-xs uppercase tracking-[0.18em] text-neutral-500 transition-colors hover:text-mint"
-          >
-            ← Dashboard
-          </a>
+    <div className="sep-wizard" data-testid="seller-presentation-wizard">
+    <div className="sep-container">
+      <header>
+        <div className="topnav">
           {/* "Start a new presentation" — A6.1. Always rendered (an
               instance is always loaded by the time this returns).
               Without this affordance, an agent could never start a
               second presentation once the resume-on-open behavior was
               in place. */}
+          <a href="/dashboard" className="topnav-l">
+            ← Dashboard
+          </a>
           <button
             type="button"
             onClick={startNew}
             data-testid="wizard-start-new"
-            className="inline-flex items-center text-xs uppercase tracking-[0.18em] text-neutral-500 transition-colors hover:text-mint"
+            className="topnav-r"
           >
             + Start a new presentation
           </button>
         </div>
-        <h1 className="text-2xl font-semibold">Seller Presentation</h1>
-        <p className="mt-1 text-sm text-gray-400">
-          Listing-appointment prep + premium seller-facing page. Step{" "}
-          {STEPS.findIndex((s) => s.id === currentStep) + 1} of {STEPS.length}.
-        </p>
-        {/* Anticipation Layer (v1.47) — a calm, always-available link to
-            the canonical cohort example seller page. Lives in the header
-            so it renders on every step (the chore-dread hits mid-flow, so
-            the polished destination needs to be one tap away throughout,
-            not only at the start). target="_blank" so clicking never
-            costs the agent their in-progress draft. URL routes through the
-            single swappable constant in @/lib/config/cohort-example. */}
-        <a
-          href={COHORT_EXAMPLE_URL}
-          target="_blank"
-          rel="noopener noreferrer"
-          data-testid="cohort-example-link"
-          className="mt-3 inline-flex items-center text-sm text-neutral-400 transition-colors hover:text-mint"
-        >
-          {COHORT_EXAMPLE_LABEL} →
-        </a>
+
+        <div className="brandhead">
+          <div className="eyebrow">
+            <span className="eyebrow-dot" />
+            SEP Studio
+          </div>
+          <h1 className="sep-title">Seller Presentation</h1>
+          <p className="subtitle">
+            Listing-appointment prep + premium seller-facing page
+          </p>
+          {/* Anticipation Layer — Step 1 only (Phase 0 decision 1).
+              target="_blank" so clicking never costs the agent their
+              in-progress draft. URL routes through the single swappable
+              constant in @/lib/config/cohort-example. */}
+          {isStep1 && (
+            <a
+              href={COHORT_EXAMPLE_URL}
+              target="_blank"
+              rel="noopener noreferrer"
+              data-testid="cohort-example-link"
+              className="example-link inline"
+            >
+              {COHORT_EXAMPLE_LABEL}&nbsp;→
+            </a>
+          )}
+        </div>
       </header>
 
-      <StepIndicator currentStep={currentStep} />
+      <StepRail currentStep={currentStep} />
 
       {/* StepErrorBoundary (A7c.4.1): scoped to the step body so a
           field that throws during render degrades to an inline
@@ -140,7 +150,7 @@ export default function SellerPresentationPage() {
           `resetKey={currentStep}` clears the caught error when the
           agent navigates away from the broken step so re-entering
           it after a code fix or storage clear is clean. */}
-      <section className="mt-8 min-h-[400px]">
+      <section className="min-h-[400px]">
         <StepErrorBoundary
           resetKey={currentStep}
           stepLabel={STEPS.find((s) => s.id === currentStep)?.label}
@@ -166,7 +176,7 @@ export default function SellerPresentationPage() {
         </StepErrorBoundary>
       </section>
 
-      <nav className="mt-8 flex justify-between">
+      <nav className="footer">
         <button
           type="button"
           onClick={() => {
@@ -174,7 +184,7 @@ export default function SellerPresentationPage() {
             if (idx > 0) setCurrentStep(STEPS[idx - 1].id);
           }}
           disabled={currentStep === STEPS[0].id}
-          className="rounded border border-gray-700 px-4 py-2 text-sm disabled:opacity-50"
+          className="ghostbtn lg"
           data-testid="wizard-prev"
         >
           ← Previous
@@ -190,7 +200,7 @@ export default function SellerPresentationPage() {
             currentStep === STEPS[STEPS.length - 1].id ||
             !isStepValid(currentStep, instance)
           }
-          className="rounded bg-mint px-4 py-2 text-sm font-medium text-black disabled:cursor-not-allowed disabled:opacity-50"
+          className="mintbtn lg"
           data-testid="wizard-next"
         >
           Next →
@@ -198,36 +208,45 @@ export default function SellerPresentationPage() {
       </nav>
 
       {currentStep === "review" && (
-        <div className="mt-8 border-t border-neutral-800 pt-6">
-          <a
-            href="/dashboard"
-            className="inline-flex items-center text-sm text-neutral-400 transition-colors hover:text-mint"
-          >
+        <div className="review-foot">
+          <a href="/dashboard" className="example-link">
             Done. Back to dashboard →
           </a>
         </div>
       )}
     </div>
+    </div>
     </SPEntitlementProvider>
   );
 }
 
-function StepIndicator({ currentStep }: { currentStep: StepId }) {
+/**
+ * Step rail (Phase B1) — replaces the old StepIndicator. Six equal
+ * columns with the redesign's todo / done / active states (a 2px
+ * underline that goes hairline → mint-line → solid-mint-glow as the
+ * agent advances). DISPLAY-ONLY: the rail items don't navigate (matches
+ * production — only Previous/Next move between steps), so they're plain
+ * <li>s, not buttons. Mobile collapses to 3 columns via the scoped CSS.
+ */
+function StepRail({ currentStep }: { currentStep: StepId }) {
   const currentIdx = STEPS.findIndex((s) => s.id === currentStep);
   return (
-    <ol className="flex gap-2 text-xs">
-      {STEPS.map((step, idx) => (
-        <li
-          key={step.id}
-          className={`flex-1 border-b-2 pb-2 ${
-            idx <= currentIdx
-              ? "border-mint text-white"
-              : "border-gray-700 text-gray-500"
-          }`}
-        >
-          {idx + 1}. {step.label}
-        </li>
-      ))}
+    <ol className="rail" aria-label="Steps">
+      {STEPS.map((step, idx) => {
+        const state =
+          idx < currentIdx ? "done" : idx === currentIdx ? "active" : "todo";
+        return (
+          <li
+            key={step.id}
+            className={`rail-item ${state}`}
+            aria-current={idx === currentIdx ? "step" : undefined}
+          >
+            <span className="rail-num">{idx + 1}.</span>
+            <span className="rail-label">{step.label}</span>
+            <span className="rail-bar" />
+          </li>
+        );
+      })}
     </ol>
   );
 }

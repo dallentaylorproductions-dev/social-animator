@@ -58,6 +58,18 @@ interface ImageUploadFieldProps {
    * affordance.
    */
   disablePasteUrl?: boolean;
+  /**
+   * Empty-state dropzone copy (Phase B1 — additive, backward
+   * compatible). When `emptyTitle` is set, the empty-state button
+   * renders it as the primary line (with `emptySubtext` beneath)
+   * instead of the default "Choose photo from your camera roll".
+   * Lets the Seller Presentation Step 1 surface a context-aware
+   * headline ("Add a photo of {address}") without forking the
+   * component or touching its Vercel-Blob upload pipeline. Callers
+   * that omit these props keep the exact prior rendering.
+   */
+  emptyTitle?: string;
+  emptySubtext?: string;
 }
 
 const MAX_EDGE = 1600;
@@ -73,6 +85,8 @@ export function ImageUploadField({
   testIdPrefix,
   urlPlaceholder = "…or paste an image URL",
   disablePasteUrl = false,
+  emptyTitle,
+  emptySubtext,
 }: ImageUploadFieldProps) {
   const fileRef = useRef<HTMLInputElement>(null);
   const [uploading, setUploading] = useState(false);
@@ -175,7 +189,22 @@ export function ImageUploadField({
           className="block w-full bg-neutral-900 border border-dashed border-neutral-700 hover:border-mint rounded-md px-3 py-6 text-xs text-neutral-400 hover:text-neutral-200 transition text-center disabled:opacity-60"
           data-testid={tid("upload")}
         >
-          {uploading ? "Uploading…" : "Choose photo from your camera roll"}
+          {uploading ? (
+            "Uploading…"
+          ) : emptyTitle ? (
+            <span className="block">
+              <span className="block text-sm text-text-primary">
+                {emptyTitle}
+              </span>
+              {emptySubtext && (
+                <span className="mt-1 block text-[11px] text-neutral-500">
+                  {emptySubtext}
+                </span>
+              )}
+            </span>
+          ) : (
+            "Choose photo from your camera roll"
+          )}
         </button>
       )}
 
