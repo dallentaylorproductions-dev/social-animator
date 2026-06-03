@@ -54,9 +54,6 @@ interface StepEditorialProps {
   ) => void;
 }
 
-const inputCls =
-  "w-full px-3 py-2 bg-neutral-900 border border-neutral-700 rounded text-sm focus:outline-none focus:border-mint";
-
 type SectionKey = "video" | "areaStats";
 
 interface SectionDef {
@@ -73,14 +70,14 @@ const SECTIONS: SectionDef[] = [
     key: "video",
     title: "Walk-through video",
     purpose:
-      "A short video of you walking the seller through the plan. Upload from your phone — plays inline on the page.",
+      "A short video of you walking the seller through the plan. Records on your phone, plays inline on the seller's page.",
     addLabel: "+ Add a video",
   },
   {
     key: "areaStats",
     title: "Area snapshot",
     purpose:
-      "Builds the animated neighborhood chart + stats block on the seller's page. Each field is optional — fill what you have.",
+      "Builds the animated neighborhood chart and stats block on the seller's page. Every field is optional — fill what you have, skip what you don't.",
     addLabel: "+ Add an area snapshot",
   },
 ];
@@ -190,14 +187,14 @@ export function StepEditorial({ draft, setDraft }: StepEditorialProps) {
   };
 
   return (
-    <div className="space-y-6" data-testid="step-editorial">
-      <header>
-        <h2 className="text-lg font-medium">Editorial extras</h2>
-        <p className="mt-1 text-xs text-gray-500">
-          Optional. Add only the sections you want on the page. Skip the rest
-          and the page hides them cleanly.
+    <section className="sec5" data-testid="step-editorial">
+      <div className="sec-head">
+        <h2 className="sec-title">Editorial extras</h2>
+        <p className="sec-sub">
+          Optional. Add the sections that fit this listing. Skip the rest and
+          the page hides them cleanly.
         </p>
-      </header>
+      </div>
 
       {/* A7d.11 — step body wrapper. The lock overlay below sits
           absolutely over this container while the walk-through video
@@ -209,9 +206,9 @@ export function StepEditorial({ draft, setDraft }: StepEditorialProps) {
           a stale-closure-prone in-flight state). The lock unlocks on
           completion OR failure (a failed upload must never trap the
           user — VideoUploadField surfaces a retry + manual fallback). */}
-      <div className="relative">
+      <div className="sec5-canvas">
         <div
-          className="space-y-4"
+          className="sec5-sections"
           // aria-busy mirrors the visual lock for assistive tech.
           aria-busy={videoUploadInFlight}
           // pointer-events:none on the body during upload moves the
@@ -242,7 +239,7 @@ export function StepEditorial({ draft, setDraft }: StepEditorialProps) {
           <UploadingLockOverlay progressPct={videoUploadSession.progressPct} />
         )}
       </div>
-    </div>
+    </section>
   );
 }
 
@@ -269,21 +266,19 @@ function UploadingLockOverlay({
       : `Uploading walkthrough video ${Math.round(progressPct)}%`;
   return (
     <div
-      className="absolute inset-0 z-10 flex items-center justify-center rounded bg-black/55 backdrop-blur-[1px]"
+      className="sec5-lock"
       role="status"
       aria-live="polite"
       data-testid="step-editorial-upload-lock"
     >
-      <div className="flex w-72 max-w-[80%] flex-col items-center gap-3 rounded border border-neutral-700 bg-neutral-900/95 px-4 py-5 text-center">
-        <p className="text-[10px] uppercase tracking-[0.18em] text-mint">
-          {label}
-        </p>
-        <div className="h-1 w-full overflow-hidden rounded bg-neutral-800">
+      <div className="sec5-lock-card">
+        <p className="sec5-lock-label">{label}</p>
+        <div className="sec5-lock-track">
           <div
             className={
               progressPct === null
-                ? "h-full w-1/3 bg-mint/70"
-                : "h-full bg-mint transition-[width] duration-150 ease-linear"
+                ? "sec5-lock-bar indeterminate"
+                : "sec5-lock-bar determinate"
             }
             style={
               progressPct === null
@@ -301,7 +296,7 @@ function UploadingLockOverlay({
             }
           />
         </div>
-        <p className="text-[11px] text-neutral-400">
+        <p className="sec5-lock-note">
           Hold tight. The rest of the step unlocks the moment this finishes.
         </p>
       </div>
@@ -322,22 +317,20 @@ function SectionCard({ def, open, onAdd, onRemove, children }: SectionCardProps)
   if (!open) {
     return (
       <div
-        className="rounded border border-dashed border-neutral-700 bg-neutral-900/20 p-4"
+        className="sec5-card closed"
         data-testid={`${tid}-card`}
         data-state="closed"
       >
-        <div className="flex items-center justify-between gap-3">
-          <div>
-            <h3 className="text-sm font-medium text-text-primary">
-              {def.title}
-            </h3>
-            <p className="mt-1 text-xs text-neutral-500">{def.purpose}</p>
+        <div className="sec5-head">
+          <div className="sec5-headings">
+            <h3 className="sec5-title">{def.title}</h3>
+            <p className="sec5-purpose">{def.purpose}</p>
           </div>
           <button
             type="button"
             onClick={onAdd}
             data-testid={`${tid}-add`}
-            className="shrink-0 rounded border border-mint px-3 py-1.5 text-xs text-mint hover:bg-mint/10"
+            className="sec5-add"
           >
             {def.addLabel}
           </button>
@@ -347,25 +340,25 @@ function SectionCard({ def, open, onAdd, onRemove, children }: SectionCardProps)
   }
   return (
     <div
-      className="rounded border border-neutral-700 bg-neutral-900/30 p-4"
+      className="sec5-card open"
       data-testid={`${tid}-card`}
       data-state="open"
     >
-      <div className="mb-3 flex items-start justify-between gap-3">
-        <div>
-          <h3 className="text-sm font-medium text-text-primary">{def.title}</h3>
-          <p className="mt-1 text-xs text-neutral-500">{def.purpose}</p>
+      <div className="sec5-head">
+        <div className="sec5-headings">
+          <h3 className="sec5-title">{def.title}</h3>
+          <p className="sec5-purpose">{def.purpose}</p>
         </div>
         <button
           type="button"
           onClick={onRemove}
           data-testid={`${tid}-remove`}
-          className="shrink-0 text-xs text-neutral-500 hover:text-red-400"
+          className="sec5-remove"
         >
           Remove this section
         </button>
       </div>
-      <div className="space-y-3">{children}</div>
+      <div className="sec5-body">{children}</div>
     </div>
   );
 }
@@ -448,27 +441,23 @@ function VideoEditor({ draft, setDraft }: StepEditorialProps) {
         testIdPrefix="step-editorial-video"
         helpText="Up to 90 seconds, 250 MB. MP4, MOV, or WebM."
       />
-      <label className="block">
-        <span className="text-[10px] uppercase tracking-[0.15em] text-neutral-500">
-          Title
-        </span>
+      <label className="field-block">
+        <span className="field-label">Title</span>
         <input
           type="text"
-          className={`${inputCls} mt-1`}
+          className="input"
           value={v.title ?? ""}
           onChange={(e) => setVideo({ title: e.target.value || undefined })}
           placeholder="A walk-through of your plan, recorded yesterday."
           data-testid="step-editorial-video-title"
         />
       </label>
-      <div className="grid grid-cols-1 gap-3 sm:grid-cols-2">
-        <label className="block">
-          <span className="text-[10px] uppercase tracking-[0.15em] text-neutral-500">
-            Runtime
-          </span>
+      <div className="sec5-grid">
+        <label className="field-block">
+          <span className="field-label">Runtime</span>
           <input
             type="text"
-            className={`${inputCls} mt-1`}
+            className="input"
             value={v.runtime ?? ""}
             onChange={(e) =>
               setVideo({ runtime: e.target.value || undefined })
@@ -476,19 +465,15 @@ function VideoEditor({ draft, setDraft }: StepEditorialProps) {
             placeholder="0:14"
             data-testid="step-editorial-video-runtime"
           />
-          <span className="mt-1 block text-[11px] text-neutral-500">
-            Filled automatically from the video.
-          </span>
+          <span className="hint">Filled automatically from the video.</span>
         </label>
-        <label className="block">
-          <span className="text-[10px] uppercase tracking-[0.15em] text-neutral-500">
-            Recorded on
-          </span>
+        <label className="field-block">
+          <span className="field-label">Recorded on</span>
           {/* A7d.3: native date picker (matches A7c.1 comps pattern).
               Stored as ISO YYYY-MM-DD; the renderer displays verbatim. */}
           <input
             type="date"
-            className={`${inputCls} mt-1`}
+            className="input"
             value={v.recordedOn ?? ""}
             onChange={(e) =>
               setVideo({ recordedOn: e.target.value || undefined })
@@ -814,25 +799,21 @@ function AreaStatsEditor({ draft, setDraft }: StepEditorialProps) {
           neighborhood chart on the published page. */}
       <AreaChartHint />
 
-      <div className="grid grid-cols-1 gap-3 sm:grid-cols-2">
-        <label className="block">
-          <span className="text-[10px] uppercase tracking-[0.15em] text-neutral-500">
-            Median sale price
-          </span>
+      <div className="sec5-grid">
+        <label className="field-block">
+          <span className="field-label">Median sale price</span>
           <CurrencyInput
-            className={`${inputCls} mt-1`}
+            className="input"
             value={stats.medianSale ?? ""}
             onChange={(v) => update({ medianSale: v || undefined })}
             placeholder="$642,000"
             aria-label="area-median-sale"
           />
         </label>
-        <label className="block">
-          <span className="text-[10px] uppercase tracking-[0.15em] text-neutral-500">
-            Year-over-year change
-          </span>
+        <label className="field-block">
+          <span className="field-label">Year-over-year change</span>
           <PercentInput
-            className={`${inputCls} mt-1`}
+            className="input"
             value={stats.medianSaleDeltaYoy ?? ""}
             onChange={(v) => update({ medianSaleDeltaYoy: v || undefined })}
             placeholder="+4.6%"
@@ -840,25 +821,21 @@ function AreaStatsEditor({ draft, setDraft }: StepEditorialProps) {
             aria-label="area-yoy"
           />
         </label>
-        <label className="block">
-          <span className="text-[10px] uppercase tracking-[0.15em] text-neutral-500">
-            Days on market
-          </span>
+        <label className="field-block">
+          <span className="field-label">Days on market</span>
           <NumberInput
-            className={`${inputCls} mt-1`}
+            className="input"
             value={stats.daysOnMarket ?? ""}
             onChange={(v) => update({ daysOnMarket: v || undefined })}
             placeholder="14"
             aria-label="area-dom"
           />
         </label>
-        <label className="block">
-          <span className="text-[10px] uppercase tracking-[0.15em] text-neutral-500">
-            Area DOM comparison
-          </span>
+        <label className="field-block">
+          <span className="field-label">Area DOM comparison</span>
           <input
             type="text"
-            className={`${inputCls} mt-1`}
+            className="input"
             value={stats.daysOnMarketZipAvg ?? ""}
             onChange={(e) =>
               update({ daysOnMarketZipAvg: e.target.value || undefined })
@@ -867,24 +844,20 @@ function AreaStatsEditor({ draft, setDraft }: StepEditorialProps) {
             data-testid="step-editorial-area-dom-comp"
           />
         </label>
-        <label className="block">
-          <span className="text-[10px] uppercase tracking-[0.15em] text-neutral-500">
-            Closings in last 90 days
-          </span>
+        <label className="field-block">
+          <span className="field-label">Closings in last 90 days</span>
           <NumberInput
-            className={`${inputCls} mt-1`}
+            className="input"
             value={stats.closings90d ?? ""}
             onChange={(v) => update({ closings90d: v || undefined })}
             placeholder="38"
             aria-label="area-closings"
           />
         </label>
-        <label className="block">
-          <span className="text-[10px] uppercase tracking-[0.15em] text-neutral-500">
-            List-to-sale ratio
-          </span>
+        <label className="field-block">
+          <span className="field-label">List-to-sale ratio</span>
           <PercentInput
-            className={`${inputCls} mt-1`}
+            className="input"
             value={stats.listToSaleRatio ?? ""}
             onChange={(v) => update({ listToSaleRatio: v || undefined })}
             placeholder="101%"
@@ -893,40 +866,33 @@ function AreaStatsEditor({ draft, setDraft }: StepEditorialProps) {
         </label>
       </div>
 
-      <div
-        className="space-y-3 border-t border-neutral-800 pt-3"
-        data-testid="step-editorial-area-monthly"
-      >
-        <div className="text-[10px] uppercase tracking-[0.15em] text-neutral-500">
-          Median price by month
-        </div>
-        <p className="text-xs text-neutral-500">
+      <div className="sec5-monthly" data-testid="step-editorial-area-monthly">
+        <span className="field-label">Median price by month</span>
+        <p className="sec5-monthly-intro">
           We label the months automatically. Pick the latest month + how many
           months of history you have, then fill in the prices you know.
         </p>
 
-        <div className="grid grid-cols-1 gap-3 sm:grid-cols-2">
-          <label className="block">
-            <span className="text-[10px] uppercase tracking-[0.15em] text-neutral-500">
-              Latest month
-            </span>
+        <div className="sec5-grid">
+          <label className="field-block">
+            <span className="field-label">Latest month</span>
             <input
               type="month"
-              className={`${inputCls} mt-1`}
+              className="input"
               value={editor.latestMonth}
               onChange={(e) => setLatestMonth(e.target.value)}
               data-testid="step-editorial-area-latest-month"
             />
           </label>
-          <label className="block">
-            <span className="text-[10px] uppercase tracking-[0.15em] text-neutral-500">
+          <label className="field-block">
+            <span className="field-label">
               Months of history (1–{MAX_MONTHLY})
             </span>
             <input
               type="text"
               inputMode="numeric"
               autoComplete="off"
-              className={`${inputCls} mt-1`}
+              className="input"
               value={countInput}
               onChange={handleCountChange}
               onBlur={handleCountBlur}
@@ -935,21 +901,21 @@ function AreaStatsEditor({ draft, setDraft }: StepEditorialProps) {
           </label>
         </div>
 
-        <div className="space-y-2">
+        <div className="sec5-month-rows">
           {labels.map(({ display }, idx) => (
             <div
               key={display}
-              className="grid grid-cols-[5.5rem_1fr] items-center gap-2"
+              className="sec5-month-row"
               data-testid={`step-editorial-area-month-${idx}`}
             >
               <div
-                className="text-xs text-neutral-400"
+                className="sec5-month-label"
                 data-testid={`step-editorial-area-month-label-${idx}`}
               >
                 {display}
               </div>
               <CurrencyInput
-                className={inputCls}
+                className="input"
                 value={editor.prices[display] ?? ""}
                 onChange={(v) => setPriceFor(display, v)}
                 placeholder="$642,000"
@@ -970,17 +936,13 @@ function AreaStatsEditor({ draft, setDraft }: StepEditorialProps) {
  */
 function AreaChartHint() {
   return (
-    <div
-      className="flex items-center gap-3 rounded border border-mint/30 bg-mint/5 px-3 py-2 text-xs text-mint"
-      data-testid="step-editorial-area-hint"
-    >
+    <div className="sec5-hint" data-testid="step-editorial-area-hint">
       <svg
         width="40"
         height="22"
         viewBox="0 0 40 22"
         fill="none"
         aria-hidden="true"
-        className="shrink-0"
       >
         <path
           d="M2 18 L10 12 L18 14 L26 6 L34 9 L38 4"
