@@ -1253,3 +1253,259 @@
     justify-content: flex-end;
   }
 }
+
+/* ============================================================== *
+ *  Step 3 — "Pricing & strategy" (Phase B3). Two-zone (public /
+ *  private) layout ported from the Claude Design source-of-truth
+ *  (strategy_app.jsx + "Pricing & Strategy - Step 3.html"), scoped
+ *  under .sep-wizard. Reuses B1's .sec-* / .field-label / .input
+ *  bases; adds only strategy-specific selectors.
+ * ============================================================== */
+
+.sep-wizard .strat {
+  display: flex;
+  flex-direction: column;
+  gap: 30px;
+}
+.sep-wizard .strat-zone {
+  display: flex;
+  flex-direction: column;
+  gap: 14px;
+}
+
+/* zone group tag (globe / lock eyebrow) */
+.sep-wizard .zone-tag {
+  display: inline-flex;
+  align-items: center;
+  gap: 9px;
+  align-self: flex-start;
+  font-family: var(--mono);
+  font-size: 11px;
+  letter-spacing: 0.18em;
+  text-transform: uppercase;
+  font-weight: 500;
+}
+.sep-wizard .zone-tag.public {
+  color: var(--mint);
+}
+.sep-wizard .zone-tag.private {
+  color: var(--faint);
+}
+.sep-wizard .zone-tag svg {
+  opacity: 0.9;
+}
+
+/* zone card */
+.sep-wizard .zone-body {
+  display: flex;
+  flex-direction: column;
+  gap: 22px;
+  background: var(--panel);
+  border: 1px solid var(--border);
+  border-radius: var(--radius);
+  padding: 22px;
+}
+.sep-wizard .strat-zone.public .zone-body {
+  border-color: var(--mint-line);
+  background: linear-gradient(180deg, var(--mint-soft), transparent 60%),
+    var(--panel);
+}
+
+.sep-wizard .strat-field {
+  display: flex;
+  flex-direction: column;
+  gap: 9px;
+}
+.sep-wizard .lbl-soft {
+  text-transform: none;
+  letter-spacing: 0;
+  font-family: var(--sans);
+  font-size: 12px;
+  color: var(--faint);
+}
+
+/* from-comps proof line */
+.sep-wizard .from-comps {
+  display: flex;
+  align-items: center;
+  gap: 10px;
+  flex-wrap: wrap;
+  margin-top: 2px;
+}
+.sep-wizard .from-comps-chip {
+  font-family: var(--mono);
+  font-size: 10px;
+  letter-spacing: 0.1em;
+  text-transform: uppercase;
+  color: var(--mint);
+  background: var(--mint-soft);
+  border: 1px solid var(--mint-line);
+  border-radius: 999px;
+  padding: 3px 10px;
+  white-space: nowrap;
+}
+.sep-wizard .from-comps-line {
+  font-size: 13.5px;
+  color: var(--muted);
+  line-height: 1.5;
+}
+.sep-wizard .from-comps-line strong {
+  color: var(--text);
+  font-weight: 700;
+}
+.sep-wizard .comp-fallback {
+  margin-top: 2px;
+  font-size: 13.5px;
+  color: var(--faint);
+  line-height: 1.5;
+}
+
+/* pricing approach — "arrives chosen" + reveal */
+.sep-wizard .approach-chosen {
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+  gap: 16px;
+  background: var(--bg);
+  border: 1px solid var(--border-strong);
+  border-radius: 14px;
+  padding: 15px 18px;
+}
+.sep-wizard .ac-text {
+  display: flex;
+  flex-direction: column;
+  gap: 4px;
+  min-width: 0;
+}
+.sep-wizard .ac-label {
+  font-size: 16px;
+  font-weight: 600;
+  letter-spacing: -0.01em;
+}
+.sep-wizard .ac-desc {
+  font-size: 13px;
+  color: var(--muted);
+  line-height: 1.45;
+}
+.sep-wizard .approach-change {
+  flex: none;
+  background: none;
+  border: none;
+  color: var(--mint);
+  font-family: var(--sans);
+  font-size: 13.5px;
+  font-weight: 600;
+  cursor: pointer;
+  padding: 6px 8px;
+  border-radius: 8px;
+  transition: background 0.18s;
+}
+.sep-wizard .approach-change:hover {
+  background: var(--mint-soft);
+}
+
+.sep-wizard .approach-reveal {
+  display: flex;
+  flex-direction: column;
+  gap: 8px;
+}
+.sep-wizard .approach-opt {
+  display: flex;
+  align-items: flex-start;
+  gap: 12px;
+  cursor: pointer;
+  background: var(--bg);
+  border: 1px solid var(--border-strong);
+  border-radius: 13px;
+  padding: 14px 16px;
+  transition: border-color 0.18s, background 0.18s;
+}
+.sep-wizard .approach-opt:hover {
+  border-color: var(--muted);
+}
+.sep-wizard .approach-opt.on {
+  border-color: var(--mint-line);
+  background: var(--mint-soft);
+}
+.sep-wizard .opt-dot {
+  flex: none;
+  width: 18px;
+  height: 18px;
+  margin-top: 1px;
+  border-radius: 50%;
+  border: 1.8px solid var(--faint);
+  transition: all 0.16s var(--ease);
+}
+.sep-wizard .approach-opt.on .opt-dot {
+  border-color: var(--mint);
+  box-shadow: inset 0 0 0 4px var(--mint);
+}
+.sep-wizard .opt-text {
+  display: flex;
+  flex-direction: column;
+  gap: 3px;
+  min-width: 0;
+}
+.sep-wizard .opt-label {
+  font-size: 15px;
+  font-weight: 600;
+}
+.sep-wizard .opt-desc {
+  font-size: 13px;
+  color: var(--muted);
+  line-height: 1.45;
+}
+
+/* comp-set confidence — segmented control + live blurb */
+.sep-wizard .conf {
+  display: flex;
+  flex-direction: column;
+  gap: 11px;
+}
+.sep-wizard .conf-seg {
+  display: grid;
+  grid-template-columns: repeat(3, 1fr);
+  gap: 6px;
+  background: var(--panel-2);
+  border: 1px solid var(--border);
+  border-radius: 13px;
+  padding: 5px;
+}
+.sep-wizard .conf-seg-btn {
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  padding: 9px 10px;
+  border-radius: 9px;
+  cursor: pointer;
+  font-size: 14px;
+  font-weight: 600;
+  color: var(--muted);
+  transition: background 0.16s var(--ease), color 0.16s var(--ease);
+}
+.sep-wizard .conf-seg-btn:hover {
+  color: var(--text);
+}
+.sep-wizard .conf-seg-btn.on {
+  background: var(--mint);
+  color: #08120f;
+}
+.sep-wizard .conf-blurb {
+  margin: 0;
+  font-size: 13.5px;
+  color: var(--muted);
+  line-height: 1.5;
+  min-height: 1.4em;
+}
+
+@media (max-width: 640px) {
+  .sep-wizard .approach-chosen {
+    flex-direction: column;
+    align-items: flex-start;
+    gap: 12px;
+  }
+  .sep-wizard .approach-change {
+    align-self: flex-end;
+    padding: 4px 0;
+  }
+}
