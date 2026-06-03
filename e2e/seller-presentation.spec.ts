@@ -233,13 +233,12 @@ test.describe('Seller Presentation — A5b per-step content', () => {
     await nextButton.click();
 
     // ---------- Step 4: Pitch ----------
-    // A7c.4 seeds INITIAL_VISIBLE_ROWS (3) empty pitch points on first
-    // mount of the step, so the agent lands on a finite starting
-    // canvas. No `step-pitch-add` clicks needed for this scenario —
-    // we fill two of the seeded rows directly. The counter denominator
-    // now reads filled-row count, so "1 of 2" still describes "1 of
-    // the 2 rows with content is public" (the third seeded row stays
-    // empty and is dropped on reload by clampPitchPoint).
+    // B4 seeds 3 Tier 1 starter points (titles filled, support empty,
+    // visibility public) when Step 1 is complete — the agent "arrives
+    // done". We overwrite the first two titles directly and leave the
+    // third seeded ("A quiet street, …"). All 3 carry titles, so the
+    // counter denominator reads 3 filled rows: point 0 stays public,
+    // point 1 is marked private, the seeded point 2 stays public → 2 of 3.
     await expect(page.getByTestId('step-pitch')).toBeVisible();
     await page
       .getByTestId('step-pitch-title-0')
@@ -251,7 +250,7 @@ test.describe('Seller Presentation — A5b per-step content', () => {
     // second is explicitly marked private (prep-only note).
     await page.getByTestId('step-pitch-private-1').click();
     await expect(page.getByTestId('step-pitch-counter')).toHaveText(
-      '1 of 2 marked public',
+      '2 of 3 marked public',
     );
     await nextButton.click();
 
@@ -268,7 +267,9 @@ test.describe('Seller Presentation — A5b per-step content', () => {
     const summary = page.getByTestId('step-review-summary');
     await expect(summary).toContainText('$700,000');
     await expect(summary).toContainText('1 provided');
-    await expect(summary).toContainText('1 🌐 public');
+    // B4: the 3rd Tier 1 card is seeded public + title-bearing, so the
+    // public pitch count is 2 (point 0 + seeded point 2); point 1 private.
+    await expect(summary).toContainText('2 🌐 public');
     await expect(summary).toContainText('1 🔒 private');
 
     // ---------- Persist + reload + walk back ----------
@@ -294,8 +295,8 @@ test.describe('Seller Presentation — A5b per-step content', () => {
             parsed.currentStep === 'review' &&
             parsed.draft?.recommendedPrice === '$700,000' &&
             (parsed.draft?.comps?.length ?? 0) === 1 &&
-            // A7c.4: 2 filled rows + 1 empty seeded row → length 3.
-            // The empty row is dropped by clampPitchPoint on reload.
+            // B4: 3 Tier 1 seeded rows, all title-bearing (2 overwritten
+            // + 1 left seeded) → length 3; none drop on reload.
             (parsed.draft?.pitchPoints?.length ?? 0) === 3 &&
             parsed.draft?.pitchPoints?.[0]?.visibility === 'public' &&
             parsed.draft?.pricingStrategyId === 'strategic-quick-sale' &&
@@ -320,7 +321,7 @@ test.describe('Seller Presentation — A5b per-step content', () => {
       'Premium staging + pro photography included.',
     );
     await expect(page.getByTestId('step-pitch-counter')).toHaveText(
-      '1 of 2 marked public',
+      '2 of 3 marked public',
     );
     await prevButton.click(); // → Step 3 Strategy
     await expect(page.getByTestId('step-strategy')).toBeVisible();
@@ -926,8 +927,9 @@ test.describe('Seller Presentation — A7c wizard input round-trip', () => {
     await nextButton.click(); // → Pitch
 
     // ---- (3) Wizard Step 4: pitch with title + support ----
-    // A7c.4 seeds 3 empty rows on mount — fill the first two directly.
-    // The third seeded-but-empty row is dropped on reload.
+    // B4 seeds 3 Tier 1 starter points on mount (Step 1 complete). We
+    // overwrite the first two titles directly; the third stays seeded
+    // (title-bearing + public), so the counter reads 2 of 3.
     await expect(page.getByTestId('step-pitch')).toBeVisible();
     await page
       .getByTestId('step-pitch-title-0')
@@ -944,7 +946,7 @@ test.describe('Seller Presentation — A7c wizard input round-trip', () => {
     // so it stays as a prep-only note; assert public count.
     await page.getByTestId('step-pitch-private-1').click();
     await expect(page.getByTestId('step-pitch-counter')).toHaveText(
-      '1 of 2 marked public',
+      '2 of 3 marked public',
     );
     await nextButton.click(); // → Editorial (A7d, fully optional — skip)
     await expect(page.getByTestId('step-editorial')).toBeVisible();
@@ -984,8 +986,8 @@ test.describe('Seller Presentation — A7c wizard input round-trip', () => {
             d.propertyZip === '44113' &&
             d.heroPhotoUrl === 'https://example.com/hero.jpg' &&
             d.preparedFor === 'the Halloran family' &&
-            // A7c.4: 2 filled + 1 empty seeded row = 3 persisted; the
-            // empty row drops out on reload via clampPitchPoint.
+            // B4: 3 Tier 1 seeded rows, all title-bearing (2 overwritten
+            // + 1 left seeded) → length 3; none drop on reload.
             (d.pitchPoints?.length ?? 0) === 3 &&
             d.pitchPoints?.[0]?.title === 'A photographer the magazines use.' &&
             d.pitchPoints?.[0]?.visibility === 'public' &&
@@ -1105,34 +1107,34 @@ test.describe('Seller Presentation — A7c wizard input round-trip', () => {
 });
 
 /**
- * Seller Presentation — A7c.4 Pitch step guidance.
+ * Seller Presentation — B4 Pitch step guidance ("arrives done").
  *
- * Two distinct things to lock in:
+ * B4 seeds three Tier 1 starter points the moment the agent lands on
+ * Step 4 with Step 1 complete, so the step arrives populated (3 filled
+ * titles, support empty, all public). Three things to lock in:
  *
- *   (1) Per-row example placeholders ROTATE so the agent reads them
- *       as inspiration, not a canned default. Asserted by checking
- *       the first three rows carry different `placeholder` attributes.
+ *   (1) ARRIVES POPULATED — exactly 3 cards carrying the catalog's first
+ *       three titles in order (a new B4 assertion).
  *
- *   (2) The strength signal — dots + one microcopy line — reads off
- *       filled rows: 0 → neutral, 1–2 → amber, ≥3 → green. The
- *       message text shifts at each threshold. Reassurance only —
- *       no publish gating, so this spec stays focused on the meter
- *       UI without touching wire/persistence behavior (covered by
- *       the round-trip tests above).
+ *   (2) STRENGTH METER — reads off filled rows: 0 → neutral, 1–2 →
+ *       amber, ≥3 → green; message shifts at each threshold. With the
+ *       step arriving green/3, we exercise the same thresholds BACKWARD
+ *       by clearing the seeded titles (3 → 2 → 1 → 0). Reassurance only —
+ *       no publish gating. Soft cap (6) still hides the add control.
  *
- * Both rely on the seed-on-mount behavior: landing on Step 4 with an
- * empty draft puts 3 rows on screen immediately, no clicks needed.
+ *   (3) COLD PATH — when Step 1 is NOT complete, Tier 1 seeding is gated
+ *       off and the step falls back to 3 EMPTY rows. The empty-state
+ *       counter ("0 of 0"), neutral meter, and rotating "e.g." title
+ *       placeholders are only real on this path, so they're asserted
+ *       here (relocated from the old empty-on-mount assertions).
  */
-test.describe('Seller Presentation — A7c.4 Pitch step guidance', () => {
-  test('per-row placeholders rotate; strength meter transitions neutral → amber → green', async ({
-    page,
-  }) => {
+test.describe('Seller Presentation — B4 Pitch step guidance', () => {
+  // Shared traversal: complete Step 1 (gates Next on a saved propertyId)
+  // then walk to Step 4. The other steps are gate-free for traversal.
+  async function walkToPitch(page: import('@playwright/test').Page) {
     await page.goto('/seller-presentation');
     await expect(page.getByTestId('step-property')).toBeVisible();
     await page.waitForURL(/\/seller-presentation\?id=workflow_[a-z0-9]+/);
-
-    // Walk to Step 4. Step 1 needs a saved propertyId before Next
-    // unlocks; the other steps are gate-free for traversal.
     await page.getByTestId('step-property-address').fill('1234 Test Drive NE');
     await page.getByTestId('step-property-city').fill('Tacoma, WA');
     await expect(page.getByTestId('step-property-saved-hint')).toBeVisible();
@@ -1141,97 +1143,151 @@ test.describe('Seller Presentation — A7c.4 Pitch step guidance', () => {
     await nextButton.click(); // → Comps
     await nextButton.click(); // → Strategy
     await nextButton.click(); // → Pitch
-
     await expect(page.getByTestId('step-pitch')).toBeVisible();
+  }
 
-    // (1) Three rows are seeded on mount (no clicks needed).
+  test('arrives populated — 3 Tier 1 starter titles seed when Step 1 is complete', async ({
+    page,
+  }) => {
+    await walkToPitch(page);
+
+    // Exactly 3 seeded cards on first mount — no 4th.
     await expect(page.getByTestId('step-pitch-card-0')).toBeVisible();
     await expect(page.getByTestId('step-pitch-card-1')).toBeVisible();
     await expect(page.getByTestId('step-pitch-card-2')).toBeVisible();
+    await expect(page.getByTestId('step-pitch-card-3')).toHaveCount(0);
 
-    // (1) Each row's title placeholder is DIFFERENT — varied by index.
-    const placeholder0 = await page
-      .getByTestId('step-pitch-title-0')
-      .getAttribute('placeholder');
-    const placeholder1 = await page
-      .getByTestId('step-pitch-title-1')
-      .getAttribute('placeholder');
-    const placeholder2 = await page
-      .getByTestId('step-pitch-title-2')
-      .getAttribute('placeholder');
-    expect(placeholder0).toBeTruthy();
-    expect(placeholder1).toBeTruthy();
-    expect(placeholder2).toBeTruthy();
-    expect(placeholder0).not.toBe(placeholder1);
-    expect(placeholder1).not.toBe(placeholder2);
-    expect(placeholder0).not.toBe(placeholder2);
-    // The placeholders are prefixed "e.g. " — the example body lives
-    // after that, and the convention from PITCH_EXAMPLES is < ~32
-    // chars so it fits on a phone.
-    for (const p of [placeholder0!, placeholder1!, placeholder2!]) {
-      expect(p.startsWith('e.g. ')).toBe(true);
-      // Generous upper bound — guards against an accidentally
-      // overlong example slipping in.
-      expect(p.length).toBeLessThanOrEqual(48);
-    }
+    // The catalog's first three titles, in order (Phase 0 §3 Tier 1).
+    await expect(page.getByTestId('step-pitch-title-0')).toHaveValue(
+      'A kitchen built for hosting',
+    );
+    await expect(page.getByTestId('step-pitch-title-1')).toHaveValue(
+      'Move-in ready, top to bottom',
+    );
+    await expect(page.getByTestId('step-pitch-title-2')).toHaveValue(
+      'A quiet street, close to the things you drive to most',
+    );
+  });
 
-    // (2) Strength meter starts at "neutral" with 0 filled rows.
+  test('strength meter arrives green and downgrades as seeded titles clear; soft cap holds', async ({
+    page,
+  }) => {
+    await walkToPitch(page);
+
     const meter = page.getByTestId('step-pitch-strength');
-    await expect(meter).toHaveAttribute('data-level', 'neutral');
-    await expect(meter).toHaveAttribute('data-filled', '0');
-    await expect(page.getByTestId('step-pitch-strength-message')).toHaveText(
-      'Add 2 to 4 selling points.',
-    );
-
-    // Fill row 0 → 1 filled → amber.
-    await page.getByTestId('step-pitch-title-0').fill('Chef-grade kitchen');
-    await expect(meter).toHaveAttribute('data-level', 'amber');
-    await expect(meter).toHaveAttribute('data-filled', '1');
-    await expect(page.getByTestId('step-pitch-strength-message')).toHaveText(
-      'A couple more makes it stronger.',
-    );
-
-    // Fill row 1 → 2 filled → still amber.
-    await page.getByTestId('step-pitch-title-1').fill('Walk-to-everything');
-    await expect(meter).toHaveAttribute('data-level', 'amber');
-    await expect(meter).toHaveAttribute('data-filled', '2');
-
-    // Fill row 2 → 3 filled → green (sweet-spot wording, no scolding).
-    await page.getByTestId('step-pitch-title-2').fill('Move-in ready');
+    // Arrives done: 3 Tier 1 titles filled → green sweet-spot wording.
     await expect(meter).toHaveAttribute('data-level', 'green');
     await expect(meter).toHaveAttribute('data-filled', '3');
     await expect(page.getByTestId('step-pitch-strength-message')).toHaveText(
       'Looks great. 4 strong points is plenty.',
     );
-
-    // Add button de-emphasizes at the sweet spot (still present, but
-    // styled as a ghost affordance). The test reads the data-emphasis
-    // attribute the component sets so styling can evolve without
-    // breaking the assertion.
+    // At the sweet spot the add affordance is de-emphasized (ghost).
     await expect(page.getByTestId('step-pitch-add')).toHaveAttribute(
       'data-emphasis',
       'ghost',
     );
 
-    // Add a 4th row → still green; meter widens, message stays.
-    await page.getByTestId('step-pitch-add').click();
-    await page.getByTestId('step-pitch-title-3').fill('Top-rated schools');
-    await expect(meter).toHaveAttribute('data-level', 'green');
-    await expect(meter).toHaveAttribute('data-filled', '4');
-
-    // Counter denominator reflects FILLED rows, not total slots —
-    // all 4 filled, all public-by-default per A7c.6.
-    await expect(page.getByTestId('step-pitch-counter')).toHaveText(
-      '4 of 4 marked public',
+    // Walk the thresholds BACKWARD by clearing seeded titles — same
+    // thresholds, opposite direction.
+    await page.getByTestId('step-pitch-title-2').fill(''); // 3 → 2 filled
+    await expect(meter).toHaveAttribute('data-level', 'amber');
+    await expect(meter).toHaveAttribute('data-filled', '2');
+    await expect(page.getByTestId('step-pitch-strength-message')).toHaveText(
+      'A couple more makes it stronger.',
     );
 
-    // Soft cap: adding rows up to the cap hides the add control and
-    // surfaces the "you've added the most" microcopy. Two more clicks
-    // (we already have 4 rows on screen) push to 6.
+    await page.getByTestId('step-pitch-title-1').fill(''); // 2 → 1 filled
+    await expect(meter).toHaveAttribute('data-level', 'amber');
+    await expect(meter).toHaveAttribute('data-filled', '1');
+
+    await page.getByTestId('step-pitch-title-0').fill(''); // 1 → 0 filled
+    await expect(meter).toHaveAttribute('data-level', 'neutral');
+    await expect(meter).toHaveAttribute('data-filled', '0');
+    await expect(page.getByTestId('step-pitch-strength-message')).toHaveText(
+      'Add 2 to 4 selling points.',
+    );
+    // Below the sweet spot the add affordance returns to primary.
+    await expect(page.getByTestId('step-pitch-add')).toHaveAttribute(
+      'data-emphasis',
+      'primary',
+    );
+
+    // Soft cap: 3 cards on screen (now empty). Add up to the cap of 6,
+    // then the add control hides and the cap microcopy shows.
+    await page.getByTestId('step-pitch-add').click(); // 4
     await page.getByTestId('step-pitch-add').click(); // 5
     await page.getByTestId('step-pitch-add').click(); // 6
     await expect(page.getByTestId('step-pitch-add')).toHaveCount(0);
     await expect(page.getByTestId('step-pitch-cap-reached')).toBeVisible();
+  });
+
+  test('cold path — Step 1 incomplete → 3 empty rows, neutral meter, rotating placeholders', async ({
+    page,
+  }) => {
+    // Land directly on Step 4 with an incomplete Step 1 (no propertyId).
+    // Next gates on Step 1, so we seed a WorkflowInstance at
+    // currentStep:'pitch' with an empty draft and open it by id — the
+    // only way to reach Step 4 on the cold path.
+    const id = 'workflow_coldpathpitch01';
+    await page.addInitScript((instanceId) => {
+      const key = 'workflowInstance:' + instanceId;
+      if (window.localStorage.getItem(key)) return;
+      const now = new Date().toISOString();
+      const record = {
+        instanceId,
+        skillId: 'seller-presentation',
+        draft: { comps: [], pitchPoints: [], commitments: [], asks: [] },
+        resolvedPrimitives: {},
+        currentStep: 'pitch',
+        timestamps: { createdAt: now, updatedAt: now },
+      };
+      window.localStorage.setItem(key, JSON.stringify(record));
+      window.localStorage.setItem(
+        'workflowInstance:index',
+        JSON.stringify([instanceId]),
+      );
+    }, id);
+
+    await page.goto('/seller-presentation?id=' + id);
+    await expect(page.getByTestId('step-pitch')).toBeVisible();
+
+    // Tier 1 seeding is gated off → fall back to 3 EMPTY rows, no 4th.
+    await expect(page.getByTestId('step-pitch-card-0')).toBeVisible();
+    await expect(page.getByTestId('step-pitch-card-1')).toBeVisible();
+    await expect(page.getByTestId('step-pitch-card-2')).toBeVisible();
+    await expect(page.getByTestId('step-pitch-card-3')).toHaveCount(0);
+
+    // Empty titles (no Tier 1 fill on the cold path).
+    await expect(page.getByTestId('step-pitch-title-0')).toHaveValue('');
+    await expect(page.getByTestId('step-pitch-title-1')).toHaveValue('');
+    await expect(page.getByTestId('step-pitch-title-2')).toHaveValue('');
+
+    // Empty-state counter + neutral meter — only real on this path.
+    await expect(page.getByTestId('step-pitch-counter')).toHaveText(
+      '0 of 0 marked public',
+    );
+    const meter = page.getByTestId('step-pitch-strength');
+    await expect(meter).toHaveAttribute('data-level', 'neutral');
+    await expect(meter).toHaveAttribute('data-filled', '0');
+
+    // Rotating "e.g." placeholders show on the empty title inputs.
+    const p0 = await page
+      .getByTestId('step-pitch-title-0')
+      .getAttribute('placeholder');
+    const p1 = await page
+      .getByTestId('step-pitch-title-1')
+      .getAttribute('placeholder');
+    const p2 = await page
+      .getByTestId('step-pitch-title-2')
+      .getAttribute('placeholder');
+    for (const p of [p0, p1, p2]) {
+      expect(p).toBeTruthy();
+      expect(p!.startsWith('e.g. ')).toBe(true);
+      expect(p!.length).toBeLessThanOrEqual(48);
+    }
+    expect(p0).not.toBe(p1);
+    expect(p1).not.toBe(p2);
+    expect(p0).not.toBe(p2);
   });
 });
 
@@ -1292,12 +1348,12 @@ test.describe('Seller Presentation — A7c.6 Pitch default visibility', () => {
       'false',
     );
 
-    // Filling a title without touching the toggle leaves it public —
-    // counter reads "1 of 1 marked public" once row 0 has content
-    // (the unfilled rows don't count toward the denominator).
+    // Under B4 every card is title-bearing (3 Tier 1 seeded + 1
+    // catalog-aware add), all default public — counter reads 4 of 4.
+    // Editing a title doesn't change visibility.
     await page.getByTestId('step-pitch-title-0').fill('Chef-grade kitchen');
     await expect(page.getByTestId('step-pitch-counter')).toHaveText(
-      '1 of 1 marked public',
+      '4 of 4 marked public',
     );
   });
 });
