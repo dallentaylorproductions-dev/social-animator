@@ -3,6 +3,7 @@
 import { useEffect, useRef, useState } from "react";
 import { useBrandSettings } from "@/lib/brand";
 import { spStrategyDisplayLabel } from "../content/strategy-display-labels";
+import { ThemePickerCard } from "./ThemePickerCard";
 import {
   validateForExport,
   type SellerPresentationDraft,
@@ -53,6 +54,8 @@ type StepId =
 interface StepReviewProps {
   draft: SellerPresentationDraft;
   goToStep: (stepId: StepId) => void;
+  /** Phase E — the theme picker writes the selected themeId back to the draft. */
+  setDraft: (next: SellerPresentationDraft) => void;
 }
 
 type PublishState =
@@ -83,7 +86,7 @@ function fieldToStep(field: string): { stepId: StepId; label: string } {
   }
 }
 
-export function StepReview({ draft, goToStep }: StepReviewProps) {
+export function StepReview({ draft, goToStep, setDraft }: StepReviewProps) {
   const [publishState, setPublishState] = useState<PublishState>({
     kind: "idle",
   });
@@ -226,6 +229,11 @@ export function StepReview({ draft, goToStep }: StepReviewProps) {
           then download the prep PDF for yourself.
         </p>
       </div>
+
+      <ThemePickerCard
+        themeId={draft.themeId}
+        onChange={(next) => setDraft({ ...draft, themeId: next })}
+      />
 
       {missing ? (
         <ValidationBlock missing={missing} goToStep={goToStep} />
