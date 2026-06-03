@@ -1509,3 +1509,299 @@
     padding: 4px 0;
   }
 }
+
+/* ============================================================== *
+ *  Step 4 — "Your pitch" (Phase B4). "Arrives populated" Tier 1
+ *  cards + per-card Swap reveal + "Yours" chip + strength meter,
+ *  ported onto .sep-wizard. Reuses B1's .sec-* / .input bases; adds
+ *  only pitch-specific selectors.
+ * ============================================================== */
+
+.sep-wizard .pitch {
+  display: flex;
+  flex-direction: column;
+  gap: 22px;
+}
+
+/* strength meter */
+.sep-wizard .pitch-meter {
+  display: flex;
+  flex-direction: column;
+  gap: 9px;
+}
+.sep-wizard .meter-track {
+  display: flex;
+  align-items: center;
+  gap: 6px;
+}
+.sep-wizard .meter-dot {
+  height: 6px;
+  width: 26px;
+  border-radius: 999px;
+  background: var(--panel-2);
+  transition: background 0.22s var(--ease);
+}
+.sep-wizard .pitch-meter[data-level="neutral"] .meter-dot.lit {
+  background: var(--faint);
+}
+.sep-wizard .pitch-meter[data-level="amber"] .meter-dot.lit {
+  background: var(--amber);
+}
+.sep-wizard .pitch-meter[data-level="green"] .meter-dot.lit {
+  background: var(--mint);
+}
+.sep-wizard .meter-msg {
+  margin: 0;
+  font-size: 13.5px;
+  font-weight: 500;
+}
+.sep-wizard .pitch-meter[data-level="neutral"] .meter-msg {
+  color: var(--faint);
+}
+.sep-wizard .pitch-meter[data-level="amber"] .meter-msg {
+  color: var(--amber);
+}
+.sep-wizard .pitch-meter[data-level="green"] .meter-msg {
+  color: var(--mint);
+}
+
+/* card list */
+.sep-wizard .pitch-list {
+  display: flex;
+  flex-direction: column;
+  gap: 12px;
+}
+.sep-wizard .pitch-card {
+  display: flex;
+  flex-direction: column;
+  gap: 12px;
+  background: var(--panel);
+  border: 1px solid var(--border);
+  border-radius: var(--radius);
+  padding: 16px 18px;
+  transition: border-color 0.2s var(--ease);
+}
+.sep-wizard .pitch-card:hover {
+  border-color: var(--border-strong);
+}
+
+.sep-wizard .pc-head {
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+  gap: 12px;
+}
+.sep-wizard .pc-eyebrow {
+  font-family: var(--mono);
+  font-size: 10px;
+  letter-spacing: 0.12em;
+  text-transform: uppercase;
+  color: var(--faint);
+}
+.sep-wizard .yours-chip {
+  display: inline-flex;
+  align-items: center;
+  font-family: var(--mono);
+  font-size: 10px;
+  letter-spacing: 0.1em;
+  text-transform: uppercase;
+  font-weight: 600;
+  color: var(--mint);
+  background: var(--mint-soft);
+  border: 1px solid var(--mint-line);
+  border-radius: 999px;
+  padding: 2px 9px;
+}
+.sep-wizard .pc-actions {
+  display: flex;
+  align-items: center;
+  gap: 4px;
+}
+.sep-wizard .pc-action {
+  display: inline-flex;
+  align-items: center;
+  gap: 5px;
+  background: none;
+  border: none;
+  color: var(--muted);
+  font-family: var(--sans);
+  font-size: 12.5px;
+  font-weight: 500;
+  cursor: pointer;
+  padding: 5px 9px;
+  border-radius: 9px;
+  transition: background 0.16s, color 0.16s;
+}
+.sep-wizard .pc-action:hover {
+  background: var(--panel-2);
+  color: var(--text);
+}
+.sep-wizard .pc-action.on {
+  background: var(--mint-soft);
+  color: var(--mint);
+}
+.sep-wizard .pc-action.danger:hover {
+  background: rgba(217, 138, 130, 0.12);
+  color: #e8a39c;
+}
+
+.sep-wizard .pitch-title {
+  font-size: 16px;
+  font-weight: 600;
+}
+.sep-wizard .pitch-support {
+  resize: vertical;
+  min-height: 52px;
+  line-height: 1.5;
+  font-size: 15px;
+}
+
+/* swap picker */
+.sep-wizard .swap-picker {
+  display: flex;
+  flex-direction: column;
+  gap: 6px;
+  background: var(--bg);
+  border: 1px solid var(--border-strong);
+  border-radius: 13px;
+  padding: 8px;
+}
+.sep-wizard .swap-opt {
+  text-align: left;
+  background: none;
+  border: 1px solid transparent;
+  border-radius: 9px;
+  color: var(--text);
+  font-family: var(--sans);
+  font-size: 14px;
+  cursor: pointer;
+  padding: 10px 12px;
+  transition: background 0.16s, border-color 0.16s;
+}
+.sep-wizard .swap-opt:hover {
+  background: var(--mint-soft);
+  border-color: var(--mint-line);
+}
+.sep-wizard .swap-empty {
+  margin: 0;
+  padding: 8px 4px;
+  font-size: 13px;
+  color: var(--faint);
+  line-height: 1.5;
+}
+
+/* visibility toggle */
+.sep-wizard .vis-toggle {
+  display: inline-flex;
+  align-self: flex-start;
+  gap: 4px;
+  background: var(--panel-2);
+  border: 1px solid var(--border);
+  border-radius: 11px;
+  padding: 4px;
+}
+.sep-wizard .vis-btn {
+  display: inline-flex;
+  align-items: center;
+  gap: 6px;
+  background: none;
+  border: none;
+  color: var(--faint);
+  font-family: var(--sans);
+  font-size: 12.5px;
+  font-weight: 600;
+  cursor: pointer;
+  padding: 6px 12px;
+  border-radius: 8px;
+  transition: background 0.16s, color 0.16s;
+}
+.sep-wizard .vis-btn:hover {
+  color: var(--text);
+}
+.sep-wizard .vis-btn.on {
+  background: var(--panel);
+  color: var(--text);
+}
+.sep-wizard .vis-btn.public.on {
+  background: var(--mint-soft);
+  color: var(--mint);
+}
+
+/* foot: add affordances + counter */
+.sep-wizard .pitch-foot {
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+  gap: 14px;
+  flex-wrap: wrap;
+}
+.sep-wizard .pitch-add-group {
+  display: flex;
+  align-items: center;
+  gap: 14px;
+  flex-wrap: wrap;
+}
+.sep-wizard .pitch-add {
+  display: inline-flex;
+  align-items: center;
+  gap: 7px;
+  background: var(--mint-soft);
+  border: 1px solid var(--mint-line);
+  border-radius: 11px;
+  color: var(--mint);
+  font-family: var(--sans);
+  font-size: 14px;
+  font-weight: 600;
+  cursor: pointer;
+  padding: 10px 16px;
+  transition: background 0.16s, color 0.16s;
+}
+.sep-wizard .pitch-add:hover {
+  background: var(--mint);
+  color: #08120f;
+}
+.sep-wizard .pitch-add.ghost {
+  background: transparent;
+  border-color: var(--border-strong);
+  color: var(--muted);
+}
+.sep-wizard .pitch-add.ghost:hover {
+  border-color: var(--muted);
+  color: var(--text);
+  background: var(--panel);
+}
+.sep-wizard .pitch-add-blank {
+  background: none;
+  border: none;
+  color: var(--faint);
+  font-family: var(--sans);
+  font-size: 13.5px;
+  font-weight: 500;
+  cursor: pointer;
+  padding: 6px 2px;
+  transition: color 0.16s;
+}
+.sep-wizard .pitch-add-blank:hover {
+  color: var(--text);
+}
+.sep-wizard .pitch-cap {
+  font-size: 13px;
+  color: var(--faint);
+}
+.sep-wizard .pitch-counter {
+  margin: 0;
+  font-size: 13px;
+  color: var(--faint);
+  white-space: nowrap;
+}
+
+@media (max-width: 640px) {
+  .sep-wizard .pitch-foot {
+    flex-direction: column;
+    align-items: flex-start;
+    gap: 12px;
+  }
+  .sep-wizard .meter-dot {
+    width: 18px;
+  }
+}
