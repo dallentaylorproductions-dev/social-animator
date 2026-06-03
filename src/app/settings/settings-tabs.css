@@ -1,0 +1,44 @@
+/* =====================================================================
+   Settings tab nav (Profile | Brand) — Phase E.0
+   Shared across /settings (Profile, default landing) and
+   /settings/brand. Pill group matching the Brand Kit chrome
+   (docs/design/brand-kit-system/brand_settings.html .tabs), styled with
+   literal hexes so it reads consistently on both routes' dark backdrop
+   without depending on the .bk-scope token cascade.
+   ===================================================================== */
+.sep-settings-tabbar {
+  display: flex;
+  justify-content: center;
+  padding: 16px 18px 0;
+  background: transparent;
+}
+.sep-settings-tabs {
+  display: inline-flex;
+  gap: 4px;
+  padding: 5px;
+  background: #19171a;
+  border: 1px solid rgba(255, 255, 255, 0.075);
+  border-radius: 13px;
+}
+.sep-settings-tab {
+  appearance: none;
+  border: none;
+  background: transparent;
+  font-family: var(--font-hanken), system-ui, sans-serif;
+  font-size: 14px;
+  font-weight: 600;
+  color: #a6a39d;
+  padding: 9px 18px;
+  border-radius: 9px;
+  cursor: pointer;
+  text-decoration: none;
+  transition: color 0.18s cubic-bezier(0.22, 1, 0.36, 1),
+    background 0.18s cubic-bezier(0.22, 1, 0.36, 1);
+}
+.sep-settings-tab:hover {
+  color: #f4f2ef;
+}
+.sep-settings-tab.active {
+  color: #08120f;
+  background: #f4f2ef;
+}

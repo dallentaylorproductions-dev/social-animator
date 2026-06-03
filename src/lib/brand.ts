@@ -42,6 +42,60 @@ export interface BrandSettings {
   agentReviews?: Review[];
   /** A7d.2 — outlink URL for the reviews block (renderer pairs with a fixed "See all reviews on Zillow" label). */
   reviewsOutlinkUrl?: string;
+  /**
+   * E.0 — Brand Kit color foundation. Three optional brand colors that
+   * flow into every published seller page as CSS custom properties on
+   * the consumer `/h/<slug>` root. All optional + hex-validated on load.
+   * Undefined means "use the production Editorial defaults" via the CSS
+   * `var()` cascade — an agent who never opens `/settings/brand`
+   * publishes pages byte-identical to today (cohort safety). The
+   * `/settings/brand` form pre-populates its pickers from
+   * `EDITORIAL_BRAND_DEFAULTS` but does NOT persist them on mount; only
+   * an explicit change writes a value here.
+   */
+  brandBackground?: string;
+  brandText?: string;
+  brandAccent?: string;
+  /**
+   * E.0 — brand-level default layout id. Seeds a fresh draft's
+   * `themeId` at creation time. "editorial" | "studio" | "warm";
+   * undefined falls back to "editorial" at render. Only "editorial" is
+   * a built layout today (Phase E); Studio/Warm are Coming soon.
+   */
+  defaultThemeId?: string;
+}
+
+/**
+ * E.0 — the production Editorial palette. The current `/h/<slug>` page
+ * renders in exactly these colors (the consumer-page CSS tokens
+ * `--paper` / `--ink` / `--brick`). They are the cohort-safety contract:
+ * `BrandKitForm` pre-populates its pickers with these, and the consumer
+ * CSS `var()` fallbacks resolve to these when brand colors are unset, so
+ * a never-customized agent publishes byte-identical pages.
+ *
+ * NOTE: these are the REAL production hexes, NOT Claude Design's
+ * published `#f4efe5 / #221d16 / #bf512c` (which never shipped — see the
+ * E.0 packet's "Palette truth" correction).
+ */
+export const EDITORIAL_BRAND_DEFAULTS = {
+  background: "#f1ebe0",
+  text: "#1a1612",
+  accent: "#c26a4e",
+} as const;
+
+/** E.0 — default brand layout id; the only built layout today. */
+export const DEFAULT_BRAND_THEME_ID = "editorial";
+
+/**
+ * E.0 — strict 6-digit hex validator for the brand color fields.
+ * Defense-at-boundary: invalid / non-string values silently become
+ * `undefined` (which the CSS cascade then treats as "use the Editorial
+ * default"), so a malformed stored value never reaches the consumer page.
+ */
+function clampBrandHex(value: unknown): string | undefined {
+  return typeof value === "string" && /^#[0-9a-f]{6}$/i.test(value)
+    ? value
+    : undefined;
 }
 
 // Storage key kept as `socanim_*` for backwards compatibility with users who
@@ -230,6 +284,16 @@ export function loadBrandSettings(): BrandSettings {
         typeof parsed.reviewsOutlinkUrl === "string" &&
         parsed.reviewsOutlinkUrl.length > 0
           ? parsed.reviewsOutlinkUrl
+          : undefined,
+      // E.0 — brand colors are hex-validated on load; invalid drops to
+      // undefined ("use Editorial default" via the consumer CSS cascade).
+      brandBackground: clampBrandHex(parsed.brandBackground),
+      brandText: clampBrandHex(parsed.brandText),
+      brandAccent: clampBrandHex(parsed.brandAccent),
+      defaultThemeId:
+        typeof parsed.defaultThemeId === "string" &&
+        parsed.defaultThemeId.length > 0
+          ? parsed.defaultThemeId
           : undefined,
     };
   } catch {

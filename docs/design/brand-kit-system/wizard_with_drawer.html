@@ -1,0 +1,244 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+<meta charset="UTF-8" />
+<meta name="viewport" content="width=device-width, initial-scale=1.0" />
+<title>Builder · Brand drawer · SEP Studio</title>
+<link rel="preconnect" href="https://fonts.googleapis.com" />
+<link rel="preconnect" href="https://fonts.gstatic.com" crossorigin />
+<link href="https://fonts.googleapis.com/css2?family=Hanken+Grotesk:ital,wght@0,400;0,500;0,600;0,700;0,800;1,500;1,600&family=Spectral:ital,wght@0,400;0,500;0,600;1,400;1,500;1,600&family=JetBrains+Mono:wght@400;500&display=swap" rel="stylesheet" />
+<link rel="stylesheet" href="brand_kit.css" />
+<style>
+  .wiz-shell { min-height: 100vh; background:
+    radial-gradient(60% 34% at 80% -6%, var(--mint-glow), transparent 60%),
+    var(--bg); }
+
+  /* step rail */
+  .wiz-steps { display: inline-flex; align-items: center; gap: 8px; }
+  .wiz-step { display: inline-flex; align-items: center; gap: 8px; font-size: 12.5px; color: var(--faint); }
+  .wiz-step .num { width: 20px; height: 20px; border-radius: 50%; border: 1px solid var(--border-strong); display: flex; align-items: center; justify-content: center; font-family: var(--mono); font-size: 10px; color: var(--faint); }
+  .wiz-step.done .num { background: var(--mint-soft); border-color: var(--mint-line); color: var(--mint); }
+  .wiz-step.active { color: var(--text); font-weight: 600; }
+  .wiz-step.active .num { background: var(--text); border-color: var(--text); color: #08120f; font-weight: 700; }
+  .wiz-sep { width: 18px; height: 1px; background: var(--border-strong); }
+
+  .wiz-main { max-width: 1000px; margin: 0 auto; padding: 40px 28px 90px; }
+  .wiz-card { background: var(--panel); border: 1px solid var(--border); border-radius: var(--radius); padding: 34px 34px 30px; }
+  .wiz-review { display: grid; grid-template-columns: minmax(0,1fr) 300px; gap: 38px; align-items: start; }
+  .wiz-checklist { display: flex; flex-direction: column; gap: 2px; margin-top: 18px; }
+  .wiz-check { display: flex; align-items: flex-start; gap: 12px; padding: 13px 0; border-bottom: 1px solid var(--border); }
+  .wiz-check:last-child { border-bottom: none; }
+  .wiz-check .ck { width: 22px; height: 22px; border-radius: 7px; background: var(--mint-soft); border: 1px solid var(--mint-line); color: var(--mint); display: flex; align-items: center; justify-content: center; flex: none; }
+  .wiz-check .cb { display: flex; flex-direction: column; gap: 2px; }
+  .wiz-check .cb b { font-size: 14px; font-weight: 600; }
+  .wiz-check .cb span { font-size: 12.5px; color: var(--muted); line-height: 1.45; }
+  .wiz-brandline { display: inline-flex; align-items: center; gap: 7px; }
+  .wiz-sw { width: 13px; height: 13px; border-radius: 50%; border: 1px solid rgba(255,255,255,0.18); }
+
+  .wiz-aside-label { font-family: var(--mono); font-size: 10.5px; letter-spacing: 0.18em; text-transform: uppercase; color: var(--faint); margin-bottom: 11px; display: block; }
+  .wiz-aside-device { border-radius: 20px; background: #000; padding: 7px; box-shadow: 0 30px 70px -34px rgba(0,0,0,0.9), 0 0 0 1px rgba(255,255,255,0.06); }
+  .wiz-aside-device .scr { border-radius: 14px; overflow: hidden; }
+
+  .wiz-foot { display: flex; align-items: center; justify-content: space-between; margin-top: 26px; }
+
+  @media (max-width: 760px) {
+    .wiz-review { grid-template-columns: 1fr; }
+    .wiz-steps .wiz-step .lbl { display: none; }
+    .wiz-card { padding: 24px 20px; }
+  }
+</style>
+</head>
+<body>
+  <div class="wiz-shell">
+    <div class="app-bar">
+      <div class="app-brand">
+        <span class="mark"></span>
+        <span>SEP Studio</span>
+        <span class="crumb">/ <b>New presentation</b></span>
+      </div>
+      <div style="display:flex; align-items:center; gap:14px;">
+        <button class="tune-btn" id="tuneBtn">
+          <span class="tune-dot"></span>
+          Tune brand
+        </button>
+      </div>
+    </div>
+
+    <div class="wiz-main">
+      <div class="wiz-steps" style="margin-bottom:22px;">
+        <span class="wiz-step done"><span class="num">&#10003;</span><span class="lbl">Listing</span></span>
+        <span class="wiz-sep"></span>
+        <span class="wiz-step done"><span class="num">&#10003;</span><span class="lbl">Price</span></span>
+        <span class="wiz-sep"></span>
+        <span class="wiz-step done"><span class="num">&#10003;</span><span class="lbl">Pitch</span></span>
+        <span class="wiz-sep"></span>
+        <span class="wiz-step done"><span class="num">&#10003;</span><span class="lbl">Area</span></span>
+        <span class="wiz-sep"></span>
+        <span class="wiz-step done"><span class="num">&#10003;</span><span class="lbl">Agent</span></span>
+        <span class="wiz-sep"></span>
+        <span class="wiz-step active"><span class="num">6</span><span class="lbl">Review</span></span>
+      </div>
+
+      <div class="wiz-card">
+        <span class="eyebrow"><span class="eyebrow-dot"></span>Step 6 &middot; Review</span>
+        <h1 class="page-title" style="margin:13px 0 8px;">Ready for the Halloran family</h1>
+        <p class="page-sub">A last look before you publish. Everything below is set, and your brand colors are already in place.</p>
+
+        <div class="wiz-review" style="margin-top:26px;">
+          <div>
+            <div class="wiz-checklist">
+              <div class="wiz-check">
+                <span class="ck">&#10003;</span>
+                <span class="cb"><b>Listing &amp; photos</b><span>4427 Dudley Dr NE, Tacoma. Hero photo set.</span></span>
+              </div>
+              <div class="wiz-check">
+                <span class="ck">&#10003;</span>
+                <span class="cb"><b>Recommended price</b><span>$687,298, anchored by 4 recent nearby sales.</span></span>
+              </div>
+              <div class="wiz-check">
+                <span class="ck">&#10003;</span>
+                <span class="cb"><b>Layout</b><span>Editorial. The magazine-style serif look.</span></span>
+              </div>
+              <div class="wiz-check">
+                <span class="ck">&#10003;</span>
+                <span class="cb">
+                  <b>Brand colors</b>
+                  <span class="wiz-brandline" id="brandLine">
+                    <span class="wiz-sw" id="swBg"></span>
+                    <span class="wiz-sw" id="swText"></span>
+                    <span class="wiz-sw" id="swAccent"></span>
+                    <span id="brandText" style="color:var(--faint);">Editorial defaults</span>
+                  </span>
+                </span>
+              </div>
+            </div>
+
+            <div class="wiz-foot">
+              <button class="btn btn-ghost">Back</button>
+              <div style="display:flex; gap:10px; align-items:center;">
+                <button class="tune-btn" id="tuneBtn2"><span class="tune-dot"></span>Tune brand</button>
+                <button class="btn btn-primary">Publish page</button>
+              </div>
+            </div>
+          </div>
+
+          <div>
+            <span class="wiz-aside-label">Seller page</span>
+            <div class="wiz-aside-device">
+              <div class="scr" id="wizMini"></div>
+            </div>
+          </div>
+        </div>
+      </div>
+    </div>
+  </div>
+
+  <!-- scrim + drawer -->
+  <div class="scrim" id="scrim"></div>
+  <aside class="drawer" id="drawer" aria-hidden="true" aria-label="Brand kit">
+    <div class="drawer-head">
+      <div class="drawer-title">
+        <span class="t">Brand kit</span>
+        <span class="s">Tune while you build. Changes save as you go.</span>
+      </div>
+      <button class="drawer-x" id="drawerClose" aria-label="Close brand kit">
+        <svg viewBox="0 0 24 24" width="16" height="16" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round"><path d="M6 6l12 12M18 6L6 18" /></svg>
+      </button>
+    </div>
+    <div class="drawer-body" id="drawerBody"></div>
+    <div class="drawer-foot">
+      <span id="drawerSaved"></span>
+    </div>
+  </aside>
+
+  <script src="https://unpkg.com/react@18.3.1/umd/react.development.js" integrity="sha384-hD6/rw4ppMLGNu3tX5cjIb+uRZ7UkRJ6BPkLpg4hAu/6onKUg4lLsHAs9EBPT82L" crossorigin="anonymous"></script>
+  <script src="https://unpkg.com/react-dom@18.3.1/umd/react-dom.development.js" integrity="sha384-u6aeetuaXnQ38mYT8rp6sbXaQe3NL9t+IBXmnYxwkUI2Hw4bsp2Wvmx4yRQF1uAm" crossorigin="anonymous"></script>
+  <script src="https://unpkg.com/@babel/standalone@7.29.0/babel.min.js" integrity="sha384-m08KidiNqLdpJqLq95G/LEi8Qvjl/xUYll3QILypMoQ65QorJ9Lvtp2RXYGBFj1y" crossorigin="anonymous"></script>
+
+  <script type="text/babel" src="mini_page.jsx"></script>
+  <script type="text/babel" src="brand_kit_form.jsx"></script>
+  <script type="text/babel">
+    const { useState, useEffect } = React;
+    const DEFAULTS = { background: "#f4efe5", text: "#221d16", accent: "#bf512c" };
+
+    // Shared brand state lives at the top; the drawer form, the review-card
+    // swatches, and the small aside preview all read from it. One record.
+    let brandState = { ...DEFAULTS, defaultThemeId: "editorial" };
+    const listeners = new Set();
+    const setBrand = (next) => { brandState = next; listeners.forEach((l) => l(next)); };
+
+    function useBrand() {
+      const [v, setV] = useState(brandState);
+      useEffect(() => { listeners.add(setV); return () => listeners.delete(setV); }, []);
+      return v;
+    }
+
+    /* ----- drawer form (layout="drawer", no republish reminder) ----- */
+    function DrawerForm() {
+      const values = useBrand();
+      return (
+        <window.BrandKitForm
+          values={values}
+          onChange={setBrand}
+          layout="drawer"
+          showRepublishReminder={false}
+          defaults={DEFAULTS}
+        />
+      );
+    }
+    ReactDOM.createRoot(document.getElementById("drawerBody")).render(<DrawerForm />);
+
+    /* ----- saved indicator in the drawer footer ----- */
+    function FootSaved() {
+      const values = useBrand();
+      const [saving, setSaving] = useState(false);
+      useEffect(() => {
+        setSaving(true);
+        const t = setTimeout(() => setSaving(false), 650);
+        return () => clearTimeout(t);
+      }, [values.background, values.text, values.accent, values.defaultThemeId]);
+      return (
+        <span className={"bk-saved" + (saving ? " saving" : "")}>
+          <span className="dot" />
+          <span className="label">{saving ? "Saving\u2026" : "Saved automatically."}</span>
+        </span>
+      );
+    }
+    ReactDOM.createRoot(document.getElementById("drawerSaved")).render(<FootSaved />);
+
+    /* ----- the small aside preview in the review card ----- */
+    function AsideMini() {
+      const v = useBrand();
+      return <window.MiniPage bg={v.background} text={v.text} accent={v.accent} themeId="editorial" scale={0.78} />;
+    }
+    ReactDOM.createRoot(document.getElementById("wizMini")).render(<AsideMini />);
+
+    /* ----- review-card swatch chips update with brand ----- */
+    (function bindSwatches() {
+      const swBg = document.getElementById("swBg");
+      const swText = document.getElementById("swText");
+      const swAccent = document.getElementById("swAccent");
+      const label = document.getElementById("brandText");
+      const sync = (v) => {
+        swBg.style.background = v.background;
+        swText.style.background = v.text;
+        swAccent.style.background = v.accent;
+        const isDefault = v.background === DEFAULTS.background && v.text === DEFAULTS.text && v.accent === DEFAULTS.accent;
+        label.textContent = isDefault ? "Editorial defaults" : "Custom";
+      };
+      listeners.add(sync); sync(brandState);
+    })();
+
+    /* ----- drawer open/close wiring ----- */
+    const scrim = document.getElementById("scrim");
+    const drawer = document.getElementById("drawer");
+    function openDrawer() { drawer.classList.add("open"); scrim.classList.add("open"); drawer.setAttribute("aria-hidden", "false"); }
+    function closeDrawer() { drawer.classList.remove("open"); scrim.classList.remove("open"); drawer.setAttribute("aria-hidden", "true"); }
+    document.getElementById("tuneBtn").addEventListener("click", openDrawer);
+    document.getElementById("tuneBtn2").addEventListener("click", openDrawer);
+    document.getElementById("drawerClose").addEventListener("click", closeDrawer);
+    scrim.addEventListener("click", closeDrawer);
+    document.addEventListener("keydown", (e) => { if (e.key === "Escape") closeDrawer(); });
+  </script>
+</body>
+</html>

@@ -931,3 +931,78 @@ test.describe('toPublicPayload — privacy allowlist (R-1 proof)', () => {
     });
   });
 });
+
+/**
+ * E.0 — brand colors projection. `toPublicPayload`'s optional 4th arg
+ * carries the agent's three brand colors (from BrandSettings). They are
+ * validated + projected field-by-field onto `payload.brandColors`, which
+ * the consumer /h/<slug> page applies as CSS custom properties. Cohort
+ * safety: an unset brand emits NO brandColors key, so the page falls back
+ * to the production Editorial palette via the CSS var() cascade.
+ */
+test.describe('toPublicPayload — brand colors projection (E.0)', () => {
+  function baseDraft(): SellerPresentationDraft {
+    return {
+      comps: [],
+      pitchPoints: [],
+      commitments: [],
+      asks: [],
+    } as unknown as SellerPresentationDraft;
+  }
+
+  test('valid hex brand colors round-trip onto payload.brandColors', () => {
+    const payload = toPublicPayload(baseDraft(), FIXTURE_AGENT_CONTACT, {}, {
+      brandBackground: '#0f1c2e',
+      brandText: '#f4e8d0',
+      brandAccent: '#c9a341',
+    });
+    expect(payload.brandColors).toEqual({
+      background: '#0f1c2e',
+      text: '#f4e8d0',
+      accent: '#c9a341',
+    });
+  });
+
+  test('no brandColors arg → payload.brandColors absent (cohort-safe fallback)', () => {
+    const payload = toPublicPayload(baseDraft(), FIXTURE_AGENT_CONTACT);
+    const serialized = JSON.stringify(payload);
+    expect(payload.brandColors).toBeUndefined();
+    expect(serialized).not.toContain('"brandColors":');
+  });
+
+  test('invalid / partial hex values drop field-by-field', () => {
+    const payload = toPublicPayload(baseDraft(), FIXTURE_AGENT_CONTACT, {}, {
+      brandBackground: '#0f1c2e', // valid
+      brandText: 'navy', // not hex — drop
+      brandAccent: '#ggg', // not hex — drop
+    });
+    expect(payload.brandColors).toEqual({ background: '#0f1c2e' });
+    expect(payload.brandColors?.text).toBeUndefined();
+    expect(payload.brandColors?.accent).toBeUndefined();
+  });
+
+  test('all-invalid brand colors → brandColors undefined (no empty object)', () => {
+    const payload = toPublicPayload(baseDraft(), FIXTURE_AGENT_CONTACT, {}, {
+      brandBackground: '#12', // too short
+      brandText: 'rgb(0,0,0)', // not hex
+      brandAccent: '', // empty
+    });
+    expect(payload.brandColors).toBeUndefined();
+  });
+
+  test('rogue / non-allowlisted keys on the brand-colors input never leak', () => {
+    const tampered = {
+      brandBackground: '#0f1c2e',
+      // Extra keys a tampered BrandSettings record could ride in — the
+      // projector reads only the three known fields, so these drop.
+      brandLogoUrl: 'https://example.com/PRIVATE_SENTINEL_BRAND_LOGO',
+      __proto__rogue: 'PRIVATE_SENTINEL_BRAND_ROGUE',
+    } as unknown as Parameters<typeof toPublicPayload>[3];
+    const payload = toPublicPayload(baseDraft(), FIXTURE_AGENT_CONTACT, {}, tampered);
+    const serialized = JSON.stringify(payload);
+    expect(payload.brandColors).toEqual({ background: '#0f1c2e' });
+    expect(serialized).not.toContain('PRIVATE_SENTINEL_BRAND_LOGO');
+    expect(serialized).not.toContain('PRIVATE_SENTINEL_BRAND_ROGUE');
+    expect(serialized).not.toContain('"brandLogoUrl":');
+  });
+});

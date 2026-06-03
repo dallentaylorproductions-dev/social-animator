@@ -6,6 +6,7 @@ import {
   toPublicPayload,
   type AgentBranding,
   type BrandReviewsInput,
+  type BrandColorsInput,
 } from "@/tools/seller-presentation/output/public-payload";
 
 /**
@@ -58,6 +59,12 @@ interface PublishPayload {
    * is dropped before reaching KV.
    */
   brandReviews?: unknown;
+  /**
+   * E.0 — agent-constant brand colors sourced from BrandSettings (Brand
+   * kit). Permissive shape on the wire; the projector validates each hex
+   * field-by-field, so a malformed / tampered value never reaches KV.
+   */
+  brandColors?: unknown;
 }
 
 export async function POST(req: Request) {
@@ -109,11 +116,25 @@ export async function POST(req: Request) {
       ? (payload.brandReviews as BrandReviewsInput)
       : {};
 
+  // E.0 — `brandColors` is wire-permissive (`unknown`). Forward it as-is;
+  // `toPublicPayload` validates each hex field-by-field, so a malformed /
+  // tampered value never reaches KV. Absent / unset → projector returns
+  // undefined and the consumer page falls back to the Editorial palette.
+  const brandColors: BrandColorsInput =
+    payload.brandColors && typeof payload.brandColors === "object"
+      ? (payload.brandColors as BrandColorsInput)
+      : {};
+
   // R-1 closed by construction: build the public-only payload and
   // pass ONLY it onward. The raw draft (with pricingStrategyId,
   // confidence, comp notes, private pitch points, etc.) is dropped
   // here and never sees the persistence path.
-  const publicPayload = toPublicPayload(draft, agentContact, brandReviews);
+  const publicPayload = toPublicPayload(
+    draft,
+    agentContact,
+    brandReviews,
+    brandColors,
+  );
 
   try {
     const result = await publishHandout({

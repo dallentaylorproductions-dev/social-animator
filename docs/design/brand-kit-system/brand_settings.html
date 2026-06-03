@@ -1,0 +1,77 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+<meta charset="UTF-8" />
+<meta name="viewport" content="width=device-width, initial-scale=1.0" />
+<title>Brand kit · Settings · SEP Studio</title>
+<link rel="preconnect" href="https://fonts.googleapis.com" />
+<link rel="preconnect" href="https://fonts.gstatic.com" crossorigin />
+<link href="https://fonts.googleapis.com/css2?family=Hanken+Grotesk:ital,wght@0,400;0,500;0,600;0,700;0,800;1,500;1,600&family=Spectral:ital,wght@0,400;0,500;0,600;1,400;1,500;1,600&family=JetBrains+Mono:wght@400;500&display=swap" rel="stylesheet" />
+<link rel="stylesheet" href="brand_kit.css" />
+<style>
+  .settings-shell { min-height: 100vh; background:
+    radial-gradient(70% 38% at 24% -6%, var(--mint-glow), transparent 60%),
+    radial-gradient(120% 60% at 50% -8%, var(--mint-soft), transparent 48%),
+    var(--bg); }
+  .settings-tabs-row { display: flex; align-items: center; }
+</style>
+</head>
+<body>
+  <div class="settings-shell">
+    <div class="app-bar">
+      <div class="app-brand">
+        <span class="mark"></span>
+        <span>SEP Studio</span>
+        <span class="crumb">/ <b>Settings</b></span>
+      </div>
+      <div class="app-user">
+        <span>Aaron Thomas</span>
+        <span class="avatar"></span>
+      </div>
+    </div>
+
+    <div class="page">
+      <div class="settings-tabs-row">
+        <div class="tabs" role="tablist" aria-label="Settings sections">
+          <button class="tab" role="tab" aria-selected="false">Profile</button>
+          <button class="tab active" role="tab" aria-selected="true">Brand</button>
+        </div>
+      </div>
+
+      <div class="page-head">
+        <h1 class="page-title">Brand kit</h1>
+        <p class="page-sub">Your brand colors flow into every seller page you publish. Set them once.</p>
+      </div>
+
+      <div id="root"></div>
+    </div>
+  </div>
+
+  <script src="https://unpkg.com/react@18.3.1/umd/react.development.js" integrity="sha384-hD6/rw4ppMLGNu3tX5cjIb+uRZ7UkRJ6BPkLpg4hAu/6onKUg4lLsHAs9EBPT82L" crossorigin="anonymous"></script>
+  <script src="https://unpkg.com/react-dom@18.3.1/umd/react-dom.development.js" integrity="sha384-u6aeetuaXnQ38mYT8rp6sbXaQe3NL9t+IBXmnYxwkUI2Hw4bsp2Wvmx4yRQF1uAm" crossorigin="anonymous"></script>
+  <script src="https://unpkg.com/@babel/standalone@7.29.0/babel.min.js" integrity="sha384-m08KidiNqLdpJqLq95G/LEi8Qvjl/xUYll3QILypMoQ65QorJ9Lvtp2RXYGBFj1y" crossorigin="anonymous"></script>
+
+  <script type="text/babel" src="mini_page.jsx"></script>
+  <script type="text/babel" src="brand_kit_form.jsx"></script>
+  <script type="text/babel">
+    const { useState } = React;
+    const DEFAULTS = { background: "#f4efe5", text: "#221d16", accent: "#bf512c" };
+
+    function SettingsApp() {
+      // Cohort safety: first load is the agent's CURRENT brand (Editorial
+      // defaults pre-populated), not an empty "set up from scratch" state.
+      const [values, setValues] = useState({ ...DEFAULTS, defaultThemeId: "editorial" });
+      return (
+        <window.BrandKitForm
+          values={values}
+          onChange={setValues}
+          layout="page"
+          showRepublishReminder={true}
+          defaults={DEFAULTS}
+        />
+      );
+    }
+    ReactDOM.createRoot(document.getElementById("root")).render(<SettingsApp />);
+  </script>
+</body>
+</html>

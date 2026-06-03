@@ -38,8 +38,25 @@ export function SellerPresentationPage({
 }) {
   const payload = clampPublicPayload(handout.data);
 
+  // E.0 — apply the agent's brand colors as CSS custom properties on the
+  // page root. Each is set ONLY when present; an undefined channel emits
+  // no property, so the consumer CSS var() fallback (the production
+  // Editorial hex) fires for it. An unset brand emits an empty object →
+  // no `style` attribute → render byte-identical to today (cohort safety).
+  const bc = payload.brandColors;
+  const brandStyle: React.CSSProperties = {};
+  if (bc?.background)
+    (brandStyle as Record<string, string>)["--brand-bg"] = bc.background;
+  if (bc?.text) (brandStyle as Record<string, string>)["--brand-text"] = bc.text;
+  if (bc?.accent)
+    (brandStyle as Record<string, string>)["--brand-accent"] = bc.accent;
+
   return (
-    <main className="sep-presentation" data-testid="seller-presentation-public">
+    <main
+      className="sep-presentation"
+      data-testid="seller-presentation-public"
+      style={brandStyle}
+    >
       <article className="page" data-screen-label="Seller Presentation">
         <Hero payload={payload} />
         <CaptionCard payload={payload} />
