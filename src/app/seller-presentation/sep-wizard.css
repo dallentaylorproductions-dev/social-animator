@@ -2601,10 +2601,28 @@
   font-size: 0.625rem;
   font-weight: 600;
   letter-spacing: 0.02em;
+  border: 1px solid var(--border-strong);
+  flex-shrink: 0;
+}
+/* E.1 — "Coming soon" is the truthful framing for not-yet-built themes:
+   neutral, NOT the gold/amber upsell treatment. */
+.sep-wizard .theme-tile-badge.is-soon {
+  background: var(--panel);
+  color: var(--faint);
+  border-color: var(--border-strong);
+}
+/* Gold "Pro" variant — unused today; kept wired for v1.48 when a theme
+   ships as a paid upsell (flip its catalog tier "soon" → "pro"). */
+.sep-wizard .theme-tile-badge.is-pro {
   background: var(--amber-soft);
   color: var(--amber);
-  border: 1px solid var(--amber-line);
-  flex-shrink: 0;
+  border-color: var(--amber-line);
+}
+
+.sep-wizard .theme-picker-foot {
+  margin-top: 12px;
+  font-size: 0.75rem;
+  color: var(--faint);
 }
 
 @media (max-width: 640px) {
