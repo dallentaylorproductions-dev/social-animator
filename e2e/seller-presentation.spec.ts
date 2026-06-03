@@ -211,7 +211,19 @@ test.describe('Seller Presentation — A5b per-step content', () => {
     await page.getByTestId('step-strategy-rationale').fill(
       'Priced 2% under market median to drive multiple offers in the first 10 days.',
     );
-    await page.getByTestId('step-strategy-strategy-strategic-quick-sale').check();
+    // B3: the pricing approach "arrives chosen" (default market-aligned),
+    // so picking a different strategy means opening the "Change approach"
+    // reveal and clicking the option card. The card is a <label> for the
+    // always-mounted (sr-only) source-of-truth radio, so clicking it
+    // natively checks the radio; we then assert via toBeChecked (which
+    // polls, unlike check()'s one-shot verify).
+    await page.getByTestId('step-strategy-change-approach').click();
+    await page
+      .getByTestId('step-strategy-option-strategic-quick-sale')
+      .click();
+    await expect(
+      page.getByTestId('step-strategy-strategy-strategic-quick-sale'),
+    ).toBeChecked();
     // Confidence radios are visually hidden (sr-only) — the wrapper label
     // card is the user's click target. `check({ force: true })` skips
     // Playwright's visibility actionability check for the hidden input.
