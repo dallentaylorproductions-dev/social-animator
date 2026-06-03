@@ -2058,3 +2058,447 @@
     align-self: flex-start;
   }
 }
+
+/* ===================================================================
+ *  Step 6 — Review (Phase B6)
+ *
+ *  Onboards the Review step onto the warm-dark `.sep-wizard` canvas:
+ *  validation/ready cards, the summary grid, the brand-incomplete
+ *  warning, the 5-state PublishSection, and the download-prep button.
+ *  Every rule is scoped under `.sep-wizard` and namespaced `.sec6-*`
+ *  so it never collides with Steps 1-5 or leaks past the wizard. The
+ *  publish state machine + prep-PDF dynamic import are untouched JS;
+ *  this block is pure presentation.
+ * =================================================================== */
+.sep-wizard .sec6 {
+  display: flex;
+  flex-direction: column;
+  gap: 26px;
+}
+
+/* ready-to-publish pill */
+.sep-wizard .sec6-ready {
+  display: inline-flex;
+  align-self: flex-start;
+  align-items: center;
+  gap: 9px;
+  border: 1px solid var(--mint-line);
+  border-radius: 999px;
+  background: var(--mint-soft);
+  padding: 8px 16px;
+}
+.sep-wizard .sec6-ready-dot {
+  width: 7px;
+  height: 7px;
+  border-radius: 50%;
+  background: var(--mint);
+  box-shadow: 0 0 0 4px var(--mint-soft), 0 0 12px 1px var(--mint);
+}
+.sep-wizard .sec6-ready-label {
+  font-size: 13px;
+  font-weight: 600;
+  letter-spacing: 0.01em;
+  color: var(--mint);
+}
+
+/* validation (missing-field) block */
+.sep-wizard .sec6-missing {
+  display: flex;
+  flex-direction: column;
+  align-items: flex-start;
+  gap: 10px;
+  border: 1px solid rgba(217, 138, 130, 0.34);
+  border-radius: 14px;
+  background: rgba(217, 138, 130, 0.08);
+  padding: 16px 18px;
+}
+.sep-wizard .sec6-missing-label {
+  margin: 0;
+  font-size: 14px;
+  font-weight: 600;
+  color: #e8a39c;
+}
+.sep-wizard .sec6-missing-action {
+  background: none;
+  border: none;
+  padding: 0;
+  font-family: var(--sans);
+  font-size: 13px;
+  font-weight: 600;
+  color: var(--mint);
+  cursor: pointer;
+  transition: opacity 0.18s;
+}
+.sep-wizard .sec6-missing-action:hover {
+  opacity: 0.8;
+}
+
+/* summary card */
+.sep-wizard .sec6-summary {
+  border: 1px solid var(--border);
+  border-radius: 16px;
+  background: var(--panel);
+  padding: 22px 22px 8px;
+}
+.sep-wizard .sec6-summary-head {
+  margin: 0 0 16px;
+  font-family: var(--mono);
+  font-size: 10.5px;
+  letter-spacing: 0.18em;
+  text-transform: uppercase;
+  color: var(--faint);
+}
+.sep-wizard .sec6-rows {
+  display: flex;
+  flex-direction: column;
+}
+.sep-wizard .sec6-row {
+  display: flex;
+  align-items: baseline;
+  gap: 16px;
+  padding: 12px 0;
+  border-top: 1px solid var(--border);
+}
+.sep-wizard .sec6-row:first-child {
+  border-top: none;
+}
+.sep-wizard .sec6-row-label {
+  flex: none;
+  width: 168px;
+  font-family: var(--mono);
+  font-size: 10.5px;
+  letter-spacing: 0.14em;
+  text-transform: uppercase;
+  color: var(--faint);
+}
+.sep-wizard .sec6-row-value {
+  flex: 1;
+  font-size: 14.5px;
+  color: var(--text);
+  line-height: 1.45;
+}
+/* pitch-points breakdown — counts read primary, "total" goes quiet */
+.sep-wizard .sec6-pitch {
+  display: inline-flex;
+  flex-wrap: wrap;
+  align-items: baseline;
+  gap: 8px;
+}
+.sep-wizard .sec6-pitch-total {
+  color: var(--faint);
+}
+.sep-wizard .sec6-pitch-sep {
+  color: var(--faint);
+}
+.sep-wizard .sec6-pitch-count {
+  font-weight: 600;
+  color: var(--text);
+}
+
+/* outputs zone (warning + publish + download) */
+.sep-wizard .sec6-outputs {
+  display: flex;
+  flex-direction: column;
+  gap: 18px;
+  border-top: 1px solid var(--border);
+  padding-top: 24px;
+}
+
+/* brand-incomplete warning */
+.sep-wizard .sec6-warning {
+  border: 1px solid var(--amber-line);
+  border-radius: 14px;
+  background: var(--amber-soft);
+  padding: 14px 16px;
+}
+.sep-wizard .sec6-warning-text {
+  margin: 0;
+  font-size: 13.5px;
+  line-height: 1.55;
+  color: var(--amber);
+}
+.sep-wizard .sec6-warning-text strong {
+  font-weight: 700;
+}
+.sep-wizard .sec6-warning-link {
+  color: var(--amber);
+  text-decoration: underline;
+  text-underline-offset: 2px;
+}
+.sep-wizard .sec6-warning-link:hover {
+  text-decoration: none;
+}
+
+/* primary publish button (idle / publishing / revoked / error reuse) */
+.sep-wizard .sec6-publish-btn {
+  align-self: flex-start;
+  display: inline-flex;
+  align-items: center;
+  justify-content: center;
+  background: var(--mint);
+  color: #08120f;
+  border: none;
+  border-radius: 12px;
+  padding: 12px 24px;
+  font-family: var(--sans);
+  font-size: 14.5px;
+  font-weight: 700;
+  cursor: pointer;
+  transition: transform 0.15s var(--ease), filter 0.2s, box-shadow 0.2s;
+  box-shadow: 0 8px 24px -10px var(--mint-glow);
+}
+.sep-wizard .sec6-publish-btn:hover {
+  filter: brightness(1.06);
+  transform: translateY(-1px);
+}
+.sep-wizard .sec6-publish-btn:active {
+  transform: translateY(0);
+}
+.sep-wizard .sec6-publish-btn:disabled {
+  opacity: 0.4;
+  cursor: not-allowed;
+  box-shadow: none;
+  filter: none;
+  transform: none;
+}
+
+/* published success card */
+.sep-wizard .sec6-published {
+  display: flex;
+  flex-direction: column;
+  gap: 14px;
+  border: 1px solid var(--mint-line);
+  border-radius: 16px;
+  background: var(--mint-soft);
+  padding: 20px;
+}
+.sep-wizard .sec6-published-head {
+  display: flex;
+  align-items: center;
+  gap: 9px;
+}
+.sep-wizard .sec6-published-dot {
+  width: 7px;
+  height: 7px;
+  border-radius: 50%;
+  background: var(--mint);
+  box-shadow: 0 0 0 4px var(--mint-soft), 0 0 12px 1px var(--mint);
+}
+.sep-wizard .sec6-published-label {
+  font-size: 14.5px;
+  font-weight: 700;
+  color: var(--mint);
+}
+.sep-wizard .sec6-url-row {
+  display: flex;
+  flex-direction: column;
+  gap: 10px;
+}
+.sep-wizard .sec6-url {
+  flex: 1;
+  word-break: break-all;
+  border: 1px solid var(--border-strong);
+  border-radius: 10px;
+  background: var(--bg);
+  padding: 10px 12px;
+  font-family: var(--mono);
+  font-size: 12px;
+  color: var(--text);
+}
+.sep-wizard .sec6-copy-btn {
+  align-self: flex-start;
+  border: 1px solid var(--border-strong);
+  border-radius: 10px;
+  background: transparent;
+  padding: 9px 14px;
+  font-family: var(--sans);
+  font-size: 12.5px;
+  font-weight: 600;
+  color: var(--text);
+  cursor: pointer;
+  transition: background 0.18s, border-color 0.18s;
+}
+.sep-wizard .sec6-copy-btn:hover {
+  background: var(--panel-2);
+  border-color: var(--mint-line);
+}
+.sep-wizard .sec6-copy-btn-sm {
+  padding: 7px 12px;
+  font-size: 11.5px;
+}
+.sep-wizard .sec6-sample {
+  display: flex;
+  flex-direction: column;
+  gap: 8px;
+  border-top: 1px solid var(--border);
+  padding-top: 14px;
+}
+.sep-wizard .sec6-sample-eyebrow {
+  margin: 0;
+  font-family: var(--mono);
+  font-size: 10px;
+  letter-spacing: 0.16em;
+  text-transform: uppercase;
+  color: var(--faint);
+}
+.sep-wizard .sec6-sample-text {
+  margin: 0;
+  white-space: pre-line;
+  font-size: 13px;
+  font-style: italic;
+  line-height: 1.6;
+  color: var(--muted);
+}
+.sep-wizard .sec6-published-actions {
+  display: flex;
+  gap: 18px;
+  padding-top: 2px;
+}
+.sep-wizard .sec6-link-action {
+  background: none;
+  border: none;
+  padding: 0;
+  font-family: var(--sans);
+  font-size: 12.5px;
+  font-weight: 600;
+  color: var(--mint);
+  cursor: pointer;
+  transition: opacity 0.18s, color 0.18s;
+}
+.sep-wizard .sec6-link-action:hover {
+  opacity: 0.8;
+}
+.sep-wizard .sec6-link-revoke {
+  color: var(--faint);
+}
+.sep-wizard .sec6-link-revoke:hover {
+  opacity: 1;
+  color: #d98a82;
+}
+
+/* revoking (quiet) */
+.sep-wizard .sec6-revoking {
+  margin: 0;
+  font-size: 13px;
+  font-style: italic;
+  color: var(--faint);
+}
+
+/* revoked panel */
+.sep-wizard .sec6-revoked {
+  display: flex;
+  flex-direction: column;
+  align-items: flex-start;
+  gap: 12px;
+  border: 1px solid var(--border);
+  border-radius: 16px;
+  background: var(--panel);
+  padding: 20px;
+}
+.sep-wizard .sec6-revoked-label {
+  margin: 0;
+  font-size: 14.5px;
+  font-weight: 700;
+  color: var(--text);
+}
+.sep-wizard .sec6-revoked-note {
+  margin: 0;
+  font-size: 13px;
+  line-height: 1.5;
+  color: var(--muted);
+}
+
+/* publish error panel */
+.sep-wizard .sec6-publish-error {
+  display: flex;
+  flex-direction: column;
+  align-items: flex-start;
+  gap: 10px;
+  border: 1px solid rgba(217, 138, 130, 0.34);
+  border-radius: 16px;
+  background: rgba(217, 138, 130, 0.08);
+  padding: 20px;
+}
+.sep-wizard .sec6-publish-error-label {
+  margin: 0;
+  font-size: 14.5px;
+  font-weight: 700;
+  color: #e8a39c;
+}
+.sep-wizard .sec6-publish-error-msg {
+  margin: 0;
+  font-size: 13px;
+  line-height: 1.5;
+  color: rgba(232, 163, 156, 0.85);
+}
+
+/* download prep PDF (agent only) */
+.sep-wizard .sec6-download-block {
+  display: flex;
+  flex-direction: column;
+  gap: 10px;
+}
+.sep-wizard .sec6-download-btn {
+  align-self: flex-start;
+  display: inline-flex;
+  align-items: center;
+  justify-content: center;
+  border: 1px solid var(--mint-line);
+  border-radius: 12px;
+  background: var(--mint-soft);
+  padding: 11px 22px;
+  font-family: var(--sans);
+  font-size: 14px;
+  font-weight: 600;
+  color: var(--mint);
+  cursor: pointer;
+  transition: background 0.18s, color 0.18s;
+}
+.sep-wizard .sec6-download-btn:hover {
+  background: var(--mint);
+  color: #08120f;
+}
+.sep-wizard .sec6-download-btn:disabled {
+  opacity: 0.4;
+  cursor: not-allowed;
+  background: var(--mint-soft);
+  color: var(--mint);
+}
+.sep-wizard .sec6-download-sub {
+  margin: 0;
+  font-size: 12.5px;
+  line-height: 1.5;
+  color: var(--faint);
+  max-width: 56ch;
+}
+.sep-wizard .sec6-download-error {
+  margin: 0;
+  font-size: 12.5px;
+  color: #d98a82;
+}
+
+/* desktop refinements */
+@media (min-width: 641px) {
+  .sep-wizard .sec6-url-row {
+    flex-direction: row;
+    align-items: center;
+  }
+  .sep-wizard .sec6-url {
+    min-width: 0;
+  }
+}
+
+/* mobile */
+@media (max-width: 640px) {
+  .sep-wizard .sec6-row {
+    flex-direction: column;
+    gap: 4px;
+  }
+  .sep-wizard .sec6-row-label {
+    width: auto;
+  }
+  .sep-wizard .sec6-published-actions {
+    flex-direction: column;
+    gap: 10px;
+  }
+}

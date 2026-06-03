@@ -2,6 +2,7 @@
 
 import { useEffect, useRef, useState } from "react";
 import { useBrandSettings } from "@/lib/brand";
+import { spStrategyDisplayLabel } from "../content/strategy-display-labels";
 import {
   validateForExport,
   type SellerPresentationDraft,
@@ -35,6 +36,18 @@ type StepId =
  * price + rationale, public vs private pitch points. This is the
  * UI surface where A6's `toPublicPayload` becomes obvious to the
  * agent before publish.
+ *
+ * Phase B6 — onboarded onto the `.sep-wizard` warm-dark canvas: the
+ * header, validation/ready cards, summary rows, brand-incomplete
+ * warning, the 5-state PublishSection, and the download-prep button all
+ * use the scoped `.sec6-*` classes in sep-wizard.css. The Pricing
+ * strategy summary row now shows the SP display label (Create Urgency …)
+ * via `spStrategyDisplayLabel` — the same label the agent picked on
+ * Step 3 — while the prep PDF keeps the formal SIR catalog name.
+ * Every load-bearing piece (PublishState/ExportState unions, the
+ * publish/revoke/download handlers, the agentContact + brandReviews
+ * projections, buildSampleSendText, CopyButton, the SSR-safe origin
+ * guard, and every data-testid) is preserved byte-for-byte.
  */
 
 interface StepReviewProps {
@@ -198,73 +211,81 @@ export function StepReview({ draft, goToStep }: StepReviewProps) {
     }
   }
 
+  const confidenceLabel = draft.confidence
+    ? draft.confidence.charAt(0).toUpperCase() + draft.confidence.slice(1)
+    : "—";
+  const totalPitchPoints =
+    publicPitchPoints.length + privatePitchPoints.length;
+
   return (
-    <div className="space-y-6" data-testid="step-review">
-      <header>
-        <h2 className="text-lg font-medium">Review</h2>
-        <p className="mt-1 text-xs text-gray-500">
-          Check everything, then publish to get a shareable link for your
-          client.
+    <section className="sec6" data-testid="step-review">
+      <div className="sec-head">
+        <h2 className="sec-title">Review</h2>
+        <p className="sec-sub">
+          Check the summary. Publish to get a shareable link for your seller,
+          then download the prep PDF for yourself.
         </p>
-      </header>
+      </div>
 
       {missing ? (
         <ValidationBlock missing={missing} goToStep={goToStep} />
       ) : (
-        <div
-          className="rounded border border-mint/40 bg-mint/5 p-4"
-          data-testid="step-review-ready"
-        >
-          <p className="text-sm font-medium text-mint">Ready to publish</p>
+        <div className="sec6-ready" data-testid="step-review-ready">
+          <span className="sec6-ready-dot" aria-hidden />
+          <span className="sec6-ready-label">Ready to publish</span>
         </div>
       )}
 
-      <section
-        className="space-y-3 text-sm text-gray-300"
-        data-testid="step-review-summary"
-      >
-        <h3 className="text-xs uppercase tracking-wider text-gray-500">
-          Summary
-        </h3>
-        <SummaryRow label="Property" value={draft.propertyAddress || "—"} />
-        {draft.propertyCity && (
-          <SummaryRow label="City" value={draft.propertyCity} />
-        )}
-        <SummaryRow
-          label="Recommended price"
-          value={draft.recommendedPrice || "—"}
-        />
-        <SummaryRow
-          label="Price rationale"
-          value={
-            draft.priceRationale
-              ? `${draft.priceRationale.slice(0, 80)}${draft.priceRationale.length > 80 ? "…" : ""}`
-              : "—"
-          }
-        />
-        <SummaryRow
-          label="Pricing strategy"
-          value={draft.pricingStrategyId || "—"}
-        />
-        <SummaryRow
-          label="Confidence"
-          value={draft.confidence || "—"}
-        />
-        <SummaryRow label="Comps" value={`${draft.comps.length} provided`} />
-        <SummaryRow
-          label="Pitch points"
-          value={`${publicPitchPoints.length + privatePitchPoints.length} total · ${publicPitchPoints.length} 🌐 public · ${privatePitchPoints.length} 🔒 private`}
-        />
-      </section>
+      <div className="sec6-summary" data-testid="step-review-summary">
+        <h3 className="sec6-summary-head">Summary</h3>
+        <div className="sec6-rows">
+          <SummaryRow label="Property" value={draft.propertyAddress || "—"} />
+          {draft.propertyCity && (
+            <SummaryRow label="City" value={draft.propertyCity} />
+          )}
+          <SummaryRow
+            label="Recommended price"
+            value={draft.recommendedPrice || "—"}
+          />
+          <SummaryRow
+            label="Price rationale"
+            value={
+              draft.priceRationale
+                ? `${draft.priceRationale.slice(0, 80)}${draft.priceRationale.length > 80 ? "…" : ""}`
+                : "—"
+            }
+          />
+          <SummaryRow
+            label="Pricing strategy"
+            value={spStrategyDisplayLabel(draft.pricingStrategyId)}
+          />
+          <SummaryRow label="Confidence" value={confidenceLabel} />
+          <SummaryRow label="Comps" value={`${draft.comps.length} provided`} />
+          <div className="sec6-row">
+            <span className="sec6-row-label">Pitch points</span>
+            <span className="sec6-row-value sec6-pitch">
+              <span className="sec6-pitch-total">{totalPitchPoints} total</span>
+              <span className="sec6-pitch-sep">·</span>
+              <span className="sec6-pitch-count">
+                {publicPitchPoints.length} 🌐 public
+              </span>
+              <span className="sec6-pitch-sep">·</span>
+              <span className="sec6-pitch-count">
+                {privatePitchPoints.length} 🔒 private
+              </span>
+            </span>
+          </div>
+        </div>
+      </div>
 
-      <div className="space-y-4 border-t border-neutral-800 pt-4">
+      <div className="sec6-outputs">
         {!brand.agentName?.trim() && (
-          <div className="rounded-md border border-gold/40 bg-gold/10 p-3">
-            <p className="text-sm text-gold">
+          <div className="sec6-warning">
+            <p className="sec6-warning-text">
               <strong>Brand profile incomplete.</strong> The seller page will
               publish, but the &ldquo;Your agent&rdquo; section will be hidden
               because no agent name is set.{" "}
-              <a href="/settings" className="underline hover:no-underline">
+              <a href="/settings" className="sec6-warning-link">
                 Set up your brand profile
               </a>{" "}
               first so visitors see your contact info.
@@ -283,13 +304,13 @@ export function StepReview({ draft, goToStep }: StepReviewProps) {
           agentName={brand.agentName ?? ""}
         />
 
-        <div className="flex flex-col gap-2">
+        <div className="sec6-download-block">
           <button
             type="button"
             onClick={handleDownloadPrep}
             disabled={Boolean(missing) || exportState === "downloading"}
             data-testid="step-review-download"
-            className="self-start rounded border border-mint/40 bg-mint/5 px-5 py-2.5 text-sm font-medium text-mint hover:bg-mint/10 disabled:cursor-not-allowed disabled:opacity-40"
+            className="sec6-download-btn"
           >
             {exportState === "downloading"
               ? "Preparing PDF…"
@@ -297,21 +318,18 @@ export function StepReview({ draft, goToStep }: StepReviewProps) {
                 ? "Downloaded ✓"
                 : "Download prep PDF (agent only)"}
           </button>
-          <p className="text-xs text-gray-500">
+          <p className="sec6-download-sub">
             Private companion to the seller page. Includes your full strategy,
             comp notes, and private talking points. Not shared with the client.
           </p>
           {typeof exportState === "object" && "error" in exportState && (
-            <p
-              className="text-xs text-red-400"
-              data-testid="step-review-download-error"
-            >
+            <p className="sec6-download-error" data-testid="step-review-download-error">
               Export failed: {exportState.error}
             </p>
           )}
         </div>
       </div>
-    </div>
+    </section>
   );
 }
 
@@ -346,51 +364,44 @@ function PublishSection({
       agentName,
     });
     return (
-      <div
-        className="space-y-3 rounded border border-mint/40 bg-mint/5 p-4"
-        data-testid="step-review-published"
-      >
-        <p className="text-sm font-medium text-mint">Seller page published</p>
-        <div className="flex flex-col gap-2 sm:flex-row sm:items-center">
-          <code className="flex-1 break-all rounded border border-neutral-700 bg-neutral-900 px-3 py-2 text-xs text-text-primary">
-            {url}
-          </code>
+      <div className="sec6-published" data-testid="step-review-published">
+        <div className="sec6-published-head">
+          <span className="sec6-published-dot" aria-hidden />
+          <span className="sec6-published-label">Seller page published</span>
+        </div>
+        <div className="sec6-url-row">
+          <code className="sec6-url">{url}</code>
           <CopyButton
             value={url}
             label="Copy URL"
             testId="step-review-copy-url"
-            className="rounded border border-neutral-700 px-3 py-2 text-xs text-text-primary hover:bg-neutral-800"
+            className="sec6-copy-btn"
           />
         </div>
-        <div>
-          <p className="mt-2 text-[11px] uppercase tracking-wider text-gray-500">
-            Sample text to send
-          </p>
-          <p
-            className="mt-1 whitespace-pre-line text-xs italic leading-relaxed text-gray-300"
-            data-testid="step-review-sample-text"
-          >
+        <div className="sec6-sample">
+          <p className="sec6-sample-eyebrow">Sample text to send</p>
+          <p className="sec6-sample-text" data-testid="step-review-sample-text">
             {sample}
           </p>
           <CopyButton
             value={sample}
             label="Copy sample text"
             testId="step-review-copy-sample"
-            className="mt-2 rounded border border-neutral-700 px-3 py-1.5 text-[11px] text-text-primary hover:bg-neutral-800"
+            className="sec6-copy-btn sec6-copy-btn-sm"
           />
         </div>
-        <div className="flex gap-3 pt-1">
+        <div className="sec6-published-actions">
           <button
             type="button"
             onClick={onPublish}
-            className="text-xs text-mint hover:underline"
+            className="sec6-link-action"
           >
             Publish again (new URL)
           </button>
           <button
             type="button"
             onClick={() => onRevoke(state.slug)}
-            className="text-xs text-gray-500 hover:text-red-400"
+            className="sec6-link-action sec6-link-revoke"
           >
             Revoke this URL
           </button>
@@ -400,14 +411,14 @@ function PublishSection({
   }
 
   if (state.kind === "revoking") {
-    return <p className="text-xs italic text-gray-500">Revoking page…</p>;
+    return <p className="sec6-revoking">Revoking page…</p>;
   }
 
   if (state.kind === "revoked") {
     return (
-      <div className="space-y-3 rounded border border-neutral-800 bg-neutral-900 p-4">
-        <p className="text-sm font-medium text-text-primary">Page revoked</p>
-        <p className="text-xs text-gray-500">
+      <div className="sec6-revoked">
+        <p className="sec6-revoked-label">Page revoked</p>
+        <p className="sec6-revoked-note">
           The previous URL now returns a &ldquo;not available&rdquo; page.
           Publish again to share a fresh link.
         </p>
@@ -415,7 +426,7 @@ function PublishSection({
           type="button"
           onClick={onPublish}
           disabled={disabled}
-          className="rounded bg-mint px-5 py-2.5 text-sm font-medium text-black hover:bg-mint-hover disabled:cursor-not-allowed disabled:opacity-40"
+          className="sec6-publish-btn"
         >
           Publish seller page
         </button>
@@ -425,17 +436,14 @@ function PublishSection({
 
   if (state.kind === "error") {
     return (
-      <div
-        className="space-y-2 rounded border border-red-500/40 bg-red-500/5 p-4"
-        data-testid="step-review-publish-error"
-      >
-        <p className="text-sm font-medium text-red-300">Something went wrong</p>
-        <p className="text-xs text-red-200/80">{state.message}</p>
+      <div className="sec6-publish-error" data-testid="step-review-publish-error">
+        <p className="sec6-publish-error-label">Something went wrong</p>
+        <p className="sec6-publish-error-msg">{state.message}</p>
         <button
           type="button"
           onClick={onPublish}
           disabled={disabled}
-          className="rounded bg-mint px-5 py-2.5 text-sm font-medium text-black hover:bg-mint-hover disabled:cursor-not-allowed disabled:opacity-40"
+          className="sec6-publish-btn"
         >
           Try again
         </button>
@@ -449,7 +457,7 @@ function PublishSection({
       onClick={onPublish}
       disabled={disabled || state.kind === "publishing"}
       data-testid="step-review-publish"
-      className="rounded bg-mint px-5 py-2.5 text-sm font-semibold text-black hover:bg-mint-hover disabled:cursor-not-allowed disabled:opacity-40"
+      className="sec6-publish-btn"
     >
       {state.kind === "publishing" ? "Publishing…" : "Publish seller page"}
     </button>
@@ -465,15 +473,12 @@ function ValidationBlock({
 }) {
   const { stepId, label } = fieldToStep(missing);
   return (
-    <div
-      className="space-y-3 rounded border border-red-500/40 bg-red-500/5 p-4"
-      data-testid="step-review-missing"
-    >
-      <p className="text-sm font-medium text-red-300">Missing: {label}</p>
+    <div className="sec6-missing" data-testid="step-review-missing">
+      <p className="sec6-missing-label">Missing: {label}</p>
       <button
         type="button"
         onClick={() => goToStep(stepId)}
-        className="text-xs text-mint hover:underline"
+        className="sec6-missing-action"
       >
         Go back to fix →
       </button>
@@ -483,11 +488,9 @@ function ValidationBlock({
 
 function SummaryRow({ label, value }: { label: string; value: string }) {
   return (
-    <div className="flex items-baseline gap-3">
-      <span className="min-w-[180px] text-xs uppercase tracking-wider text-gray-500">
-        {label}
-      </span>
-      <span className="flex-1">{value}</span>
+    <div className="sec6-row">
+      <span className="sec6-row-label">{label}</span>
+      <span className="sec6-row-value">{value}</span>
     </div>
   );
 }

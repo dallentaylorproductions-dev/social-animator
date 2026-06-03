@@ -4,6 +4,7 @@ import { useEffect, useState } from "react";
 import { CurrencyInput } from "@/components/inputs/CurrencyInput";
 import { computeCompMedian } from "@/lib/seller-presentation/median";
 import { PRICING_STRATEGIES } from "@/tools/seller-intelligence-report/content/pricing-strategies";
+import { SP_STRATEGY_DISPLAY_LABELS } from "../content/strategy-display-labels";
 import type {
   Comp,
   ConfidenceLevel,
@@ -40,8 +41,10 @@ import type {
  * Pricing-strategy catalog is the SHARED canonical list at
  * `src/tools/seller-intelligence-report/content/pricing-strategies.ts`
  * (SIR + SP read the same IDs). SP shows its own DISPLAY labels via the
- * local `SP_STRATEGY_DISPLAY_LABELS` map below; the catalog's formal
- * names are unchanged (SIR's audience + the prep PDF keep them). The
+ * shared `SP_STRATEGY_DISPLAY_LABELS` map (B6 relocated it to
+ * `../content/strategy-display-labels` so Step 6 Review can show the
+ * same label); the catalog's formal names are unchanged (SIR's audience
+ * + the prep PDF keep them). The
  * canonical `pricingStrategyId` is what persists — only the visible
  * label differs.
  *
@@ -66,16 +69,11 @@ const DEFAULT_STRATEGY_ID = "market-aligned";
  * SP-specific display labels for the canonical pricing-strategy IDs.
  * SP's audience (agents in the wizard) sees these friendlier labels; the
  * shared catalog's formal `name` ("Strategic Pricing for Quick Sale" …)
- * stays the SIR + prep-PDF label. A local map — NOT a ripple into the
- * shared catalog.
+ * stays the SIR + prep-PDF label. The map is the shared
+ * `content/strategy-display-labels` module (B6 relocation) so Step 6's
+ * Review summary can show the same label the agent picked here — NOT a
+ * ripple into the shared catalog.
  */
-const SP_STRATEGY_DISPLAY_LABELS: Record<string, string> = {
-  "strategic-quick-sale": "Create Urgency",
-  "market-aligned": "Market-aligned",
-  "premium-positioning": "Premium Positioning",
-  "test-then-adjust": "Test then adjust",
-};
-
 const displayLabel = (id: string) => SP_STRATEGY_DISPLAY_LABELS[id] ?? id;
 
 const CONFIDENCE_OPTIONS: ReadonlyArray<{
