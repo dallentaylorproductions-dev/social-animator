@@ -1,24 +1,45 @@
 /* =====================================================================
-   Settings tab nav (Profile | Brand) — Phase E.0
+   Settings tab nav (Profile | Brand) — Phase E.0 + E.0 fix-up
    Shared across /settings (Profile, default landing) and
    /settings/brand. Pill group matching the Brand Kit chrome
-   (docs/design/brand-kit-system/brand_settings.html .tabs), styled with
-   literal hexes so it reads consistently on both routes' dark backdrop
-   without depending on the .bk-scope token cascade.
+   (docs/design/brand-kit-system/brand_settings.html .tabs).
+
+   Fix-up (ratified 2026-06-03): integrate the strip INTO the content
+   column — left-aligned above each page's title, on dark panel tokens,
+   not a centered cream pill floating at the viewport top.
+
+   The pill container chrome is IDENTICAL on both routes (dark panel
+   #19171a, 1px line border, ~10px radius, 4px padding, 2px gap). Only
+   the outer alignment wrapper width differs, to sit flush with each
+   route's content column left edge: Profile uses Tailwind max-w-2xl
+   (42rem) + px-6 (24px); the Brand page uses the .page column
+   (max-width 1060px + 28px side padding). box-sizing: border-box so the
+   side padding nests inside max-width exactly like each page's column.
    ===================================================================== */
 .sep-settings-tabbar {
   display: flex;
-  justify-content: center;
-  padding: 16px 18px 0;
-  background: transparent;
+  justify-content: flex-start;
+  margin: 0 auto;
+  box-sizing: border-box;
 }
+/* Match Profile's content column: max-w-2xl (42rem) + px-6 (24px). */
+.sep-settings-tabbar--profile {
+  max-width: 42rem;
+  padding: 28px 24px 0;
+}
+/* Match the Brand-kit .page column: 1060px + 28px side padding. */
+.sep-settings-tabbar--brand {
+  max-width: 1060px;
+  padding: 28px 28px 0;
+}
+
 .sep-settings-tabs {
   display: inline-flex;
-  gap: 4px;
-  padding: 5px;
-  background: #19171a;
-  border: 1px solid rgba(255, 255, 255, 0.075);
-  border-radius: 13px;
+  gap: 2px;
+  padding: 4px;
+  background: #19171a; /* --panel */
+  border: 1px solid rgba(255, 255, 255, 0.08); /* --border line token */
+  border-radius: 10px;
 }
 .sep-settings-tab {
   appearance: none;
@@ -27,9 +48,9 @@
   font-family: var(--font-hanken), system-ui, sans-serif;
   font-size: 14px;
   font-weight: 600;
-  color: #a6a39d;
+  color: #a6a39d; /* --muted (secondary text) */
   padding: 9px 18px;
-  border-radius: 9px;
+  border-radius: 8px;
   cursor: pointer;
   text-decoration: none;
   transition: color 0.18s cubic-bezier(0.22, 1, 0.36, 1),
