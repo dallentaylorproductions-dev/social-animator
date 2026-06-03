@@ -47,6 +47,9 @@ export type GateStateClient =
 interface SPEntitlement {
   aiAccessState: GateStateClient | null;
   aiAccessLabel: string;
+  /** Premium-theme gate (Phase E). `null` while loading; 'available' for Pro/AI tiers, 'upgrade-required'/'policy-locked' otherwise. */
+  themeAccessState: GateStateClient | null;
+  themeAccessLabel: string;
   suppressUpgradeUi: boolean;
   /** Feature-flag state for comp-import. `null` while loading; `false` hides the affordance entirely. */
   compImportEnabled: boolean | null;
@@ -55,6 +58,8 @@ interface SPEntitlement {
 const Ctx = createContext<SPEntitlement>({
   aiAccessState: null,
   aiAccessLabel: '',
+  themeAccessState: null,
+  themeAccessLabel: '',
   suppressUpgradeUi: false,
   compImportEnabled: null,
 });
@@ -67,6 +72,8 @@ export function SPEntitlementProvider({ children }: { children: ReactNode }) {
   const [state, setState] = useState<SPEntitlement>({
     aiAccessState: null,
     aiAccessLabel: '',
+    themeAccessState: null,
+    themeAccessLabel: '',
     suppressUpgradeUi: false,
     compImportEnabled: null,
   });
@@ -89,6 +96,8 @@ export function SPEntitlementProvider({ children }: { children: ReactNode }) {
         setState({
           aiAccessState: data.aiAccess?.state ?? 'available',
           aiAccessLabel: data.aiAccess?.label ?? '',
+          themeAccessState: data.themeAccess?.state ?? 'available',
+          themeAccessLabel: data.themeAccess?.label ?? '',
           suppressUpgradeUi: !!data.suppressUpgradeUi,
           compImportEnabled: !!data.features?.compImportEnabled,
         });
