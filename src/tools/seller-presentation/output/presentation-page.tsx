@@ -8,7 +8,16 @@ import {
 } from "./public-payload";
 import { effectivePosterUrl } from "../engine/types";
 import { PresentationPageMotion } from "./motion";
+import { BrandEngine } from "@/lib/brand/color-engine";
 import "./presentation-page.css";
+
+// E.1 — production Editorial defaults (the cohort-safe palette). Signature =
+// the agent's brandAccent; surface/ink = layout-owned defaults, overridable.
+const E1_DEFAULTS = {
+  signature: "#C26A4E",
+  surface: "#F1EBE0",
+  ink: "#1A1612",
+} as const;
 
 /**
  * Seller Presentation — premium consumer-facing page (v1.47 / A7b + A7d.1).
@@ -38,18 +47,20 @@ export function SellerPresentationPage({
 }) {
   const payload = clampPublicPayload(handout.data);
 
-  // E.0 — apply the agent's brand colors as CSS custom properties on the
-  // page root. Each is set ONLY when present; an undefined channel emits
-  // no property, so the consumer CSS var() fallback (the production
-  // Editorial hex) fires for it. An unset brand emits an empty object →
-  // no `style` attribute → render byte-identical to today (cohort safety).
+  // E.1 — derive the full 7-role ramp from the agent's signature
+  // (brandColors.accent) + layout-owned surface/ink, then inline the
+  // CLAMPED RESOLVED HEXES as CSS vars on <main>. The engine runs at render
+  // (server-side, pure) — contrast clamps can't live in CSS, so the inlined
+  // values are the live path; the stylesheet's color-mix(in oklch, …)
+  // values are only the pre-JS fallback. Unset brand → engine runs with the
+  // production defaults, so the page renders the Editorial family (NO cyan).
   const bc = payload.brandColors;
-  const brandStyle: React.CSSProperties = {};
-  if (bc?.background)
-    (brandStyle as Record<string, string>)["--brand-bg"] = bc.background;
-  if (bc?.text) (brandStyle as Record<string, string>)["--brand-text"] = bc.text;
-  if (bc?.accent)
-    (brandStyle as Record<string, string>)["--brand-accent"] = bc.accent;
+  const derived = BrandEngine.derive(bc?.accent ?? E1_DEFAULTS.signature, {
+    surface: bc?.background ?? E1_DEFAULTS.surface,
+    ink: bc?.text ?? E1_DEFAULTS.ink,
+    secondary: bc?.secondary ?? null,
+  });
+  const brandStyle = derived.vars as React.CSSProperties;
 
   return (
     <main

@@ -1,36 +1,28 @@
 import { test, expect, type Page } from '@playwright/test';
 
 /**
- * Seller Presentation — brand-colors visual regression gate (Phase E.0).
+ * Seller Presentation — brand-colors regression gate (Phase E.1).
  *
- * The cohort-safety contract: when an agent has NOT set brand colors, the
- * consumer /h/<slug> page must render byte-identical to today's
- * production Editorial palette; when they HAVE, only the three brand
- * colors change while every derived shade + layout stays put.
+ * Re-pinned from E.0 for the brand-color unification. The page now runs the
+ * OKLCh ramp engine at render and inlines the resolved ramp hexes on <main>.
+ * Two pinned consequences (ratified, NOT bugs):
+ *   1. NO cyan anywhere — the 8 ex-`#4ef2d9` spots now read as the signature
+ *      family. This is the no-cyan gate.
+ *   2. Default-look delta: at the Editorial defaults the signature is
+ *      terracotta `#c26a4e` (3.24:1 vs cream → unclamped, so the three
+ *      primaries still resolve to today's hexes); only the derived shades
+ *      (e.g. --paper-deep, now ramp-derived) and the 8 ex-mint spots change.
  *
- * Implemented as deterministic COMPUTED-STYLE assertions rather than
- * pixel screenshots. The contract is precisely "the unset render resolves
- * to the EXACT production hexes" — computed-color equality proves that
- * directly and is immune to font-rendering drift across CI runners (the
- * baseline-stability stop condition the packet flagged). The three
- * brand-wired primaries are --paper/--ink/--brick; the derived shades
- * (e.g. --paper-deep on the outer wrapper) stay fixed in E.0, which these
- * tests also assert.
- *
- * Driven via the stateless dev preview route (/seller-presentation-preview),
- * which accepts optional brandBg/brandText/brandAccent params routed
- * through the same clampPublicPayload boundary as a real publish.
+ * Deterministic computed-style assertions (font-drift-immune), driven via
+ * the stateless preview route.
  */
 
-// Production Editorial palette (the var() fallbacks in presentation-page.css).
+const CYAN = 'rgb(78, 242, 217)'; // #4ef2d9 — must appear NOWHERE
 const PROD = {
-  paper: 'rgb(241, 235, 224)', // --paper  #f1ebe0
-  ink: 'rgb(26, 22, 18)', //     --ink    #1a1612
-  brick: 'rgb(194, 106, 78)', // --brick  #c26a4e
-  paperDeep: 'rgb(232, 224, 210)', // --paper-deep #e8e0d2 (derived, fixed)
+  paper: 'rgb(241, 235, 224)', // --surface #f1ebe0
+  ink: 'rgb(26, 22, 18)', //     --ink     #1a1612
+  signature: 'rgb(194, 106, 78)', // --signature #c26a4e (unclamped at defaults)
 };
-
-// A deliberately non-default brand: navy bg + cream text + gold accent.
 const BRAND = {
   bg: '#0f1c2e',
   text: '#f4e8d0',
@@ -40,49 +32,61 @@ const BRAND = {
   accentRgb: 'rgb(201, 163, 65)',
 };
 
-async function colorsOf(page: Page) {
+async function primaries(page: Page) {
   const page_ = page.locator('.sep-presentation .page').first();
-  const outer = page.getByTestId('seller-presentation-public');
   const dollar = page.locator('.sep-presentation .price .dollar').first();
   await expect(page_).toBeVisible();
   await expect(dollar).toBeVisible();
   const read = (loc: ReturnType<Page['locator']>, prop: string) =>
-    loc.evaluate(
-      (el, p) => getComputedStyle(el).getPropertyValue(p),
-      prop,
-    );
+    loc.evaluate((el, p) => getComputedStyle(el).getPropertyValue(p), prop);
   return {
     pageBg: await read(page_, 'background-color'),
     pageText: await read(page_, 'color'),
     accent: await read(dollar, 'color'),
-    outerBg: await read(outer, 'background-color'),
   };
 }
 
-test.describe('Seller Presentation — brand colors (E.0)', () => {
-  test('UNSET brand colors render the exact production Editorial palette (cohort-safety gate)', async ({
+// Scan every element's computed color + backgroundColor for the cyan.
+async function cyanCount(page: Page): Promise<number> {
+  return page.evaluate((cyan) => {
+    let n = 0;
+    document.querySelectorAll('.sep-presentation, .sep-presentation *').forEach((el) => {
+      const cs = getComputedStyle(el as Element);
+      if (cs.color === cyan) n++;
+      if (cs.backgroundColor === cyan) n++;
+      if (cs.borderTopColor === cyan) n++;
+    });
+    return n;
+  }, CYAN);
+}
+
+test.describe('Seller Presentation — brand colors (E.1)', () => {
+  test('UNSET: primaries resolve to today\'s Editorial hexes; ramp inlined; ZERO cyan', async ({
     page,
   }) => {
     await page.goto('/seller-presentation-preview?fixture=full');
-    const c = await colorsOf(page);
-
-    // The three brand-wired primaries resolve to today's production hexes
-    // via the CSS var() fallbacks — byte-identical to before E.0.
+    const c = await primaries(page);
     expect(c.pageBg).toBe(PROD.paper);
     expect(c.pageText).toBe(PROD.ink);
-    expect(c.accent).toBe(PROD.brick);
+    expect(c.accent).toBe(PROD.signature);
 
-    // A derived shade (outer wrapper = --paper-deep) is untouched.
-    expect(c.outerBg).toBe(PROD.paperDeep);
+    // The engine inlines the resolved ramp on <main> (the live path).
+    const styleAttr =
+      (await page.getByTestId('seller-presentation-public').getAttribute('style')) ?? '';
+    expect(styleAttr).toContain('--signature');
+    expect(styleAttr).not.toContain('--brand-'); // E.0 indirection retired
 
-    // The page also emits NO inline brand custom properties when unset.
-    const styleAttr = await page
-      .getByTestId('seller-presentation-public')
-      .getAttribute('style');
-    expect(styleAttr ?? '').not.toContain('--brand-');
+    // The no-cyan gate: the 8 ex-mint spots now read signature-family.
+    expect(await cyanCount(page)).toBe(0);
+    // The hero eyebrow (ex-cyan) is now the signature family, not cyan.
+    const eyebrow = await page
+      .locator('.sep-presentation .caption-card .for')
+      .first()
+      .evaluate((el) => getComputedStyle(el).color);
+    expect(eyebrow).not.toBe(CYAN);
   });
 
-  test('SET brand colors flow into the three primaries; layout + derived shades unchanged', async ({
+  test('SET (navy/cream/gold): primaries flow; layout intact; ZERO cyan', async ({
     page,
   }) => {
     await page.goto(
@@ -92,33 +96,49 @@ test.describe('Seller Presentation — brand colors (E.0)', () => {
         BRAND.text,
       )}&brandAccent=${encodeURIComponent(BRAND.accent)}`,
     );
-    const c = await colorsOf(page);
-
-    // The three brand colors now drive the page.
+    const c = await primaries(page);
     expect(c.pageBg).toBe(BRAND.bgRgb);
     expect(c.pageText).toBe(BRAND.textRgb);
     expect(c.accent).toBe(BRAND.accentRgb);
 
-    // Derived shade still fixed (E.0 only brand-wires the 3 primaries) —
-    // proves the swap is scoped, not a palette-wide change.
-    expect(c.outerBg).toBe(PROD.paperDeep);
+    expect(await cyanCount(page)).toBe(0);
 
-    // Layout/structure identical: the same locked-design sections render.
     await expect(page.getByTestId('sep-hero')).toBeVisible();
     await expect(page.getByTestId('sep-price-panel')).toContainText('675');
     await expect(page.getByTestId('sep-why-price')).toBeVisible();
     await expect(page.getByTestId('sep-pitch')).toBeVisible();
   });
 
-  test('invalid brand hex params fall back to the production palette (defense at boundary)', async ({
+  test('secondary set → decorative role differs from signature; still ZERO cyan', async ({
+    page,
+  }) => {
+    // navy signature + gold secondary: the end-mark dot (decorative) takes
+    // gold, distinct from the navy signature dollar.
+    await page.goto(
+      '/seller-presentation-preview?fixture=full&brandAccent=%231F3A6B&brandSecondary=%23B0863A',
+    );
+    const dollar = await page
+      .locator('.sep-presentation .price .dollar')
+      .first()
+      .evaluate((el) => getComputedStyle(el).color);
+    const endDot = await page
+      .locator('.sep-presentation .end-mark .dot')
+      .first()
+      .evaluate((el) => getComputedStyle(el).backgroundColor);
+    expect(dollar).not.toBe(endDot); // signature (navy) ≠ decorative (gold)
+    expect(await cyanCount(page)).toBe(0);
+  });
+
+  test('invalid brand hex params fall back to the production palette', async ({
     page,
   }) => {
     await page.goto(
       '/seller-presentation-preview?fixture=full&brandBg=navy&brandText=%23ggg&brandAccent=',
     );
-    const c = await colorsOf(page);
+    const c = await primaries(page);
     expect(c.pageBg).toBe(PROD.paper);
     expect(c.pageText).toBe(PROD.ink);
-    expect(c.accent).toBe(PROD.brick);
+    expect(c.accent).toBe(PROD.signature);
+    expect(await cyanCount(page)).toBe(0);
   });
 });

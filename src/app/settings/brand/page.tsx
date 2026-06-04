@@ -52,10 +52,13 @@ export default function BrandSettingsPage() {
 
   // Pre-populate the picker UI from the production defaults when a brand
   // color is unset (display only — not persisted until the agent acts).
+  // `secondary` has NO default: unset ("") is a first-class state, shown as
+  // the hatched empty swatch.
   const values: BrandKitFormValues = {
     background: settings.brandBackground ?? EDITORIAL_BRAND_DEFAULTS.background,
     text: settings.brandText ?? EDITORIAL_BRAND_DEFAULTS.text,
     accent: settings.brandAccent ?? EDITORIAL_BRAND_DEFAULTS.accent,
+    secondary: settings.brandSecondary ?? "",
     defaultThemeId: settings.defaultThemeId ?? DEFAULT_BRAND_THEME_ID,
   };
 
@@ -65,6 +68,9 @@ export default function BrandSettingsPage() {
       brandBackground: next.background,
       brandText: next.text,
       brandAccent: next.accent,
+      // Persist secondary as ABSENT when unset (never the empty string) —
+      // the E.0 optional-field contract. JSON.stringify drops `undefined`.
+      brandSecondary: next.secondary ? next.secondary : undefined,
       defaultThemeId: next.defaultThemeId,
     };
     setSettings(updated);
@@ -81,8 +87,8 @@ export default function BrandSettingsPage() {
         <div className="page-head" style={{ marginTop: 0 }}>
           <h1 className="page-title">Brand kit</h1>
           <p className="page-sub">
-            Your brand colors flow into every seller page you publish. Set them
-            once.
+            Pick one color. We build your palette from it — and it flows into
+            every seller page you publish.
           </p>
         </div>
         <BrandKitForm

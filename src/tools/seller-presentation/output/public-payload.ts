@@ -99,6 +99,8 @@ export interface BrandColorsInput {
   brandBackground?: string;
   brandText?: string;
   brandAccent?: string;
+  /** E.1 — optional secondary (decorative role); additive, field-by-field projected. */
+  brandSecondary?: string;
 }
 
 /**
@@ -113,6 +115,8 @@ export interface PublicBrandColors {
   background?: string;
   text?: string;
   accent?: string;
+  /** E.1 — optional secondary. The consumer page runs it through the ramp engine (decorative role). */
+  secondary?: string;
 }
 
 /**
@@ -220,6 +224,7 @@ function projectBrandColors(
   if (isValidHex(input.brandBackground)) out.background = input.brandBackground;
   if (isValidHex(input.brandText)) out.text = input.brandText;
   if (isValidHex(input.brandAccent)) out.accent = input.brandAccent;
+  if (isValidHex(input.brandSecondary)) out.secondary = input.brandSecondary;
   return Object.keys(out).length > 0 ? out : undefined;
 }
 
@@ -531,6 +536,8 @@ function clampBrandColors(raw: unknown): PublicBrandColors | undefined {
     out.background = r.background;
   if (typeof r.text === "string" && isValidHex(r.text)) out.text = r.text;
   if (typeof r.accent === "string" && isValidHex(r.accent)) out.accent = r.accent;
+  if (typeof r.secondary === "string" && isValidHex(r.secondary))
+    out.secondary = r.secondary;
   return Object.keys(out).length > 0 ? out : undefined;
 }
 

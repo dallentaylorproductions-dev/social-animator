@@ -42,11 +42,13 @@ interface PageProps {
     brandBg?: string;
     brandText?: string;
     brandAccent?: string;
+    brandSecondary?: string;
   }>;
 }
 
 export default async function SellerPresentationPreview({ searchParams }: PageProps) {
-  const { fixture, brandBg, brandText, brandAccent } = await searchParams;
+  const { fixture, brandBg, brandText, brandAccent, brandSecondary } =
+    await searchParams;
   // A7d.8 — added three poster-precedence variants. The renderer's
   // VideoBlock emits `data-poster-source` so the e2e suite can assert
   // which branch of the override > scrub > auto cascade fired without
@@ -99,6 +101,7 @@ export default async function SellerPresentationPreview({ searchParams }: PagePr
   if (isHex(brandBg)) brandColors.background = brandBg;
   if (isHex(brandText)) brandColors.text = brandText;
   if (isHex(brandAccent)) brandColors.accent = brandAccent;
+  if (isHex(brandSecondary)) brandColors.secondary = brandSecondary; // E.1
   const data = (
     Object.keys(brandColors).length > 0 ? { ...payload, brandColors } : payload
   ) as unknown as Record<string, unknown>;
