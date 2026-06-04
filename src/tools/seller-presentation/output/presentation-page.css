@@ -23,33 +23,48 @@
 ============================================ */
 
 .sep-presentation {
-  /* ---- Color tokens ---- */
-  /* E.0 — the three PRIMARY tokens are brand-wired: each consumes the
-     agent's brand color (set as a CSS custom property on the page root by
-     presentation-page.tsx) and falls back to the EXACT current production
-     hex when unset. Cohort safety: an agent who never sets brand colors
-     publishes pages byte-identical to today (the fallback IS the prior
-     hardcoded value). The derived shades below (paper-deep/raise/card/
-     line*, ink-2/muted/faint) stay FIXED in E.0 — re-deriving them from
-     the primaries can't reproduce the hand-tuned production hexes without
-     breaking byte-identity, so it's deferred to a later packet. */
-  --paper: var(--brand-bg, #f1ebe0);
-  --paper-deep: #e8e0d2;
-  --paper-raise: #fbf7ee;
-  --paper-card: #fcf9f2;
-  --paper-line: #e0d6c5;
-  --paper-line-soft: #eae1d0;
-  --ink: var(--brand-text, #1a1612);
-  --ink-2: #2a241f;
-  --ink-muted: #6e665b;
-  --ink-faint: #a29888;
-  --mint: #4ef2d9;
-  --mint-deep: #1f8f7c;
-  --gold: #c9a86a;
-  --gold-warm: #b8965a;
-  --brick: var(--brand-accent, #c26a4e);
-  --brick-deep: #a85439;
-  --rose: #d29a9a;
+  /* ---- E.1 brand ramp (color unification) ----
+     One signature → a 7-role tonal ramp. presentation-page.tsx runs the
+     OKLCh engine at render and INLINES the AA-clamped resolved hexes for
+     --surface/--ink + the signature family onto <main> (the live path —
+     contrast clamps can't live in CSS). The color-mix(in oklch, …) values
+     here are the pre-JS FALLBACK only. Layout-owned dark surfaces / on-dark
+     creams / photo placeholders / #000 frames stay fixed below; semantic
+     status colors (--pos*, --chart-*) are kept. The hardcoded cyan mint is
+     gone — every ex-mint accent now reads as the signature family. */
+  --surface: #f1ebe0;
+  --ink: #1a1612;
+  --signature: #c26a4e;
+  --signature-deep: color-mix(in oklch, var(--signature), #000 22%);
+  --signature-link: color-mix(in oklch, var(--signature), #000 14%);
+  --tint-12: color-mix(in oklch, var(--signature) 12%, var(--surface));
+  --tint-6: color-mix(in oklch, var(--signature) 6%, var(--surface));
+  --line-30: color-mix(in oklch, var(--signature) 30%, var(--surface));
+  --on-signature: #f1ebe0;
+  --decorative: var(--signature);
+  /* signature lightened for legibility on the solid dark band (per the
+     design's solid-dark-band treatment; display tint, not contrast-clamped). */
+  --signature-on-dark: color-mix(in oklch, var(--signature) 72%, #fff);
+  --decorative-on-dark: color-mix(in oklch, var(--decorative) 72%, #fff);
+
+  /* production aliases — existing selectors read these names; now they
+     resolve through the ramp + re-derived shades that TRACK the brand. */
+  --paper: var(--surface);
+  --brick: var(--signature);
+  --brick-deep: var(--signature-deep);
+  --paper-deep: color-mix(in oklch, var(--ink) 8%, var(--surface));
+  --paper-raise: var(--tint-6);
+  --paper-card: var(--tint-12);
+  --paper-line: var(--line-30);
+  --paper-line-soft: color-mix(in oklch, var(--signature) 16%, var(--surface));
+  --ink-2: color-mix(in oklch, var(--ink) 90%, var(--surface));
+  --ink-muted: color-mix(in oklch, var(--ink) 56%, var(--surface));
+  --ink-faint: color-mix(in oklch, var(--ink) 38%, var(--surface));
+  /* decorative (was gold/rose) → the decorative role (secondary when set) */
+  --gold: var(--decorative);
+  --gold-warm: var(--decorative);
+  --rose: var(--decorative);
+  /* semantic status colors — KEEP (legitimately fixed) */
   --pos: #1d9e75;
   --pos-bright: #6ee7a8;
   --chart-blue: #3f6c8e;
@@ -245,7 +260,7 @@
   font-size: 9.5px;
   letter-spacing: 0.22em;
   text-transform: uppercase;
-  color: var(--mint);
+  color: var(--signature-on-dark); /* E.1: ex-mint eyebrow on solid dark card → signature family */
   display: flex;
   align-items: center;
   gap: 10px;
@@ -255,7 +270,7 @@
   content: "";
   width: 6px;
   height: 6px;
-  background: var(--mint);
+  background: var(--signature-on-dark); /* E.1: ex-mint dot on dark card */
   border-radius: 50%;
 }
 .sep-presentation .caption-card .kicker {
@@ -437,7 +452,7 @@
   top: 50%;
   width: 5px;
   height: 5px;
-  background: var(--mint);
+  background: var(--signature); /* E.1: ex-mint section dot on cream → signature */
   border-radius: 50%;
   transform: translateY(-50%);
 }
@@ -1162,7 +1177,7 @@
   color: var(--gold);
 }
 .sep-presentation .agent .sec-label .num::before {
-  background: var(--mint);
+  background: var(--signature-on-dark); /* E.1: ex-mint dot on dark agent band */
 }
 .sep-presentation .agent .sec-label .lbl {
   background: rgba(244, 239, 228, 0.16);
@@ -1213,8 +1228,8 @@
   width: 22px;
   height: 22px;
   border-radius: 50%;
-  background: var(--mint);
-  color: #0a2a24;
+  background: var(--signature); /* E.1: ex-mint verified badge fill → signature */
+  color: var(--on-signature);
   display: grid;
   place-items: center;
   border: 2px solid var(--ink);
@@ -1371,7 +1386,7 @@
   display: inline-block;
   width: 5px;
   height: 5px;
-  background: var(--mint);
+  background: var(--decorative); /* E.1: ex-mint end-mark dot → decorative (secondary when set) */
   border-radius: 50%;
   margin: 0 6px;
   vertical-align: middle;
@@ -1410,8 +1425,8 @@
   width: 16px;
   height: 16px;
   border-radius: 4px;
-  background: var(--mint);
-  color: #0a2a24;
+  background: var(--decorative); /* E.1: ex-mint footer glyph fill → decorative */
+  color: var(--on-signature);
   display: grid;
   place-items: center;
   font-family: var(--sep-display);
@@ -1429,7 +1444,7 @@
 }
 .sep-presentation .foot .brand .wm em {
   font-style: italic;
-  color: var(--mint);
+  color: var(--signature-on-dark); /* E.1: ex-mint wordmark emphasis on dark → signature */
 }
 .sep-presentation .foot .small {
   margin-top: 18px;
