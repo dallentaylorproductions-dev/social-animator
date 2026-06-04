@@ -1,232 +1,218 @@
 "use client";
 
-import { useLayoutEffect, useRef, useState } from "react";
+import type { BrandVars } from "@/lib/brand/color-engine";
 
 /**
- * MiniPage — brand-driven miniature seller page (Phase E.0).
+ * MiniPage — brand-driven miniature seller page (Phase E.1, Brand kit v2).
  *
- * Recreated from docs/design/brand-kit-system/mini_page.jsx (Claude
- * Design source-of-truth). Visuals live in ./brand-kit.css under the
- * `.bk-scope` namespace; this component renders the structure + threads
- * the agent's three brand colors through CSS custom properties.
+ * Recreated from docs/design/brand-unification/minipage.jsx (the role-
+ * coverage reference). It is a faithful, miniaturised render of the
+ * published /h/<slug> Editorial page: every brand role in the derived
+ * ramp appears here exactly where it appears in production. Visuals live
+ * in ./brand-kit.css under the `.bk-scope` namespace (the `.mp-*` block).
  *
- * INVERSION CONTRACT:
- *   - COLORS come from props (bg / text / accent), set as
- *     --m-bg / --m-text / --m-accent. Every other visible color is
- *     DERIVED from those three via color-mix in brand-kit.css (muted,
- *     faint, rules, the dark agent-footer card). No theme-baked colors.
- *   - LAYOUT / TYPOGRAPHY come from `themeId`. Only "editorial" exists
- *     today (serif headlines, magazine rhythm, serif numerals, dark
- *     footer). "studio" / "warm" fall back to editorial until those
- *     layouts are built (flagged Coming soon).
- *   - `scale` (default 1) scales the whole page; a ResizeObserver keeps
- *     the outer box sized to the scaled height so layout reserves real
- *     space.
+ * COLOR CONTRACT (E.1):
+ *   - Colors arrive as the resolved derived ramp — `vars` is
+ *     `BrandEngine.derive(...).vars` (a `--signature` / `--tint-12` / …
+ *     map). They are spread as inline CSS custom properties on the `.mp`
+ *     root, so the whole page re-tones the instant the agent dials a
+ *     color. No srgb color-mix on the live path; the engine resolved the
+ *     AA-clamped hexes upstream.
+ *   - Layout-owned surfaces (the cream canvas `--surface`, the dark agent
+ *     band `--ink`, photo placeholders) are fixed and do NOT move with the
+ *     brand color — they read from `--surface`/`--ink`, also in `vars`.
+ *
+ * Role map (matches the production seller page + palette strip):
+ *   --signature       eyebrows, dots, badge, glyph, price rule, stat values
+ *   --signature-deep  the big price numeral on the tint-12 panel
+ *   --signature-link  the "See the full plan" body link
+ *   --tint-12         price panel fill        --tint-6   stat-card fills
+ *   --line-30         list dividers + stat grid lines
+ *   --on-signature    label/glyph on signature fills (play button, CTA)
+ *   --decorative      plan numerals + end-mark (secondary when set)
  *
  * Canned content matches the design: Halloran family / 4427 Dudley Dr.
  * The hero photo, video, and avatar are CSS placeholders.
+ *
+ * studio/warm fall back to the Editorial layout (only one built today),
+ * so `themeId` does not branch the structure — it is accepted for API
+ * parity with the seller-page renderer and the form's default-layout
+ * select.
  */
 
-const BASE_W = 360; // natural design width of the mini page
-
-interface LayoutTokens {
-  serif: boolean;
-  /** Font stack for headline/price/numeral surfaces. */
-  head: string;
-  /** font-weight used for the recommended-price + area-stat numbers. */
-  priceWeight: number;
+export interface MiniPageProps {
+  /** Resolved derived ramp from `BrandEngine.derive(...).vars`. */
+  vars: BrandVars;
+  /** E.1: only "editorial" is rendered; "studio"/"warm" fall back. */
+  themeId?: string;
 }
 
-// themeId -> layout/type tokens. Editorial is the only built layout.
-// (Spectral in the design; this project's editorial serif is Instrument
-// Serif, surfaced via the --serif token in brand-kit.css — the same
-// serif the real /h/<slug> page renders, so the preview is truthful.)
-const LAYOUTS: Record<string, LayoutTokens> = {
-  editorial: {
-    serif: true,
-    head: "var(--serif)",
-    priceWeight: 500,
-  },
-};
-
-function layoutFor(themeId: string | undefined): LayoutTokens {
-  return (themeId && LAYOUTS[themeId]) || LAYOUTS.editorial; // studio/warm -> editorial
-}
-
-function IconPlay({ s = 11 }: { s?: number }) {
+function Eyebrow({
+  children,
+  tone,
+}: {
+  children: React.ReactNode;
+  tone?: "signature";
+}) {
   return (
-    <svg viewBox="0 0 24 24" width={s} height={s} fill="currentColor">
-      <path d="M8 5v14l11-7z" />
-    </svg>
+    <div className={"mp-eyebrow" + (tone === "signature" ? " is-sig" : "")}>
+      {children}
+    </div>
   );
 }
 
-export interface MiniPageProps {
-  bg: string;
-  text: string;
-  accent: string;
-  /** E.0: only "editorial" is rendered; "studio"/"warm" fall back. */
-  themeId?: string;
-  /** Default 1; Settings uses 0.74. */
-  scale?: number;
+function PhotoSlot({ label, tall }: { label: string; tall?: boolean }) {
+  return (
+    <div className={"mp-photo" + (tall ? " is-tall" : "")} aria-hidden="true">
+      <span className="mp-photo__tag">{label}</span>
+    </div>
+  );
 }
 
-export function MiniPage({
-  bg,
-  text,
-  accent,
-  themeId = "editorial",
-  scale = 1,
-}: MiniPageProps) {
-  const innerRef = useRef<HTMLDivElement>(null);
-  const [h, setH] = useState(0);
-
-  useLayoutEffect(() => {
-    const el = innerRef.current;
-    if (!el) return;
-    const measure = () => setH(el.offsetHeight);
-    measure();
-    let ro: ResizeObserver | undefined;
-    if (typeof ResizeObserver !== "undefined") {
-      ro = new ResizeObserver(measure);
-      ro.observe(el);
-    }
-    return () => {
-      if (ro) ro.disconnect();
-    };
-  });
-
-  const lay = layoutFor(themeId);
-  const vars = {
-    "--m-bg": bg,
-    "--m-text": text,
-    "--m-accent": accent,
-    "--m-head": lay.head,
-    "--m-price-weight": lay.priceWeight,
-  } as React.CSSProperties;
-
+export function MiniPage({ vars }: MiniPageProps) {
   return (
     <div
-      className="mini-scaler"
-      style={{ width: BASE_W * scale, height: h * scale }}
+      className="mp"
       data-testid="brand-minipage-preview"
+      style={vars as React.CSSProperties}
     >
-      <div
-        ref={innerRef}
-        className={"mini" + (lay.serif ? " is-serif" : "")}
-        style={{
-          ...vars,
-          width: BASE_W,
-          transform: `scale(${scale})`,
-          transformOrigin: "top left",
-        }}
-      >
-        {/* hero */}
-        <div className="m-hero">
-          <div className="m-hero-photo" />
-          <div className="m-hero-band">
-            <span className="m-eyebrow on-dark">For the Halloran family</span>
-            <span className="m-addr">4427 Dudley Dr NE</span>
-            <span className="m-city">Tacoma, WA 98406</span>
+      {/* HERO — layout-owned photo + dark scrim, on-dark eyebrow (the
+          on-photo rule: signature text never sits on photo content) */}
+      <div className="mp-hero">
+        <PhotoSlot label="hero photo" tall />
+        <div className="mp-hero__scrim">
+          <Eyebrow>For the Halloran family</Eyebrow>
+          <h1 className="mp-display mp-hero__addr">4427 Dudley Dr NE</h1>
+          <div className="mp-meta">
+            Tacoma, WA 98406 <span className="mp-dot">•</span> 4 bd{" "}
+            <span className="mp-dot">•</span> 3 ba
           </div>
         </div>
+      </div>
 
-        {/* recommended price */}
-        <div className="m-sec">
-          <span className="m-eyebrow on-accent">Recommended list</span>
-          <div className="m-price">
-            <span className="m-dollar">$</span>687,298
+      <div className="mp-body">
+        {/* PRICE — tint-12 panel, signature-deep numerals, signature rule */}
+        <section className="mp-sec">
+          <Eyebrow tone="signature">Recommended list</Eyebrow>
+          <div className="mp-price-panel">
+            <div className="mp-price">
+              <span className="mp-price__cur">$</span>687,298
+            </div>
+            <div className="mp-rule" />
+            <p className="mp-note">
+              <em>4 recent sales nearby anchor this number.</em>
+            </p>
           </div>
-          <div className="m-rule" />
-          <span className="m-note">4 recent sales nearby anchor this number.</span>
-        </div>
+        </section>
 
-        {/* agent video note */}
-        <div className="m-sec">
-          <span className="m-eyebrow">A short note from your agent</span>
-          <h4 className="m-head">
-            Two <i>minutes</i>, on your home.
-          </h4>
-          <div className="m-video">
-            <span className="m-play">
-              <IconPlay s={11} />
+        {/* NOTE + video — on-signature play button */}
+        <section className="mp-sec">
+          <Eyebrow>A short note from your agent</Eyebrow>
+          <h2 className="mp-display mp-h2">
+            Two <em>minutes</em>, on your home.
+          </h2>
+          <div className="mp-video">
+            <PhotoSlot label="walkthrough" />
+            <span className="mp-play" aria-hidden="true">
+              ▶
             </span>
           </div>
-        </div>
+        </section>
 
-        {/* pitch list */}
-        <div className="m-sec">
-          <span className="m-eyebrow">What I&apos;ll do for you</span>
-          <h4 className="m-head">
-            A quiet, <i>thorough</i> way to sell.
-          </h4>
-          <ol className="m-list">
+        {/* PLAN — decorative numerals (secondary when set, else signature),
+            line-30 dividers, signature-link "See the full plan" */}
+        <section className="mp-sec">
+          <Eyebrow>What I&apos;ll do for you</Eyebrow>
+          <h2 className="mp-display mp-h2">
+            A quiet, <em>thorough</em> way to sell.
+          </h2>
+          <ol className="mp-list">
             <li>
-              <span className="m-num">1</span>
-              <span className="m-li">
+              <span className="mp-num">1</span>
+              <div>
                 <b>Chef&apos;s kitchen</b>
                 <span>Marble counters, brass pot filler</span>
-              </span>
+              </div>
             </li>
             <li>
-              <span className="m-num">2</span>
-              <span className="m-li">
+              <span className="mp-num">2</span>
+              <div>
                 <b>Lake views</b>
                 <span>Five-minute walk to Clear Lake</span>
-              </span>
+              </div>
             </li>
             <li>
-              <span className="m-num">3</span>
-              <span className="m-li">
+              <span className="mp-num">3</span>
+              <div>
                 <b>Brand-new roof</b>
                 <span>Installed last year</span>
-              </span>
+              </div>
             </li>
           </ol>
-          <a className="m-link" href="#">
+          <a className="mp-link" href="#">
             See the full plan
           </a>
+        </section>
+
+        {/* END-MARK — centered decorative glyph */}
+        <div className="mp-endmark" aria-hidden="true">
+          ◆
         </div>
 
-        {/* area stats */}
-        <div className="m-sec">
-          <span className="m-eyebrow">Recent area sales</span>
-          <h4 className="m-head">
-            A neighborhood that <i>moves</i>.
-          </h4>
-          <div className="m-stats">
-            <div className="m-stat">
-              <b>$675,202</b>
-              <span>Median sold</span>
+        {/* STATS — tint-6 cards on a line-30 grid, signature values */}
+        <section className="mp-sec">
+          <Eyebrow>Recent area sales</Eyebrow>
+          <h2 className="mp-display mp-h2">
+            A neighborhood that <em>moves</em>.
+          </h2>
+          <div className="mp-stats">
+            <div className="mp-stat">
+              <div className="mp-stat__v">$675,202</div>
+              <div className="mp-stat__l">Median sold</div>
             </div>
-            <div className="m-stat">
-              <b>14</b>
-              <span>Days on market</span>
+            <div className="mp-stat">
+              <div className="mp-stat__v">14</div>
+              <div className="mp-stat__l">Days on market</div>
             </div>
-            <div className="m-stat">
-              <b>37</b>
-              <span>Sold this year</span>
+            <div className="mp-stat">
+              <div className="mp-stat__v">37</div>
+              <div className="mp-stat__l">Sold this year</div>
             </div>
-            <div className="m-stat">
-              <b>101%</b>
-              <span>Sale to list</span>
+            <div className="mp-stat">
+              <div className="mp-stat__v">101%</div>
+              <div className="mp-stat__l">Sale to list</div>
             </div>
           </div>
-        </div>
+        </section>
+      </div>
 
-        {/* agent footer */}
-        <div className="m-foot">
-          <span className="m-eyebrow on-dark">Your agent</span>
-          <h4 className="m-foot-name">Aaron Thomas.</h4>
-          <div className="m-foot-row">
-            <div className="m-avatar" />
-            <span className="m-li">
-              <b>Aaron Thomas</b>
-              <span>Thomas Realty</span>
+      {/* AGENT — layout-owned deep band, on-signature CTA, signature badge */}
+      <div className="mp-agent">
+        <Eyebrow tone="signature">Your agent</Eyebrow>
+        <h2 className="mp-display mp-agent__name">Aaron Thomas.</h2>
+        <div className="mp-agent__card">
+          <span className="mp-avatar" aria-hidden="true" />
+          <div>
+            <b>Aaron Thomas</b>
+            <span>
+              Thomas Realty{" "}
+              <span className="mp-badge" aria-hidden="true">
+                ✓
+              </span>
             </span>
           </div>
-          <div className="m-cta">Schedule a listing call</div>
-          <div className="m-cta ghost">Call Aaron directly</div>
+        </div>
+        <button type="button" className="mp-cta">
+          Schedule a listing call
+        </button>
+        <button type="button" className="mp-cta is-ghost">
+          Call Aaron directly
+        </button>
+        <div className="mp-foot">
+          <span className="mp-glyph" aria-hidden="true">
+            ◆
+          </span>{" "}
+          Thomas Realty
         </div>
       </div>
     </div>

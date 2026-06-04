@@ -86,3 +86,48 @@ readability chips incl. Links LOW + Bump contrast; save-never-blocked; no-write-
 `skill.ts`, `BrandProfileForm.tsx` — all currently CLEAN). Commit:
 `feat(sp): Phase E.1 — brand color unification …`. PR; Dallen smokes (a) unset publish →
 no cyan; (b) cobalt one family; (c) navy+gold; (d) Brand kit UX; (e) published page frozen.
+
+---
+
+## ✅ DONE — Item 3 + Item 6 (form) complete
+
+**Item 3 — Brand kit v2 form, rebuilt in the app's primitives:**
+- `BrandKitForm.tsx` rebuilt to the v2 layout: signature (hero) row, optional
+  secondary row (hatched empty state, Add/Clear), the read-only **palette strip**
+  (7 chips from `derived.hexes`), a collapsed **Page surface** disclosure
+  (background + text), the default-layout select, the round-2 **Readability**
+  panel, footer notes, and the sticky phone preview. `BrandEngine.derive()` runs
+  in a `useMemo` keyed on signature/secondary/background/text; the resolved ramp
+  is applied to the MiniPage root as inline CSS vars.
+- `MiniPage.tsx` rewritten to consume the **derived ramp** (`--signature` family,
+  `--tint-12/6`, `--line-30`, `--on-signature`, `--decorative`, `--surface/--ink`)
+  with full role coverage per `minipage.jsx` — tint-12 price panel + signature-deep
+  numeral, decorative plan numerals + end-mark, on-signature play/CTA, line-30
+  dividers, signature stats. No srgb color-mix on the live path.
+- `brand-kit.css` form + MiniPage + responsive blocks replaced with a port of
+  `brand_kit.css`, scoped under `.bk-scope`, self-hosted fonts (Hanken /
+  Instrument Serif / JetBrains Mono); added v2 chrome tokens.
+- `settings/brand/page.tsx` wires `secondary` (value = `brandSecondary ?? ""`),
+  persists `brandSecondary` as **ABSENT when unset** (never `""`), updated the
+  signature-centric subhead.
+- **Test IDs:** kept `brand-color-accent` (= signature row — NOT renamed),
+  `brand-color-background/-text`, `brand-readability-verdict`,
+  `brand-autosave-indicator`, `brand-default-theme`, `brand-minipage-preview`.
+  Added `brand-color-secondary`, `brand-palette-strip`, `brand-palette-chip-<token>`,
+  `brand-surface-disclosure`, `brand-readability-fixes`, `brand-readability-ratio`,
+  `brand-readability-fix`.
+
+**Item 6 — form specs** (`e2e/settings-brand-kit-v2.spec.ts`, 7 specs, green):
+1. renders v2 structure (signature + secondary rows, 7 read-only palette chips
+   with NO inputs, MiniPage preview);
+2. **NO write on mount** — empty storage stays empty (E.0 critical gate);
+3. **Page-surface disclosure** collapsed by default, reveals background/text on toggle;
+4. **secondary** Add→type sets it (Section-numerals chip appears, persists as hex),
+   Clear unsets to **ABSENT** (key dropped, not `""`);
+5. invalid hex does not commit (error border, last good value stays);
+6. **readability** — low-contrast signature flips verdict to "Worth a look", Bump
+   contrast deepens the field + recovers the verdict, change persists (save never gated);
+7. defaults (terracotta) — verdict good, but the **Links chip warns independently**.
+
+**Gates:** `npm run build` exit 0 · truthful-copy PASS · full chromium suite 305
+passed · mobile-webkit 2 passed · invariants untouched.
