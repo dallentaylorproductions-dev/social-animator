@@ -1,0 +1,146 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+<meta charset="UTF-8" />
+<meta name="viewport" content="width=device-width, initial-scale=1.0" />
+<title>4427 Dudley Dr NE — for the Halloran family</title>
+<link rel="stylesheet" href="assets/seller.css" />
+</head>
+<body data-signature="#2C53C4" data-screen-label="Seller page · cobalt">
+
+<nav class="sp-nav">
+  <div class="sp-wordmark">Thomas <em>Realty</em></div>
+  <div class="sp-nav__meta">Prepared June 2026</div>
+</nav>
+
+<main class="sp">
+  <!-- HERO -->
+  <header class="sp-hero">
+    <div class="sp-photo"><span class="sp-photo__tag">hero photo — 4427 dudley dr ne</span></div>
+    <div class="sp-hero__scrim">
+      <p class="sp-eyebrow is-sig">For the Halloran family</p>
+      <h1 class="sp-display sp-hero__addr">4427 Dudley Dr NE</h1>
+      <div class="sp-hero__meta">Tacoma, WA 98406 <span class="sp-dot">•</span> 4 bd <span class="sp-dot">•</span> 3 ba <span class="sp-dot">•</span> 2,940 sqft</div>
+    </div>
+  </header>
+
+  <!-- PRICE -->
+  <section class="sp-section">
+    <p class="sp-eyebrow is-sig">Recommended list</p>
+    <div class="sp-price-panel">
+      <div class="sp-price"><span class="sp-price__cur">$</span>687,298</div>
+      <div class="sp-price-rule"></div>
+      <p class="sp-price-note"><em>Four recent sales nearby anchor this number — not a guess, a read on your block.</em></p>
+    </div>
+  </section>
+
+  <!-- NOTE + VIDEO -->
+  <section class="sp-section">
+    <p class="sp-eyebrow">A short note from your agent</p>
+    <h2 class="sp-display sp-h2">Two <em>minutes</em>, on your home.</h2>
+    <div class="sp-video">
+      <div class="sp-photo"><span class="sp-photo__tag">walkthrough video</span></div>
+      <span class="sp-play" aria-hidden="true">▶</span>
+    </div>
+  </section>
+
+  <!-- PLAN -->
+  <section class="sp-section">
+    <p class="sp-eyebrow">What I'll do for you</p>
+    <h2 class="sp-display sp-h2">A quiet, <em>thorough</em> way to sell.</h2>
+    <ol class="sp-list">
+      <li><span class="sp-num">1</span><div><h3>Chef's kitchen, framed right</h3><p>Marble counters and the brass pot filler shot in the morning light buyers walk in to.</p></div></li>
+      <li><span class="sp-num">2</span><div><h3>Lake views, told honestly</h3><p>Five-minute walk to Clear Lake — we lead with it, because your buyers will too.</p></div></li>
+      <li><span class="sp-num">3</span><div><h3>Brand-new roof, documented</h3><p>Installed last year. We put the receipts in front of every inspection question.</p></div></li>
+    </ol>
+    <a class="sp-link" href="#">See the full plan</a>
+  </section>
+
+  <div class="sp-endmark" aria-hidden="true">◆</div>
+
+  <!-- STATS -->
+  <section class="sp-section">
+    <p class="sp-eyebrow">Recent area sales</p>
+    <h2 class="sp-display sp-h2">A neighborhood that <em>moves</em>.</h2>
+    <div class="sp-stats">
+      <div class="sp-stat"><div class="sp-stat__v">$675,202</div><div class="sp-stat__l">Median sold</div></div>
+      <div class="sp-stat"><div class="sp-stat__v">14</div><div class="sp-stat__l">Days on market</div></div>
+      <div class="sp-stat"><div class="sp-stat__v">37</div><div class="sp-stat__l">Sold this year</div></div>
+      <div class="sp-stat"><div class="sp-stat__v">101%</div><div class="sp-stat__l">Sale to list</div></div>
+    </div>
+  </section>
+</main>
+
+<!-- AGENT (deep band) -->
+<section class="sp-agent">
+  <div class="sp">
+    <div class="sp-section" style="margin-bottom:0;">
+      <p class="sp-eyebrow is-sig">Your agent</p>
+      <h2 class="sp-display sp-agent__name">Aaron Thomas.</h2>
+      <div class="sp-agent__card">
+        <span class="sp-avatar" aria-hidden="true"></span>
+        <div>
+          <h4>Aaron Thomas</h4>
+          <div class="sp-role">Thomas Realty <span class="sp-badge" aria-hidden="true">✓ verified</span></div>
+        </div>
+      </div>
+      <div class="sp-ctas">
+        <button class="sp-cta">Schedule a listing call</button>
+        <button class="sp-cta is-ghost">Call Aaron directly</button>
+      </div>
+    </div>
+  </div>
+  <div class="sp-foot"><span class="sp-glyph" aria-hidden="true">◆</span> Thomas Realty <span class="sp-dot">•</span> Prepared for the Halloran family</div>
+</section>
+
+<!-- DEMO signature switcher (not production chrome) -->
+<aside class="sp-demo" id="demo">
+  <div class="sp-demo__t"><span>Signature · demo</span><span id="demoHex">#2C53C4</span></div>
+  <div class="sp-demo__sw" id="presets"></div>
+  <div class="sp-demo__row"><input id="demoInput" value="#2C53C4" spellcheck="false" /></div>
+  <label class="sp-demo__toggle"><input type="checkbox" id="secToggle" /> Set a secondary (gold)</label>
+</aside>
+
+<script src="assets/color_engine.js"></script>
+<script>
+(function () {
+  const E = window.BrandEngine;
+  const PRESETS = ['#C26A4E', '#2C53C4', '#2F7A55', '#7A3E6B'];
+  const SECONDARY = '#B0863A';
+  let signature = document.body.dataset.signature || '#2C53C4';
+  let secondary = null;
+
+  function apply() {
+    const d = E.derive(signature, { surface: '#F1EBE0', ink: '#1A1612', secondary: secondary });
+    E.applyVars(document.documentElement, d);
+    document.getElementById('demoHex').textContent = signature.toUpperCase();
+  }
+
+  // presets
+  const wrap = document.getElementById('presets');
+  PRESETS.forEach(function (hex) {
+    const b = document.createElement('button');
+    b.style.background = hex; b.title = hex;
+    b.onclick = function () {
+      signature = hex; document.getElementById('demoInput').value = hex;
+      mark(); apply();
+    };
+    wrap.appendChild(b);
+  });
+  function mark() {
+    [...wrap.children].forEach(function (b, i) { b.classList.toggle('is-on', PRESETS[i].toUpperCase() === signature.toUpperCase()); });
+  }
+
+  document.getElementById('demoInput').addEventListener('change', function (e) {
+    const n = E.normHex(e.target.value);
+    if (n) { signature = n; mark(); apply(); }
+  });
+  document.getElementById('secToggle').addEventListener('change', function (e) {
+    secondary = e.target.checked ? SECONDARY : null; apply();
+  });
+
+  mark(); apply();
+})();
+</script>
+</body>
+</html>

@@ -1,0 +1,273 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+<meta charset="UTF-8" />
+<meta name="viewport" content="width=device-width, initial-scale=1.0" />
+<title>Brand kit v2 — Settings</title>
+<link rel="stylesheet" href="assets/brand_kit.css" />
+</head>
+<body>
+<div id="root"></div>
+
+<script src="https://unpkg.com/react@18.3.1/umd/react.development.js" integrity="sha384-hD6/rw4ppMLGNu3tX5cjIb+uRZ7UkRJ6BPkLpg4hAu/6onKUg4lLsHAs9EBPT82L" crossorigin="anonymous"></script>
+<script src="https://unpkg.com/react-dom@18.3.1/umd/react-dom.development.js" integrity="sha384-u6aeetuaXnQ38mYT8rp6sbXaQe3NL9t+IBXmnYxwkUI2Hw4bsp2Wvmx4yRQF1uAm" crossorigin="anonymous"></script>
+<script src="https://unpkg.com/@babel/standalone@7.29.0/babel.min.js" integrity="sha384-m08KidiNqLdpJqLq95G/LEi8Qvjl/xUYll3QILypMoQ65QorJ9Lvtp2RXYGBFj1y" crossorigin="anonymous"></script>
+
+<script src="assets/color_engine.js"></script>
+<script type="text/babel" src="palette_strip.jsx"></script>
+<script type="text/babel" src="assets/minipage.jsx"></script>
+
+<script type="text/babel">
+const { useState, useEffect, useMemo, useRef } = React;
+const E = window.BrandEngine;
+
+const DEFAULTS = {
+  signature: '#C26A4E',   // existing brandAccent field — rename is label-only
+  secondary: '',          // NEW optional field — empty = unset
+  background: '#F1EBE0',  // layout-owned default (demoted, overridable)
+  text: '#1A1612',        // layout-owned default (demoted, overridable)
+  layout: 'editorial',
+};
+const STORE_KEY = 'brandkit.v2';
+
+function load() {
+  try {
+    const raw = JSON.parse(localStorage.getItem(STORE_KEY) || '{}');
+    // E.0 validation contract: hex-clamped on load, never written on mount.
+    const out = Object.assign({}, DEFAULTS);
+    ['signature','background','text'].forEach(k => { if (E.normHex(raw[k])) out[k] = E.normHex(raw[k]); });
+    if (raw.secondary === '' || E.normHex(raw.secondary)) out.secondary = raw.secondary === '' ? '' : E.normHex(raw.secondary);
+    if (raw.layout) out.layout = raw.layout;
+    return out;
+  } catch (e) { return Object.assign({}, DEFAULTS); }
+}
+
+/* ---- editable hex field with its own draft state ---- */
+function HexField({ value, onCommit, placeholder, testid }) {
+  const [draft, setDraft] = useState(value || '');
+  const [bad, setBad] = useState(false);
+  useEffect(() => { setDraft(value || ''); }, [value]);
+  function commit(v) {
+    const s = (v || '').trim();
+    if (s === '' && placeholder) { setBad(false); onCommit(''); return; }
+    const n = E.normHex(s);
+    if (n) { setBad(false); onCommit(n); } else { setBad(true); }
+  }
+  return (
+    <input
+      className={'hexin' + (bad ? ' is-invalid' : '')}
+      data-testid={testid}
+      value={draft}
+      placeholder={placeholder || ''}
+      spellCheck="false"
+      onChange={e => setDraft(e.target.value)}
+      onBlur={e => commit(e.target.value)}
+      onKeyDown={e => { if (e.key === 'Enter') e.target.blur(); }}
+    />
+  );
+}
+
+/* ---- a color row (swatch + hex + reset/clear) ---- */
+function ColorRow({ kind, label, optLabel, color, empty, help, onCommit, onReset, resetLabel, testid }) {
+  return (
+    <div className={'crow' + (kind === 'secondary' ? ' is-secondary' : '')}>
+      <div className={'swatch' + (empty ? ' is-empty' : '')} style={empty ? null : { background: color }}></div>
+      <div>
+        <div className="crow__head">
+          <span className="crow__label">{label}</span>
+          {optLabel ? <span className="crow__opt">{optLabel}</span> : null}
+        </div>
+        <div className="crow__field">
+          <HexField value={empty ? '' : color} placeholder={kind === 'secondary' ? 'Optional' : ''} onCommit={onCommit} testid={testid} />
+          <button className="minibtn" onClick={onReset}>{resetLabel}</button>
+        </div>
+        {help ? <p className="crow__help">{help}</p> : null}
+      </div>
+    </div>
+  );
+}
+
+/* ---- readability sample chip ---- */
+function Sample({ label, ratio, target, sampleBg, txtColor, onFix }) {
+  const pass = ratio >= target;
+  return (
+    <div className="sample" style={{ '--sample-bg': sampleBg }}>
+      <span className="sample__txt" style={{ color: txtColor }}>{label}</span>
+      <span className="sample__right">
+        <span className={'sample__ratio ' + (pass ? 'is-pass' : 'is-warn')} data-testid="brand-readability-ratio">
+          {pass ? 'Clear' : 'Low'} {ratio.toFixed(1)}
+        </span>
+        {!pass && onFix ? <button className="sample__fix" onClick={onFix} data-testid="brand-readability-fix">Bump contrast</button> : null}
+      </span>
+    </div>
+  );
+}
+
+function App() {
+  const [st, setSt] = useState(load);
+  const [adv, setAdv] = useState(false);
+  const mpRef = useRef(null);
+
+  // persist (this is a user action, not mount — contract honored)
+  useEffect(() => { localStorage.setItem(STORE_KEY, JSON.stringify(st)); }, [st]);
+
+  const derived = useMemo(() => E.derive(st.signature, {
+    surface: st.background, ink: st.text, cream: st.background,
+    secondary: st.secondary || null,
+  }), [st.signature, st.secondary, st.background, st.text]);
+
+  // push full ramp onto the MiniPage root
+  useEffect(() => {
+    if (mpRef.current) E.applyVars(mpRef.current, derived);
+  }, [derived]);
+
+  const set = (patch) => setSt(s => Object.assign({}, s, patch));
+
+  // ---- readability verdict (round 2: role-based standards) ----
+  const r = derived.report;
+  const raw = r.rawSignatureOnSurface;          // the agent's pick, unclamped
+  const pricesPass = raw >= 3.0;                 // large display roles → AA-large
+  const linksPass = raw >= 4.5;                  // body-size links → AA
+  const bodyPass = r.bodyOnSurface >= 4.5;
+  const secRatio = st.secondary ? E.contrast(E.normHex(st.secondary), st.background) : null;
+  const secPass = secRatio == null ? true : secRatio >= 3.0;
+  // Verdict tracks the load-bearing roles; the Links chip carries its own finer warning.
+  const good = bodyPass && pricesPass && secPass;
+
+  function bumpTo(target) {
+    const fixed = E.clampContrast(E.normHex(st.signature), st.background, target, 'deepen');
+    set({ signature: fixed });
+  }
+  function bumpSecondary() {
+    const fixed = E.clampContrast(E.normHex(st.secondary), st.background, 3.0, 'deepen');
+    set({ secondary: fixed });
+  }
+
+  return (
+    <div className="wrap">
+      <div className="topbar">
+        <a className="studio-link" href="#">← Studio</a>
+        <div className="tabs">
+          <button className="tab">Profile</button>
+          <button className="tab is-active">Brand</button>
+        </div>
+      </div>
+
+      <div className="head">
+        <h1>Brand kit</h1>
+        <p>Pick one color. We build your palette from it — and it flows into every seller page you publish.</p>
+      </div>
+
+      <div className="cols">
+        <div className="form">
+          {/* SIGNATURE — the hero input */}
+          <ColorRow
+            kind="signature" label="Signature color" optLabel="The one color"
+            color={st.signature} testid="brand-color-signature"
+            help="Pick one color. We build your palette from it — prices, buttons, links, accents and dividers all derive from here."
+            onCommit={v => set({ signature: v })}
+            onReset={() => set({ signature: DEFAULTS.signature })}
+            resetLabel="Reset"
+          />
+
+          {/* SECONDARY — optional, quieter */}
+          <ColorRow
+            kind="secondary" label="Secondary color" optLabel="Optional"
+            color={st.secondary || '#000000'} empty={!st.secondary} testid="brand-color-secondary"
+            help="Used for decorative moments — section numerals, end-marks — when set. Derived from your signature when not."
+            onCommit={v => set({ secondary: v })}
+            onReset={() => set({ secondary: '' })}
+            resetLabel={st.secondary ? 'Clear' : 'Add'}
+          />
+
+          {/* YOUR PALETTE — read-only derived ramp */}
+          <div className="palette-block">
+            <div className="palette-block__head">
+              <span className="palette-block__title">Your palette</span>
+              <span className="palette-block__sub">Derived · read-only</span>
+            </div>
+            <PaletteStrip hexes={derived.hexes} />
+          </div>
+
+          {/* PAGE SURFACE — advanced, collapsed */}
+          <div className={'adv' + (adv ? ' is-open' : '')}>
+            <button className="adv__toggle" onClick={() => setAdv(a => !a)} aria-expanded={adv}>
+              <span className="adv__caret">▶</span>
+              <span className="adv__t">Page surface</span>
+              <span className="adv__sub">Layout-owned defaults you can override</span>
+            </button>
+            <div className="adv__body">
+              <ColorRow
+                kind="surface" label="Background" color={st.background} testid="brand-color-background"
+                onCommit={v => set({ background: v })} onReset={() => set({ background: DEFAULTS.background })} resetLabel="Reset"
+              />
+              <ColorRow
+                kind="surface" label="Text" color={st.text} testid="brand-color-text"
+                onCommit={v => set({ text: v })} onReset={() => set({ text: DEFAULTS.text })} resetLabel="Reset"
+              />
+            </div>
+          </div>
+
+          {/* DEFAULT LAYOUT */}
+          <div className="field-block">
+            <div className="field-block__label">Default layout</div>
+            <select className="select" value={st.layout} onChange={e => set({ layout: e.target.value })}>
+              <option value="editorial">Editorial</option>
+              <option value="studio">Studio</option>
+              <option value="warm">Warm</option>
+            </select>
+            <p className="field-block__help">The layout new presentations start with. Studio and Warm fall back to the Editorial layout for now. You can switch any single presentation later.</p>
+          </div>
+
+          {/* READABILITY */}
+          <div className={'read ' + (good ? 'is-good' : 'is-warn')} data-testid="brand-readability">
+            <div className="read__verdict">
+              <span className="read__pill">
+                <span className="read__dot">{good ? '✓' : '!'}</span>
+                {good ? 'Easy to read' : 'Worth a look'}
+              </span>
+            </div>
+            <p className="read__desc">
+              {good
+                ? 'Your signature has plenty of contrast against the page. Sellers will see it clearly on any screen.'
+                : 'One role is faint against the page. It still saves — published pages auto-clamp to stay legible — but a small bump matches what sellers see.'}
+            </p>
+            <div className="read__samples">
+              <Sample label="Body text" ratio={r.bodyOnSurface} target={4.5} sampleBg={st.background} txtColor={st.text} />
+              <Sample label="Prices & big numbers" ratio={raw} target={3.0} sampleBg={st.background} txtColor={derived.hexes['signature']} onFix={!pricesPass ? () => bumpTo(3.0) : null} />
+              <Sample label="Links" ratio={raw} target={4.5} sampleBg={st.background} txtColor={derived.hexes['signature-link']} onFix={!linksPass ? () => bumpTo(4.5) : null} />
+              {st.secondary
+                ? <Sample label="Section numerals" ratio={secRatio} target={3.0} sampleBg={st.background} txtColor={E.normHex(st.secondary)} onFix={!secPass ? bumpSecondary : null} />
+                : null}
+            </div>
+          </div>
+
+          {/* NOTES */}
+          <div className="notes">
+            <div className="note"><span className="note__dot"></span><span>Saved automatically.</span></div>
+            <div className="note"><span className="note__i">ⓘ</span><span>Existing published pages keep their original colors. New publishes use your latest brand.</span></div>
+          </div>
+        </div>
+
+        {/* PREVIEW */}
+        <div className="preview">
+          <div className="preview__head">
+            <span className="preview__label">Preview</span>
+            <span className="preview__live">Live</span>
+          </div>
+          <div className="phone">
+            <div className="phone__screen">
+              <div ref={mpRef}><MiniPage /></div>
+            </div>
+          </div>
+          <p className="preview__caption">This is what your seller sees. It updates as you dial each color.</p>
+        </div>
+      </div>
+    </div>
+  );
+}
+
+ReactDOM.createRoot(document.getElementById('root')).render(<App />);
+</script>
+</body>
+</html>
