@@ -182,7 +182,7 @@ function PricePanel({ payload }: { payload: PublicPayload }) {
         }
       : {};
   return (
-    <section className="price-panel" data-testid="sep-price-panel">
+    <section className="price-panel" data-testid="sep-price-panel" data-brand-role="tint-12">
       <div className="lbl">Recommended list</div>
       <div className="price" {...countupAttrs}>
         <PriceDisplay value={recommended} />
@@ -214,8 +214,8 @@ function PriceDisplay({ value }: { value: string }) {
   const parts = digits.split(",");
   return (
     <>
-      <span className="dollar">$</span>
-      <span data-price-digits>
+      <span className="dollar" data-brand-role="signature">$</span>
+      <span data-price-digits data-brand-role="signature-deep">
         {parts.map((part, i) => (
           <span key={i}>
             {i > 0 && <span className="sep">,</span>}
@@ -516,6 +516,7 @@ function ReviewsSection({ payload }: { payload: PublicPayload }) {
           href={outlink.url}
           target="_blank"
           rel="noopener noreferrer"
+          data-brand-role="signature-link"
         >
           {seeAllCopy}
         </a>
@@ -690,7 +691,7 @@ function AreaStats({ stats }: { stats: NonNullable<PublicPayload["areaStats"]> }
   return (
     <div className="area-stats">
       {cells.map((c, i) => (
-        <div className="as reveal" key={i}>
+        <div className="as reveal" key={i} data-brand-role="tint-6">
           <div className="l">{c.label}</div>
           <div className="v">{c.value}</div>
           {c.ctx && <div className="ctx">{c.ctx}</div>}
@@ -1142,6 +1143,7 @@ function AgentCtas({ agent }: { agent: AgentBranding }) {
         <a
           href={`mailto:${email}?subject=${encodeURIComponent("Listing call")}`}
           className="cta primary reveal"
+          data-brand-role="on-signature"
         >
           <span>Schedule a listing call</span>
           <span className="ar">
@@ -1185,9 +1187,9 @@ function formatPhoneDisplay(raw: string): string {
 function EndMark() {
   return (
     <div className="end-mark">
-      <span className="rule" />
-      <span className="dot" aria-hidden="true" />
-      <span className="rule" />
+      <span className="rule" data-brand-role="line-30" />
+      <span className="dot" aria-hidden="true" data-brand-role="decorative" />
+      <span className="rule" data-brand-role="line-30" />
     </div>
   );
 }

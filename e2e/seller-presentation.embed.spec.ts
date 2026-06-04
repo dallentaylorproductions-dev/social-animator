@@ -73,6 +73,32 @@ test.describe("Seller preview — embed bridge", () => {
     expect(applied).not.toBe("#ff00ff");
   });
 
+  test("sep-highlight-role briefly outlines elements carrying that role (stretch)", async ({
+    page,
+  }) => {
+    await page.goto("/seller-presentation-preview?fixture=full&embed=1");
+    await expect(page.locator(PAGE)).toBeVisible();
+    await expect.poll(() =>
+      page.evaluate(() => document.documentElement.classList.contains("sep-embed")),
+    ).toBe(true);
+    // the price "$" carries data-brand-role="signature" (always rendered)
+    await expect(page.locator('[data-brand-role~="signature"]').first()).toBeVisible();
+
+    await page.evaluate(() => {
+      window.postMessage(
+        { type: "sep-highlight-role", role: "signature" },
+        window.location.origin,
+      );
+    });
+    await expect
+      .poll(() =>
+        page.evaluate(
+          () => document.querySelectorAll(".sep-role-highlight").length,
+        ),
+      )
+      .toBeGreaterThan(0);
+  });
+
   test("non-embed preview does NOT mark the doc or attach the bridge", async ({
     page,
   }) => {

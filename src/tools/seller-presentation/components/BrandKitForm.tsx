@@ -181,7 +181,13 @@ const PALETTE_ROLES: Array<{ key: keyof BrandHexes; name: string; label: string 
   { key: "on-signature", name: "on-signature", label: "text on fills" },
 ];
 
-function PaletteStrip({ hexes }: { hexes: BrandHexes }) {
+function PaletteStrip({
+  hexes,
+  onHighlight,
+}: {
+  hexes: BrandHexes;
+  onHighlight?: (role: string) => void;
+}) {
   return (
     <div
       className="palette-strip"
@@ -199,6 +205,8 @@ function PaletteStrip({ hexes }: { hexes: BrandHexes }) {
               key={role.key}
               className="pchip"
               data-testid={"brand-palette-chip-" + role.key}
+              onMouseEnter={() => onHighlight?.(role.key)}
+              onClick={() => onHighlight?.(role.key)}
             >
               <div className="pchip__swatch" style={{ background: swatchBg }} aria-hidden="true">
                 {isOnSig ? (
@@ -396,6 +404,15 @@ export function BrandKitForm({
       ),
     });
 
+  // ---- palette-chip → embedded-preview region highlight (stretch) ----
+  const postHighlight = (role: string) => {
+    if (!bridgeReady) return;
+    iframeRef.current?.contentWindow?.postMessage(
+      { type: "sep-highlight-role", role },
+      window.location.origin,
+    );
+  };
+
   // ---- brand ready (advisory contrast never downgrades it) ----
   const complete = logoPresent && !!(agentName && agentName.trim());
 
@@ -470,7 +487,7 @@ export function BrandKitForm({
             <span className="palette-block__title">Your palette</span>
             <span className="palette-block__sub">Derived · read-only</span>
           </div>
-          <PaletteStrip hexes={derived.hexes} />
+          <PaletteStrip hexes={derived.hexes} onHighlight={postHighlight} />
         </div>
 
         {/* PAGE SURFACE (collapsed disclosure) */}
