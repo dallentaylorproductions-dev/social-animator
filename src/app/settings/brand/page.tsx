@@ -40,7 +40,7 @@ export default function BrandSettingsPage() {
 
   if (!settings) {
     return (
-      <main className="bk-scope settings-shell" data-testid="settings-brand-page">
+      <main className="bk-scope" data-testid="settings-brand-page">
         <div className="page">
           <div style={{ color: "#a6a39d", padding: "48px 0", fontSize: 14 }}>
             Loading…
@@ -72,9 +72,12 @@ export default function BrandSettingsPage() {
   };
 
   return (
-    <main className="bk-scope settings-shell" data-testid="settings-brand-page">
-      <div className="page">
-        <div className="page-head">
+    <main className="bk-scope" data-testid="settings-brand-page">
+      {/* fix-up #2: transparent main (the continuous glow surface lives on
+          settings/layout.tsx); top padding trimmed so the header sits
+          ~22px under the tab strip instead of ~40px+ down the page. */}
+      <div className="page" style={{ paddingTop: 22 }}>
+        <div className="page-head" style={{ marginTop: 0 }}>
           <h1 className="page-title">Brand kit</h1>
           <p className="page-sub">
             Your brand colors flow into every seller page you publish. Set them

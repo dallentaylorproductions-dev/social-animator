@@ -16,6 +16,23 @@
    (max-width 1060px + 28px side padding). box-sizing: border-box so the
    side padding nests inside max-width exactly like each page's column.
    ===================================================================== */
+/* Shared settings surface (fix-up #2): hoisted to settings/layout.tsx so
+   the tab strip + page content sit on ONE continuous canvas on both
+   routes — no plain-black band above the strip, no seam where a glow
+   would otherwise begin. Base is neutral-950 (#0a0a0a) to match the
+   byte-identical Profile page's opaque `bg-neutral-950` main exactly
+   (so where that opaque main starts, the surface meets seamlessly); the
+   mint radial glow sits at the top behind the strip. The Brand page main
+   is transparent (settings-shell class dropped) so this glow shows
+   continuously through it. */
+.sep-settings-shell {
+  min-height: 100vh;
+  background:
+    radial-gradient(70% 38% at 24% -6%, rgba(110, 231, 199, 0.18), transparent 60%),
+    radial-gradient(120% 60% at 50% -8%, rgba(110, 231, 199, 0.13), transparent 48%),
+    #0a0a0a;
+}
+
 .sep-settings-tabbar {
   display: flex;
   justify-content: flex-start;
@@ -25,12 +42,12 @@
 /* Match Profile's content column: max-w-2xl (42rem) + px-6 (24px). */
 .sep-settings-tabbar--profile {
   max-width: 42rem;
-  padding: 28px 24px 0;
+  padding: 24px 24px 0;
 }
 /* Match the Brand-kit .page column: 1060px + 28px side padding. */
 .sep-settings-tabbar--brand {
   max-width: 1060px;
-  padding: 28px 28px 0;
+  padding: 24px 28px 0;
 }
 
 .sep-settings-tabs {
