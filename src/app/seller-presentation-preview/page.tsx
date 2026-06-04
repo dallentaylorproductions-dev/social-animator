@@ -10,6 +10,7 @@ import {
   POSTER_OVERRIDE_WINS_PAYLOAD,
   POSTER_SCRUB_OVER_AUTO_PAYLOAD,
 } from "@/tools/seller-presentation/output/__fixtures__/sample-payload";
+import { EmbedBridge } from "./EmbedBridge";
 
 /**
  * Dev preview route for the locked premium consumer page
@@ -43,12 +44,17 @@ interface PageProps {
     brandText?: string;
     brandAccent?: string;
     brandSecondary?: string;
+    embed?: string;
   }>;
 }
 
 export default async function SellerPresentationPreview({ searchParams }: PageProps) {
-  const { fixture, brandBg, brandText, brandAccent, brandSecondary } =
+  const { fixture, brandBg, brandText, brandAccent, brandSecondary, embed } =
     await searchParams;
+  // v3 — embed mode: the Brand kit settings preview iframes this route with
+  // `embed=1`. EmbedBridge then hides non-page chrome and applies vars pushed
+  // live (same-origin postMessage) so dialing a color repaints with no reload.
+  const isEmbed = embed === "1";
   // A7d.8 — added three poster-precedence variants. The renderer's
   // VideoBlock emits `data-poster-source` so the e2e suite can assert
   // which branch of the override > scrub > auto cascade fired without
@@ -118,5 +124,10 @@ export default async function SellerPresentationPreview({ searchParams }: PagePr
     data,
   };
 
-  return <SellerPresentationPage handout={handout} />;
+  return (
+    <>
+      <SellerPresentationPage handout={handout} />
+      {isEmbed && <EmbedBridge />}
+    </>
+  );
 }

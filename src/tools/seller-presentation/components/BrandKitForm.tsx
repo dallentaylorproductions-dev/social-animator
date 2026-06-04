@@ -2,42 +2,41 @@
 
 import { useEffect, useMemo, useRef, useState } from "react";
 import { BrandEngine, type BrandHexes } from "@/lib/brand/color-engine";
-import { MiniPage } from "./MiniPage";
+import { extractLogoColors } from "@/lib/brand/logo-colors";
 
 /**
- * BrandKitForm — the ONE controlled component for Brand kit v2 (Phase E.1).
- * Recreated from docs/design/brand-unification/brand_kit_v2.html +
- * palette_strip.jsx (Claude Design references); ENGINEERING_CONTRACT.md is
- * authoritative. Visuals live in ./brand-kit.css under the `.bk-scope`
- * namespace.
+ * BrandKitForm — Brand kit v3 (first-time-success optimization + real-template
+ * preview). Recreated from docs/design/brand-kit-v3/ (mock + ENGINEERING_NOTES);
+ * the README's NON-NORMATIVE deltas are binding. Visuals live in ./brand-kit.css
+ * under the `.bk-scope` namespace.
  *
- * THE ONE COLOR. The agent picks a single **signature** color (the existing
- * `brandAccent` field — the rename is label-only, no migration) plus an
- * optional **secondary**. `BrandEngine.derive()` turns the signature into a
- * 7-role tonal ramp (OKLCh, every text-bearing step AA-clamped per role);
- * the derived shades are SHOWN read-only (the palette strip) and previewed
- * live (the MiniPage), never asked as extra pickers.
+ * THE ONE COLOR. The agent picks a single **signature**; BrandEngine.derive()
+ * turns it into the 7-role ramp (shown read-only), and a live **real-template**
+ * preview — the actual seller page embedded in an iframe — repaints instantly as
+ * they dial (same-origin postMessage bridge; debounced param-reload fallback).
  *
- * Controlled — the PARENT owns `values` and persists (it maps `accent` →
- * `brandAccent` and `secondary` → `brandSecondary`, persisting secondary as
- * ABSENT when unset). This child renders and reports changes; it NEVER
- * writes on mount (E.0 cohort-safety contract).
+ * v3 deltas from v2:
+ *  - Secondary color ROW removed (Item 1). The `secondary` data field + engine
+ *    support stay; if a saved secondary exists, one quiet line renders.
+ *  - "Suggested from your logo" row (Item 2) — up to 3 colors extracted from the
+ *    Profile logo; one tap applies to Signature. Visible-but-empty with no logo.
+ *  - "Open full sample page" (Item 3) — new tab, full page, current unsaved colors.
+ *  - Readability collapses on a clean pass; body-text "adjusted" copy only when
+ *    the render clamp actually moved a value (Item 4).
+ *  - "Brand ready" closure state (Item 5); advisory contrast never downgrades it.
+ *  - Real-template embedded preview replaces the MiniPage (Item 6).
  *
- * Pieces (left column, top → bottom): signature row, secondary row, the
- * read-only "Your palette" strip, a collapsed "Page surface" disclosure
- * (background + text), the default-layout select, the never-blocking
- * Readability panel, and the footer notes. Right column: a sticky phone
- * preview of the MiniPage. Save is NEVER gated by contrast.
+ * Controlled — the PARENT owns `values` + persists (mapping accent→brandAccent,
+ * secondary→brandSecondary). NEVER writes on mount; autosave on change;
+ * readability NEVER blocks save.
  */
 
 export interface BrandKitFormValues {
-  /** Layout-owned page paper (demoted default, overridable). */
   background: string;
-  /** Layout-owned ink (demoted default, overridable). */
   text: string;
-  /** THE signature — wire-compatible with E.0 `brandAccent` (label rename). */
+  /** THE signature — wire-compatible with brandAccent (label rename). */
   accent: string;
-  /** NEW optional secondary; "" = unset (a first-class state). */
+  /** Optional secondary (data field kept; no UI row in v3). "" = unset. */
   secondary: string;
   defaultThemeId: string;
 }
@@ -45,9 +44,11 @@ export interface BrandKitFormValues {
 export interface BrandKitFormProps {
   values: BrandKitFormValues;
   onChange: (next: BrandKitFormValues) => void;
-  layout?: "page" | "drawer";
-  showRepublishReminder?: boolean;
   defaults: { background: string; text: string; accent: string };
+  /** Profile logo (data URL) — drives logo suggestions + Brand ready. */
+  logoDataUrl?: string | null;
+  /** Profile agent name — drives Brand ready completeness. */
+  agentName?: string;
 }
 
 const THEME_OPTIONS = [
@@ -56,17 +57,29 @@ const THEME_OPTIONS = [
   { id: "warm", label: "Warm" },
 ];
 
-/* ---- editable hex field with its own draft state ----------------- */
+const PREVIEW_BASE = "/seller-presentation-preview";
+
+/** Build the preview query string for the current (possibly unsaved) values. */
+function previewParams(v: BrandKitFormValues, embed: boolean): string {
+  const p = new URLSearchParams();
+  p.set("fixture", "full");
+  if (embed) p.set("embed", "1");
+  p.set("brandAccent", v.accent);
+  p.set("brandBg", v.background);
+  p.set("brandText", v.text);
+  if (v.secondary) p.set("brandSecondary", v.secondary);
+  return p.toString();
+}
+
+/* ---- editable hex field (commit on blur/Enter; invalid reverts) -------- */
 function HexField({
   value,
   onCommit,
-  placeholder,
   testId,
   inputRef,
 }: {
   value: string;
   onCommit: (v: string) => void;
-  placeholder?: string;
   testId: string;
   inputRef?: React.Ref<HTMLInputElement>;
 }) {
@@ -77,19 +90,12 @@ function HexField({
   }, [value]);
 
   function commit(v: string) {
-    const s = (v || "").trim();
-    // Empty + has-placeholder (secondary) commits as unset.
-    if (s === "" && placeholder) {
-      setBad(false);
-      onCommit("");
-      return;
-    }
-    const n = BrandEngine.normHex(s);
+    const n = BrandEngine.normHex((v || "").trim());
     if (n) {
       setBad(false);
       onCommit(n);
     } else {
-      setBad(true); // invalid: keep last good value (no commit)
+      setBad(true);
     }
   }
 
@@ -99,7 +105,6 @@ function HexField({
       className={"hexin" + (bad ? " is-invalid" : "")}
       data-testid={testId}
       value={draft}
-      placeholder={placeholder || ""}
       spellCheck={false}
       aria-label={testId}
       onChange={(e) => setDraft(e.target.value)}
@@ -111,49 +116,32 @@ function HexField({
   );
 }
 
-/* ---- one color row (swatch + hex + reset/clear/add) -------------- */
+/* ---- one color row: swatch IS the native picker trigger ---------------- */
 function ColorRow({
-  kind,
   label,
   optLabel,
   color,
-  empty,
-  help,
   onCommit,
   onReset,
   resetLabel,
+  help,
   testId,
   pickerTestId,
-  inputRef,
 }: {
-  kind: "signature" | "secondary" | "surface";
   label: string;
   optLabel?: string;
   color: string;
-  empty?: boolean;
-  help?: string;
   onCommit: (v: string) => void;
   onReset: () => void;
   resetLabel: string;
+  help?: string;
   testId: string;
   pickerTestId: string;
-  inputRef?: React.Ref<HTMLInputElement>;
 }) {
-  // The swatch is the native OS color-picker trigger (restored from E.0 —
-  // hex-only entry is hostile to nontechnical agents). A visually-hidden
-  // <input type="color"> fills the swatch; clicking anywhere on it opens the
-  // picker. Picking commits through the SAME path as a hex commit (parent
-  // set → autosave → derive re-run). For the empty secondary the picker
-  // opens from black and the first pick sets it (Add → pick). Values are
-  // normalized to the engine's #RRGGBB casing so picker + hex agree.
-  const pickerValue = (BrandEngine.normHex(empty ? "#000000" : color) ||
-    "#000000").toLowerCase();
+  const pickerValue = (BrandEngine.normHex(color) || "#000000").toLowerCase();
   return (
-    <div className={"crow" + (kind === "secondary" ? " is-secondary" : "")}>
-      <label
-        className={"swatch" + (empty ? " is-empty" : "")}
-        style={empty ? undefined : { background: color }}
-      >
+    <div className="crow">
+      <label className="swatch" style={{ background: color }}>
         <input
           type="color"
           className="swatch__native"
@@ -171,13 +159,7 @@ function ColorRow({
           {optLabel ? <span className="crow__opt">{optLabel}</span> : null}
         </div>
         <div className="crow__field">
-          <HexField
-            value={empty ? "" : color}
-            placeholder={kind === "secondary" ? "Optional" : ""}
-            onCommit={onCommit}
-            testId={testId}
-            inputRef={inputRef}
-          />
+          <HexField value={color} onCommit={onCommit} testId={testId} />
           <button type="button" className="minibtn" onClick={onReset}>
             {resetLabel}
           </button>
@@ -188,15 +170,8 @@ function ColorRow({
   );
 }
 
-/* ---- palette strip: the read-only derived ramp ------------------- */
-// Order + copy is intentional (palette_strip.jsx): hero first, then
-// deep/link, fills, line, on-fill. Labels describe REAL layout roles
-// (truthful-copy rule — no aspirational claims).
-const PALETTE_ROLES: Array<{
-  key: keyof BrandHexes;
-  name: string;
-  label: string;
-}> = [
+/* ---- palette strip: the read-only 7-role derived ramp ------------------ */
+const PALETTE_ROLES: Array<{ key: keyof BrandHexes; name: string; label: string }> = [
   { key: "signature", name: "signature", label: "prices & big numbers" },
   { key: "signature-deep", name: "deep", label: "price numerals" },
   { key: "signature-link", name: "link", label: "body links" },
@@ -218,8 +193,6 @@ function PaletteStrip({ hexes }: { hexes: BrandHexes }) {
         {PALETTE_ROLES.map((role) => {
           const hex = hexes[role.key];
           const isOnSig = role.key === "on-signature";
-          // The on-signature chip previews the pairing: the swatch is the
-          // signature fill, the "Aa" glyph is the on-signature tone.
           const swatchBg = isOnSig ? hexes["signature"] : hex;
           return (
             <div
@@ -227,11 +200,7 @@ function PaletteStrip({ hexes }: { hexes: BrandHexes }) {
               className="pchip"
               data-testid={"brand-palette-chip-" + role.key}
             >
-              <div
-                className="pchip__swatch"
-                style={{ background: swatchBg }}
-                aria-hidden="true"
-              >
+              <div className="pchip__swatch" style={{ background: swatchBg }} aria-hidden="true">
                 {isOnSig ? (
                   <span className="pchip__aa" style={{ color: hex }}>
                     Aa
@@ -251,7 +220,7 @@ function PaletteStrip({ hexes }: { hexes: BrandHexes }) {
   );
 }
 
-/* ---- readability sample chip ------------------------------------- */
+/* ---- readability sample chip ------------------------------------------- */
 function Sample({
   label,
   ratio,
@@ -259,6 +228,7 @@ function Sample({
   sampleBg,
   txtColor,
   onFix,
+  adjusted,
 }: {
   label: string;
   ratio: number;
@@ -266,15 +236,16 @@ function Sample({
   sampleBg: string;
   txtColor: string;
   onFix?: () => void;
+  adjusted?: boolean;
 }) {
   const pass = ratio >= target;
   return (
-    <div
-      className="sample"
-      style={{ "--sample-bg": sampleBg } as React.CSSProperties}
-    >
+    <div className="sample" style={{ "--sample-bg": sampleBg } as React.CSSProperties}>
       <span className="sample__txt" style={{ color: txtColor }}>
         {label}
+        {adjusted ? (
+          <span className="sample__adjusted">adjusted to stay readable</span>
+        ) : null}
       </span>
       <span className="sample__right">
         <span
@@ -298,7 +269,7 @@ function Sample({
   );
 }
 
-/* ---- saved indicator (autosave; no Save button) ----------------- */
+/* ---- saved indicator (autosave; no Save button) ----------------------- */
 function SavedIndicator({ trigger }: { trigger: string }) {
   const [saving, setSaving] = useState(false);
   const first = useRef(true);
@@ -322,22 +293,27 @@ function SavedIndicator({ trigger }: { trigger: string }) {
   );
 }
 
-/* ---- the form --------------------------------------------------- */
+/* ---- the form ---------------------------------------------------------- */
 export function BrandKitForm({
   values,
   onChange,
-  layout = "page",
-  showRepublishReminder = false,
   defaults,
+  logoDataUrl,
+  agentName,
 }: BrandKitFormProps) {
   const DEF = defaults;
   const [adv, setAdv] = useState(false);
-  const secondaryInputRef = useRef<HTMLInputElement>(null);
+  const [readOpen, setReadOpen] = useState(false);
+  const [suggestions, setSuggestions] = useState<string[]>([]);
+  const iframeRef = useRef<HTMLIFrameElement>(null);
+  const [bridgeReady, setBridgeReady] = useState(false);
+  // initial iframe src — captured once; live updates flow over the bridge.
+  const initialSrc = useRef(`${PREVIEW_BASE}?${previewParams(values, true)}`);
+  const [iframeSrc, setIframeSrc] = useState(initialSrc.current);
+
   const set = (patch: Partial<BrandKitFormValues>) =>
     onChange({ ...values, ...patch });
 
-  // Live derivation — keyed on the four inputs (contract §State). The full
-  // ramp + readability report are DERIVED, never stored.
   const derived = useMemo(
     () =>
       BrandEngine.derive(values.accent, {
@@ -348,21 +324,68 @@ export function BrandKitForm({
     [values.accent, values.secondary, values.background, values.text],
   );
 
-  // ---- readability verdict (round 2: role-based standards) ----
+  // ---- logo color suggestions (extraction, never AI) ----
+  const logoPresent = !!logoDataUrl;
+  useEffect(() => {
+    let alive = true;
+    if (!logoDataUrl) {
+      setSuggestions([]);
+      return;
+    }
+    extractLogoColors(logoDataUrl).then((cols) => {
+      if (alive) setSuggestions(cols);
+    });
+    return () => {
+      alive = false;
+    };
+  }, [logoDataUrl]);
+
+  // ---- live preview bridge ----
+  // Listen for the embed's ready handshake (same-origin only).
+  useEffect(() => {
+    const onMsg = (e: MessageEvent) => {
+      if (e.origin !== window.location.origin) return;
+      const d = e.data as { type?: string };
+      if (d && d.type === "sep-embed-ready") setBridgeReady(true);
+    };
+    window.addEventListener("message", onMsg);
+    return () => window.removeEventListener("message", onMsg);
+  }, []);
+
+  // When the bridge is live, push the derived vars on every change (no reload).
+  useEffect(() => {
+    if (!bridgeReady) return;
+    const win = iframeRef.current?.contentWindow;
+    if (!win) return;
+    win.postMessage(
+      { type: "sep-brand-vars", vars: derived.vars },
+      window.location.origin,
+    );
+  }, [derived, bridgeReady]);
+
+  // Fallback: until the bridge is confirmed, reflect changes via a debounced
+  // param reload of the iframe (covers a blocked/absent bridge).
+  useEffect(() => {
+    if (bridgeReady) return;
+    const t = setTimeout(() => {
+      setIframeSrc(`${PREVIEW_BASE}?${previewParams(values, true)}`);
+    }, 400);
+    return () => clearTimeout(t);
+  }, [values, bridgeReady]);
+
+  // ---- readability (v3: collapse on clean pass; honest "adjusted") ----
   const r = derived.report;
-  const raw = r.rawSignatureOnSurface; // the agent's pick, unclamped
-  const pricesPass = raw >= 3.0; // large display roles → AA-large
-  const linksPass = raw >= 4.5; // body-size links → AA
+  const raw = r.rawSignatureOnSurface;
+  const pricesPass = raw >= 3.0;
+  const linksPass = raw >= 4.5;
   const bodyPass = r.bodyOnSurface >= 4.5;
+  const bodyAdjusted = r.bodyClamped;
   const secHex = values.secondary ? BrandEngine.normHex(values.secondary) : null;
   const secRatio = secHex ? BrandEngine.contrast(secHex, values.background) : null;
   const secPass = secRatio == null ? true : secRatio >= 3.0;
-  // Verdict tracks the load-bearing roles (body + prices + secondary-if-set);
-  // the Links chip carries its own finer warning without flipping the verdict.
   const good = bodyPass && pricesPass && secPass;
+  const expanded = !good || readOpen;
 
-  // "Bump contrast" sets the field to the engine's clamp result for that
-  // chip's target. NEVER blocks save — it only advises.
   const bumpSignature = (target: number) =>
     set({
       accent: BrandEngine.clampContrast(
@@ -372,237 +395,296 @@ export function BrandKitForm({
         "deepen",
       ),
     });
-  const bumpSecondary = () => {
-    if (!secHex) return;
-    set({
-      secondary: BrandEngine.clampContrast(
-        secHex,
-        values.background,
-        3.0,
-        "deepen",
-      ),
-    });
-  };
 
-  const hasSecondary = !!values.secondary;
+  // ---- brand ready (advisory contrast never downgrades it) ----
+  const complete = logoPresent && !!(agentName && agentName.trim());
 
-  const controls = (
-    <div className="bk-form">
-      {/* SIGNATURE — the hero input. testid kept as brand-color-accent
-          (production is truth; do NOT rename to brand-color-signature). */}
-      <ColorRow
-        kind="signature"
-        label="Signature color"
-        optLabel="The one color"
-        color={values.accent}
-        testId="brand-color-accent"
-        pickerTestId="brand-color-picker-accent"
-        help="Pick one color. We build your palette from it — prices, buttons, links, accents and dividers all derive from here."
-        onCommit={(v) => set({ accent: v })}
-        onReset={() => set({ accent: DEF.accent })}
-        resetLabel="Reset"
-      />
+  const samplePageHref = `${PREVIEW_BASE}?${previewParams(values, false)}`;
 
-      {/* SECONDARY — optional, quieter. Unset persists as ABSENT, not "".
-          "Add" reveals the field for the agent to enter THEIR own color (we
-          never pick one for them — truthful-substrate); "Clear" unsets. */}
-      <ColorRow
-        kind="secondary"
-        label="Secondary color"
-        optLabel="Optional"
-        color={values.secondary || "#000000"}
-        empty={!hasSecondary}
-        testId="brand-color-secondary"
-        pickerTestId="brand-color-picker-secondary"
-        help="Used for decorative moments — section numerals, end-marks — when set. Derived from your signature when not."
-        onCommit={(v) => set({ secondary: v })}
-        onReset={() =>
-          hasSecondary
-            ? set({ secondary: "" })
-            : secondaryInputRef.current?.focus()
-        }
-        resetLabel={hasSecondary ? "Clear" : "Add"}
-        inputRef={secondaryInputRef}
-      />
+  return (
+    <div className="bk-v3 cols">
+      <div className="bk-form">
+        {/* SIGNATURE */}
+        <ColorRow
+          label="Signature color"
+          optLabel="The one color"
+          color={values.accent}
+          onCommit={(v) => set({ accent: v })}
+          onReset={() => set({ accent: DEF.accent })}
+          resetLabel="Reset"
+          help="Your one brand color. Everything else — prices, buttons, links, accents and dividers — is derived from it."
+          testId="brand-color-accent"
+          pickerTestId="brand-color-picker-accent"
+        />
 
-      {/* YOUR PALETTE — read-only derived ramp */}
-      <div className="palette-block">
-        <div className="palette-block__head">
-          <span className="palette-block__title">Your palette</span>
-          <span className="palette-block__sub">Derived · read-only</span>
+        {/* a saved secondary from an earlier template (data kept; no row) */}
+        {values.secondary ? (
+          <p className="secondary-saved" data-testid="brand-secondary-saved-note">
+            Secondary color saved for future templates.
+          </p>
+        ) : null}
+
+        {/* SUGGESTED FROM YOUR LOGO */}
+        <div className="suggest" data-testid="brand-logo-suggestions">
+          {logoPresent && suggestions.length > 0 ? (
+            <>
+              <div className="suggest__copy">
+                {suggestions.length === 1
+                  ? "We found this color in your logo."
+                  : "Suggested from your logo."}
+              </div>
+              <div className="suggest__row">
+                {suggestions.map((hex, i) => {
+                  const active =
+                    BrandEngine.normHex(hex) === BrandEngine.normHex(values.accent);
+                  return (
+                    <button
+                      key={hex}
+                      type="button"
+                      className={"suggest__chip" + (active ? " is-active" : "")}
+                      style={{ background: hex }}
+                      data-testid={"brand-logo-suggestion-" + i}
+                      onClick={() => set({ accent: hex })}
+                      title={`Apply ${hex}`}
+                      aria-label={`Apply ${hex} as your signature color`}
+                    >
+                      {active ? <span className="suggest__tick">✓</span> : null}
+                    </button>
+                  );
+                })}
+              </div>
+            </>
+          ) : (
+            <div className="suggest__empty" data-testid="brand-logo-suggestions-empty">
+              Upload a logo and we&apos;ll suggest colors from it.{" "}
+              <a className="link" href="/settings">
+                Go to Profile
+              </a>
+            </div>
+          )}
         </div>
-        <PaletteStrip hexes={derived.hexes} />
-      </div>
 
-      {/* PAGE SURFACE — advanced disclosure, collapsed by default */}
-      <div className={"adv" + (adv ? " is-open" : "")}>
-        <button
-          type="button"
-          className="adv__toggle"
-          onClick={() => setAdv((a) => !a)}
-          aria-expanded={adv}
-          data-testid="brand-surface-disclosure"
-        >
-          <span className="adv__caret" aria-hidden="true">
-            ▶
-          </span>
-          <span className="adv__t">Page surface</span>
-          <span className="adv__sub">Layout-owned defaults you can override</span>
-        </button>
-        <div className="adv__body">
-          <ColorRow
-            kind="surface"
-            label="Background"
-            color={values.background}
-            testId="brand-color-background"
-            pickerTestId="brand-color-picker-background"
-            onCommit={(v) => set({ background: v })}
-            onReset={() => set({ background: DEF.background })}
-            resetLabel="Reset"
-          />
-          <ColorRow
-            kind="surface"
-            label="Text"
-            color={values.text}
-            testId="brand-color-text"
-            pickerTestId="brand-color-picker-text"
-            onCommit={(v) => set({ text: v })}
-            onReset={() => set({ text: DEF.text })}
-            resetLabel="Reset"
-          />
+        {/* DERIVED PALETTE */}
+        <div className="palette-block">
+          <div className="palette-block__head">
+            <span className="palette-block__title">Your palette</span>
+            <span className="palette-block__sub">Derived · read-only</span>
+          </div>
+          <PaletteStrip hexes={derived.hexes} />
         </div>
-      </div>
 
-      {/* DEFAULT LAYOUT */}
-      <div className="field-block">
-        <label className="field-block__label" htmlFor="bk-theme">
-          Default layout
-        </label>
-        <select
-          id="bk-theme"
-          className="select"
-          value={values.defaultThemeId}
-          onChange={(e) => set({ defaultThemeId: e.target.value })}
-          data-testid="brand-default-theme"
+        {/* PAGE SURFACE (collapsed disclosure) */}
+        <div className={"adv" + (adv ? " is-open" : "")}>
+          <button
+            type="button"
+            className="adv__toggle"
+            onClick={() => setAdv((a) => !a)}
+            aria-expanded={adv}
+            data-testid="brand-surface-disclosure"
+          >
+            <span className="adv__caret" aria-hidden="true">
+              ▶
+            </span>
+            <span className="adv__t">Page surface</span>
+            <span className="adv__sub">Layout-owned defaults you can override</span>
+          </button>
+          <div className="adv__body">
+            <ColorRow
+              label="Background"
+              color={values.background}
+              onCommit={(v) => set({ background: v })}
+              onReset={() => set({ background: DEF.background })}
+              resetLabel="Reset"
+              testId="brand-color-background"
+              pickerTestId="brand-color-picker-background"
+            />
+            <ColorRow
+              label="Body text"
+              color={values.text}
+              onCommit={(v) => set({ text: v })}
+              onReset={() => set({ text: DEF.text })}
+              resetLabel="Reset"
+              testId="brand-color-text"
+              pickerTestId="brand-color-picker-text"
+            />
+          </div>
+        </div>
+
+        {/* DEFAULT LAYOUT — production dropdown (card picker is a future concept) */}
+        <div className="field-block">
+          <label className="field-block__label" htmlFor="bk-theme">
+            Default layout
+          </label>
+          <select
+            id="bk-theme"
+            className="select"
+            value={values.defaultThemeId}
+            onChange={(e) => set({ defaultThemeId: e.target.value })}
+            data-testid="brand-default-theme"
+          >
+            {THEME_OPTIONS.map((o) => (
+              <option key={o.id} value={o.id}>
+                {o.label}
+              </option>
+            ))}
+          </select>
+          <p className="field-block__help">
+            The layout new presentations start with. Studio and Warm fall back to
+            the Editorial layout for now. You can switch any single presentation
+            later.
+          </p>
+        </div>
+
+        {/* READABILITY v3 — collapses on a clean pass; never blocks save */}
+        <div
+          className={"read " + (good ? "is-good" : "is-warn")}
+          data-testid="brand-readability"
+          role="status"
         >
-          {THEME_OPTIONS.map((o) => (
-            <option key={o.id} value={o.id}>
-              {o.label}
-            </option>
-          ))}
-        </select>
-        <p className="field-block__help">
-          The layout new presentations start with. Studio and Warm fall back to
-          the Editorial layout for now. You can switch any single presentation
-          later.
-        </p>
-      </div>
-
-      {/* READABILITY — never blocks save */}
-      <div
-        className={"read " + (good ? "is-good" : "is-warn")}
-        data-testid="brand-readability"
-        role="status"
-      >
-        <div className="read__verdict">
-          <span className="read__pill" data-testid="brand-readability-verdict">
+          <button
+            type="button"
+            className="read__head"
+            data-testid="brand-readability-verdict"
+            aria-expanded={expanded}
+            onClick={() => {
+              if (good) setReadOpen((o) => !o);
+            }}
+          >
             <span className="read__dot" aria-hidden="true">
               {good ? "✓" : "!"}
             </span>
-            {good ? "Easy to read" : "Worth a look"}
-          </span>
-        </div>
-        <p className="read__desc">
-          {good
-            ? "Your signature has plenty of contrast against the page. Sellers will see it clearly on any screen."
-            : "One role is faint against the page. It still saves — published pages auto-clamp to stay legible — but a small bump matches what sellers see."}
-        </p>
-        <div className="read__samples" data-testid="brand-readability-fixes">
-          <Sample
-            label="Body text"
-            ratio={r.bodyOnSurface}
-            target={4.5}
-            sampleBg={values.background}
-            txtColor={values.text}
-          />
-          <Sample
-            label="Prices & big numbers"
-            ratio={raw}
-            target={3.0}
-            sampleBg={values.background}
-            txtColor={derived.hexes["signature"]}
-            onFix={!pricesPass ? () => bumpSignature(3.0) : undefined}
-          />
-          <Sample
-            label="Links"
-            ratio={raw}
-            target={4.5}
-            sampleBg={values.background}
-            txtColor={derived.hexes["signature-link"]}
-            onFix={!linksPass ? () => bumpSignature(4.5) : undefined}
-          />
-          {hasSecondary && secRatio != null ? (
-            <Sample
-              label="Section numerals"
-              ratio={secRatio}
-              target={3.0}
-              sampleBg={values.background}
-              txtColor={secHex || values.secondary}
-              onFix={!secPass ? bumpSecondary : undefined}
-            />
+            <span className="read__verdict">
+              <strong>{good ? "Readability all clear" : "Readability needs a look"}</strong>
+              <span>
+                {good
+                  ? "Your page text passes contrast checks."
+                  : "Some page text may be hard to read."}
+              </span>
+            </span>
+            {good ? (
+              <span className="read__toggle">
+                {readOpen ? "Hide details" : "View details"}
+              </span>
+            ) : null}
+          </button>
+
+          {expanded ? (
+            <div className="read__samples" data-testid="brand-readability-fixes">
+              <Sample
+                label="Body text"
+                ratio={r.bodyOnSurface}
+                target={4.5}
+                sampleBg={values.background}
+                txtColor={values.text}
+                adjusted={bodyAdjusted}
+              />
+              <Sample
+                label="Prices & big numbers"
+                ratio={raw}
+                target={3.0}
+                sampleBg={values.background}
+                txtColor={derived.hexes["signature"]}
+                onFix={!pricesPass ? () => bumpSignature(3.0) : undefined}
+              />
+              <Sample
+                label="Links"
+                ratio={raw}
+                target={4.5}
+                sampleBg={values.background}
+                txtColor={derived.hexes["signature-link"]}
+                onFix={!linksPass ? () => bumpSignature(4.5) : undefined}
+              />
+              {secHex && secRatio != null ? (
+                <Sample
+                  label="Section numerals"
+                  ratio={secRatio}
+                  target={3.0}
+                  sampleBg={values.background}
+                  txtColor={secHex}
+                />
+              ) : null}
+              {bodyAdjusted ? (
+                <p className="read__adjusted-note">
+                  We used a deeper shade so your text stays readable — your choices
+                  are untouched.
+                </p>
+              ) : null}
+            </div>
           ) : null}
         </div>
-      </div>
 
-      {/* FOOTER NOTES */}
-      <div className="notes">
-        <SavedIndicator
-          trigger={`${values.background}|${values.text}|${values.accent}|${values.secondary}|${values.defaultThemeId}`}
-        />
-        {showRepublishReminder && (
-          <span className="note">
-            <span className="note__i" aria-hidden="true">
-              ⓘ
-            </span>
-            <span>
-              Existing published pages keep their original colors. New publishes
-              use your latest brand.
-            </span>
+        {/* SAVE + SCOPE (scope sits directly under autosave) */}
+        <div className="notes">
+          <SavedIndicator
+            trigger={`${values.background}|${values.text}|${values.accent}|${values.secondary}|${values.defaultThemeId}`}
+          />
+          <p className="scope-note">
+            Existing published pages keep their original colors. New publishes use
+            your latest brand.
+          </p>
+        </div>
+
+        {/* BRAND READY — closure state (advisory contrast never downgrades it) */}
+        <div
+          className={"ready " + (complete ? "is-complete" : "is-incomplete")}
+          data-testid="brand-ready-state"
+        >
+          <span className="ready__mark" aria-hidden="true">
+            {complete ? "✓" : ""}
           </span>
-        )}
-      </div>
-    </div>
-  );
-
-  const preview = (
-    <div className="preview">
-      <div className="preview__head">
-        <span className="preview__label">Preview</span>
-        <span className="preview__live">Live</span>
-      </div>
-      <div className="phone">
-        <div className="phone__screen">
-          <MiniPage vars={derived.vars} themeId={values.defaultThemeId} />
+          <div className="ready__body">
+            {complete ? (
+              <>
+                <strong>Brand ready</strong>
+                <span>
+                  Your color, logo, and page contrast are set for seller pages.
+                </span>
+              </>
+            ) : (
+              <>
+                <strong>Almost ready</strong>
+                <span>
+                  Add your agent name and logo so seller pages feel complete.{" "}
+                  <a className="link" href="/settings">
+                    Go to Profile
+                  </a>
+                </span>
+              </>
+            )}
+          </div>
         </div>
       </div>
-      <p className="preview__caption">
-        This is what your seller sees. It updates as you dial each color.
-      </p>
-    </div>
-  );
 
-  if (layout === "drawer") {
-    return (
-      <div className="bk-v2 bk-v2--drawer">
-        {preview}
-        {controls}
+      {/* PREVIEW — the REAL seller template, embedded live */}
+      <div className="preview">
+        <div className="preview__head">
+          <span className="preview__label">Preview</span>
+          <span className="preview__live">Live</span>
+        </div>
+        <div className="phone">
+          <div className="phone__screen">
+            <iframe
+              ref={iframeRef}
+              className="phone__frame"
+              src={iframeSrc}
+              title="Live seller-page preview"
+              data-testid="brand-minipage-preview"
+            />
+          </div>
+        </div>
+        <a
+          className="sample-page-btn"
+          href={samplePageHref}
+          target="_blank"
+          rel="noopener noreferrer"
+          data-testid="brand-open-sample-page"
+        >
+          Open full sample page
+        </a>
+        <p className="preview__caption">
+          Opens a full-length sample page in your current colors.
+        </p>
       </div>
-    );
-  }
-  return (
-    <div className="bk-v2 cols">
-      {controls}
-      {preview}
     </div>
   );
 }

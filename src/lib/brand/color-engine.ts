@@ -36,6 +36,14 @@ export interface BrandHexes {
   decorative: string;
   surface: string;
   ink: string;
+  /**
+   * v3 — body-text color, lightness-clamped to ≥4.5:1 vs the surface (the one
+   * text/surface pair that E.1 reported but did not clamp). `ink` stays RAW so
+   * layout-owned dark surfaces (the agent band background) are unaffected; only
+   * body COPY uses `ink-text`. At the production defaults (#1A1612 on #F1EBE0,
+   * 15.2:1) this is a NO-OP, so `ink-text === ink` and the baseline never moves.
+   */
+  "ink-text": string;
 }
 
 export type BrandVars = Record<string, string>;
@@ -46,7 +54,12 @@ export interface BrandReport {
   linkOnSurface: number;
   deepOnPanel: number;
   onSignature: number;
+  /** Contrast of the agent's RAW body text vs surface (reported, unclamped). */
   bodyOnSurface: number;
+  /** Contrast of the CLAMPED body text (`ink-text`) vs surface — what renders. */
+  bodyOnSurfaceClamped: number;
+  /** True iff the body-text clamp actually moved the value (drives "adjusted" copy). */
+  bodyClamped: boolean;
   decorativeOnSurface: number;
 }
 
@@ -304,6 +317,15 @@ function derive(signature: string, opts?: DeriveOptions): DerivedBrand {
   // decorative — secondary at FULL STRENGTH when set (no ramp); else signature
   const decorative = secondary || sig;
 
+  // v3 — body-text clamp: deepen (light surface) or lighten (dark surface) the
+  // body ink in 5% OKLCh steps until it clears AA (4.5:1) vs the surface. This
+  // is the one text/surface pair E.1 reported but left unclamped. `ink` stays
+  // RAW (layout-owned dark surfaces read it as a background); only body COPY
+  // reads `ink-text`. At the Editorial defaults this is a NO-OP (15.2:1).
+  const inkDir: "lighten" | "deepen" = luminance(surface) >= 0.4 ? "deepen" : "lighten";
+  const inkText = clampContrast(ink, surface, 4.5, inkDir);
+  const bodyClamped = inkText !== ink;
+
   const hexes: BrandHexes = {
     signature: sig,
     "signature-deep": deep,
@@ -315,6 +337,7 @@ function derive(signature: string, opts?: DeriveOptions): DerivedBrand {
     decorative: decorative,
     surface: surface,
     ink: ink,
+    "ink-text": inkText,
   };
 
   const vars: BrandVars = {};
@@ -329,6 +352,8 @@ function derive(signature: string, opts?: DeriveOptions): DerivedBrand {
     deepOnPanel: contrast(deep, tint12),
     onSignature: contrast(onSig, sig),
     bodyOnSurface: contrast(ink, surface),
+    bodyOnSurfaceClamped: contrast(inkText, surface),
+    bodyClamped,
     decorativeOnSurface: contrast(decorative, surface),
   };
 
