@@ -172,6 +172,41 @@ function mixSrgb(a: string, b: string, wB: number): string {
 }
 const mix = mixOklch;
 
+/* --------------------------------------------------------------------------
+ * surface-mixed steps — HUE-LOCKED (tint-12 / tint-6 / line-30).
+ *
+ * These mix the signature toward the page surface. The Editorial surface is a
+ * WARM cream (#F1EBE0), so the plain OKLCh mix — which also interpolates hue —
+ * drags a COOL signature (blue/teal/purple) through a muddy yellow zone: the
+ * "yellowy divider" failure (a derived tone the agent can't associate with
+ * their brand and can't edit). The fix holds the signature's HUE constant and
+ * interpolates ONLY lightness + chroma toward the surface at the step weight,
+ * so a pale divider reads as "a pale version of MY color," never a third hue.
+ *
+ * L and C are computed identically to mixOklch(surface, sig, wSig) — only the
+ * hue is pinned — so the tint LIGHTNESS/CHROMA character is unchanged; only
+ * the cast is corrected.
+ *
+ * Near-neutral signatures (an agent picks a gray) have an UNSTABLE hue at
+ * C≈0, so below CHROMA_FLOOR we fall back to the plain mix and let grays
+ * derive as clean grays. Floor chosen empirically: saturated brand colors sit
+ * at C≈0.08–0.20 in OKLCh and pure/near grays at C≲0.01, so 0.02 cleanly
+ * separates "has a hue worth locking" from "effectively neutral."
+ * ------------------------------------------------------------------------ */
+const CHROMA_FLOOR = 0.02; // OKLCh chroma; below this, hue is meaningless
+function mixSurfaceHueLocked(
+  surface: string,
+  sig: string,
+  wSig: number,
+): string {
+  const G = rgbToOklch(sig);
+  if (G.C < CHROMA_FLOOR) return mixOklch(surface, sig, wSig); // gray → plain
+  const S = rgbToOklch(surface);
+  const L = S.L + (G.L - S.L) * wSig;
+  const C = S.C + (G.C - S.C) * wSig;
+  return oklchToRgb(L, C, G.h); // hold the signature's hue
+}
+
 /* ---- WCAG contrast ---- */
 function luminance(hex: string): number {
   const p = hexToRgb(hex);
@@ -243,10 +278,12 @@ function derive(signature: string, opts?: DeriveOptions): DerivedBrand {
   const secondary = opts.secondary ? normHex(opts.secondary) : null;
   const sigIn = normHex(signature) || "#C26A4E";
 
-  // decorative fills & lines — color-mix(signature N%, surface). Not clamped.
-  const tint12 = mix(surface, sigIn, 0.12);
-  const tint6 = mix(surface, sigIn, 0.06);
-  const line30 = mix(surface, sigIn, 0.3);
+  // decorative fills & lines — color-mix(signature N%, surface), HUE-LOCKED to
+  // the signature so cool brands don't pick up the warm cream's yellow cast.
+  // Not clamped (decorative). See mixSurfaceHueLocked.
+  const tint12 = mixSurfaceHueLocked(surface, sigIn, 0.12);
+  const tint6 = mixSurfaceHueLocked(surface, sigIn, 0.06);
+  const line30 = mixSurfaceHueLocked(surface, sigIn, 0.3);
 
   // display / decorative / fill signature — AA-large (3:1) vs surface
   let sig = clampContrast(sigIn, surface, 3.0, "deepen");

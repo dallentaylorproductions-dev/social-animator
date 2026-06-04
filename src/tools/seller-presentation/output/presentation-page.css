@@ -37,6 +37,10 @@
   --signature: #c26a4e;
   --signature-deep: color-mix(in oklch, var(--signature), #000 22%);
   --signature-link: color-mix(in oklch, var(--signature), #000 14%);
+  /* tint-12/6 + line-30: the engine inlines HUE-LOCKED resolved hexes (it
+     holds the signature hue when mixing toward the warm cream surface). CSS
+     color-mix can't express that, so these fallbacks may differ slightly in
+     hue for cool signatures — the inlined values are authoritative. */
   --tint-12: color-mix(in oklch, var(--signature) 12%, var(--surface));
   --tint-6: color-mix(in oklch, var(--signature) 6%, var(--surface));
   --line-30: color-mix(in oklch, var(--signature) 30%, var(--surface));
