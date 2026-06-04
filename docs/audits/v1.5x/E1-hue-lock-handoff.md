@@ -69,4 +69,8 @@ acceptable mobile-webkit binary-missing only).
 Set your brand color in `/settings/brand`, republish, and confirm the **divider** and
 **panel tints** read as YOUR hue family (no yellow/salmon/sage cast). Then PR + squash.
 
-Preview URL: _(filled in after push — Vercel branch preview)_
+Preview URL (branch alias, stable):
+https://social-animat-git-ac3526-dallentaylorproductions-5050s-projects.vercel.app
+- Form: `/settings/brand` — pick a cool signature, watch the palette strip + divider.
+- Seller (cobalt): `/seller-presentation-preview?fixture=full&brandAccent=%232C53C4`
+- Seller (navy + gold): `/seller-presentation-preview?fixture=full&brandAccent=%231F3A6B&brandSecondary=%23B0863A`
