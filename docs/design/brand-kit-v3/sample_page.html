@@ -1,0 +1,118 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+<meta charset="UTF-8" />
+<meta name="viewport" content="width=device-width, initial-scale=1.0" />
+<title>Sample seller page</title>
+<style>
+  *{box-sizing:border-box;margin:0;}
+  :root{ --sans:-apple-system,BlinkMacSystemFont,"Helvetica Neue",Helvetica,Arial,sans-serif; --mono:ui-monospace,SFMono-Regular,Menlo,monospace; }
+  html,body{height:100%;}
+  body{ font-family:var(--sans); -webkit-font-smoothing:antialiased; }
+  .ribbon{ position:fixed; top:0; left:0; right:0; z-index:5; background:#131210; color:#A49E90; font:500 11px/1 var(--sans); padding:7px 16px; display:flex; gap:8px; align-items:center; }
+  .ribbon b{ color:#ECE7DD; font-weight:600; }
+  .ribbon .mono{ font:500 10px/1 var(--mono); color:#716C61; margin-left:auto; }
+  main{ padding-top:30px; min-height:100%; }
+  .hatch{ background:repeating-linear-gradient(135deg,#d9d4cd 0 11px,#cfc9c1 11px 22px); position:relative; display:flex; align-items:flex-end; }
+  .hatch span{ font:500 10px/1 var(--mono); letter-spacing:.06em; text-transform:uppercase; color:#7c766d; background:rgba(255,255,255,.74); padding:4px 8px; margin:12px; border-radius:4px; }
+  .wrap{ max-width:1000px; margin:0 auto; padding:0 28px; }
+  .topbar{ display:flex; align-items:center; gap:12px; padding:18px 0; }
+  .logo{ width:34px; height:34px; border-radius:8px; display:flex; align-items:center; justify-content:center; font:700 14px/1 var(--mono); }
+  .nav{ margin-left:auto; display:flex; gap:22px; font-size:14px; }
+  .eyebrow{ font:600 11px/1 var(--mono); letter-spacing:.16em; text-transform:uppercase; margin-bottom:14px; }
+  .scrim{ padding:34px 0 40px; }
+  .addr{ font-size:46px; font-weight:700; letter-spacing:-.02em; line-height:1.05; }
+  .sub{ font-size:16px; margin-top:12px; opacity:.7; }
+  .cta{ display:flex; gap:12px; margin-top:26px; }
+  .btn{ border:none; border-radius:10px; padding:14px 22px; font:600 15px/1 var(--sans); cursor:pointer; }
+  .btn-ghost{ background:transparent; }
+  .section{ font:600 11px/1 var(--mono); letter-spacing:.14em; text-transform:uppercase; margin:46px 0 18px; }
+  .grid{ display:grid; grid-template-columns:repeat(3,1fr); gap:20px; }
+  .card{ border-radius:14px; overflow:hidden; }
+  .card .body{ padding:16px 16px 20px; }
+  .price{ font-size:20px; font-weight:700; }
+  .meta{ font-size:13px; margin-top:4px; opacity:.6; }
+  .cardaddr{ font-size:15px; font-weight:500; margin-top:9px; }
+  footer{ margin-top:60px; padding:40px 0 70px; }
+  .fname{ font-size:20px; font-weight:700; }
+  .fmeta{ font-size:13px; margin-top:8px; opacity:.6; line-height:1.7; }
+  @media (max-width:720px){ .grid{ grid-template-columns:1fr; } .addr{ font-size:34px; } }
+</style>
+</head>
+<body>
+<div class="ribbon">
+  <b>Sample page</b> · rendered in your current colors (not yet published)
+  <span class="mono" id="paramline"></span>
+</div>
+<main id="page"></main>
+
+<script src="js/color-utils.js"></script>
+<script>
+  (function(){
+    const CU = window.CU;
+    const p = new URLSearchParams(location.search);
+    const accent = CU.normalizeHex(p.get("accent")) || "#C26A4E";
+    const bg = CU.normalizeHex(p.get("bg")) || "#F1EBE0";
+    const text = CU.normalizeHex(p.get("text")) || "#1A1612";
+    const layout = p.get("layout") || "spotlight";
+    const agent = p.get("agent") || "Your agency";
+    const logo = p.get("logo") === "1";
+
+    function mix(a,b,t){ const A=CU.hexToRgb(a),B=CU.hexToRgb(b); return CU.rgbToHex({r:A.r+(B.r-A.r)*t,g:A.g+(B.g-A.g)*t,b:A.b+(B.b-A.b)*t}); }
+    const ink = CU.readableInk(accent);
+    const accentText = CU.accentOnSurface(accent, bg).hex;
+    const muted = mix(text,bg,.42), hair = mix(text,bg,.86), card = mix(bg,text,.04);
+
+    document.body.style.background = bg;
+    document.body.style.color = text;
+    document.getElementById("paramline").textContent = `${accent} · ${bg} · ${text}`;
+
+    const listings = [
+      {price:"$845,000",meta:"4 bd · 3 ba · 2,410 sqft",addr:"18 Linden Court"},
+      {price:"$612,000",meta:"3 bd · 2 ba · 1,680 sqft",addr:"240 Mesa Ridge Dr"},
+      {price:"$1,180,000",meta:"5 bd · 4 ba · 3,090 sqft",addr:"7 Overlook Lane"},
+    ];
+    const cards = listings.map(l=>`
+      <div class="card" style="border:1px solid ${hair};background:${card}">
+        <div class="hatch" style="height:150px"></div>
+        <div class="body">
+          <div class="price">${l.price}</div>
+          <div class="meta">${l.meta}</div>
+          <div class="cardaddr">${l.addr}</div>
+        </div>
+      </div>`).join("");
+
+    document.getElementById("page").innerHTML = `
+      <div class="wrap">
+        <div class="topbar">
+          <div class="logo" style="${logo? `background:${accent};color:${ink}` : `border:1.5px dashed ${mix(text,bg,.55)};color:${muted};font-size:9px`}">${logo? (agent[0]||"A") : "logo"}</div>
+          <strong style="font-size:16px">${agent}</strong>
+          <div class="nav" style="color:${muted}"><span>Listings</span><span>About</span><span>Contact</span></div>
+        </div>
+      </div>
+      <div class="hatch" style="height:200px"><span>listing photo</span></div>
+      <div class="scrim" style="background:${card};border-bottom:1px solid ${hair}">
+        <div class="wrap">
+          <div class="eyebrow" style="color:${accentText}">Just listed</div>
+          <div class="addr">18 Linden Court</div>
+          <div class="sub">Maple Heights · Listed by ${agent}</div>
+          <div class="cta">
+            <button class="btn" style="background:${accent};color:${ink}">Contact agent</button>
+            <button class="btn btn-ghost" style="color:${accentText};border:1px solid ${mix(accentText,bg,.55)}">Schedule a tour</button>
+          </div>
+        </div>
+      </div>
+      <div class="wrap">
+        <div class="section" style="color:${accentText}">More from ${agent.split(" ")[0]}</div>
+        <div class="grid" style="${layout==='list'?'grid-template-columns:1fr':''}">${cards}</div>
+      </div>
+      <footer style="background:${card};border-top:1px solid ${hair}">
+        <div class="wrap">
+          <div class="fname" style="color:${accentText}">${agent}</div>
+          <div class="fmeta">License #00000000 · (000) 000-0000<br>Equal housing opportunity · Sample content</div>
+        </div>
+      </footer>`;
+  })();
+</script>
+</body>
+</html>
