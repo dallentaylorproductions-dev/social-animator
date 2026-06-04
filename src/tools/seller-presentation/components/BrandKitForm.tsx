@@ -123,6 +123,7 @@ function ColorRow({
   onReset,
   resetLabel,
   testId,
+  pickerTestId,
   inputRef,
 }: {
   kind: "signature" | "secondary" | "surface";
@@ -135,15 +136,35 @@ function ColorRow({
   onReset: () => void;
   resetLabel: string;
   testId: string;
+  pickerTestId: string;
   inputRef?: React.Ref<HTMLInputElement>;
 }) {
+  // The swatch is the native OS color-picker trigger (restored from E.0 —
+  // hex-only entry is hostile to nontechnical agents). A visually-hidden
+  // <input type="color"> fills the swatch; clicking anywhere on it opens the
+  // picker. Picking commits through the SAME path as a hex commit (parent
+  // set → autosave → derive re-run). For the empty secondary the picker
+  // opens from black and the first pick sets it (Add → pick). Values are
+  // normalized to the engine's #RRGGBB casing so picker + hex agree.
+  const pickerValue = (BrandEngine.normHex(empty ? "#000000" : color) ||
+    "#000000").toLowerCase();
   return (
     <div className={"crow" + (kind === "secondary" ? " is-secondary" : "")}>
-      <div
+      <label
         className={"swatch" + (empty ? " is-empty" : "")}
         style={empty ? undefined : { background: color }}
-        aria-hidden="true"
-      />
+      >
+        <input
+          type="color"
+          className="swatch__native"
+          value={pickerValue}
+          aria-label={label + " color picker"}
+          data-testid={pickerTestId}
+          onChange={(e) =>
+            onCommit(BrandEngine.normHex(e.target.value) || e.target.value)
+          }
+        />
+      </label>
       <div className="crow__body">
         <div className="crow__head">
           <span className="crow__label">{label}</span>
@@ -375,6 +396,7 @@ export function BrandKitForm({
         optLabel="The one color"
         color={values.accent}
         testId="brand-color-accent"
+        pickerTestId="brand-color-picker-accent"
         help="Pick one color. We build your palette from it — prices, buttons, links, accents and dividers all derive from here."
         onCommit={(v) => set({ accent: v })}
         onReset={() => set({ accent: DEF.accent })}
@@ -391,6 +413,7 @@ export function BrandKitForm({
         color={values.secondary || "#000000"}
         empty={!hasSecondary}
         testId="brand-color-secondary"
+        pickerTestId="brand-color-picker-secondary"
         help="Used for decorative moments — section numerals, end-marks — when set. Derived from your signature when not."
         onCommit={(v) => set({ secondary: v })}
         onReset={() =>
@@ -432,6 +455,7 @@ export function BrandKitForm({
             label="Background"
             color={values.background}
             testId="brand-color-background"
+            pickerTestId="brand-color-picker-background"
             onCommit={(v) => set({ background: v })}
             onReset={() => set({ background: DEF.background })}
             resetLabel="Reset"
@@ -441,6 +465,7 @@ export function BrandKitForm({
             label="Text"
             color={values.text}
             testId="brand-color-text"
+            pickerTestId="brand-color-picker-text"
             onCommit={(v) => set({ text: v })}
             onReset={() => set({ text: DEF.text })}
             resetLabel="Reset"

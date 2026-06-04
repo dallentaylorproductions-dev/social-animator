@@ -129,6 +129,53 @@ test.describe("Brand kit v2 form", () => {
       .toBe(false);
   });
 
+  test("native color picker on the signature swatch commits + recomputes the palette strip", async ({
+    page,
+  }) => {
+    await page.goto("/settings/brand");
+
+    // defaults: signature chip reads terracotta
+    const sigChipHex = page
+      .getByTestId("brand-palette-chip-signature")
+      .locator(".pchip__hex");
+    await expect(sigChipHex).toHaveText(/C26A4E/i);
+
+    // drive the native <input type="color"> directly (Playwright fills it)
+    await page.getByTestId("brand-color-picker-accent").fill("#2c53c4");
+
+    // hex field + derived strip both recompute to the picked color
+    await expect(page.getByTestId("brand-color-accent")).toHaveValue("#2C53C4");
+    await expect(sigChipHex).toHaveText(/2C53C4/i);
+
+    // committed through the same path as a hex edit (autosave)
+    await expect
+      .poll(async () => (await readStore(page))?.brandAccent)
+      .toBe("#2C53C4");
+  });
+
+  test("picking on the empty secondary swatch sets it (Add → pick)", async ({
+    page,
+  }) => {
+    await page.goto("/settings/brand");
+    const secRow = page
+      .locator(".crow.is-secondary")
+      .filter({ has: page.getByTestId("brand-color-secondary") });
+    await expect(secRow.getByRole("button")).toHaveText("Add");
+
+    await page.getByTestId("brand-color-picker-secondary").fill("#b0863a");
+
+    await expect(page.getByTestId("brand-color-secondary")).toHaveValue(
+      "#B0863A",
+    );
+    await expect(secRow.getByRole("button")).toHaveText("Clear");
+    await expect(
+      page.getByTestId("brand-readability-fixes").getByText("Section numerals"),
+    ).toBeVisible();
+    await expect
+      .poll(async () => (await readStore(page))?.brandSecondary)
+      .toBe("#B0863A");
+  });
+
   test("invalid hex does not commit (last good value stays, error border shown)", async ({
     page,
   }) => {

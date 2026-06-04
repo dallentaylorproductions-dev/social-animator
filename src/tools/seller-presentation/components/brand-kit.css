@@ -146,6 +146,7 @@
   border-top: 1px solid var(--ui-line);
 }
 .bk-scope .swatch {
+  display: block;
   width: 64px;
   height: 64px;
   border-radius: var(--r-md);
@@ -153,6 +154,14 @@
     0 1px 0 rgba(0, 0, 0, 0.3);
   position: relative;
   overflow: hidden;
+  cursor: pointer;
+  transition: box-shadow 0.15s;
+}
+/* the swatch IS the native color-picker trigger (clickable affordance) */
+.bk-scope .swatch:hover,
+.bk-scope .swatch:focus-within {
+  box-shadow: inset 0 0 0 1px rgba(255, 255, 255, 0.18),
+    0 0 0 3px var(--v2-mint-dim);
 }
 .bk-scope .swatch.is-empty {
   background: repeating-linear-gradient(
@@ -162,6 +171,24 @@
     ),
     var(--ui-field);
   box-shadow: inset 0 0 0 1px var(--ui-line-2);
+}
+.bk-scope .swatch.is-empty:hover,
+.bk-scope .swatch.is-empty:focus-within {
+  box-shadow: inset 0 0 0 1px var(--ui-line-2), 0 0 0 3px var(--v2-mint-dim);
+}
+/* visually hidden, but fills the swatch so a click anywhere opens the OS
+   picker; the swatch background shows the live color (or hatch when empty) */
+.bk-scope .swatch__native {
+  position: absolute;
+  inset: 0;
+  width: 100%;
+  height: 100%;
+  margin: 0;
+  padding: 0;
+  border: 0;
+  background: none;
+  opacity: 0;
+  cursor: pointer;
 }
 .bk-scope .crow__head {
   display: flex;
