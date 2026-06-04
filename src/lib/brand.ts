@@ -57,6 +57,16 @@ export interface BrandSettings {
   brandText?: string;
   brandAccent?: string;
   /**
+   * E.1 — optional SECONDARY brand color. `brandAccent` is now the
+   * "signature" (label-only rename in the UI; no field rename, no
+   * migration). The secondary is decorative-only (section numerals,
+   * end-marks) at full strength; the seller-page engine derives it from
+   * the signature when unset. Follows the E.0 optional-field contract
+   * verbatim: hex-clamped on load, NEVER written on mount, unset (absent /
+   * empty) is a first-class state.
+   */
+  brandSecondary?: string;
+  /**
    * E.0 — brand-level default layout id. Seeds a fresh draft's
    * `themeId` at creation time. "editorial" | "studio" | "warm";
    * undefined falls back to "editorial" at render. Only "editorial" is
@@ -290,6 +300,7 @@ export function loadBrandSettings(): BrandSettings {
       brandBackground: clampBrandHex(parsed.brandBackground),
       brandText: clampBrandHex(parsed.brandText),
       brandAccent: clampBrandHex(parsed.brandAccent),
+      brandSecondary: clampBrandHex(parsed.brandSecondary),
       defaultThemeId:
         typeof parsed.defaultThemeId === "string" &&
         parsed.defaultThemeId.length > 0

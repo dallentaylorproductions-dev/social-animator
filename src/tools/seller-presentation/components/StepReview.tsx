@@ -128,6 +128,8 @@ export function StepReview({ draft, goToStep }: StepReviewProps) {
     brandBackground: brand.brandBackground,
     brandText: brand.brandText,
     brandAccent: brand.brandAccent,
+    // E.1 — optional secondary (decorative role); additive to the E.0 trio.
+    brandSecondary: brand.brandSecondary,
   };
 
   // A7c.4: StepPitch seeds INITIAL_VISIBLE_ROWS empty rows on mount

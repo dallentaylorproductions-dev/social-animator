@@ -1005,4 +1005,33 @@ test.describe('toPublicPayload — brand colors projection (E.0)', () => {
     expect(serialized).not.toContain('PRIVATE_SENTINEL_BRAND_ROGUE');
     expect(serialized).not.toContain('"brandLogoUrl":');
   });
+
+  // ---- E.1 — optional secondary (decorative role) ----
+  test('E.1 — valid secondary round-trips onto payload.brandColors.secondary', () => {
+    const payload = toPublicPayload(baseDraft(), FIXTURE_AGENT_CONTACT, {}, {
+      brandAccent: '#1f3a6b',
+      brandSecondary: '#b0863a',
+    });
+    expect(payload.brandColors).toEqual({
+      accent: '#1f3a6b',
+      secondary: '#b0863a',
+    });
+  });
+
+  test('E.1 — secondary absent → no secondary key (unset is first-class)', () => {
+    const payload = toPublicPayload(baseDraft(), FIXTURE_AGENT_CONTACT, {}, {
+      brandAccent: '#1f3a6b',
+    });
+    expect(payload.brandColors).toEqual({ accent: '#1f3a6b' });
+    expect(payload.brandColors?.secondary).toBeUndefined();
+    expect(JSON.stringify(payload)).not.toContain('"secondary":');
+  });
+
+  test('E.1 — non-hex secondary drops, signature survives', () => {
+    const payload = toPublicPayload(baseDraft(), FIXTURE_AGENT_CONTACT, {}, {
+      brandAccent: '#1f3a6b',
+      brandSecondary: 'gold', // not hex — drop
+    });
+    expect(payload.brandColors).toEqual({ accent: '#1f3a6b' });
+  });
 });
