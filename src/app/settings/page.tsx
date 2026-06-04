@@ -26,7 +26,7 @@ export default async function SettingsPage() {
   }
 
   return (
-    <main className="min-h-screen bg-neutral-950 text-white">
+    <main className="min-h-screen text-white">
       <div className="max-w-2xl mx-auto px-6 py-12 lg:py-20">
         <header className="mb-10">
           <Link
