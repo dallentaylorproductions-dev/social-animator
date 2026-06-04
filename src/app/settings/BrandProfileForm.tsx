@@ -125,6 +125,14 @@ export function BrandProfileForm() {
           />
         </Field>
       </div>
+      {/* Item 4 (post-E.0): truthful color-destination label — verified
+          against real consumers (Listing Flyer, Listing Presentation,
+          Open House Promo, SIR PDF). These Profile colors do NOT style the
+          published seller page; those colors live in the Brand tab. */}
+      <p className="-mt-3 text-[11px] text-neutral-600 leading-relaxed">
+        These colors style your flyers, presentations, and promos. Your seller
+        page&apos;s colors are set in the Brand tab.
+      </p>
 
       <Field label="Brokerage">
         <TextInput
@@ -233,6 +241,13 @@ export function BrandProfileForm() {
             onChange={(v) => update("agentCtaReassurance", v || undefined)}
             placeholder="No pressure. Reach out whenever you're ready."
           />
+          {/* Item 3 (post-E.0): truthful destination label — verified
+              against presentation-page.tsx AgentCtas (renders directly
+              under the "Schedule a listing call" button). */}
+          <p className="mt-1.5 text-[11px] text-neutral-600 leading-relaxed">
+            Appears under the &ldquo;Schedule a listing call&rdquo; button on
+            your published seller page.
+          </p>
         </Field>
       </div>
 

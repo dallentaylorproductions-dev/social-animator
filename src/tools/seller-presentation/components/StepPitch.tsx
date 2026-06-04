@@ -179,6 +179,36 @@ export function StepPitch({ draft, setDraft }: StepPitchProps) {
 
   const [openSwapIndex, setOpenSwapIndex] = useState<number | null>(null);
 
+  // Item 2 (post-E.0): the open Swap picker dismisses on an outside click
+  // or Escape. Previously the only way out was pressing Swap again, which
+  // agents didn't discover. Clicks inside the open picker, or on its own
+  // Swap toggle, are ignored here so the existing toggle + option onClick
+  // handlers (which manage their own close) keep working without a
+  // double-fire (a re-press would otherwise close-then-reopen).
+  useEffect(() => {
+    if (openSwapIndex === null) return;
+    const onPointerDown = (e: MouseEvent) => {
+      const t = e.target as HTMLElement | null;
+      if (!t) return;
+      if (t.closest(`[data-testid="step-pitch-swap-picker-${openSwapIndex}"]`)) {
+        return;
+      }
+      if (t.closest(`[data-testid="step-pitch-swap-${openSwapIndex}"]`)) {
+        return;
+      }
+      setOpenSwapIndex(null);
+    };
+    const onKeyDown = (e: KeyboardEvent) => {
+      if (e.key === "Escape") setOpenSwapIndex(null);
+    };
+    document.addEventListener("mousedown", onPointerDown);
+    document.addEventListener("keydown", onKeyDown);
+    return () => {
+      document.removeEventListener("mousedown", onPointerDown);
+      document.removeEventListener("keydown", onKeyDown);
+    };
+  }, [openSwapIndex]);
+
   const updatePoint = (id: string, patch: Partial<PitchPoint>) => {
     const next = draft.pitchPoints.map((p) =>
       p.id === id ? { ...p, ...patch } : p,

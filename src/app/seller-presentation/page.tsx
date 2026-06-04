@@ -171,11 +171,7 @@ export default function SellerPresentationPage() {
             <StepEditorial draft={instance.draft} setDraft={setDraft} />
           )}
           {currentStep === "review" && (
-            <StepReview
-              draft={instance.draft}
-              goToStep={setCurrentStep}
-              setDraft={setDraft}
-            />
+            <StepReview draft={instance.draft} goToStep={setCurrentStep} />
           )}
         </StepErrorBoundary>
       </section>
