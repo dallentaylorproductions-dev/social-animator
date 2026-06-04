@@ -85,4 +85,7 @@ logo suggestions (with/without a logo); Open full sample page from unsaved value
 collapse + honest "adjusted" copy on a low-contrast body choice; Brand-ready both states;
 secondary-saved note (you have a saved secondary to test with); mobile. Then PR + squash.
 
-Preview URL: _(filled in after push — Vercel branch preview)_
+Preview URL (branch alias, stable):
+https://social-animat-git-08516e-dallentaylorproductions-5050s-projects.vercel.app
+- Brand kit (the whole v3 form + live embedded preview): `/settings/brand`
+- Embedded preview seen standalone (cobalt): `/seller-presentation-preview?fixture=full&brandAccent=%232C53C4`
