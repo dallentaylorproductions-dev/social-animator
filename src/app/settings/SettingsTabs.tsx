@@ -5,18 +5,20 @@ import { usePathname } from "next/navigation";
 import "./settings-tabs.css";
 
 /**
- * Settings tab nav (Phase E.0 + E.0 fix-up). Profile is the default
- * landing (production behavior unchanged); Brand is the new addition.
- * Active tab resolves from the pathname so a deep link to either route
- * highlights correctly.
+ * Settings header (Phase E.0 + fix-ups). Renders the shared settings
+ * chrome — the "← Studio" breadcrumb then the Profile | Brand tab strip —
+ * from settings/layout.tsx, so BOTH render identically on /settings and
+ * /settings/brand (fix-up #4: the back link is no longer trapped on the
+ * Profile route, and breadcrumb + strip never jump when switching tabs).
+ * Order: breadcrumb → tab strip → page header.
  *
- * Placement: the strip is left-aligned WITH each route's content column.
- * Profile and Brand use different centered column widths (max-w-2xl vs
- * the Brand-kit .page at 1060px), so the outer wrapper picks the matching
- * width per route — the only way to sit flush with each page's content
- * left edge. The pill container chrome itself is identical on both routes
- * (dark panel token, subtle line border); only the alignment wrapper
- * differs. Renders from settings/layout.tsx, above each page's content.
+ * Profile is the default landing; the active tab resolves from the
+ * pathname. Placement: the head is left-aligned WITH each route's content
+ * column. Profile and Brand use different centered column widths
+ * (max-w-2xl vs the Brand-kit .page at 1060px), so the wrapper picks the
+ * matching width per route — the only way to sit flush with each page's
+ * content left edge. The breadcrumb + tab chrome themselves are identical
+ * on both routes; only the alignment-wrapper width differs.
  */
 export function SettingsTabs() {
   const pathname = usePathname();
@@ -25,12 +27,13 @@ export function SettingsTabs() {
   return (
     <div
       className={
-        "sep-settings-tabbar " +
-        (isBrand
-          ? "sep-settings-tabbar--brand"
-          : "sep-settings-tabbar--profile")
+        "sep-settings-head " +
+        (isBrand ? "sep-settings-head--brand" : "sep-settings-head--profile")
       }
     >
+      <Link href="/dashboard" className="sep-settings-back">
+        ← Studio
+      </Link>
       <nav
         className="sep-settings-tabs"
         role="tablist"

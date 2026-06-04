@@ -74,9 +74,10 @@ export default function BrandSettingsPage() {
   return (
     <main className="bk-scope" data-testid="settings-brand-page">
       {/* fix-up #2: transparent main (the continuous glow surface lives on
-          settings/layout.tsx); top padding trimmed so the header sits
-          ~22px under the tab strip instead of ~40px+ down the page. */}
-      <div className="page" style={{ paddingTop: 22 }}>
+          settings/layout.tsx). fix-up #4: top padding matched to the
+          Profile route's reference gap via .sep-brand-head-gap so the page
+          header sits at the same Y on both routes (no jump on tab switch). */}
+      <div className="page sep-brand-head-gap">
         <div className="page-head" style={{ marginTop: 0 }}>
           <h1 className="page-title">Brand kit</h1>
           <p className="page-sub">

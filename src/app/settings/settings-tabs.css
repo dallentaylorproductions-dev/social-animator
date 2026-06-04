@@ -33,21 +33,43 @@
     #0a0a0a;
 }
 
-.sep-settings-tabbar {
+/* Shared settings head: breadcrumb + tab strip, stacked and left-aligned
+   with each route's content column (fix-up #4). Same content + chrome on
+   both routes; only the wrapper width/side-padding differs to sit flush
+   with each page's column. */
+.sep-settings-head {
   display: flex;
-  justify-content: flex-start;
+  flex-direction: column;
+  align-items: flex-start;
   margin: 0 auto;
   box-sizing: border-box;
 }
 /* Match Profile's content column: max-w-2xl (42rem) + px-6 (24px). */
-.sep-settings-tabbar--profile {
+.sep-settings-head--profile {
   max-width: 42rem;
   padding: 24px 24px 0;
 }
 /* Match the Brand-kit .page column: 1060px + 28px side padding. */
-.sep-settings-tabbar--brand {
+.sep-settings-head--brand {
   max-width: 1060px;
   padding: 24px 28px 0;
+}
+
+/* "← Studio" back link — same look as the original Profile breadcrumb
+   (text-xs uppercase tracking-[0.2em] text-mint hover:underline), now
+   shared across both routes. */
+.sep-settings-back {
+  font-size: 12px;
+  line-height: 1;
+  font-weight: 500;
+  text-transform: uppercase;
+  letter-spacing: 0.2em;
+  color: #4ef2d9; /* --color-mint */
+  text-decoration: none;
+  margin-bottom: 16px;
+}
+.sep-settings-back:hover {
+  text-decoration: underline;
 }
 
 .sep-settings-tabs {
@@ -79,4 +101,19 @@
 .sep-settings-tab.active {
   color: #08120f;
   background: #f4f2ef;
+}
+
+/* fix-up #4: strip→header gap identical on both routes, Profile as the
+   reference. Profile's gap is its inner column top padding (Tailwind
+   py-12 = 48px, lg:py-20 = 80px) plus the "Settings" h1's mt-2 (8px).
+   The Brand page's .page column gets the same total so the page header
+   sits at the same Y — no vertical jump when switching tabs. (Coupled to
+   Profile's Tailwind values by design; both are stable constants.) */
+.bk-scope .page.sep-brand-head-gap {
+  padding-top: 56px;
+}
+@media (min-width: 1024px) {
+  .bk-scope .page.sep-brand-head-gap {
+    padding-top: 88px;
+  }
 }
