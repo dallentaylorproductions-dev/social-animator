@@ -104,3 +104,75 @@ test.describe("BrandEngine — derivation contract", () => {
     expect(BrandEngine.derive(TERRACOTTA, { secondary: null }).secondarySet).toBe(false);
   });
 });
+
+/* --------------------------------------------------------------------------
+ * Hue-locked derivation (the "yellowy divider" fix). The surface-mixed steps
+ * (tint-12 / tint-6 / line-30) must hold the SIGNATURE hue when mixing toward
+ * the warm cream surface, so cool brands don't pick up a yellow cast. Hue is
+ * compared in OKLCh; assertions are quantization-robust (8-bit rgb roundtrip
+ * drifts hue at low chroma, so we assert both "closer to signature than to the
+ * old mix / to the surface" and a generous absolute bound, not brittle decimals).
+ * ------------------------------------------------------------------------ */
+function hueDist(a: number, b: number): number {
+  const d = Math.abs(a - b) % 360;
+  return d > 180 ? 360 - d : d;
+}
+const SURFACE_STEPS = [
+  ["tint-12", 0.12],
+  ["tint-6", 0.06],
+  ["line-30", 0.3],
+] as const;
+
+test.describe("BrandEngine — hue-locked surface mixes", () => {
+  const COOL = {
+    cobalt: "#2C53C4",
+    navy: "#1F3A6B",
+    green: "#2E8B57",
+    magenta: "#B5179E",
+  };
+
+  for (const [name, sig] of Object.entries(COOL)) {
+    test(`${name}: tint-12 / tint-6 / line-30 hold the signature hue (no yellow drag)`, () => {
+      const d = BrandEngine.derive(sig, { surface: PAPER, ink: INK });
+      const hSig = BrandEngine.rgbToOklch(sig).h;
+      const hSurface = BrandEngine.rgbToOklch(PAPER).h;
+      for (const [step, w] of SURFACE_STEPS) {
+        const newHue = BrandEngine.rgbToOklch(d.hexes[step]).h;
+        // plain (old) mix interpolated hue → drifted toward the cream
+        const oldHue = BrandEngine.rgbToOklch(
+          BrandEngine.mixOklch(PAPER, sig, w),
+        ).h;
+        const dNew = hueDist(newHue, hSig);
+        const dOld = hueDist(oldHue, hSig);
+        // the fix pulls the step's hue toward the signature vs the old mix...
+        expect(dNew).toBeLessThan(dOld);
+        // ...lands on the signature hue (generous ε for low-chroma 8-bit drift)...
+        expect(dNew).toBeLessThan(8);
+        // ...and sits far from the warm-cream hue that caused the cast
+        expect(hueDist(newHue, hSig)).toBeLessThan(hueDist(newHue, hSurface));
+      }
+    });
+  }
+
+  test("baseline pin: terracotta-default tint-12 / tint-6 / line-30 (hue-locked engine output)", () => {
+    // Re-pinned for the hue-lock change. Terracotta + cream are both warm, so
+    // the delta is small, but the hue now tracks the signature (~38°) instead
+    // of being dragged toward the cream (~80°). Exact engine output:
+    const d = BrandEngine.derive(TERRACOTTA, { surface: PAPER, ink: INK });
+    expect(d.hexes["tint-12"]).toBe("#F1D9D2");
+    expect(d.hexes["tint-6"]).toBe("#F4E1DB");
+    expect(d.hexes["line-30"]).toBe("#E9C2B6");
+  });
+
+  test("gray-floor fallback: a near-neutral signature derives clean grays (plain mix, no injected hue)", () => {
+    const GRAY = "#808080";
+    const d = BrandEngine.derive(GRAY, { surface: PAPER, ink: INK });
+    // below CHROMA_FLOOR the hue-lock falls back to the plain OKLCh mix — assert
+    // the three steps are byte-identical to mixOklch (proves the fallback path)
+    for (const [step, w] of SURFACE_STEPS) {
+      expect(d.hexes[step]).toBe(BrandEngine.mixOklch(PAPER, GRAY, w));
+    }
+    // and the result stays near-neutral (no third hue injected)
+    expect(BrandEngine.rgbToOklch(d.hexes["line-30"]).C).toBeLessThan(0.03);
+  });
+});
