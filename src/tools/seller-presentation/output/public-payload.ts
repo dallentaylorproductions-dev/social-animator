@@ -89,6 +89,33 @@ export interface BrandReviewsInput {
 export const REVIEWS_OUTLINK_LABEL = "See all reviews on Zillow";
 
 /**
+ * E.0 — brand colors input. Same provenance as `AgentBranding` /
+ * `BrandReviewsInput`: read from BrandSettings on the client, forwarded
+ * by the publish route, projected field-by-field into the public
+ * payload. Wire-permissive (raw hex strings or undefined); the projector
+ * validates each field and drops anything that isn't a 6-digit hex.
+ */
+export interface BrandColorsInput {
+  brandBackground?: string;
+  brandText?: string;
+  brandAccent?: string;
+}
+
+/**
+ * E.0 — public projection of the three brand colors. The consumer
+ * `/h/<slug>` page applies these as inline CSS custom properties
+ * (`--brand-bg` / `--brand-text` / `--brand-accent`) on the page root.
+ * Each field is independently optional: an undefined field falls through
+ * to the consumer-page CSS `var()` fallback (the production Editorial
+ * hex), so an unset brand renders byte-identical to today.
+ */
+export interface PublicBrandColors {
+  background?: string;
+  text?: string;
+  accent?: string;
+}
+
+/**
  * Public projection of a comp. A7a trims the PUBLIC emit to exactly
  * `{address, soldPrice, soldDate, sqft}` per the locked design.
  * v1.47 Lane A polish: `yearBuilt` joins the public emit so the
@@ -163,6 +190,37 @@ export interface PublicPayload {
   areaStats?: AreaStats;
   /** Same projection as `agentBranding` — the locked-design renderer reads `agent`. */
   agent: AgentBranding;
+
+  // ---- E.0 brand colors (consumer page applies as CSS custom props) ----
+  /** Undefined when no brand color was set — the consumer CSS falls back to the Editorial defaults. */
+  brandColors?: PublicBrandColors;
+}
+
+/**
+ * E.0 — strict 6-digit hex validator (defense-at-boundary). Anything
+ * that isn't a `#rrggbb` string is rejected, so a malformed or tampered
+ * value never reaches the consumer page's inline `style`.
+ */
+function isValidHex(value: string | undefined): value is string {
+  return typeof value === "string" && /^#[0-9a-f]{6}$/i.test(value);
+}
+
+/**
+ * E.0 — project the brand colors field-by-field. Each color is validated
+ * independently; invalid / absent fields are simply omitted (the
+ * consumer CSS `var()` fallback then fires for that channel). Returns
+ * undefined when nothing valid survives, so an unset brand emits no
+ * `brandColors` key at all (cohort-safe — the page renders today's
+ * Editorial palette via the CSS fallbacks).
+ */
+function projectBrandColors(
+  input: BrandColorsInput,
+): PublicBrandColors | undefined {
+  const out: PublicBrandColors = {};
+  if (isValidHex(input.brandBackground)) out.background = input.brandBackground;
+  if (isValidHex(input.brandText)) out.text = input.brandText;
+  if (isValidHex(input.brandAccent)) out.accent = input.brandAccent;
+  return Object.keys(out).length > 0 ? out : undefined;
 }
 
 /**
@@ -316,6 +374,7 @@ export function toPublicPayload(
   draft: SellerPresentationDraft,
   agentContact: AgentBranding,
   brandReviews: BrandReviewsInput = {},
+  brandColors: BrandColorsInput = {},
 ): PublicPayload {
   const propertyAddress = draft.propertyAddress ?? "";
   const recommendedPrice = draft.recommendedPrice ?? "";
@@ -379,6 +438,11 @@ export function toPublicPayload(
     reviewsOutlink: projectedOutlink,
     areaStats: projectAreaStats(draft.areaStats),
     agent,
+
+    // E.0 — brand colors validated + projected field-by-field. Undefined
+    // when nothing valid was supplied, so the consumer page falls back to
+    // the production Editorial palette via its CSS var() cascade.
+    brandColors: projectBrandColors(brandColors),
   };
 }
 
@@ -448,7 +512,26 @@ export function clampPublicPayload(raw: unknown): PublicPayload {
     reviewsOutlink: clampReviewsOutlink(r.reviewsOutlink),
     areaStats: clampAreaStats(r.areaStats),
     agent,
+    brandColors: clampBrandColors(r.brandColors),
   };
+}
+
+/**
+ * E.0 — defense-at-boundary clamp for the public brand colors. Reads the
+ * already-projected public shape (`{background, text, accent}`) from a KV
+ * record, re-validating each field as a 6-digit hex. Returns undefined
+ * when nothing valid survives so the renderer treats "no brand colors"
+ * as a single state (CSS var() fallbacks fire).
+ */
+function clampBrandColors(raw: unknown): PublicBrandColors | undefined {
+  if (!raw || typeof raw !== "object") return undefined;
+  const r = raw as Record<string, unknown>;
+  const out: PublicBrandColors = {};
+  if (typeof r.background === "string" && isValidHex(r.background))
+    out.background = r.background;
+  if (typeof r.text === "string" && isValidHex(r.text)) out.text = r.text;
+  if (typeof r.accent === "string" && isValidHex(r.accent)) out.accent = r.accent;
+  return Object.keys(out).length > 0 ? out : undefined;
 }
 
 function emptyPayload(): PublicPayload {

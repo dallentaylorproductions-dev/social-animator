@@ -1,4 +1,3 @@
-import Link from "next/link";
 import { auth } from "@/lib/auth";
 import { getUser } from "@/lib/db";
 import { BrandProfileForm } from "./BrandProfileForm";
@@ -26,15 +25,11 @@ export default async function SettingsPage() {
   }
 
   return (
-    <main className="min-h-screen bg-neutral-950 text-white">
+    <main className="min-h-screen text-white">
       <div className="max-w-2xl mx-auto px-6 py-12 lg:py-20">
         <header className="mb-10">
-          <Link
-            href="/dashboard"
-            className="text-xs uppercase tracking-[0.2em] text-mint hover:underline"
-          >
-            ← Studio
-          </Link>
+          {/* "← Studio" breadcrumb hoisted to settings/layout.tsx (fix-up
+              #4) so it renders on both /settings and /settings/brand. */}
           <h1 className="text-3xl font-bold mt-2">Settings</h1>
         </header>
 

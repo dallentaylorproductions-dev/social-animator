@@ -24,13 +24,22 @@
 
 .sep-presentation {
   /* ---- Color tokens ---- */
-  --paper: #f1ebe0;
+  /* E.0 — the three PRIMARY tokens are brand-wired: each consumes the
+     agent's brand color (set as a CSS custom property on the page root by
+     presentation-page.tsx) and falls back to the EXACT current production
+     hex when unset. Cohort safety: an agent who never sets brand colors
+     publishes pages byte-identical to today (the fallback IS the prior
+     hardcoded value). The derived shades below (paper-deep/raise/card/
+     line*, ink-2/muted/faint) stay FIXED in E.0 — re-deriving them from
+     the primaries can't reproduce the hand-tuned production hexes without
+     breaking byte-identity, so it's deferred to a later packet. */
+  --paper: var(--brand-bg, #f1ebe0);
   --paper-deep: #e8e0d2;
   --paper-raise: #fbf7ee;
   --paper-card: #fcf9f2;
   --paper-line: #e0d6c5;
   --paper-line-soft: #eae1d0;
-  --ink: #1a1612;
+  --ink: var(--brand-text, #1a1612);
   --ink-2: #2a241f;
   --ink-muted: #6e665b;
   --ink-faint: #a29888;
@@ -38,7 +47,7 @@
   --mint-deep: #1f8f7c;
   --gold: #c9a86a;
   --gold-warm: #b8965a;
-  --brick: #c26a4e;
+  --brick: var(--brand-accent, #c26a4e);
   --brick-deep: #a85439;
   --rose: #d29a9a;
   --pos: #1d9e75;

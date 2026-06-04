@@ -37,11 +37,16 @@ import {
 export const dynamic = "force-dynamic";
 
 interface PageProps {
-  searchParams: Promise<{ fixture?: string }>;
+  searchParams: Promise<{
+    fixture?: string;
+    brandBg?: string;
+    brandText?: string;
+    brandAccent?: string;
+  }>;
 }
 
 export default async function SellerPresentationPreview({ searchParams }: PageProps) {
-  const { fixture } = await searchParams;
+  const { fixture, brandBg, brandText, brandAccent } = await searchParams;
   // A7d.8 — added three poster-precedence variants. The renderer's
   // VideoBlock emits `data-poster-source` so the e2e suite can assert
   // which branch of the override > scrub > auto cascade fired without
@@ -82,6 +87,22 @@ export default async function SellerPresentationPreview({ searchParams }: PagePr
                 ? POSTER_NONE_PAYLOAD
                 : FULL_PAYLOAD;
 
+  // E.0 — optional brand-color override (drives the brand-colors e2e
+  // regression spec + Dallen's browser smoke). Validated hex only; merged
+  // onto the fixture payload's `brandColors`, then routed through the SAME
+  // clampPublicPayload boundary as a real publish (SellerPresentationPage
+  // re-clamps handout.data). No params → no brandColors → the page renders
+  // the production Editorial palette via the CSS var() fallbacks.
+  const isHex = (v: string | undefined): v is string =>
+    typeof v === "string" && /^#[0-9a-f]{6}$/i.test(v);
+  const brandColors: Record<string, string> = {};
+  if (isHex(brandBg)) brandColors.background = brandBg;
+  if (isHex(brandText)) brandColors.text = brandText;
+  if (isHex(brandAccent)) brandColors.accent = brandAccent;
+  const data = (
+    Object.keys(brandColors).length > 0 ? { ...payload, brandColors } : payload
+  ) as unknown as Record<string, unknown>;
+
   // Wrap the fixture payload in a HandoutRecord so the renderer's
   // contract matches the production /h/[slug] path exactly. The
   // `data` field is the public payload; the rest is record chrome.
@@ -91,7 +112,7 @@ export default async function SellerPresentationPreview({ searchParams }: PagePr
     ownerEmail: "preview@example.com",
     createdAt: new Date().toISOString(),
     updatedAt: new Date().toISOString(),
-    data: payload as unknown as Record<string, unknown>,
+    data,
   };
 
   return <SellerPresentationPage handout={handout} />;

@@ -1,0 +1,210 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+<meta charset="UTF-8" />
+<meta name="viewport" content="width=device-width, initial-scale=1.0" />
+<title>Live page · Admin chrome · SEP Studio</title>
+<link rel="preconnect" href="https://fonts.googleapis.com" />
+<link rel="preconnect" href="https://fonts.gstatic.com" crossorigin />
+<link href="https://fonts.googleapis.com/css2?family=Hanken+Grotesk:ital,wght@0,400;0,500;0,600;0,700;0,800;1,500;1,600&family=Spectral:ital,wght@0,400;0,500;0,600;1,400;1,500;1,600&family=JetBrains+Mono:wght@400;500&display=swap" rel="stylesheet" />
+<link rel="stylesheet" href="brand_kit.css" />
+<style>
+  /* The live page fills the viewport in the AGENT'S published brand colors.
+     This stands in for the cached server-rendered /h/<slug>. */
+  body { background: #2b2723; }
+  .live-stage { min-height: 100vh; display: flex; justify-content: center; }
+  .live-page { width: 100%; max-width: 440px; min-height: 100vh; box-shadow: 0 0 120px -20px rgba(0,0,0,0.6); }
+  .live-page .mini-scaler { width: 100% !important; }
+  .live-page .mini { width: 100% !important; transform: none !important; }
+
+  /* ---- admin chrome bar (only the signed-in agent sees this) ---- */
+  .admin-bar {
+    position: fixed; top: 16px; right: 16px; z-index: 30;
+    display: flex; align-items: center; gap: 12px;
+    padding: 10px 12px 10px 16px; border-radius: 14px;
+    background: rgba(18,16,17,0.82); backdrop-filter: blur(14px);
+    border: 1px solid var(--border-strong);
+    box-shadow: 0 20px 50px -22px rgba(0,0,0,0.85);
+    transition: opacity 0.3s var(--ease), transform 0.3s var(--ease);
+  }
+  .admin-bar.hidden { opacity: 0; transform: translateY(-12px); pointer-events: none; }
+  .admin-id { display: inline-flex; align-items: center; gap: 9px; font-size: 12.5px; color: var(--muted); padding-right: 12px; border-right: 1px solid var(--border); }
+  .admin-id .pulse { width: 8px; height: 8px; border-radius: 50%; background: var(--mint); box-shadow: 0 0 0 3px var(--mint-soft); flex: none; }
+  .admin-id b { color: var(--text); font-weight: 600; }
+  .admin-actions { display: inline-flex; align-items: center; gap: 8px; }
+
+  /* small "preview as seller" toggle to prove the chrome is agent-only */
+  .seller-restore { position: fixed; bottom: 20px; left: 50%; transform: translateX(-50%); z-index: 30; display: none; }
+  .seller-restore.show { display: block; }
+
+  .admin-hint { position: fixed; left: 16px; bottom: 16px; z-index: 25; max-width: 290px; font-size: 11.5px; line-height: 1.5; color: var(--faint); background: rgba(18,16,17,0.7); border: 1px solid var(--border); border-radius: 11px; padding: 11px 13px; backdrop-filter: blur(10px); }
+  .admin-hint b { color: var(--muted); font-weight: 600; }
+
+  @media (max-width: 520px) {
+    .admin-bar { left: 12px; right: 12px; top: 12px; justify-content: space-between; }
+    .admin-hint { display: none; }
+  }
+</style>
+</head>
+<body>
+  <div class="live-stage">
+    <div class="live-page" id="livePage"></div>
+  </div>
+
+  <!-- ADMIN CHROME: visible only because the publishing agent is signed in.
+       A seller (not signed in) sees none of this -- just the clean page. -->
+  <div class="admin-bar" id="adminBar">
+    <span class="admin-id"><span class="pulse"></span>You're viewing <b>your own page</b></span>
+    <span class="admin-actions">
+      <button class="tune-btn" id="tuneBtn"><span class="tune-dot"></span>Tune brand</button>
+      <button class="btn btn-primary" id="republishTop">Republish</button>
+      <button class="btn btn-quiet" id="asSeller" title="Preview as your seller sees it">Preview as seller</button>
+    </span>
+  </div>
+
+  <button class="btn btn-ghost seller-restore" id="restoreAdmin">Exit seller preview</button>
+
+  <div class="admin-hint" id="adminHint">
+    <b>Heads-up:</b> color changes don't touch this live page until you Republish. The drawer shows the new look; the page behind it stays as last published.
+  </div>
+
+  <!-- scrim + drawer -->
+  <div class="scrim" id="scrim"></div>
+  <aside class="drawer" id="drawer" aria-hidden="true" aria-label="Brand kit">
+    <div class="drawer-head">
+      <div class="drawer-title">
+        <span class="t">Brand kit</span>
+        <span class="s">Tune the result. Republish to push it live.</span>
+      </div>
+      <button class="drawer-x" id="drawerClose" aria-label="Close brand kit">
+        <svg viewBox="0 0 24 24" width="16" height="16" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round"><path d="M6 6l12 12M18 6L6 18" /></svg>
+      </button>
+    </div>
+    <div class="drawer-body" id="drawerBody"></div>
+    <div class="drawer-foot">
+      <span id="drawerSaved"></span>
+      <button class="btn btn-primary" id="republishDrawer">Republish</button>
+    </div>
+  </aside>
+
+  <!-- toast -->
+  <div class="toast" id="toast">
+    <svg viewBox="0 0 24 24" width="15" height="15" fill="none" stroke="currentColor" stroke-width="2.6" stroke-linecap="round" stroke-linejoin="round"><path d="M20 6L9 17l-5-5" /></svg>
+    <span id="toastText">Republished. Your seller now sees these colors.</span>
+  </div>
+
+  <script src="https://unpkg.com/react@18.3.1/umd/react.development.js" integrity="sha384-hD6/rw4ppMLGNu3tX5cjIb+uRZ7UkRJ6BPkLpg4hAu/6onKUg4lLsHAs9EBPT82L" crossorigin="anonymous"></script>
+  <script src="https://unpkg.com/react-dom@18.3.1/umd/react-dom.development.js" integrity="sha384-u6aeetuaXnQ38mYT8rp6sbXaQe3NL9t+IBXmnYxwkUI2Hw4bsp2Wvmx4yRQF1uAm" crossorigin="anonymous"></script>
+  <script src="https://unpkg.com/@babel/standalone@7.29.0/babel.min.js" integrity="sha384-m08KidiNqLdpJqLq95G/LEi8Qvjl/xUYll3QILypMoQ65QorJ9Lvtp2RXYGBFj1y" crossorigin="anonymous"></script>
+
+  <script type="text/babel" src="mini_page.jsx"></script>
+  <script type="text/babel" src="brand_kit_form.jsx"></script>
+  <script type="text/babel">
+    const { useState, useEffect } = React;
+    const DEFAULTS = { background: "#f4efe5", text: "#221d16", accent: "#bf512c" };
+
+    /* Two records here, ON PURPOSE:
+        - published: the colors baked into the cached live page.
+        - draft:     what the agent is dialing in the drawer.
+       The live page renders `published`. The drawer renders `draft`.
+       They only converge when the agent clicks Republish. This proves the
+       contract: brand edits don't auto-apply to /h/<slug>. */
+    let published = { ...DEFAULTS, defaultThemeId: "editorial" };
+    let draft = { ...DEFAULTS, defaultThemeId: "editorial" };
+    const pubListeners = new Set();
+    const draftListeners = new Set();
+    const setPublished = (v) => { published = v; pubListeners.forEach((l) => l(v)); };
+    const setDraft = (v) => { draft = v; draftListeners.forEach((l) => l(v)); };
+
+    function useStore(getter, set) {
+      const [v, setV] = useState(getter());
+      useEffect(() => { set.add(setV); return () => set.delete(setV); }, []);
+      return v;
+    }
+
+    /* the live page (renders the PUBLISHED colors, full width, scale 1) */
+    function LivePage() {
+      const v = useStore(() => published, pubListeners);
+      return <window.MiniPage bg={v.background} text={v.text} accent={v.accent} themeId="editorial" scale={1} />;
+    }
+    ReactDOM.createRoot(document.getElementById("livePage")).render(<LivePage />);
+
+    /* the drawer form (renders + edits the DRAFT) */
+    function DrawerForm() {
+      const v = useStore(() => draft, draftListeners);
+      return (
+        <window.BrandKitForm
+          values={v}
+          onChange={setDraft}
+          layout="drawer"
+          showRepublishReminder={true}
+          defaults={DEFAULTS}
+        />
+      );
+    }
+    ReactDOM.createRoot(document.getElementById("drawerBody")).render(<DrawerForm />);
+
+    /* drawer footer saved indicator */
+    function FootSaved() {
+      const v = useStore(() => draft, draftListeners);
+      const [saving, setSaving] = useState(false);
+      const first = React.useRef(true);
+      useEffect(() => {
+        if (first.current) { first.current = false; return; }
+        setSaving(true);
+        const t = setTimeout(() => setSaving(false), 650);
+        return () => clearTimeout(t);
+      }, [v.background, v.text, v.accent, v.defaultThemeId]);
+      return (
+        <span className={"bk-saved" + (saving ? " saving" : "")}>
+          <span className="dot" />
+          <span className="label">{saving ? "Saving\u2026" : "Saved as draft."}</span>
+        </span>
+      );
+    }
+    ReactDOM.createRoot(document.getElementById("drawerSaved")).render(<FootSaved />);
+
+    /* ----- drawer open/close ----- */
+    const scrim = document.getElementById("scrim");
+    const drawer = document.getElementById("drawer");
+    function openDrawer() { drawer.classList.add("open"); scrim.classList.add("open"); drawer.setAttribute("aria-hidden", "false"); }
+    function closeDrawer() { drawer.classList.remove("open"); scrim.classList.remove("open"); drawer.setAttribute("aria-hidden", "true"); }
+    document.getElementById("tuneBtn").addEventListener("click", openDrawer);
+    document.getElementById("drawerClose").addEventListener("click", closeDrawer);
+    scrim.addEventListener("click", closeDrawer);
+    document.addEventListener("keydown", (e) => { if (e.key === "Escape") closeDrawer(); });
+
+    /* ----- republish: draft -> published (the explicit apply action) ----- */
+    const toast = document.getElementById("toast");
+    let toastTimer;
+    function showToast(msg) {
+      document.getElementById("toastText").textContent = msg;
+      toast.classList.add("show");
+      clearTimeout(toastTimer);
+      toastTimer = setTimeout(() => toast.classList.remove("show"), 2600);
+    }
+    function republish() {
+      setPublished({ ...draft });
+      showToast("Republished. Your seller now sees these colors.");
+    }
+    document.getElementById("republishDrawer").addEventListener("click", republish);
+    document.getElementById("republishTop").addEventListener("click", () => { openDrawer(); });
+
+    /* ----- preview-as-seller: hides ALL admin chrome (proves it's agent-only) ----- */
+    const adminBar = document.getElementById("adminBar");
+    const adminHint = document.getElementById("adminHint");
+    const restore = document.getElementById("restoreAdmin");
+    document.getElementById("asSeller").addEventListener("click", () => {
+      closeDrawer();
+      adminBar.classList.add("hidden");
+      adminHint.style.display = "none";
+      restore.classList.add("show");
+    });
+    restore.addEventListener("click", () => {
+      adminBar.classList.remove("hidden");
+      adminHint.style.display = "";
+      restore.classList.remove("show");
+    });
+  </script>
+</body>
+</html>

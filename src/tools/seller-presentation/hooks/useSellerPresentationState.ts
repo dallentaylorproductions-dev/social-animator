@@ -12,6 +12,19 @@ import {
   EMPTY_DRAFT,
   type SellerPresentationDraft,
 } from "@/tools/seller-presentation/engine/types";
+import { DEFAULT_BRAND_THEME_ID, loadBrandSettings } from "@/lib/brand";
+
+/**
+ * E.0 — seed a fresh draft's `themeId` from the brand-level default
+ * layout. Read synchronously from localStorage (NOT via the async
+ * useBrandSettings hook) so the value is available at creation time
+ * inside the mount effect / startNew handler. Falls back to "editorial"
+ * when unset — existing in-flight drafts keep their own themeId (or
+ * undefined → editorial at render), so this only affects NEW drafts.
+ */
+function seedDraftThemeId(): string {
+  return loadBrandSettings().defaultThemeId || DEFAULT_BRAND_THEME_ID;
+}
 
 /**
  * Seller Presentation — shared wizard state (Phase A foundation).
@@ -136,7 +149,7 @@ export function useSellerPresentationState(): SellerPresentationState {
     // (c) Nothing to resume — start fresh.
     const created = createInstance<SellerPresentationDraft>({
       skillId: SKILL_ID,
-      draft: { ...EMPTY_DRAFT },
+      draft: { ...EMPTY_DRAFT, themeId: seedDraftThemeId() },
       currentStep: "property",
     });
     adoptInstance(created);
@@ -189,7 +202,7 @@ export function useSellerPresentationState(): SellerPresentationState {
   const startNew = () => {
     const created = createInstance<SellerPresentationDraft>({
       skillId: SKILL_ID,
-      draft: { ...EMPTY_DRAFT },
+      draft: { ...EMPTY_DRAFT, themeId: seedDraftThemeId() },
       currentStep: "property",
     });
     setInstance(created);

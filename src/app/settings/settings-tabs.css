@@ -1,0 +1,119 @@
+/* =====================================================================
+   Settings tab nav (Profile | Brand) — Phase E.0 + E.0 fix-up
+   Shared across /settings (Profile, default landing) and
+   /settings/brand. Pill group matching the Brand Kit chrome
+   (docs/design/brand-kit-system/brand_settings.html .tabs).
+
+   Fix-up (ratified 2026-06-03): integrate the strip INTO the content
+   column — left-aligned above each page's title, on dark panel tokens,
+   not a centered cream pill floating at the viewport top.
+
+   The pill container chrome is IDENTICAL on both routes (dark panel
+   #19171a, 1px line border, ~10px radius, 4px padding, 2px gap). Only
+   the outer alignment wrapper width differs, to sit flush with each
+   route's content column left edge: Profile uses Tailwind max-w-2xl
+   (42rem) + px-6 (24px); the Brand page uses the .page column
+   (max-width 1060px + 28px side padding). box-sizing: border-box so the
+   side padding nests inside max-width exactly like each page's column.
+   ===================================================================== */
+/* Shared settings surface (fix-up #2): hoisted to settings/layout.tsx so
+   the tab strip + page content sit on ONE continuous canvas on both
+   routes — no plain-black band above the strip, no seam where a glow
+   would otherwise begin. Base is neutral-950 (#0a0a0a) to match the
+   byte-identical Profile page's opaque `bg-neutral-950` main exactly
+   (so where that opaque main starts, the surface meets seamlessly); the
+   mint radial glow sits at the top behind the strip. The Brand page main
+   is transparent (settings-shell class dropped) so this glow shows
+   continuously through it. */
+.sep-settings-shell {
+  min-height: 100vh;
+  background:
+    radial-gradient(70% 38% at 24% -6%, rgba(110, 231, 199, 0.18), transparent 60%),
+    radial-gradient(120% 60% at 50% -8%, rgba(110, 231, 199, 0.13), transparent 48%),
+    #0a0a0a;
+}
+
+/* Shared settings head: breadcrumb + tab strip, stacked and left-aligned
+   with each route's content column (fix-up #4). Same content + chrome on
+   both routes; only the wrapper width/side-padding differs to sit flush
+   with each page's column. */
+.sep-settings-head {
+  display: flex;
+  flex-direction: column;
+  align-items: flex-start;
+  margin: 0 auto;
+  box-sizing: border-box;
+}
+/* Match Profile's content column: max-w-2xl (42rem) + px-6 (24px). */
+.sep-settings-head--profile {
+  max-width: 42rem;
+  padding: 24px 24px 0;
+}
+/* Match the Brand-kit .page column: 1060px + 28px side padding. */
+.sep-settings-head--brand {
+  max-width: 1060px;
+  padding: 24px 28px 0;
+}
+
+/* "← Studio" back link — same look as the original Profile breadcrumb
+   (text-xs uppercase tracking-[0.2em] text-mint hover:underline), now
+   shared across both routes. */
+.sep-settings-back {
+  font-size: 12px;
+  line-height: 1;
+  font-weight: 500;
+  text-transform: uppercase;
+  letter-spacing: 0.2em;
+  color: #4ef2d9; /* --color-mint */
+  text-decoration: none;
+  margin-bottom: 16px;
+}
+.sep-settings-back:hover {
+  text-decoration: underline;
+}
+
+.sep-settings-tabs {
+  display: inline-flex;
+  gap: 2px;
+  padding: 4px;
+  background: #19171a; /* --panel */
+  border: 1px solid rgba(255, 255, 255, 0.08); /* --border line token */
+  border-radius: 10px;
+}
+.sep-settings-tab {
+  appearance: none;
+  border: none;
+  background: transparent;
+  font-family: var(--font-hanken), system-ui, sans-serif;
+  font-size: 14px;
+  font-weight: 600;
+  color: #a6a39d; /* --muted (secondary text) */
+  padding: 9px 18px;
+  border-radius: 8px;
+  cursor: pointer;
+  text-decoration: none;
+  transition: color 0.18s cubic-bezier(0.22, 1, 0.36, 1),
+    background 0.18s cubic-bezier(0.22, 1, 0.36, 1);
+}
+.sep-settings-tab:hover {
+  color: #f4f2ef;
+}
+.sep-settings-tab.active {
+  color: #08120f;
+  background: #f4f2ef;
+}
+
+/* fix-up #4: strip→header gap identical on both routes, Profile as the
+   reference. Profile's gap is its inner column top padding (Tailwind
+   py-12 = 48px, lg:py-20 = 80px) plus the "Settings" h1's mt-2 (8px).
+   The Brand page's .page column gets the same total so the page header
+   sits at the same Y — no vertical jump when switching tabs. (Coupled to
+   Profile's Tailwind values by design; both are stable constants.) */
+.bk-scope .page.sep-brand-head-gap {
+  padding-top: 56px;
+}
+@media (min-width: 1024px) {
+  .bk-scope .page.sep-brand-head-gap {
+    padding-top: 88px;
+  }
+}

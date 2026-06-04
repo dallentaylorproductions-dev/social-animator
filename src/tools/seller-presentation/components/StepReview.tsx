@@ -121,6 +121,18 @@ export function StepReview({ draft, goToStep, setDraft }: StepReviewProps) {
     reviewsOutlinkUrl: brand.reviewsOutlinkUrl,
   };
 
+  // E.0 — brand colors are agent-constant (set once in Settings → Brand
+  // kit). Forwarded in the publish body alongside agentContact +
+  // brandReviews; the route hands them to toPublicPayload, which
+  // validates each hex and projects them onto payload.brandColors. When
+  // unset, the consumer /h/<slug> page falls back to the production
+  // Editorial palette via its CSS var() cascade (cohort-safe).
+  const brandColors = {
+    brandBackground: brand.brandBackground,
+    brandText: brand.brandText,
+    brandAccent: brand.brandAccent,
+  };
+
   // A7c.4: StepPitch seeds INITIAL_VISIBLE_ROWS empty rows on mount
   // so the agent lands on a finite canvas — those rows persist with
   // default `visibility: 'private'`, but they have NO content and
@@ -145,7 +157,7 @@ export function StepReview({ draft, goToStep, setDraft }: StepReviewProps) {
       const res = await fetch("/api/seller-presentation/publish", {
         method: "POST",
         headers: { "Content-Type": "application/json" },
-        body: JSON.stringify({ draft, agentContact, brandReviews }),
+        body: JSON.stringify({ draft, agentContact, brandReviews, brandColors }),
       });
       const body = (await res.json().catch(() => ({}))) as {
         ok?: boolean;
