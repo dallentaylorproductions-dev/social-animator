@@ -13,7 +13,7 @@ import { BrandEngine } from "../src/lib/brand/color-engine";
 
 const PAPER = "#F1EBE0";
 const INK = "#1A1612";
-const DEFAULT_SIG = "#C26A4E"; // engine default signature
+const DEFAULT_SIG = "#037290"; // F3 engine default signature (flagship blue)
 
 function hueDist(a: number, b: number): number {
   const d = Math.abs(a - b) % 360;
@@ -56,7 +56,7 @@ test.describe("deriveConsumerRoles — flagship role resolution", () => {
     expect(L(r.tint9)).toBeLessThan(L(r.tint6));
   });
 
-  test("invalid / undefined accent → the production DEFAULT ramp (terracotta)", () => {
+  test("invalid / undefined accent → the F3 production DEFAULT ramp (flagship blue)", () => {
     const fromUndefined = deriveConsumerRoles(undefined);
     const fromGarbage = deriveConsumerRoles("not-a-hex");
     const expected = deriveConsumerRoles(DEFAULT_SIG);
@@ -64,11 +64,15 @@ test.describe("deriveConsumerRoles — flagship role resolution", () => {
     expect(fromUndefined).toEqual(expected);
     expect(fromGarbage).toEqual(expected);
 
-    // and it matches the engine's own default ramp on the locked surface/ink
+    // and it matches the engine's own default ramp on the locked surface/ink.
+    // F3 — the unset-brand flagship default is blue (NOT the legacy terracotta;
+    // that now lives only on the v1 cohort path).
     const eng = BrandEngine.derive(DEFAULT_SIG, { surface: PAPER, ink: INK });
     expect(fromUndefined.signature).toBe(eng.hexes.signature);
     expect(fromUndefined.tint12).toBe(eng.hexes["tint-12"]);
     expect(fromUndefined.tint9).toBe(eng.hexes["tint-9"]);
+    // explicit cohort split: the blue default is NOT the legacy terracotta ramp
+    expect(fromUndefined).not.toEqual(deriveConsumerRoles("#C26A4E"));
   });
 
   test("deterministic — same accent, identical roles", () => {

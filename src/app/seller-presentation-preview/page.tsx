@@ -46,9 +46,12 @@ interface PageProps {
     brandAccent?: string;
     brandSecondary?: string;
     embed?: string;
-    // F2 — `?template=flagship` renders the fixture through the flagship (v2)
-    // template (the same read-time override the /h/ route exposes), so the
-    // e2e suite + Dallen's browser smoke can exercise v2 without a v2 publish.
+    // Read-time template override (the same switch the /h/ route exposes):
+    //   • `?template=flagship` — render the fixture through the flagship (v2)
+    //     template (lets the suite + browser smoke exercise v2).
+    //   • `?template=v1` — the F3 inverse: render through the v1 template. Used
+    //     with the `full-v2` fixture (a templateVersion: 2 payload) to prove a
+    //     v2 payload can be forced back to the v1 renderer.
     template?: string;
   }>;
 }
@@ -56,7 +59,8 @@ interface PageProps {
 export default async function SellerPresentationPreview({ searchParams }: PageProps) {
   const { fixture, brandBg, brandText, brandAccent, brandSecondary, embed, template } =
     await searchParams;
-  const templateOverride = template === "flagship" ? "flagship" : undefined;
+  const templateOverride =
+    template === "flagship" ? "flagship" : template === "v1" ? "v1" : undefined;
   // v3 — embed mode: the Brand kit settings preview iframes this route with
   // `embed=1`. EmbedBridge then hides non-page chrome and applies vars pushed
   // live (same-origin postMessage) so dialing a color repaints with no reload.
@@ -78,6 +82,11 @@ export default async function SellerPresentationPreview({ searchParams }: PagePr
     // F2 — flagship privacy fixture: FULL payload + rogue private keys, to
     // prove the clamp boundary strips them before the flagship renders.
     "flagship-privacy",
+    // F3 — a real v2-stamped payload (templateVersion: 2). Renders the flagship
+    // with NO `?template` param (proving the publish-version stamp routes on its
+    // own), and `&template=v1` forces it back through the v1 renderer (the
+    // inverse override).
+    "full-v2",
   ] as const;
   type Variant = (typeof VARIANTS)[number];
   const variant = (VARIANTS as readonly string[]).includes(fixture ?? "")
@@ -104,7 +113,9 @@ export default async function SellerPresentationPreview({ searchParams }: PagePr
                 ? POSTER_NONE_PAYLOAD
                 : variant === "flagship-privacy"
                   ? FLAGSHIP_PRIVACY_PAYLOAD
-                  : FULL_PAYLOAD;
+                  : variant === "full-v2"
+                    ? { ...FULL_PAYLOAD, templateVersion: 2 }
+                    : FULL_PAYLOAD;
 
   // E.0 — optional brand-color override (drives the brand-colors e2e
   // regression spec + Dallen's browser smoke). Validated hex only; merged

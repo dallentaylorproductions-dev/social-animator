@@ -17,7 +17,9 @@
  * runs in the server-rendered `/h/<slug>` path.
  *
  * `accentHex` undefined / not a valid hex → the engine derives the production
- * DEFAULT ramp (terracotta `#C26A4E`), so callers never need to pre-validate.
+ * DEFAULT ramp (F3: flagship blue `#037290`), so callers never need to
+ * pre-validate. New publishes are flagship, so an unset-brand v2 page renders
+ * the blue default ramp here (the v1 unset default stays terracotta elsewhere).
  */
 
 import { BrandEngine } from "@/lib/brand/color-engine";
@@ -66,7 +68,7 @@ export function deriveConsumerRoles(
 ): ConsumerRoles {
   // Drive the canonical engine with the agent's accent + the LOCKED layout
   // surface/ink. Invalid/undefined accent falls through to the engine's
-  // default signature (#C26A4E) internally.
+  // default signature (F3: flagship blue #037290) internally.
   const d = BrandEngine.derive(accentHex ?? "", {
     surface: LAYOUT.paper,
     ink: LAYOUT.ink,
@@ -95,5 +97,34 @@ export function deriveConsumerRoles(
     onDark: LAYOUT.onDark,
     darkBand: LAYOUT.darkBand,
     darkBand2: LAYOUT.darkBand2,
+  };
+}
+
+/**
+ * The flagship root's CSS custom-property map, derived from a resolved role
+ * set. This is the ONE place the `role → --token` mapping lives, so the
+ * server-rendered FlagshipPage and the Brand-kit live preview (which pushes
+ * these same vars over the embed bridge) paint from one source of truth —
+ * "the preview and the real page share one color path." `--decorative` aliases
+ * the signature (secondary retired in PR #29).
+ */
+export function consumerRoleVars(roles: ConsumerRoles): Record<string, string> {
+  return {
+    "--signature": roles.signature,
+    "--signature-deep": roles.signatureDeep,
+    "--signature-link": roles.signatureLink,
+    "--tint-12": roles.tint12,
+    "--tint-9": roles.tint9,
+    "--tint-6": roles.tint6,
+    "--line-30": roles.line30,
+    "--on-signature": roles.onSignature,
+    "--decorative": roles.signature,
+    "--paper": roles.paper,
+    "--ink": roles.ink,
+    "--ink-soft": roles.inkSoft,
+    "--ink-faint": roles.inkFaint,
+    "--on-dark": roles.onDark,
+    "--dark-band": roles.darkBand,
+    "--dark-band-2": roles.darkBand2,
   };
 }

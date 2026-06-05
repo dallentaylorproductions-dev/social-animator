@@ -76,21 +76,31 @@ export interface BrandSettings {
 }
 
 /**
- * E.0 — the production Editorial palette. The current `/h/<slug>` page
- * renders in exactly these colors (the consumer-page CSS tokens
- * `--paper` / `--ink` / `--brick`). They are the cohort-safety contract:
- * `BrandKitForm` pre-populates its pickers with these, and the consumer
- * CSS `var()` fallbacks resolve to these when brand colors are unset, so
- * a never-customized agent publishes byte-identical pages.
+ * The Editorial palette `BrandKitForm` pre-populates its pickers + Reset
+ * targets with. surface/ink are the layout-locked page register; `accent` is
+ * the default SIGNATURE a never-customized agent starts from.
  *
- * NOTE: these are the REAL production hexes, NOT Claude Design's
- * published `#f4efe5 / #221d16 / #bf512c` (which never shipped — see the
- * E.0 packet's "Palette truth" correction).
+ * F3 — the default signature flipped terracotta `#c26a4e` → flagship blue
+ * `#037290` (passes 3:1 display + 4.5:1 links/body on the paper surface
+ * clamp-free). Because new publishes are flagship (v2), a never-customized
+ * agent now publishes the blue default ramp.
+ *
+ * COHORT CONTRACT (read carefully): this constant is the FORM default only —
+ * it is NOT consumed by either renderer. The v1 path's unset-brand default
+ * lives in `E1_DEFAULTS.signature` (presentation-page.tsx) and is DELIBERATELY
+ * still terracotta, so already-published v1 pages stay byte-identical; the v1
+ * CSS `var()` fallbacks (presentation-page.css) are likewise still the
+ * terracotta hexes. So the form default (blue) and the v1 fallback (terracotta)
+ * intentionally diverge here at F3 — they are no longer the same hex.
+ *
+ * NOTE: surface/ink are the REAL production hexes, NOT Claude Design's
+ * published `#f4efe5 / #221d16` (which never shipped — see the E.0 packet's
+ * "Palette truth" correction).
  */
 export const EDITORIAL_BRAND_DEFAULTS = {
   background: "#f1ebe0",
   text: "#1a1612",
-  accent: "#c26a4e",
+  accent: "#037290",
 } as const;
 
 /** E.0 — default brand layout id; the only built layout today. */
