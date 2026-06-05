@@ -73,7 +73,7 @@ test.describe("Seller preview — embed bridge", () => {
     expect(applied).not.toBe("#ff00ff");
   });
 
-  test("sep-highlight-role briefly outlines elements carrying that role (stretch)", async ({
+  test("preview is non-interactive display — the price never carries a box, and the retired highlight is inert", async ({
     page,
   }) => {
     await page.goto("/seller-presentation-preview?fixture=full&embed=1");
@@ -81,22 +81,60 @@ test.describe("Seller preview — embed bridge", () => {
     await expect.poll(() =>
       page.evaluate(() => document.documentElement.classList.contains("sep-embed")),
     ).toBe(true);
-    // the price "$" carries data-brand-role="signature" (always rendered)
-    await expect(page.locator('[data-brand-role~="signature"]').first()).toBeVisible();
 
-    await page.evaluate(() => {
-      window.postMessage(
-        { type: "sep-highlight-role", role: "signature" },
-        window.location.origin,
-      );
+    // The price block renders as a plain serif figure on the band — no outline
+    // box anywhere, and the $ / digits read as bare text (no border, no chip).
+    // (Regression: the palette-chip highlight stretch used to draw an `outline`
+    // box on the $ and digits spans.) The .price container keeps its intentional
+    // design hairline (border-bottom) — that is the band rule, not the artifact.
+    // A box only renders when a side has both a non-`none` style AND a
+    // non-zero width. The retired highlight drew `outline: 2px solid`, so the
+    // load-bearing guard is `outline-style: none` on every part of the price —
+    // and likewise no *visible* border on the $/digits text. (Latent specified
+    // widths from UA/reset rules are invisible while the style stays `none`,
+    // so we key off the styles, not the widths.)
+    const priceBoxes = await page.evaluate(() => {
+      const cs = (sel: string) => {
+        const el = document.querySelector<HTMLElement>(sel);
+        if (!el) return null;
+        const s = getComputedStyle(el);
+        const visibleBorder =
+          s.borderStyle !== "none" &&
+          ["borderTopWidth", "borderRightWidth", "borderBottomWidth", "borderLeftWidth"]
+            .some((w) => parseFloat(s[w as keyof CSSStyleDeclaration] as string) > 0);
+        return { outlineStyle: s.outlineStyle, visibleBorder };
+      };
+      return {
+        container: cs("main.sep-presentation .price"),
+        dollar: cs("main.sep-presentation .price .dollar"),
+        digits: cs("main.sep-presentation .price [data-price-digits]"),
+      };
     });
-    await expect
-      .poll(() =>
-        page.evaluate(
-          () => document.querySelectorAll(".sep-role-highlight").length,
-        ),
-      )
-      .toBeGreaterThan(0);
+    // No outline box on any part of the price (the retired highlight drew one).
+    expect(priceBoxes.container?.outlineStyle).toBe("none");
+    expect(priceBoxes.dollar?.outlineStyle).toBe("none");
+    expect(priceBoxes.digits?.outlineStyle).toBe("none");
+    // The $ and digits read as bare text — no visible border/chip box.
+    // (The .price container keeps its intentional design hairline border-bottom.)
+    expect(priceBoxes.dollar?.visibleBorder).toBe(false);
+    expect(priceBoxes.digits?.visibleBorder).toBe(false);
+
+    // The retired highlight message is now a no-op: no element ever acquires
+    // the (deleted) highlight class, so clicking around the form draws no boxes.
+    await page.evaluate(() => {
+      for (const role of ["signature", "signature-deep", "tint-12"]) {
+        window.postMessage(
+          { type: "sep-highlight-role", role },
+          window.location.origin,
+        );
+      }
+    });
+    await page.waitForTimeout(200);
+    expect(
+      await page.evaluate(
+        () => document.querySelectorAll(".sep-role-highlight").length,
+      ),
+    ).toBe(0);
   });
 
   test("non-embed preview does NOT mark the doc or attach the bridge", async ({
