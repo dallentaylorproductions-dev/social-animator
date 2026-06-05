@@ -242,8 +242,7 @@ function Sample({
   label,
   ratio,
   target,
-  sampleBg,
-  txtColor,
+  roleColor,
   adjusted,
   fixes,
   note,
@@ -251,25 +250,29 @@ function Sample({
   label: string;
   ratio: number;
   target: number;
-  sampleBg: string;
-  txtColor: string;
+  roleColor: string;
   adjusted?: boolean;
   fixes?: SampleFix[];
   note?: string;
 }) {
   const pass = ratio >= target;
+  // The instrument renders on the FIXED panel surface (the live preview beside
+  // the panel is the honest sample). A small swatch keeps the role-color hint
+  // while the label stays neutral and legible at any user colors.
   return (
-    <div className="sample" style={{ "--sample-bg": sampleBg } as React.CSSProperties}>
+    <div className="sample">
       <div className="sample__row">
-        {/* honest swatch: the role color on the ACTUAL page background */}
-        <span className="sample__txt" style={{ color: txtColor }}>
+        <span className="sample__txt">
+          <span
+            className="sample__dot"
+            style={{ background: roleColor }}
+            aria-hidden="true"
+          />
           {label}
           {adjusted ? (
             <span className="sample__adjusted">adjusted to stay readable</span>
           ) : null}
         </span>
-        {/* controls sit on the PANEL surface so the instrument stays legible
-            at any user colors */}
         <span className="sample__right">
           <span
             className={"sample__ratio " + (pass ? "is-pass" : "is-warn")}
@@ -685,8 +688,7 @@ export function BrandKitForm({
                 label="Body text"
                 ratio={r.bodyOnSurface}
                 target={4.5}
-                sampleBg={values.background}
-                txtColor={values.text}
+                roleColor={values.text}
                 adjusted={bodyAdjusted}
                 fixes={bodyFix?.fixes}
                 note={bodyFix?.note}
@@ -695,8 +697,7 @@ export function BrandKitForm({
                 label="Prices & big numbers"
                 ratio={raw}
                 target={3.0}
-                sampleBg={values.background}
-                txtColor={derived.hexes["signature"]}
+                roleColor={derived.hexes["signature"]}
                 fixes={pricesFix?.fixes}
                 note={pricesFix?.note}
               />
@@ -704,8 +705,7 @@ export function BrandKitForm({
                 label="Links"
                 ratio={raw}
                 target={4.5}
-                sampleBg={values.background}
-                txtColor={derived.hexes["signature-link"]}
+                roleColor={derived.hexes["signature-link"]}
                 fixes={linksFix?.fixes}
                 note={linksFix?.note}
               />
@@ -714,8 +714,7 @@ export function BrandKitForm({
                   label="Section numerals"
                   ratio={secRatio}
                   target={3.0}
-                  sampleBg={values.background}
-                  txtColor={secHex}
+                  roleColor={secHex}
                   fixes={secFix?.fixes}
                   note={secFix?.note}
                 />

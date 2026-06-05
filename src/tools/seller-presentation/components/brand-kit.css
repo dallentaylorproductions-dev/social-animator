@@ -475,17 +475,18 @@
   flex-direction: column;
   gap: 10px;
 }
-/* The sample row keeps an HONEST swatch (the role color on the actual page
-   background, var(--sample-bg)), but every control — ratio pill, fix buttons,
-   the "adjusted" pill, the unreachable note — sits on the fixed PANEL surface
-   so the instrument stays legible at ANY user colors (hostile combos included). */
+/* Readability rows are an INSTRUMENT, not a sample — they render on the fixed
+   PANEL surface so they stay legible at ANY user colors. The honest sample is
+   the live preview beside the panel. A small swatch keeps the role-color hint;
+   the label + pills + buttons + note all read on the panel. */
 .bk-scope .sample {
   display: flex;
   flex-direction: column;
   gap: 10px;
-  background: var(--sample-bg, #f1ebe0);
+  background: var(--ui-panel-2);
+  border: 1px solid var(--ui-line);
   border-radius: var(--r-md);
-  padding: 15px 16px;
+  padding: 13px 14px;
 }
 .bk-scope .sample__row {
   display: flex;
@@ -494,18 +495,26 @@
   gap: 12px;
 }
 .bk-scope .sample__txt {
-  font-size: 15px;
+  display: flex;
+  align-items: center;
+  gap: 9px;
+  min-width: 0;
+  font-size: 14px;
   font-weight: 500;
+  color: var(--ui-text);
+}
+.bk-scope .sample__dot {
+  width: 14px;
+  height: 14px;
+  border-radius: 4px;
+  flex: 0 0 auto;
+  box-shadow: inset 0 0 0 1px rgba(255, 255, 255, 0.18);
 }
 .bk-scope .sample__right {
   display: flex;
   align-items: center;
-  gap: 6px;
+  gap: 8px;
   flex: 0 0 auto;
-  background: var(--ui-panel);
-  border: 1px solid var(--ui-line);
-  border-radius: 999px;
-  padding: 4px 5px;
 }
 .bk-scope .sample__ratio {
   font-family: var(--mono);
@@ -516,9 +525,11 @@
   border-radius: 20px;
 }
 .bk-scope .sample__ratio.is-pass {
+  background: var(--v2-mint-dim);
   color: var(--v2-mint);
 }
 .bk-scope .sample__ratio.is-warn {
+  background: var(--v2-amber-dim);
   color: var(--v2-amber);
 }
 .bk-scope .sample__fix {
@@ -540,7 +551,7 @@
   font-size: 12px;
   line-height: 1.45;
   color: var(--ui-text-2);
-  background: var(--ui-panel-2);
+  background: var(--ui-field);
   border: 1px solid var(--ui-line);
   border-radius: var(--r-sm);
   padding: 9px 11px;
@@ -803,9 +814,9 @@
   font-size: 10.5px;
   font-style: normal;
   font-weight: 600;
-  /* panel-legible at any sample background */
+  /* panel-legible (the row is --ui-panel-2; sit the pill on --ui-field) */
   color: var(--v2-amber);
-  background: var(--ui-panel-2);
+  background: var(--ui-field);
   border: 1px solid var(--ui-line);
   padding: 2px 8px;
   border-radius: 20px;
@@ -878,9 +889,10 @@
    RESPONSIVE — single-column stacking (mobile contract)
    ===================================================================== */
 @media (max-width: 940px) {
+  /* single column — tighten the gap so the preview sits closer to the form */
   .bk-scope .cols {
     grid-template-columns: 1fr;
-    gap: 48px;
+    gap: 32px;
   }
   .bk-scope .preview {
     position: static;
@@ -888,22 +900,58 @@
   .bk-scope .bk-v2--drawer .preview {
     margin-bottom: 22px;
   }
+  /* cap the swatch height so chips never balloon into giant cards */
   .bk-scope .palette-strip__chips {
     grid-template-columns: repeat(4, 1fr);
-    gap: 14px 10px;
+    gap: 12px 10px;
+  }
+  .bk-scope .pchip__swatch {
+    aspect-ratio: auto;
+    height: 52px;
   }
 }
 @media (max-width: 560px) {
+  /* COMPACT palette: small swatches, 4-then-3 (≤2 short rows), labels reduced —
+     never giant 2-up cards that push the preview a screen away. */
   .bk-scope .palette-strip__chips {
-    grid-template-columns: repeat(2, 1fr);
+    grid-template-columns: repeat(4, 1fr);
+    gap: 10px 8px;
   }
-  .bk-scope .phone {
-    width: 100%;
-    max-width: 360px;
+  .bk-scope .pchip {
+    gap: 5px;
+  }
+  .bk-scope .pchip__swatch {
+    height: 42px;
+    border-radius: 8px;
+  }
+  .bk-scope .pchip__role {
+    font-size: 8.5px;
+  }
+  .bk-scope .pchip__label {
+    font-size: 10.5px;
+    line-height: 1.2;
+  }
+  .bk-scope .pchip__hex {
+    font-size: 9px;
+  }
+  /* tighten the dial→see distance: signature → palette → preview */
+  .bk-scope .cols {
+    gap: 24px;
   }
   .bk-scope .crow {
     grid-template-columns: 52px 1fr;
     gap: 16px;
+    padding: 18px 0;
+  }
+  .bk-scope .suggest {
+    padding: 14px 0 18px;
+  }
+  .bk-scope .palette-block {
+    padding: 18px 0;
+  }
+  .bk-scope .phone {
+    width: 100%;
+    max-width: 360px;
   }
   .bk-scope .swatch {
     width: 52px;
