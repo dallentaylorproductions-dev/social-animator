@@ -193,6 +193,47 @@ test.describe("BrandEngine — hue-locked surface mixes", () => {
     expect(d.report.bodyOnSurfaceClamped).toBeGreaterThanOrEqual(4.5);
   });
 
+  test("bidirectional clamp: dark-on-dark reaches via LIGHTEN, light-on-light via DEEPEN", () => {
+    const L = (h: string) => BrandEngine.rgbToOklch(h).L;
+    // dark fg on a darker surface — deepen has no headroom, must lighten
+    const dark = BrandEngine.clampContrastEx("#1A1A1A", "#0A0A0A", 4.5);
+    expect(dark.reached).toBe(true);
+    expect(dark.contrast).toBeGreaterThanOrEqual(4.5);
+    expect(L(dark.hex)).toBeGreaterThan(L("#1A1A1A")); // went lighter
+
+    // light fg on a lighter surface — must deepen
+    const light = BrandEngine.clampContrastEx("#EDEDED", "#FFFFFF", 4.5);
+    expect(light.reached).toBe(true);
+    expect(light.contrast).toBeGreaterThanOrEqual(4.5);
+    expect(L(light.hex)).toBeLessThan(L("#EDEDED")); // went darker
+  });
+
+  test("unreachable target returns reached:false (never a silent identity) — stress combo links", () => {
+    // Dallen's stress combo: signature #030303 on a strong red can't reach AA
+    // for links in EITHER direction (max ~4.49 < 4.5).
+    const ex = BrandEngine.clampContrastEx("#030303", "#E61E1E", 4.5);
+    expect(ex.reached).toBe(false);
+    expect(BrandEngine.maxAchievableContrast("#030303", "#E61E1E")).toBeLessThan(4.5);
+    // prices (3.0) on the same pair IS reachable
+    expect(BrandEngine.clampContrastEx("#030303", "#E61E1E", 3.0).reached).toBe(true);
+  });
+
+  test("clamp is a NO-OP when the pair already passes (reached immediately, hex unchanged)", () => {
+    const ex = BrandEngine.clampContrastEx("#1A1612", "#F1EBE0", 4.5);
+    expect(ex.reached).toBe(true);
+    expect(ex.hex).toBe("#1A1612"); // body ink on cream is 15.2:1 → untouched
+  });
+
+  test("softenSurfaceFor makes an unreachable role reachable with a real surface change", () => {
+    const soft = BrandEngine.softenSurfaceFor("#E61E1E", "#030303", 4.5);
+    expect(soft.reached).toBe(true);
+    expect(soft.hex).not.toBe("#E61E1E"); // the background actually moved
+    // on the softened surface the signature can now reach AA
+    expect(
+      BrandEngine.maxAchievableContrast("#030303", soft.hex),
+    ).toBeGreaterThanOrEqual(4.5);
+  });
+
   test("gray-floor fallback: a near-neutral signature derives clean grays (plain mix, no injected hue)", () => {
     const GRAY = "#808080";
     const d = BrandEngine.derive(GRAY, { surface: PAPER, ink: INK });

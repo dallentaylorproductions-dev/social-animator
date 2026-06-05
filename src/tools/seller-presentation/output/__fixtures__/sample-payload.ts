@@ -89,7 +89,12 @@ export const FULL_PAYLOAD: PublicPayload = {
     city: "Tremont",
     state: "OH",
     zip: "44113",
-    heroPhotoUrl: undefined,
+    // A real, license-safe LOCAL house photo (committed under public/sample-
+    // assets) so the preview/sample hero reads as a photo — not a flat block an
+    // agent might fear carries to their page. The template renders it as the
+    // decorative (aria-hidden) hero background; the scrim band + eyebrow sit
+    // over it exactly as on a real page. Fixture DATA only — template untouched.
+    heroPhotoUrl: "/sample-assets/exterior.webp",
     recommendedList: "$675,000",
     rationaleShort:
       "A price the market will meet quickly — and one that gives the right buyer room to fall in love.",

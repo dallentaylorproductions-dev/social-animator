@@ -248,21 +248,125 @@ function normHex(s: unknown): string | null {
   return "#" + h.toUpperCase();
 }
 
-/* ---- lightness clamp (OKLCh steps toward black/white) ---- */
-function clampContrast(
+/* --------------------------------------------------------------------------
+ * lightness clamp — BIDIRECTIONAL (OKLCh, hue+chroma held).
+ *
+ * The original clamp deepened ONLY (toward #000). Against a dark/saturated
+ * surface a foreground that needs to get LIGHTER never converged: the walk
+ * returned the original color and any "fix" wired to it silently no-op'd (the
+ * dead "Bump contrast" button). And a near-black foreground (#030303) is
+ * already at the deepen extreme, so deepening has no headroom at all.
+ *
+ * The clamp now evaluates BOTH directions and walks whichever raises contrast
+ * with the SMALLEST change first. When the target can't be reached in either
+ * direction it returns the best-effort (max-contrast) color AND a `reached`
+ * flag — never a silent identity. Callers use `reached` to decide whether to
+ * offer a foreground fix or fall back to a background fix (reachability honesty).
+ * ------------------------------------------------------------------------ */
+interface ClampResult {
+  hex: string;
+  reached: boolean;
+  contrast: number;
+}
+
+// Walk one direction in 5% OKLCh-lightness steps (≤28). Returns the FIRST step
+// that meets `target` (reached), else the highest-contrast step seen.
+function walkContrast(
   color: string,
   surface: string,
   target: number,
   dir: "lighten" | "deepen",
-): string {
+): { hex: string; reached: boolean; steps: number; best: number } {
   const neutral = dir === "lighten" ? "#FFFFFF" : "#000000";
-  let c = color,
-    guard = 0;
-  while (contrast(c, surface) < target && guard < 28) {
+  let c = color;
+  let bestHex = color;
+  let bestC = contrast(color, surface);
+  for (let steps = 0; steps <= 28; steps++) {
+    const cc = contrast(c, surface);
+    if (cc > bestC) {
+      bestC = cc;
+      bestHex = c;
+    }
+    if (cc >= target) return { hex: c, reached: true, steps, best: bestC };
     c = mixOklch(c, neutral, 0.05);
-    guard++;
   }
-  return c;
+  return { hex: bestHex, reached: false, steps: 28, best: bestC };
+}
+
+// Bidirectional clamp with metadata. `dir` forces a single direction (kept for
+// callers that want it); omitted = AUTO (both directions, smallest change first).
+function clampContrastEx(
+  color: string,
+  surface: string,
+  target: number,
+  dir?: "lighten" | "deepen",
+): ClampResult {
+  const start = normHex(color) || color;
+  const c0 = contrast(start, surface);
+  if (c0 >= target) return { hex: start, reached: true, contrast: c0 };
+  if (dir) {
+    const w = walkContrast(start, surface, target, dir);
+    return { hex: w.hex, reached: w.reached, contrast: contrast(w.hex, surface) };
+  }
+  const dn = walkContrast(start, surface, target, "deepen");
+  const lt = walkContrast(start, surface, target, "lighten");
+  let pick: { hex: string; reached: boolean };
+  if (dn.reached && lt.reached) pick = dn.steps <= lt.steps ? dn : lt;
+  else if (dn.reached) pick = dn;
+  else if (lt.reached) pick = lt;
+  else pick = dn.best >= lt.best ? dn : lt; // unreachable → best-effort
+  return {
+    hex: pick.hex,
+    reached: pick.reached,
+    contrast: contrast(pick.hex, surface),
+  };
+}
+
+function clampContrast(
+  color: string,
+  surface: string,
+  target: number,
+  dir?: "lighten" | "deepen",
+): string {
+  return clampContrastEx(color, surface, target, dir).hex;
+}
+
+// Best contrast a foreground can reach against a surface across BOTH directions
+// (hue+chroma held) — the reachability oracle for the fix system.
+function maxAchievableContrast(color: string, surface: string): number {
+  const start = normHex(color) || color;
+  const dn = walkContrast(start, surface, Infinity, "deepen");
+  const lt = walkContrast(start, surface, Infinity, "lighten");
+  return Math.max(contrast(start, surface), dn.best, lt.best);
+}
+
+// Minimal surface lightness shift (either direction, smallest change first)
+// that makes `foreground` able to reach `target` — the background-fix engine.
+function softenSurfaceFor(
+  surface: string,
+  foreground: string,
+  target: number,
+): ClampResult {
+  const start = normHex(surface) || surface;
+  const fg = normHex(foreground) || foreground;
+  if (maxAchievableContrast(fg, start) >= target) {
+    return { hex: start, reached: true, contrast: maxAchievableContrast(fg, start) };
+  }
+  let up = start;
+  let down = start;
+  for (let i = 1; i <= 28; i++) {
+    up = mixOklch(up, "#FFFFFF", 0.05);
+    if (maxAchievableContrast(fg, up) >= target)
+      return { hex: up, reached: true, contrast: maxAchievableContrast(fg, up) };
+    down = mixOklch(down, "#000000", 0.05);
+    if (maxAchievableContrast(fg, down) >= target)
+      return { hex: down, reached: true, contrast: maxAchievableContrast(fg, down) };
+  }
+  const upBest = maxAchievableContrast(fg, up);
+  const downBest = maxAchievableContrast(fg, down);
+  return upBest >= downBest
+    ? { hex: up, reached: false, contrast: upBest }
+    : { hex: down, reached: false, contrast: downBest };
 }
 
 /* --------------------------------------------------------------------------
@@ -298,32 +402,32 @@ function derive(signature: string, opts?: DeriveOptions): DerivedBrand {
   const tint6 = mixSurfaceHueLocked(surface, sigIn, 0.06);
   const line30 = mixSurfaceHueLocked(surface, sigIn, 0.3);
 
-  // display / decorative / fill signature — AA-large (3:1) vs surface
-  let sig = clampContrast(sigIn, surface, 3.0, "deepen");
+  // display / decorative / fill signature — AA-large (3:1) vs surface.
+  // AUTO direction: deepen on a light surface, lighten on a dark one — the
+  // engine picks whichever reaches the target with the smallest change.
+  let sig = clampContrast(sigIn, surface, 3.0);
 
   // on-signature, with the fill-clamp fallback
   let onSig = resolveOn(sig, surface, ink);
   if (onSig === null) {
-    sig = clampContrast(sig, surface, 4.5, "deepen");
+    sig = clampContrast(sig, surface, 4.5);
     onSig = surface;
   }
 
-  // body-size links — AA (4.5:1) vs surface, deepened from the raw signature
-  const link = clampContrast(sigIn, surface, 4.5, "deepen");
+  // body-size links — AA (4.5:1) vs surface, from the raw signature
+  const link = clampContrast(sigIn, surface, 4.5);
 
   // price numerals on the tint-12 panel — AA (4.5:1)
-  const deep = clampContrast(mix(sigIn, "#000000", 0.22), tint12, 4.5, "deepen");
+  const deep = clampContrast(mix(sigIn, "#000000", 0.22), tint12, 4.5);
 
   // decorative — secondary at FULL STRENGTH when set (no ramp); else signature
   const decorative = secondary || sig;
 
-  // v3 — body-text clamp: deepen (light surface) or lighten (dark surface) the
-  // body ink in 5% OKLCh steps until it clears AA (4.5:1) vs the surface. This
-  // is the one text/surface pair E.1 reported but left unclamped. `ink` stays
-  // RAW (layout-owned dark surfaces read it as a background); only body COPY
-  // reads `ink-text`. At the Editorial defaults this is a NO-OP (15.2:1).
-  const inkDir: "lighten" | "deepen" = luminance(surface) >= 0.4 ? "deepen" : "lighten";
-  const inkText = clampContrast(ink, surface, 4.5, inkDir);
+  // v3 — body-text clamp: AUTO-direction lightness walk until body copy clears
+  // AA (4.5:1) vs the surface (the one text/surface pair E.1 reported but left
+  // unclamped). `ink` stays RAW (layout-owned dark surfaces read it as a
+  // background); only body COPY reads `ink-text`. NO-OP at the defaults (15.2:1).
+  const inkText = clampContrast(ink, surface, 4.5);
   const bodyClamped = inkText !== ink;
 
   const hexes: BrandHexes = {
@@ -387,6 +491,9 @@ export const BrandEngine = {
   isValidHex,
   normHex,
   clampContrast,
+  clampContrastEx,
+  maxAchievableContrast,
+  softenSurfaceFor,
   resolveOn,
   derive,
   applyVars,
