@@ -8,8 +8,18 @@ import {
 } from "./public-payload";
 import { effectivePosterUrl } from "../engine/types";
 import { PresentationPageMotion } from "./motion";
+import dynamic from "next/dynamic";
 import { BrandEngine } from "@/lib/brand/color-engine";
 import "./presentation-page.css";
+
+// Flagship (v2) template — code-split so its module graph (and the self-hosted
+// Newsreader @font-face it carries) lands in a SEPARATE chunk, never the v1
+// seller-presentation CSS chunk. It only renders for templateVersion 2 (no
+// production publish writes that in F1), so v1 pages load neither the chunk nor
+// the font — keeping the v1 CSS byte-identical and the font off every live page.
+const FlagshipPage = dynamic(() =>
+  import("./flagship/FlagshipPage").then((m) => m.FlagshipPage),
+);
 
 // E.1 — production Editorial defaults (the cohort-safe palette). Signature =
 // the agent's brandAccent; surface/ink = layout-owned defaults, overridable.
@@ -40,7 +50,41 @@ const E1_DEFAULTS = {
  *   - agent.photoUrl null → monogram well in same dimensions
  */
 
+/**
+ * Public consumer-page entry point + flagship-version dispatcher (F1).
+ *
+ * Branches on the clamped `templateVersion`: an exact `2` renders the flagship
+ * (v2) template via the FlagshipPage stub; everything else — including every
+ * already-published payload (which carries no templateVersion → clamped to 1)
+ * — renders the v1 markup exactly as today. In F1 no publish writes a `2`, so
+ * this is invisible rails: production always takes the v1 arm.
+ */
 export function SellerPresentationPage({
+  handout,
+}: {
+  handout: HandoutRecord;
+}) {
+  const { templateVersion } = clampPublicPayload(handout.data);
+  if (templateVersion === 2) {
+    // Delegate the v1 markup into the flagship shell (passthrough — the v1 JSX
+    // is rendered here, not forked). FlagshipPage adds only the Newsreader font
+    // shell, kept in its own code-split chunk so v1 pages stay byte-identical.
+    return (
+      <FlagshipPage>
+        <SellerPresentationV1 handout={handout} />
+      </FlagshipPage>
+    );
+  }
+  return <SellerPresentationV1 handout={handout} />;
+}
+
+/**
+ * v1 consumer page — the production Editorial markup. Rendered for every
+ * stored payload (and any templateVersion: 1 publish). Kept verbatim; the
+ * flagship dispatcher and FlagshipPage stub delegate here so the v1 output
+ * stays byte-identical.
+ */
+export function SellerPresentationV1({
   handout,
 }: {
   handout: HandoutRecord;
