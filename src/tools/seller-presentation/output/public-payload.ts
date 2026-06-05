@@ -32,6 +32,7 @@ import type {
   ReviewsOutlink,
   SellerPresentationDraft,
 } from "../engine/types";
+import { PUBLISH_TEMPLATE_VERSION } from "../config/template-version";
 
 // Re-export the public-safe locked-design types so consumers
 // (publish route, A7b renderer, allowlist spec) can import from one
@@ -174,6 +175,14 @@ export interface PublicWhyPrice {
 }
 
 export interface PublicPayload {
+  /**
+   * Flagship-rollout discriminator (F1). Absent on every already-published
+   * slug → the renderer treats "missing" as v1, so old pages keep the current
+   * look forever. New publishes carry `PUBLISH_TEMPLATE_VERSION`. The read
+   * clamp coerces anything that isn't exactly `2` back to `1`.
+   */
+  templateVersion?: 1 | 2;
+
   // ---- A6 flat fields (kept for the A6 functional renderer) ----
   propertyAddress: string;
   propertyCity?: string;
@@ -413,6 +422,11 @@ export function toPublicPayload(
   );
 
   return {
+    // F1 — stamp the publish-time template version. F1 keeps every publish on
+    // v1 (PUBLISH_TEMPLATE_VERSION === 1); F3 flips the constant to start
+    // shipping the flagship template to new publishes.
+    templateVersion: PUBLISH_TEMPLATE_VERSION,
+
     // ---- A6 flat fields ----
     propertyAddress,
     propertyCity: draft.propertyCity,
@@ -484,6 +498,11 @@ export function clampPublicPayload(raw: unknown): PublicPayload {
   const agent = clampAgentBranding(r.agent ?? r.agentBranding);
 
   return {
+    // F1 — template-version clamp at the trust boundary. This payload is stored
+    // in KV and could be hand-edited/tampered, so coerce to v1 unless the value
+    // is EXACTLY the number 2. Tampered / absent (old slugs) / any other value
+    // → 1, which renders today's look.
+    templateVersion: r.templateVersion === 2 ? 2 : 1,
     propertyAddress,
     propertyCity,
     recommendedPrice,
@@ -543,6 +562,7 @@ function clampBrandColors(raw: unknown): PublicBrandColors | undefined {
 
 function emptyPayload(): PublicPayload {
   return {
+    templateVersion: 1,
     propertyAddress: "",
     recommendedPrice: "",
     comps: [],

@@ -30,6 +30,15 @@ export interface BrandHexes {
   "signature-deep": string;
   "signature-link": string;
   "tint-12": string;
+  /**
+   * F1 (flagship foundation) — quiet band tint, the midpoint between the
+   * panel tint (`tint-12`, 12%) and the card tint (`tint-6`, 6%): a 9%
+   * hue-locked signature→surface mix. Additive: consumed by the flagship
+   * (v2) template via `deriveConsumerRoles`. It is intentionally NOT emitted
+   * as a CSS var (see the vars loop in `derive`) so v1 pages, which inline
+   * `vars` on <main>, stay byte-identical until F2 wires `--tint-9` into CSS.
+   */
+  "tint-9": string;
   "tint-6": string;
   "line-30": string;
   "on-signature": string;
@@ -399,6 +408,9 @@ function derive(signature: string, opts?: DeriveOptions): DerivedBrand {
   // the signature so cool brands don't pick up the warm cream's yellow cast.
   // Not clamped (decorative). See mixSurfaceHueLocked.
   const tint12 = mixSurfaceHueLocked(surface, sigIn, 0.12);
+  // F1 — quiet band tint: 9%, midway between the panel tint (12%) and the
+  // card tint (6%). Same hue-locked surface-mix model as its neighbors.
+  const tint9 = mixSurfaceHueLocked(surface, sigIn, 0.09);
   const tint6 = mixSurfaceHueLocked(surface, sigIn, 0.06);
   const line30 = mixSurfaceHueLocked(surface, sigIn, 0.3);
 
@@ -435,6 +447,7 @@ function derive(signature: string, opts?: DeriveOptions): DerivedBrand {
     "signature-deep": deep,
     "signature-link": link,
     "tint-12": tint12,
+    "tint-9": tint9,
     "tint-6": tint6,
     "line-30": line30,
     "on-signature": onSig,
@@ -444,8 +457,15 @@ function derive(signature: string, opts?: DeriveOptions): DerivedBrand {
     "ink-text": inkText,
   };
 
+  // CSS-var emission. `tint-9` (F1, additive) is deliberately excluded: it is
+  // consumed via `hexes` by the flagship (v2) template / `deriveConsumerRoles`,
+  // and emitting `--tint-9` would change the inline style v1 pages put on
+  // <main>, breaking the byte-identity gate. F2 wires it into CSS when the
+  // flagship template actually consumes it — then drop it from VARS_EXCLUDE.
+  const VARS_EXCLUDE = new Set<keyof BrandHexes>(["tint-9"]);
   const vars: BrandVars = {};
   (Object.keys(hexes) as Array<keyof BrandHexes>).forEach((k) => {
+    if (VARS_EXCLUDE.has(k)) return;
     vars["--" + k] = hexes[k];
   });
 

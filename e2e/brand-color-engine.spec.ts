@@ -164,6 +164,39 @@ test.describe("BrandEngine — hue-locked surface mixes", () => {
     expect(d.hexes["line-30"]).toBe("#E9C2B6");
   });
 
+  test("quiet band tint (F1): tint-9 exists, sits between tint-12 and tint-6, holds hue, deterministic", () => {
+    const d = BrandEngine.derive(TERRACOTTA, { surface: PAPER, ink: INK });
+    const L = (hex: string) => BrandEngine.luminance(hex);
+    // exists + is a valid resolved hex
+    expect(BrandEngine.isValidHex(d.hexes["tint-9"])).toBe(true);
+    // sits between the panel tint (12%) and the card tint (6%) in lightness:
+    // more signature mixed in → darker, so tint-12 < tint-9 < tint-6
+    expect(L(d.hexes["tint-12"])).toBeLessThan(L(d.hexes["tint-9"]));
+    expect(L(d.hexes["tint-9"])).toBeLessThan(L(d.hexes["tint-6"]));
+    // holds the signature hue like its neighbors (no warm-cream drag) — assert
+    // for a cool signature where a non-hue-locked mix would visibly drift
+    const COOL = "#2C53C4";
+    const dc = BrandEngine.derive(COOL, { surface: PAPER, ink: INK });
+    const hSig = BrandEngine.rgbToOklch(COOL).h;
+    const hTint9 = BrandEngine.rgbToOklch(dc.hexes["tint-9"]).h;
+    expect(hueDist(hTint9, hSig)).toBeLessThan(8);
+    // deterministic — same input, same output
+    const d2 = BrandEngine.derive(TERRACOTTA, { surface: PAPER, ink: INK });
+    expect(d2.hexes["tint-9"]).toBe(d.hexes["tint-9"]);
+  });
+
+  test("quiet band tint is NOT emitted as a CSS var (v1 byte-identity gate)", () => {
+    // tint-9 lives only on `hexes` (consumed by the flagship template via
+    // deriveConsumerRoles). Emitting `--tint-9` would change the inline style
+    // v1 pages put on <main>. Lock that it stays out of `vars`.
+    const d = BrandEngine.derive(TERRACOTTA, { surface: PAPER, ink: INK });
+    expect(d.hexes["tint-9"]).toBeDefined();
+    expect(d.vars["--tint-9"]).toBeUndefined();
+    // the existing emitted tints are unchanged
+    expect(d.vars["--tint-12"]).toBe(d.hexes["tint-12"]);
+    expect(d.vars["--tint-6"]).toBe(d.hexes["tint-6"]);
+  });
+
   test("body-text clamp NO-OP at production defaults (#1A1612 on #F1EBE0, 15.2:1)", () => {
     const d = BrandEngine.derive(TERRACOTTA, { surface: PAPER, ink: INK });
     // ink stays raw; ink-text equals it (no movement) — baseline must not shift
