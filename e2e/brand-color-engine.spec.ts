@@ -164,6 +164,35 @@ test.describe("BrandEngine — hue-locked surface mixes", () => {
     expect(d.hexes["line-30"]).toBe("#E9C2B6");
   });
 
+  test("body-text clamp NO-OP at production defaults (#1A1612 on #F1EBE0, 15.2:1)", () => {
+    const d = BrandEngine.derive(TERRACOTTA, { surface: PAPER, ink: INK });
+    // ink stays raw; ink-text equals it (no movement) — baseline must not shift
+    expect(d.hexes.ink).toBe("#1A1612");
+    expect(d.hexes["ink-text"]).toBe("#1A1612");
+    expect(d.report.bodyClamped).toBe(false);
+    expect(d.report.bodyOnSurface).toBeGreaterThan(15); // ~15.2:1
+    expect(d.report.bodyOnSurfaceClamped).toBe(d.report.bodyOnSurface);
+  });
+
+  test("body-text clamp convergence: a low-contrast body ink deepens to ≥4.5:1 (light surface)", () => {
+    // a mid grey body text on cream fails AA — the clamp must deepen it
+    const d = BrandEngine.derive(TERRACOTTA, { surface: PAPER, ink: "#9A8F80" });
+    expect(d.report.bodyOnSurface).toBeLessThan(4.5); // raw fails
+    expect(d.report.bodyClamped).toBe(true);
+    expect(d.hexes["ink-text"]).not.toBe(BrandEngine.normHex("#9A8F80"));
+    expect(d.report.bodyOnSurfaceClamped).toBeGreaterThanOrEqual(4.5);
+    // `ink` (layout-owned surface token) is untouched — only ink-text moved
+    expect(d.hexes.ink).toBe("#9A8F80");
+  });
+
+  test("body-text clamp lightens on a dark surface", () => {
+    // dark surface + a too-dark body ink → clamp walks lightness UP to clear AA
+    const d = BrandEngine.derive(TERRACOTTA, { surface: "#14110D", ink: "#2A2620" });
+    expect(d.report.bodyOnSurface).toBeLessThan(4.5);
+    expect(d.report.bodyClamped).toBe(true);
+    expect(d.report.bodyOnSurfaceClamped).toBeGreaterThanOrEqual(4.5);
+  });
+
   test("gray-floor fallback: a near-neutral signature derives clean grays (plain mix, no injected hue)", () => {
     const GRAY = "#808080";
     const d = BrandEngine.derive(GRAY, { surface: PAPER, ink: INK });

@@ -34,6 +34,11 @@
      gone — every ex-mint accent now reads as the signature family. */
   --surface: #f1ebe0;
   --ink: #1a1612;
+  /* v3 body-text clamp: `--ink-text` is body COPY, clamped to ≥4.5:1 vs the
+     surface by the engine (inlined resolved hex; the live path). `--ink` stays
+     raw for layout-owned dark surfaces (the agent band background). Pre-JS
+     fallback = raw ink; at the defaults the clamp is a NO-OP so they match. */
+  --ink-text: var(--ink);
   --signature: #c26a4e;
   --signature-deep: color-mix(in oklch, var(--signature), #000 22%);
   --signature-link: color-mix(in oklch, var(--signature), #000 14%);
@@ -117,7 +122,7 @@
     0 32px 80px -40px rgba(40, 28, 16, 0.22);
 
   background: var(--paper-deep);
-  color: var(--ink);
+  color: var(--ink-text);
   min-height: 100vh;
   -webkit-font-smoothing: antialiased;
   text-rendering: optimizeLegibility;
@@ -129,11 +134,25 @@
   box-sizing: border-box;
 }
 
+/* v3 embed mode (Brand kit live preview, ?embed=1) — hide non-page chrome so
+   the frame reads as a clean preview; EmbedBridge sets .sep-embed on <html>. */
+html.sep-embed .sep-presentation .share {
+  display: none;
+}
+/* palette-chip region highlight (stretch) — a calm, fading outline applied to
+   elements tagged with data-brand-role when the form posts sep-highlight-role. */
+html.sep-embed .sep-role-highlight {
+  outline: 2px solid color-mix(in oklch, var(--signature) 70%, transparent);
+  outline-offset: 2px;
+  border-radius: 3px;
+  transition: outline-color 1.2s ease;
+}
+
 .sep-presentation .page {
   width: 100%;
   background: var(--paper);
   position: relative;
-  color: var(--ink);
+  color: var(--ink-text);
   margin: 0 auto;
   font-family: var(--sep-ui);
 }
@@ -367,7 +386,7 @@
   font-size: 108px;
   line-height: 0.88;
   letter-spacing: -0.04em;
-  color: var(--ink);
+  color: var(--ink-text);
   display: flex;
   align-items: flex-start;
   margin: 0;
@@ -480,7 +499,7 @@
   line-height: 1;
   letter-spacing: -0.025em;
   margin: 0 0 22px;
-  color: var(--ink);
+  color: var(--ink-text);
   max-width: 12ch;
 }
 .sep-presentation .sec-title em {
@@ -693,7 +712,7 @@
   font-size: 21px;
   line-height: 1.18;
   letter-spacing: -0.01em;
-  color: var(--ink);
+  color: var(--ink-text);
 }
 .sep-presentation .comp .addr small {
   display: block;
@@ -707,7 +726,7 @@
 .sep-presentation .comp .sold {
   font-family: var(--sep-display);
   font-size: 24px;
-  color: var(--ink);
+  color: var(--ink-text);
   letter-spacing: -0.015em;
   text-align: right;
   line-height: 1;
@@ -770,7 +789,7 @@
   font-size: 22px;
   line-height: 1.22;
   letter-spacing: -0.015em;
-  color: var(--ink);
+  color: var(--ink-text);
 }
 .sep-presentation .pp .t small {
   display: block;
@@ -823,7 +842,7 @@
   font-size: 19px;
   line-height: 1.36;
   letter-spacing: -0.005em;
-  color: var(--ink);
+  color: var(--ink-text);
   margin: 0 0 14px;
   max-width: 36ch;
 }
@@ -848,7 +867,7 @@
   gap: 10px;
   font-family: var(--sep-ui);
   font-size: 13px;
-  color: var(--ink);
+  color: var(--ink-text);
   text-decoration: none;
   border-bottom: 1px solid var(--brick);
   padding-bottom: 2px;
@@ -881,7 +900,7 @@
   border-radius: 4px;
   background: var(--paper);
   text-decoration: none;
-  color: var(--ink);
+  color: var(--ink-text);
   transition: border-color var(--ease) 180ms, transform var(--ease) 180ms;
   max-width: 38ch;
 }
@@ -893,7 +912,7 @@
   font-size: 19px;
   line-height: 1.3;
   letter-spacing: -0.005em;
-  color: var(--ink);
+  color: var(--ink-text);
 }
 .sep-presentation .reviews-outlink-card-meta {
   font-family: var(--sep-mono);
@@ -1154,7 +1173,7 @@
   font-size: 22px;
   line-height: 1.2;
   letter-spacing: -0.01em;
-  color: var(--ink);
+  color: var(--ink-text);
   font-style: italic;
 }
 .sep-presentation .area--empty .area-empty .p {
@@ -1327,7 +1346,7 @@
 }
 .sep-presentation .cta.primary {
   background: #f4efe4;
-  color: var(--ink);
+  color: var(--ink-text);
 }
 .sep-presentation .cta.outline {
   background: transparent;
@@ -1346,7 +1365,7 @@
 }
 .sep-presentation .cta.outline .ar {
   background: #f4efe4;
-  color: var(--ink);
+  color: var(--ink-text);
 }
 .sep-presentation .cta:hover .ar {
   transform: translateX(3px);

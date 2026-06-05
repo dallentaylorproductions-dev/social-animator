@@ -111,6 +111,12 @@ export function BrandProfileForm() {
         )}
       </Field>
 
+      {/* v3 smoke fix: group heading clarifies these colors are for Social
+          Animator / export artifacts, NOT the seller page (Brand tab) — new
+          users read the two as redundant otherwise. */}
+      <h3 className="text-xs uppercase tracking-[0.18em] text-neutral-500">
+        Social &amp; export colors
+      </h3>
       <div className="grid grid-cols-2 gap-4">
         <Field label="Primary color">
           <ColorInput
@@ -130,8 +136,8 @@ export function BrandProfileForm() {
           Open House Promo, SIR PDF). These Profile colors do NOT style the
           published seller page; those colors live in the Brand tab. */}
       <p className="-mt-3 text-[11px] text-neutral-600 leading-relaxed">
-        These colors style your flyers, presentations, and promos. Your seller
-        page&apos;s colors are set in the Brand tab.
+        These style your Social Animator templates, flyers, and promos. Your
+        seller page colors live in the Brand tab.
       </p>
 
       <Field label="Brokerage">

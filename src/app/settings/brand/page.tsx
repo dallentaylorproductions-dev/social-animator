@@ -87,16 +87,16 @@ export default function BrandSettingsPage() {
         <div className="page-head" style={{ marginTop: 0 }}>
           <h1 className="page-title">Brand kit</h1>
           <p className="page-sub">
-            Pick one color. We build your palette from it — and it flows into
-            every seller page you publish.
+            Set one signature color. We derive the rest and check your pages stay
+            readable.
           </p>
         </div>
         <BrandKitForm
           values={values}
           onChange={handleChange}
-          layout="page"
-          showRepublishReminder={true}
           defaults={EDITORIAL_BRAND_DEFAULTS}
+          logoDataUrl={settings.logoDataUrl}
+          agentName={settings.agentName}
         />
       </div>
     </main>
