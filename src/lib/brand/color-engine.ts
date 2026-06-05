@@ -402,7 +402,13 @@ function derive(signature: string, opts?: DeriveOptions): DerivedBrand {
   const surface = normHex(opts.surface) || "#F1EBE0"; // = paper
   const ink = normHex(opts.ink) || "#1A1612";
   const secondary = opts.secondary ? normHex(opts.secondary) : null;
-  const sigIn = normHex(signature) || "#C26A4E";
+  // F3 — last-resort signature default when none is supplied. Flagship blue
+  // (was terracotta #C26A4E). Reached ONLY when `signature` is empty/invalid:
+  // the v2/flagship unset-brand path (deriveConsumerRoles passes "") lands here
+  // → blue. The v1 path always passes a valid signature (the agent's accent, or
+  // E1_DEFAULTS' terracotta), so it NEVER reaches this fallback and stays
+  // byte-identical.
+  const sigIn = normHex(signature) || "#037290";
 
   // decorative fills & lines — color-mix(signature N%, surface), HUE-LOCKED to
   // the signature so cool brands don't pick up the warm cream's yellow cast.

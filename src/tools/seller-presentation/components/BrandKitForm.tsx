@@ -3,6 +3,10 @@
 import { useEffect, useMemo, useRef, useState } from "react";
 import { BrandEngine, type BrandHexes } from "@/lib/brand/color-engine";
 import { extractLogoColors } from "@/lib/brand/logo-colors";
+import {
+  consumerRoleVars,
+  deriveConsumerRoles,
+} from "../output/consumer-roles";
 
 /**
  * BrandKitForm — Brand kit v3 (first-time-success optimization + real-template
@@ -66,6 +70,11 @@ function previewParams(v: BrandKitFormValues, embed: boolean): string {
   const p = new URLSearchParams();
   p.set("fixture", "full");
   if (embed) p.set("embed", "1");
+  // F3 — new publishes are flagship (v2), so the live preview renders the
+  // FLAGSHIP template (the read-time override the preview route exposes).
+  // Agents now dial colors against the look they actually publish, and the
+  // preview shares ONE color path with the real page (deriveConsumerRoles).
+  p.set("template", "flagship");
   p.set("brandAccent", v.accent);
   p.set("brandBg", v.background);
   p.set("brandText", v.text);
@@ -346,6 +355,15 @@ export function BrandKitForm({
     [values.accent, values.secondary, values.background, values.text],
   );
 
+  // F3 — the flagship preview consumes ONLY the signature ramp (paper/ink are
+  // layout-locked), resolved through the SAME deriveConsumerRoles the real v2
+  // page uses. These are the vars pushed over the live bridge so dialing the
+  // signature repaints the flagship root without a reload.
+  const previewRoleVars = useMemo(
+    () => consumerRoleVars(deriveConsumerRoles(values.accent)),
+    [values.accent],
+  );
+
   // ---- logo color suggestions (extraction, never AI) ----
   const logoPresent = !!logoDataUrl;
   useEffect(() => {
@@ -374,16 +392,18 @@ export function BrandKitForm({
     return () => window.removeEventListener("message", onMsg);
   }, []);
 
-  // When the bridge is live, push the derived vars on every change (no reload).
+  // When the bridge is live, push the flagship role vars on every change (no
+  // reload). Pushes the deriveConsumerRoles set (not derived.vars) so the
+  // tokens match exactly what the flagship root consumes.
   useEffect(() => {
     if (!bridgeReady) return;
     const win = iframeRef.current?.contentWindow;
     if (!win) return;
     win.postMessage(
-      { type: "sep-brand-vars", vars: derived.vars },
+      { type: "sep-brand-vars", vars: previewRoleVars },
       window.location.origin,
     );
-  }, [derived, bridgeReady]);
+  }, [previewRoleVars, bridgeReady]);
 
   // Fallback: until the bridge is confirmed, reflect changes via a debounced
   // param reload of the iframe (covers a blocked/absent bridge).

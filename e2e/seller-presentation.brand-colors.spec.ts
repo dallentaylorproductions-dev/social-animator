@@ -129,6 +129,27 @@ test.describe('Seller Presentation — brand colors (E.1)', () => {
     expect(await cyanCount(page)).toBe(0);
   });
 
+  test('F3 SAFETY GATE: an unset-brand v1 page stays terracotta (byte-identical, NOT the new blue default)', async ({
+    page,
+  }) => {
+    // F3 flipped the FORM default + engine fallback to flagship blue #037290,
+    // but the v1 cohort default (E1_DEFAULTS.signature + the v1 CSS fallbacks)
+    // is deliberately untouched. A pre-F3 slug published with NO brand settings
+    // renders v1 (no ?template, no brand params) and MUST still resolve to the
+    // legacy terracotta signature — proving the change is invisible to the
+    // already-published cohort.
+    await page.goto('/seller-presentation-preview?fixture=full');
+    // it is the v1 renderer (flagship root absent)
+    await expect(page.getByTestId('seller-presentation-public')).toBeVisible();
+    await expect(page.getByTestId('seller-presentation-flagship')).toHaveCount(0);
+    const c = await primaries(page);
+    expect(c.pageBg).toBe(PROD.paper);
+    expect(c.pageText).toBe(PROD.ink);
+    expect(c.accent).toBe(PROD.signature); // terracotta rgb(194,106,78), NOT blue
+    // and explicitly NOT the new blue default (#037290 → rgb(3,114,144))
+    expect(c.accent).not.toBe('rgb(3, 114, 144)');
+  });
+
   test('invalid brand hex params fall back to the production palette', async ({
     page,
   }) => {

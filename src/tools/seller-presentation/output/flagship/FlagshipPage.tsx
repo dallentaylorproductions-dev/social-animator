@@ -1,7 +1,7 @@
 import type { CSSProperties } from "react";
 import type { HandoutRecord } from "@/lib/share-urls";
 import { clampPublicPayload } from "../public-payload";
-import { deriveConsumerRoles } from "../consumer-roles";
+import { consumerRoleVars, deriveConsumerRoles } from "../consumer-roles";
 import { PresentationPageMotion } from "../motion";
 import { newsreader } from "./fonts";
 import { Hero } from "./Hero";
@@ -43,25 +43,10 @@ export function FlagshipPage({ handout }: { handout: HandoutRecord }) {
 
   // Inline the resolved role hexes as custom properties on the flagship root
   // (the signatured element). These are the live path; no CSS color-mix
-  // fallback is needed because the engine already resolved every clamp.
-  const roleVars = {
-    "--signature": roles.signature,
-    "--signature-deep": roles.signatureDeep,
-    "--signature-link": roles.signatureLink,
-    "--tint-12": roles.tint12,
-    "--tint-9": roles.tint9,
-    "--tint-6": roles.tint6,
-    "--line-30": roles.line30,
-    "--on-signature": roles.onSignature,
-    "--decorative": roles.signature, // secondary retired → = signature
-    "--paper": roles.paper,
-    "--ink": roles.ink,
-    "--ink-soft": roles.inkSoft,
-    "--ink-faint": roles.inkFaint,
-    "--on-dark": roles.onDark,
-    "--dark-band": roles.darkBand,
-    "--dark-band-2": roles.darkBand2,
-  } as CSSProperties;
+  // fallback is needed because the engine already resolved every clamp. The
+  // `role → --token` map is shared with the Brand-kit live preview via
+  // consumerRoleVars (one color path for preview + real page).
+  const roleVars = consumerRoleVars(roles) as CSSProperties;
 
   return (
     <div

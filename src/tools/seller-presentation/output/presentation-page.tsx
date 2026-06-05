@@ -21,8 +21,16 @@ const FlagshipPage = dynamic(() =>
   import("./flagship/FlagshipPage").then((m) => m.FlagshipPage),
 );
 
-// E.1 — production Editorial defaults (the cohort-safe palette). Signature =
-// the agent's brandAccent; surface/ink = layout-owned defaults, overridable.
+// E.1 — v1 unset-brand defaults (the cohort-safe palette). Signature = the
+// agent's brandAccent; surface/ink = layout-owned defaults, overridable.
+//
+// F3 LOCK: `signature` stays terracotta `#C26A4E` ON PURPOSE. F3 flipped the
+// FORM default + the engine's last-resort fallback to blue `#037290`, but the
+// v1 renderer reads its unset default from THIS local constant (never the live
+// default), and v1 always hands the engine a valid signature so it never hits
+// the engine's blue fallback. Keeping this terracotta is what makes an
+// already-published unset-brand v1 page render byte-identical before/after F3.
+// (v2/flagship unset pages render blue via the engine fallback — intended.)
 const E1_DEFAULTS = {
   signature: "#C26A4E",
   surface: "#F1EBE0",
@@ -51,30 +59,36 @@ const E1_DEFAULTS = {
  */
 
 /**
- * Public consumer-page entry point + flagship-version dispatcher (F1 → F2).
+ * Public consumer-page entry point + flagship-version dispatcher (F1 → F3).
  *
  * Branches on the clamped `templateVersion`: an exact `2` renders the flagship
  * (v2) template; everything else — including every already-published payload
  * (which carries no templateVersion → clamped to 1) — renders the v1 markup
- * exactly as today. No publish writes a `2` yet (F3 flips that), so production
- * always takes the v1 arm.
+ * exactly as today. F3 flips publishes to v2, so NEW slugs take the flagship
+ * arm while every pre-F3 slug stays v1.
  *
- * F2 reachability: `templateOverride="flagship"` forces the flagship arm for a
- * single render regardless of the stored payload version — a pure presentation
- * switch (no data / storage / serialization change) wired by the `/h/` route's
- * `?template=flagship` query (and the dev preview route). When the override is
- * absent AND the payload is v1, this renders v1 BYTE-IDENTICALLY to before.
+ * Read-time presentation override (a pure presentation switch — no data /
+ * storage / serialization change — wired by the `/h/` route's `?template=`
+ * query and the dev preview route):
+ *   - `"flagship"` forces the flagship arm for ANY stored version (F2). Post-F3
+ *     it's also how an agent previews a still-v1 slug's flagship upgrade before
+ *     republishing.
+ *   - `"v1"` is the inverse (F3): force the v1 arm even for a v2 payload — same
+ *     read-only switch in the other direction.
+ * An override always wins over the stored version. With NO override AND a v1
+ * payload, this renders v1 BYTE-IDENTICALLY to before.
  */
 export function SellerPresentationPage({
   handout,
   templateOverride,
 }: {
   handout: HandoutRecord;
-  /** Read-time presentation override (F2 reachability). Only "flagship" forces v2. */
-  templateOverride?: "flagship";
+  /** Read-time presentation override. "flagship" forces v2; "v1" forces v1. */
+  templateOverride?: "flagship" | "v1";
 }) {
   const { templateVersion } = clampPublicPayload(handout.data);
-  if (templateVersion === 2 || templateOverride === "flagship") {
+  // "v1" override wins outright — render the v1 arm regardless of stored version.
+  if (templateOverride !== "v1" && (templateVersion === 2 || templateOverride === "flagship")) {
     // Render the real flagship (v2) template. FlagshipPage is dynamically
     // imported so its module graph — the Newsreader @font-face and the
     // flagship stylesheet — stays in a SEPARATE chunk that never loads on a

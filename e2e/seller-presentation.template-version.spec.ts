@@ -1,9 +1,9 @@
 import { test, expect } from "@playwright/test";
 
 /**
- * Flagship F1 — templateVersion discriminator specs (node context, repo
+ * Flagship templateVersion discriminator specs (node context, repo
  * convention — no Vitest). Proves the rollout rails:
- *   - new publishes are stamped with PUBLISH_TEMPLATE_VERSION (1 in F1)
+ *   - new publishes are stamped with PUBLISH_TEMPLATE_VERSION (F3: 2 → flagship)
  *   - the read clamp (trust boundary) coerces anything that isn't EXACTLY the
  *     number 2 back to 1 — so old slugs (no field), tampered, and garbage all
  *     render today's v1 look.
@@ -27,11 +27,11 @@ const minimalDraft = {
   pitchPoints: [],
 } as unknown as SellerPresentationDraft;
 
-test.describe("Seller Presentation — templateVersion (F1)", () => {
-  test("toPublicPayload stamps the publish-time version (1 in F1)", () => {
+test.describe("Seller Presentation — templateVersion (F3)", () => {
+  test("toPublicPayload stamps the publish-time version (2 in F3)", () => {
     const p = toPublicPayload(minimalDraft, {});
     expect(p.templateVersion).toBe(PUBLISH_TEMPLATE_VERSION);
-    expect(PUBLISH_TEMPLATE_VERSION).toBe(1); // F1 keeps every publish on v1
+    expect(PUBLISH_TEMPLATE_VERSION).toBe(2); // F3 flips new publishes to flagship
   });
 
   test("read clamp: an EXACT numeric 2 survives", () => {

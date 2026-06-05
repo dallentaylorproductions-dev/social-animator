@@ -34,7 +34,13 @@ export function EmbedBridge() {
     const root = document.documentElement;
     root.classList.add("sep-embed");
 
+    // The element that carries the brand CSS custom properties. F3: the live
+    // preview renders the flagship template, whose root is the signatured
+    // `[data-flagship-shell]` div (it declares the role vars inline, so
+    // setProperty here overrides them). Falls back to the v1 `main.sep-
+    // presentation` root when a v1 page is embedded directly.
     const pageRoot = () =>
+      document.querySelector<HTMLElement>("[data-flagship-shell]") ??
       document.querySelector<HTMLElement>("main.sep-presentation");
 
     // tell the opener the live bridge is up (same-origin target only)

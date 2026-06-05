@@ -73,16 +73,18 @@ export default async function HandoutPage({ params, searchParams }: PageProps) {
   const record = await fetchHandout(slug);
   if (!record) notFound();
 
-  // F2 reachability — read-time presentation override. `?template=flagship`
-  // renders the SAME stored payload through the flagship (v2) template; it is
-  // a PURE presentation switch (no data / storage / serialization change), so
-  // it is safe on public pages. Nothing publishes templateVersion: 2 yet, so
-  // this query is how the flagship is smoked against a live slug. Any other
-  // value (or its absence) renders the stored version unchanged — for every
-  // already-published payload that is v1, byte-identical to today. F3 decides
-  // whether to keep or remove this override when it flips the publish version.
+  // Read-time presentation override — a PURE presentation switch (no data /
+  // storage / serialization change), so it is safe on public pages. Two values:
+  //   • `?template=flagship` — render the stored payload through the flagship
+  //     (v2) template. Post-F3 (publishes are v2) this is how an agent previews
+  //     a still-v1 slug's flagship upgrade BEFORE republishing.
+  //   • `?template=v1` — the inverse: render a v2 payload through the v1 (pre-
+  //     flagship) template.
+  // Any other value (or its absence) renders the stored version unchanged — for
+  // every already-published payload that is v1, byte-identical to today.
   const { template } = await searchParams;
-  const templateOverride = template === 'flagship' ? 'flagship' : undefined;
+  const templateOverride =
+    template === 'flagship' ? 'flagship' : template === 'v1' ? 'v1' : undefined;
 
   // Type dispatch — each handout type owns its own renderer. New
   // handout types add a new arm here; the typed dispatch is the

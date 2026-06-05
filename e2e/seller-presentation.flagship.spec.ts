@@ -37,6 +37,22 @@ test.describe("Flagship — reachability override (v1 byte-identity preserved)",
     await expect(page.getByTestId("seller-presentation-public")).toBeVisible();
     await expect(page.getByTestId("seller-presentation-flagship")).toHaveCount(0);
   });
+
+  test("a v2-stamped payload renders flagship with NO override (F3 publish stamp routes on its own)", async ({
+    page,
+  }) => {
+    await page.goto("/seller-presentation-preview?fixture=full-v2");
+    await expect(page.getByTestId("seller-presentation-flagship")).toBeVisible();
+    await expect(page.getByTestId("seller-presentation-public")).toHaveCount(0);
+  });
+
+  test("?template=v1 forces the v1 renderer for a v2 payload (F3 inverse override)", async ({
+    page,
+  }) => {
+    await page.goto("/seller-presentation-preview?fixture=full-v2&template=v1");
+    await expect(page.getByTestId("seller-presentation-public")).toBeVisible();
+    await expect(page.getByTestId("seller-presentation-flagship")).toHaveCount(0);
+  });
 });
 
 test.describe("Flagship — per-section render (full fixture)", () => {
@@ -133,8 +149,18 @@ test.describe("Flagship — optional-slot matrix (minimal reads complete)", () =
 });
 
 test.describe("Flagship — CTA on-signature contrast (contract §2/§4)", () => {
-  test("terracotta primary label resolves DARK", async ({ page }) => {
-    await page.goto(FLAGSHIP); // default signature = terracotta #c26a4e
+  test("default signature (F3 flagship blue) primary label resolves CREAM", async ({
+    page,
+  }) => {
+    await page.goto(FLAGSHIP); // F3 default signature = flagship blue #037290
+    const color = await read(page.getByTestId("fs-cta-primary"), "color");
+    expect(luminance(color)).toBeGreaterThan(0.4); // cream, not dark ink
+  });
+
+  test("terracotta primary label resolves DARK (explicit signature)", async ({
+    page,
+  }) => {
+    await page.goto(`${FLAGSHIP}&brandAccent=%23c26a4e`);
     const color = await read(page.getByTestId("fs-cta-primary"), "color");
     expect(luminance(color)).toBeLessThan(0.15); // dark ink, not cream
   });
