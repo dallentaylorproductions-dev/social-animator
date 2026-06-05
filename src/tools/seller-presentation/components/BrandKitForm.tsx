@@ -232,50 +232,66 @@ function PaletteStrip({
 }
 
 /* ---- readability sample chip ------------------------------------------- */
+// A fix renders only when it produces a REAL change (reachability honesty).
+interface SampleFix {
+  label: string;
+  apply: () => void;
+}
+
 function Sample({
   label,
   ratio,
   target,
   sampleBg,
   txtColor,
-  onFix,
   adjusted,
+  fixes,
+  note,
 }: {
   label: string;
   ratio: number;
   target: number;
   sampleBg: string;
   txtColor: string;
-  onFix?: () => void;
   adjusted?: boolean;
+  fixes?: SampleFix[];
+  note?: string;
 }) {
   const pass = ratio >= target;
   return (
     <div className="sample" style={{ "--sample-bg": sampleBg } as React.CSSProperties}>
-      <span className="sample__txt" style={{ color: txtColor }}>
-        {label}
-        {adjusted ? (
-          <span className="sample__adjusted">adjusted to stay readable</span>
-        ) : null}
-      </span>
-      <span className="sample__right">
-        <span
-          className={"sample__ratio " + (pass ? "is-pass" : "is-warn")}
-          data-testid="brand-readability-ratio"
-        >
-          {pass ? "Clear" : "Low"} {ratio.toFixed(1)}
+      <div className="sample__row">
+        {/* honest swatch: the role color on the ACTUAL page background */}
+        <span className="sample__txt" style={{ color: txtColor }}>
+          {label}
+          {adjusted ? (
+            <span className="sample__adjusted">adjusted to stay readable</span>
+          ) : null}
         </span>
-        {!pass && onFix ? (
-          <button
-            type="button"
-            className="sample__fix"
-            onClick={onFix}
-            data-testid="brand-readability-fix"
+        {/* controls sit on the PANEL surface so the instrument stays legible
+            at any user colors */}
+        <span className="sample__right">
+          <span
+            className={"sample__ratio " + (pass ? "is-pass" : "is-warn")}
+            data-testid="brand-readability-ratio"
           >
-            Bump contrast
-          </button>
-        ) : null}
-      </span>
+            {pass ? "Clear" : "Low"} {ratio.toFixed(1)}
+          </span>
+          {!pass &&
+            fixes?.map((f) => (
+              <button
+                key={f.label}
+                type="button"
+                className="sample__fix"
+                onClick={f.apply}
+                data-testid="brand-readability-fix"
+              >
+                {f.label}
+              </button>
+            ))}
+        </span>
+      </div>
+      {!pass && note ? <p className="sample__note">{note}</p> : null}
     </div>
   );
 }
@@ -407,15 +423,80 @@ export function BrandKitForm({
     if (!good) setReadOpen(true);
   }, [good]);
 
-  const bumpSignature = (target: number) =>
-    set({
-      accent: BrandEngine.clampContrast(
-        BrandEngine.normHex(values.accent) || values.accent,
-        values.background,
-        target,
-        "deepen",
-      ),
+  // ---- reachability-aware fixes (no dead buttons, ever) ----------------
+  // For a failing role we build only fixes that produce a REAL change. A
+  // foreground fix is offered when the role can reach its target by lightness
+  // alone; otherwise we fall back to softening the BACKGROUND (the honest
+  // alternative) and say so. Body offers both paths, smallest change first.
+  const sigHex = BrandEngine.normHex(values.accent) || values.accent;
+  const bg = values.background;
+  const dL = (a: string, b: string) =>
+    Math.abs(BrandEngine.rgbToOklch(a).L - BrandEngine.rgbToOklch(b).L);
+
+  // signature roles (prices 3.0 / links 4.5) — the foreground IS the signature
+  function signatureFixes(target: number): {
+    fixes: SampleFix[];
+    note?: string;
+  } {
+    const fg = BrandEngine.clampContrastEx(sigHex, bg, target);
+    if (fg.reached) {
+      return { fixes: [{ label: "Bump contrast", apply: () => set({ accent: fg.hex }) }] };
+    }
+    const soft = BrandEngine.softenSurfaceFor(bg, sigHex, target);
+    return {
+      fixes: [{ label: "Soften the background", apply: () => set({ background: soft.hex }) }],
+      note:
+        target >= 4.5
+          ? "Your background is too strong for readable links at any shade — soften the background instead."
+          : "Your background is too strong for a readable signature at any shade — soften the background instead.",
+    };
+  }
+
+  // body role — offer "Use a readable text shade" (ink) + "Soften the
+  // background" (surface); drop the ink fix when it's unreachable.
+  function bodyFixes(): { fixes: SampleFix[]; note?: string } {
+    const inkEx = BrandEngine.clampContrastEx(values.text, bg, 4.5);
+    const soft = BrandEngine.softenSurfaceFor(bg, values.text, 4.5);
+    const cands: Array<SampleFix & { change: number }> = [];
+    if (inkEx.reached) {
+      cands.push({
+        label: "Use a readable text shade",
+        apply: () => set({ text: inkEx.hex }),
+        change: dL(values.text, inkEx.hex),
+      });
+    }
+    cands.push({
+      label: "Soften the background",
+      apply: () => set({ background: soft.hex }),
+      change: dL(bg, soft.hex),
     });
+    cands.sort((a, b) => a.change - b.change); // smallest change first
+    return {
+      fixes: cands.map(({ label, apply }) => ({ label, apply })),
+      note: inkEx.reached
+        ? undefined
+        : "Your background is too strong for readable text at any shade — soften the background instead.",
+    };
+  }
+
+  // secondary (section numerals 3.0) — bump the secondary or soften the bg
+  function secondaryFixes(): { fixes: SampleFix[]; note?: string } {
+    if (!secHex) return { fixes: [] };
+    const fg = BrandEngine.clampContrastEx(secHex, bg, 3.0);
+    if (fg.reached) {
+      return { fixes: [{ label: "Bump contrast", apply: () => set({ secondary: fg.hex }) }] };
+    }
+    const soft = BrandEngine.softenSurfaceFor(bg, secHex, 3.0);
+    return {
+      fixes: [{ label: "Soften the background", apply: () => set({ background: soft.hex }) }],
+      note: "Your background is too strong for readable section numerals at any shade — soften the background instead.",
+    };
+  }
+
+  const pricesFix = pricesPass ? null : signatureFixes(3.0);
+  const linksFix = linksPass ? null : signatureFixes(4.5);
+  const bodyFix = bodyPass ? null : bodyFixes();
+  const secFix = secHex && !secPass ? secondaryFixes() : null;
 
   // ---- palette-chip → embedded-preview region highlight (stretch) ----
   const postHighlight = (role: string) => {
@@ -607,6 +688,8 @@ export function BrandKitForm({
                 sampleBg={values.background}
                 txtColor={values.text}
                 adjusted={bodyAdjusted}
+                fixes={bodyFix?.fixes}
+                note={bodyFix?.note}
               />
               <Sample
                 label="Prices & big numbers"
@@ -614,7 +697,8 @@ export function BrandKitForm({
                 target={3.0}
                 sampleBg={values.background}
                 txtColor={derived.hexes["signature"]}
-                onFix={!pricesPass ? () => bumpSignature(3.0) : undefined}
+                fixes={pricesFix?.fixes}
+                note={pricesFix?.note}
               />
               <Sample
                 label="Links"
@@ -622,7 +706,8 @@ export function BrandKitForm({
                 target={4.5}
                 sampleBg={values.background}
                 txtColor={derived.hexes["signature-link"]}
-                onFix={!linksPass ? () => bumpSignature(4.5) : undefined}
+                fixes={linksFix?.fixes}
+                note={linksFix?.note}
               />
               {secHex && secRatio != null ? (
                 <Sample
@@ -631,6 +716,8 @@ export function BrandKitForm({
                   target={3.0}
                   sampleBg={values.background}
                   txtColor={secHex}
+                  fixes={secFix?.fixes}
+                  note={secFix?.note}
                 />
               ) : null}
               {bodyAdjusted ? (
