@@ -51,29 +51,35 @@ const E1_DEFAULTS = {
  */
 
 /**
- * Public consumer-page entry point + flagship-version dispatcher (F1).
+ * Public consumer-page entry point + flagship-version dispatcher (F1 → F2).
  *
  * Branches on the clamped `templateVersion`: an exact `2` renders the flagship
- * (v2) template via the FlagshipPage stub; everything else — including every
- * already-published payload (which carries no templateVersion → clamped to 1)
- * — renders the v1 markup exactly as today. In F1 no publish writes a `2`, so
- * this is invisible rails: production always takes the v1 arm.
+ * (v2) template; everything else — including every already-published payload
+ * (which carries no templateVersion → clamped to 1) — renders the v1 markup
+ * exactly as today. No publish writes a `2` yet (F3 flips that), so production
+ * always takes the v1 arm.
+ *
+ * F2 reachability: `templateOverride="flagship"` forces the flagship arm for a
+ * single render regardless of the stored payload version — a pure presentation
+ * switch (no data / storage / serialization change) wired by the `/h/` route's
+ * `?template=flagship` query (and the dev preview route). When the override is
+ * absent AND the payload is v1, this renders v1 BYTE-IDENTICALLY to before.
  */
 export function SellerPresentationPage({
   handout,
+  templateOverride,
 }: {
   handout: HandoutRecord;
+  /** Read-time presentation override (F2 reachability). Only "flagship" forces v2. */
+  templateOverride?: "flagship";
 }) {
   const { templateVersion } = clampPublicPayload(handout.data);
-  if (templateVersion === 2) {
-    // Delegate the v1 markup into the flagship shell (passthrough — the v1 JSX
-    // is rendered here, not forked). FlagshipPage adds only the Newsreader font
-    // shell, kept in its own code-split chunk so v1 pages stay byte-identical.
-    return (
-      <FlagshipPage>
-        <SellerPresentationV1 handout={handout} />
-      </FlagshipPage>
-    );
+  if (templateVersion === 2 || templateOverride === "flagship") {
+    // Render the real flagship (v2) template. FlagshipPage is dynamically
+    // imported so its module graph — the Newsreader @font-face and the
+    // flagship stylesheet — stays in a SEPARATE chunk that never loads on a
+    // v1 page, keeping v1 byte-identical.
+    return <FlagshipPage handout={handout} />;
   }
   return <SellerPresentationV1 handout={handout} />;
 }
@@ -751,8 +757,15 @@ function AreaStats({ stats }: { stats: NonNullable<PublicPayload["areaStats"]> }
  *
  * Graceful: if series is missing or empty, render nothing — the
  * area-stats block above already conveys the snapshot.
+ *
+ * F2 — EXPORTED for reuse by the flagship (v2) AreaStats section. The
+ * geometry / scales / label-placement / draw-on motion are FROZEN and
+ * shared verbatim between v1 and v2; the flagship applies ONLY a color/
+ * type skin via its own scoped stylesheet (TOKEN_MAP §7), overriding the
+ * chart's class-based colors (.line-stroke, .area-fill, …) — no edit to
+ * this geometry is made. Adding `export` is the sole change here.
  */
-function AreaChart({
+export function AreaChart({
   series,
   recommended,
 }: {

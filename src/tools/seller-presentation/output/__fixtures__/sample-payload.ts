@@ -332,3 +332,48 @@ export const POSTER_NONE_PAYLOAD: PublicPayload = {
     videoUrl: "https://example.com/walkthrough.mp4",
   },
 };
+
+/**
+ * F2 — flagship privacy fixture. FULL_PAYLOAD with ROGUE private keys glued
+ * onto the raw record (the hand-tampered-KV scenario): private top-level
+ * fields, a per-comp `counted` flag + note, and a private-pitch array. None
+ * are part of the public payload type; `clampPublicPayload` reads only the
+ * allowlisted keys, so NONE may reach the rendered flagship HTML. The
+ * flagship privacy spec injects this through the SAME clamp boundary as a
+ * real publish and asserts every sentinel — and the literal "counted" key —
+ * is absent. (Projection-level guarantees — set-aside filtering, private
+ * pitch dropping, strategy/confidence stripping at publish time — are proven
+ * by seller-presentation.publish-allowlist.spec.ts.)
+ */
+export const FLAGSHIP_PRIVACY_SENTINELS = {
+  strategy: "SENTINELSTRATEGYIDQ9",
+  confidence: "SENTINELCONFIDENCEQ9",
+  compNote: "SENTINELCOMPNOTEQ9",
+  fieldConfidence: "SENTINELFIELDCONFQ9",
+  privatePitch: "SENTINELPRIVATEPITCHQ9",
+} as const;
+
+export const FLAGSHIP_PRIVACY_PAYLOAD = {
+  ...FULL_PAYLOAD,
+  // rogue private top-level keys — clamp ignores unknown keys entirely.
+  strategyId: FLAGSHIP_PRIVACY_SENTINELS.strategy,
+  strategyLabel: FLAGSHIP_PRIVACY_SENTINELS.strategy,
+  confidence: FLAGSHIP_PRIVACY_SENTINELS.confidence,
+  pitchPrivatePoints: [FLAGSHIP_PRIVACY_SENTINELS.privatePitch],
+  // a comp carrying the set-aside flag + private projection-only fields —
+  // clampPublicComp emits ONLY {address, soldPrice, soldDate, sqft, yearBuilt},
+  // so `counted`, `notes`, `fieldConfidence` are dropped at the boundary.
+  whyPrice: {
+    ...FULL_PAYLOAD.whyPrice,
+    comps: FULL_PAYLOAD.whyPrice.comps.map((c, i) =>
+      i === 0
+        ? {
+            ...c,
+            counted: false,
+            notes: FLAGSHIP_PRIVACY_SENTINELS.compNote,
+            fieldConfidence: FLAGSHIP_PRIVACY_SENTINELS.fieldConfidence,
+          }
+        : c,
+    ),
+  },
+} as unknown as PublicPayload;
