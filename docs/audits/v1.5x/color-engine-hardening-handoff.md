@@ -88,4 +88,7 @@ Reproduce the exact combo (`#E61E1E` bg / `#030303` sig / `#FF9E3D` body): every
 button does something, the Body chip gets real help, the panel stays legible. Also try a
 near-neutral gray signature and a pale signature on cream. Then PR + squash.
 
-Preview URL: _(filled in after push — Vercel branch preview)_
+Preview URL (branch alias, stable):
+https://social-animat-git-e9199a-dallentaylorproductions-5050s-projects.vercel.app → `/settings/brand`
+(Set the stress combo in Page surface + Signature: bg `#E61E1E`, signature `#030303`,
+body text `#FF9E3D`, then open the Readability "View details".)
