@@ -139,14 +139,6 @@
 html.sep-embed .sep-presentation .share {
   display: none;
 }
-/* palette-chip region highlight (stretch) — a calm, fading outline applied to
-   elements tagged with data-brand-role when the form posts sep-highlight-role. */
-html.sep-embed .sep-role-highlight {
-  outline: 2px solid color-mix(in oklch, var(--signature) 70%, transparent);
-  outline-offset: 2px;
-  border-radius: 3px;
-  transition: outline-color 1.2s ease;
-}
 
 .sep-presentation .page {
   width: 100%;

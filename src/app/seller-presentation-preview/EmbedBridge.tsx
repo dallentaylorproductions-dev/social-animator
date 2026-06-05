@@ -17,17 +17,13 @@ import { useEffect } from "react";
  *      • {type:'sep-brand-vars', vars}  → applies the derived CSS custom
  *        properties to the page root (reuses BrandEngine.applyVars' shape:
  *        a { '--token': '#hex' } map), so dialing a color repaints instantly.
- *      • {type:'sep-highlight-role', role} → briefly outlines elements that
- *        carry that ramp role (the palette-chip highlight stretch). No-op when
- *        no elements are tagged with `data-brand-role`.
  *
  * Security: every message is rejected unless `event.origin` equals this
- * window's origin — a cross-origin frame can never push vars or highlights.
+ * window's origin — a cross-origin frame can never push vars.
  */
 
 type BrandVarsMessage = { type: "sep-brand-vars"; vars: Record<string, string> };
-type HighlightMessage = { type: "sep-highlight-role"; role: string };
-type EmbedMessage = BrandVarsMessage | HighlightMessage;
+type EmbedMessage = BrandVarsMessage;
 
 function isRecord(v: unknown): v is Record<string, unknown> {
   return typeof v === "object" && v !== null;
@@ -53,8 +49,6 @@ export function EmbedBridge() {
       /* opener gone / cross-origin — the form falls back to param reloads */
     }
 
-    let highlightTimer: ReturnType<typeof setTimeout> | undefined;
-
     const onMessage = (event: MessageEvent) => {
       // SAME-ORIGIN ONLY — reject anything else outright.
       if (event.origin !== window.location.origin) return;
@@ -71,27 +65,12 @@ export function EmbedBridge() {
         }
         return;
       }
-
-      if (data.type === "sep-highlight-role" && typeof data.role === "string") {
-        const role = data.role;
-        const marks = document.querySelectorAll<HTMLElement>(
-          `[data-brand-role~="${CSS.escape(role)}"]`,
-        );
-        if (marks.length === 0) return;
-        marks.forEach((m) => m.classList.add("sep-role-highlight"));
-        if (highlightTimer) clearTimeout(highlightTimer);
-        highlightTimer = setTimeout(() => {
-          marks.forEach((m) => m.classList.remove("sep-role-highlight"));
-        }, 1500);
-        return;
-      }
     };
 
     window.addEventListener("message", onMessage);
     return () => {
       window.removeEventListener("message", onMessage);
       root.classList.remove("sep-embed");
-      if (highlightTimer) clearTimeout(highlightTimer);
     };
   }, []);
 
