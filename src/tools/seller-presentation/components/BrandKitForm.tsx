@@ -51,10 +51,12 @@ export interface BrandKitFormProps {
   agentName?: string;
 }
 
+// Editorial is the only LIVE layout; Studio/Warm are disabled "Coming soon"
+// (Phase E truthful state — both fall back to Editorial at render regardless).
 const THEME_OPTIONS = [
-  { id: "editorial", label: "Editorial" },
-  { id: "studio", label: "Studio" },
-  { id: "warm", label: "Warm" },
+  { id: "editorial", label: "Editorial", soon: false },
+  { id: "studio", label: "Studio · Coming soon", soon: true },
+  { id: "warm", label: "Warm · Coming soon", soon: true },
 ];
 
 const PREVIEW_BASE = "/seller-presentation-preview";
@@ -205,6 +207,7 @@ function PaletteStrip({
               key={role.key}
               className="pchip"
               data-testid={"brand-palette-chip-" + role.key}
+              title="Derived automatically from your signature"
               onMouseEnter={() => onHighlight?.(role.key)}
               onClick={() => onHighlight?.(role.key)}
             >
@@ -392,7 +395,17 @@ export function BrandKitForm({
   const secRatio = secHex ? BrandEngine.contrast(secHex, values.background) : null;
   const secPass = secRatio == null ? true : secRatio >= 3.0;
   const good = bodyPass && pricesPass && secPass;
-  const expanded = !good || readOpen;
+  // The accordion is open iff `readOpen`. A warn force-OPENS it (effect below),
+  // and applying a one-tap fix re-runs derivation + updates the chips IN PLACE
+  // with the panel still open — it collapses ONLY when the user clicks "Hide
+  // details". (The verdict pill may flip to all-clear while expanded — fine.)
+  const expanded = readOpen;
+  // A warn force-opens the details; once open it stays open (this only sets,
+  // never unsets — "Hide details" is the sole collapse), so applying a fix that
+  // clears the warn keeps the remaining suggestions visible.
+  useEffect(() => {
+    if (!good) setReadOpen(true);
+  }, [good]);
 
   const bumpSignature = (target: number) =>
     set({
@@ -540,7 +553,7 @@ export function BrandKitForm({
             data-testid="brand-default-theme"
           >
             {THEME_OPTIONS.map((o) => (
-              <option key={o.id} value={o.id}>
+              <option key={o.id} value={o.id} disabled={o.soon}>
                 {o.label}
               </option>
             ))}

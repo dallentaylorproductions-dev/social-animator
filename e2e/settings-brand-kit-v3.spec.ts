@@ -196,6 +196,58 @@ test.describe("Brand kit v3 form", () => {
     );
   });
 
+  test("default-layout dropdown gates Studio/Warm as Coming soon (disabled)", async ({
+    page,
+  }) => {
+    await page.goto("/settings/brand");
+    const sel = page.getByTestId("brand-default-theme");
+    await expect(sel.locator('option[value="editorial"]')).toBeEnabled();
+    await expect(sel.locator('option[value="studio"]')).toBeDisabled();
+    await expect(sel.locator('option[value="warm"]')).toBeDisabled();
+    await expect(sel.locator('option[value="studio"]')).toHaveText(/Coming soon/);
+  });
+
+  test("applying a readability fix keeps the accordion OPEN with remaining suggestions", async ({
+    page,
+  }) => {
+    // a pale signature on cream fails BOTH prices (3.0) and links (4.5)
+    await seed(page, { brandAccent: "#f0e0d0" });
+    await page.goto("/settings/brand");
+
+    const fixes = page.getByTestId("brand-readability-fix");
+    await expect(fixes).toHaveCount(2); // prices + links
+
+    // apply the first fix → panel stays expanded; one suggestion remains
+    await fixes.first().click();
+    await expect(page.getByTestId("brand-readability-fixes")).toBeVisible();
+    await expect(page.getByTestId("brand-readability-fix")).toHaveCount(1);
+
+    // apply the last fix → verdict flips to all-clear but the panel STAYS open
+    await page.getByTestId("brand-readability-fix").click();
+    await expect(page.getByTestId("brand-readability-verdict")).toContainText(
+      "all clear",
+    );
+    await expect(page.getByTestId("brand-readability-fixes")).toBeVisible();
+
+    // collapses ONLY on Hide details
+    await page.getByTestId("brand-readability-verdict").click();
+    await expect(page.getByTestId("brand-readability-fixes")).toBeHidden();
+  });
+
+  test("palette chips read as read-only (title hint, default cursor)", async ({
+    page,
+  }) => {
+    await page.goto("/settings/brand");
+    const chip = page.getByTestId("brand-palette-chip-signature");
+    await expect(chip).toHaveAttribute(
+      "title",
+      "Derived automatically from your signature",
+    );
+    expect(
+      await chip.evaluate((el) => getComputedStyle(el).cursor),
+    ).toBe("default");
+  });
+
   test("preview is the embedded real template; surface disclosure collapsed; pickers present", async ({
     page,
   }) => {

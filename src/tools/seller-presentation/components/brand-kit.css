@@ -301,6 +301,8 @@
   display: flex;
   flex-direction: column;
   gap: 9px;
+  /* read-only / derived — no pointer, no hover affordance implying clickable */
+  cursor: default;
 }
 .bk-scope .pchip__swatch {
   width: 100%;
