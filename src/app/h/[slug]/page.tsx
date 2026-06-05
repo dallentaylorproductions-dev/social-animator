@@ -26,6 +26,7 @@ export const revalidate = 0;
 
 interface PageProps {
   params: Promise<{ slug: string }>;
+  searchParams: Promise<{ [key: string]: string | string[] | undefined }>;
 }
 
 export async function generateMetadata({
@@ -67,17 +68,30 @@ export async function generateMetadata({
   };
 }
 
-export default async function HandoutPage({ params }: PageProps) {
+export default async function HandoutPage({ params, searchParams }: PageProps) {
   const { slug } = await params;
   const record = await fetchHandout(slug);
   if (!record) notFound();
+
+  // F2 reachability — read-time presentation override. `?template=flagship`
+  // renders the SAME stored payload through the flagship (v2) template; it is
+  // a PURE presentation switch (no data / storage / serialization change), so
+  // it is safe on public pages. Nothing publishes templateVersion: 2 yet, so
+  // this query is how the flagship is smoked against a live slug. Any other
+  // value (or its absence) renders the stored version unchanged — for every
+  // already-published payload that is v1, byte-identical to today. F3 decides
+  // whether to keep or remove this override when it flips the publish version.
+  const { template } = await searchParams;
+  const templateOverride = template === 'flagship' ? 'flagship' : undefined;
 
   // Type dispatch — each handout type owns its own renderer. New
   // handout types add a new arm here; the typed dispatch is the
   // place to thread the per-type privacy posture (e.g. SP renders
   // from PublicPayload, not the raw draft).
   if (record.type === 'seller-presentation') {
-    return <SellerPresentationPage handout={record} />;
+    return (
+      <SellerPresentationPage handout={record} templateOverride={templateOverride} />
+    );
   }
   if (record.type === 'open-house-handout') {
     return <OpenHouseHandoutPage handout={record} />;

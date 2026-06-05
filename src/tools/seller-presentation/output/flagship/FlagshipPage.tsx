@@ -1,29 +1,88 @@
-import type { ReactNode } from "react";
+import type { CSSProperties } from "react";
+import type { HandoutRecord } from "@/lib/share-urls";
+import { clampPublicPayload } from "../public-payload";
+import { deriveConsumerRoles } from "../consumer-roles";
+import { PresentationPageMotion } from "../motion";
 import { newsreader } from "./fonts";
+import { Hero } from "./Hero";
+import { Price } from "./Price";
+import { AgentNote } from "./AgentNote";
+import { WhyPrice } from "./WhyPrice";
+import { Pitch } from "./Pitch";
+import { Reviews } from "./Reviews";
+import { AreaStats } from "./AreaStats";
+import { AgentBand } from "./AgentBand";
+import { Footer } from "./Footer";
+import "./flagship.css";
 
 /**
- * FlagshipPage — the v2 (templateVersion: 2) consumer-page shell.
+ * FlagshipPage — the v2 (templateVersion: 2) consumer-page template (F2).
  *
- * F1 STUB: invisible rails. It DELEGATES to the existing v1 markup, which the
- * dispatcher passes in as `children` (a true passthrough — the v1 JSX is not
- * forked), and wraps it only in the flagship display-serif shell. Applying
- * `newsreader.variable` HERE — and nowhere else — is what makes the
- * self-hosted Newsreader font exist in the build.
+ * Renders the SAME public payload as v1 (read via clampPublicPayload, the
+ * shared privacy boundary), through the converged editorial layout. It
+ * consumes ONLY the signature ramp: `deriveConsumerRoles(brandColors.accent)`
+ * resolves the full role set (post-clamp hexes + layout-locked neutrals),
+ * inlined as CSS custom properties on the flagship root — the ONE place they
+ * are declared, so `var(--signature)` etc. are in scope for the whole subtree
+ * (declaring on :root would leave them invalid). `brandColors.background/text`
+ * are IGNORED — paper + ink are layout-locked.
  *
- * It deliberately takes `children` rather than importing the v1 component, so
- * this module's graph carries ONLY the font: combined with the dynamic import
- * in presentation-page.tsx, the Newsreader @font-face lands in FlagshipPage's
- * own code-split chunk, never the v1 seller-presentation CSS chunk. Since no
- * production payload is v2, that chunk (and the font) never load on a live
- * page — v1 stays byte-identical.
+ * Applying `newsreader.variable` here (and only here) is what attaches the
+ * self-hosted display serif. Combined with the dynamic import in
+ * presentation-page.tsx, the Newsreader @font-face and `flagship.css` land in
+ * FlagshipPage's own code-split chunk — never the v1 CSS chunk — so v1 pages
+ * stay byte-identical and load neither.
  *
- * F2 replaces the delegated children with the real flagship template,
- * consuming the brand roles via `deriveConsumerRoles` and `--font-newsreader`.
+ * The shared `PresentationPageMotion` island is mounted verbatim (no fork):
+ * the flagship markup adopts the same `.reveal` / `.chart` / price count-up
+ * (`data-price-countup`) hooks the driver already keys on.
  */
-export function FlagshipPage({ children }: { children: ReactNode }) {
+export function FlagshipPage({ handout }: { handout: HandoutRecord }) {
+  const payload = clampPublicPayload(handout.data);
+  const roles = deriveConsumerRoles(payload.brandColors?.accent);
+
+  // Inline the resolved role hexes as custom properties on the flagship root
+  // (the signatured element). These are the live path; no CSS color-mix
+  // fallback is needed because the engine already resolved every clamp.
+  const roleVars = {
+    "--signature": roles.signature,
+    "--signature-deep": roles.signatureDeep,
+    "--signature-link": roles.signatureLink,
+    "--tint-12": roles.tint12,
+    "--tint-9": roles.tint9,
+    "--tint-6": roles.tint6,
+    "--line-30": roles.line30,
+    "--on-signature": roles.onSignature,
+    "--decorative": roles.signature, // secondary retired → = signature
+    "--paper": roles.paper,
+    "--ink": roles.ink,
+    "--ink-soft": roles.inkSoft,
+    "--ink-faint": roles.inkFaint,
+    "--on-dark": roles.onDark,
+    "--dark-band": roles.darkBand,
+    "--dark-band-2": roles.darkBand2,
+  } as CSSProperties;
+
   return (
-    <div className={newsreader.variable} data-flagship-shell>
-      {children}
+    <div
+      className={`fs-page ${newsreader.variable}`}
+      style={roleVars}
+      data-flagship-shell
+      data-testid="seller-presentation-flagship"
+    >
+      <div className="fs-frame">
+        <Hero payload={payload} />
+        <Price payload={payload} />
+        <AgentNote payload={payload} />
+        <WhyPrice payload={payload} />
+        <Pitch payload={payload} />
+        <Reviews payload={payload} />
+        <AreaStats payload={payload} />
+        <AgentBand payload={payload} />
+        {/* Wordmark is a conditional white-label slot (F4 one-line wire-up). */}
+        <Footer payload={payload} showWordmark />
+      </div>
+      <PresentationPageMotion />
     </div>
   );
 }

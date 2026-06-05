@@ -1,0 +1,608 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+<meta charset="UTF-8" />
+<meta name="viewport" content="width=device-width, initial-scale=1.0" />
+<title>Seller page — Editorial template (round 2)</title>
+<link rel="preconnect" href="https://fonts.googleapis.com" />
+<link rel="preconnect" href="https://fonts.gstatic.com" crossorigin />
+<link href="https://fonts.googleapis.com/css2?family=Newsreader:ital,opsz,wght@0,6..72,400;0,6..72,500;0,6..72,600;1,6..72,400;1,6..72,500&family=Hanken+Grotesk:wght@400;500;600&family=IBM+Plex+Mono:wght@400;500&display=swap" rel="stylesheet" />
+<style>
+/* ============================================================================
+   FLAGSHIP SELLER PAGE — Editorial template · round 2 (color-first)
+   ----------------------------------------------------------------------------
+   COLOR INPUTS = the engine's derived roles. The ONLY brand input is
+   --signature; every other brand role is derived from it (color-mix in OKLCh,
+   matching ENGINEERING_CONTRACT §2). The two clamped roles (--signature-link,
+   --on-signature) are seeded per signature with the engine's RESOLVED hex,
+   because WCAG clamps can't live in CSS (contract §2/§3/§4).
+   Layout-owned neutrals are labelled and are NOT derived from the signature.
+   ============================================================================ */
+
+/* ---- LAYOUT-OWNED NEUTRALS (constant across every signature) -------------- */
+:root{
+  --surface:      #f1ebe0;   /* paper — contract default `background`            (layout) */
+  --paper:        var(--surface);
+  --paper-sunk:   #ece4d5;   /* faint inset on paper                             (layout) */
+  --ink:          #1a1612;   /* reading text — contract default `text`           (layout) */
+  --ink-soft:     #6b6256;   /* secondary / meta                                 (layout) */
+  --ink-faint:    #9c9384;   /* tertiary hairline text                           (layout) */
+  --tint-base:    #fbf8f2;   /* neutral base the tints mix INTO — see README §A  (layout) */
+  --on-dark:      #f1ebe0;   /* cream text on the dark band/scrim                (layout) */
+  --dark-band:    #17120c;   /* dark section base                                (layout) */
+  --dark-band-2:  #221b12;   /* raised card on the dark band                     (layout) */
+
+  --maxw: 680px;
+  --gutter: clamp(20px, 6cqi, 40px);
+  --ease: cubic-bezier(.22,.61,.36,1);
+
+  --serif: "Newsreader", Georgia, "Times New Roman", serif;
+  --sans:  "Hanken Grotesk", system-ui, -apple-system, sans-serif;
+  --mono:  "IBM Plex Mono", ui-monospace, "SF Mono", monospace;
+}
+
+/* ---- DERIVED RAMP ROLES (signature is the only brand input) ---------------
+   Declared on [data-signature] — the SAME element that defines --signature —
+   so var(--signature) is in scope (declaring these at :root computes them
+   invalid, because --signature lives on a descendant). Formulas per contract
+   §2. Tints mix into --tint-base (neutral), NOT the warm cream surface — that
+   yields the confident "sky tint" the brand-kit preview shows; the literal
+   `12%→surface` computes a muted olive (README §A, flagged as engine clarif.). */
+[data-signature]{
+  --signature-deep: color-mix(in oklch, var(--signature), #000 22%);
+  --tint-12: color-mix(in oklch, var(--signature) 24%, var(--tint-base));
+  --tint-6:  color-mix(in oklch, var(--signature) 13%, var(--tint-base));
+  --line-30: color-mix(in oklch, var(--signature) 34%, var(--tint-base));
+  --decorative: var(--signature);   /* §2: secondary ?? signature — secondary retired (A3) */
+}
+/* per-section tint rhythm (round 3 §3) — applied as a class on each band, not a
+   global toggle. The default derived roles above ARE the confident strength;
+   .tint-quiet steps each role down one notch. Locked map: note=quiet,
+   why=confident, pitch=quiet, reviews=confident, area=confident. */
+.tint-confident{
+  --tint-12: color-mix(in oklch, var(--signature) 24%, var(--tint-base));
+  --tint-6:  color-mix(in oklch, var(--signature) 13%, var(--tint-base));
+  --line-30: color-mix(in oklch, var(--signature) 34%, var(--tint-base));
+}
+.tint-quiet{
+  --tint-12: color-mix(in oklch, var(--signature) 13%, var(--tint-base));
+  --tint-6:  color-mix(in oklch, var(--signature) 7%,  var(--tint-base));
+  --line-30: color-mix(in oklch, var(--signature) 24%, var(--tint-base));
+}
+
+/* ---- SIGNATURE SEED (per signature: raw + the two clamp-resolved roles) ----
+   Values produced by the engine model (OKLCh, contract §3/§4). link = body
+   contrast 4.5 vs surface; on-signature = resolveOn(fill, paper, ink). */
+[data-signature="blue"]      { --signature:#037290; --signature-link:#037290; --on-signature:#f1ebe0; } /* link 4.6 unclamped · on=paper */
+[data-signature="green"]     { --signature:#1c6b45; --signature-link:#1c6b45; --on-signature:#f1ebe0; } /* link 5.5 unclamped · on=paper */
+[data-signature="terracotta"]{ --signature:#c26a4e; --signature-link:#a14c31; --on-signature:#1a1612; } /* link clamped -2 · on=INK (contract §4) */
+[data-signature="yellow"]    { --signature:#e8c547; --signature-link:#7a5900; --on-signature:#1a1612; } /* hostile: display FAILS 3:1 · link clamped -7 */
+[data-signature="navy"]      { --signature:#15263f; --signature-link:#15263f; --on-signature:#f1ebe0; } /* hostile: very dark · on=paper */
+[data-signature="magenta"]   { --signature:#c8197b; --signature-link:#c8197b; --on-signature:#f1ebe0; } /* hostile: high chroma · on=paper */
+
+/* ============================== RESET ===================================== */
+*{box-sizing:border-box;margin:0;padding:0;}
+html{-webkit-text-size-adjust:100%;}
+body{background:#2a2622;color:var(--ink);font-family:var(--sans);font-size:16px;line-height:1.55;-webkit-font-smoothing:antialiased;text-rendering:optimizeLegibility;}
+img{display:block;max-width:100%;}
+a{color:inherit;}
+
+/* ============================== REVIEW BAR (engineering strips) ============ */
+.reviewbar{position:fixed;top:0;left:0;right:0;z-index:200;display:flex;align-items:center;gap:16px;flex-wrap:wrap;padding:9px 16px;background:rgba(18,15,12,.9);backdrop-filter:blur(14px);-webkit-backdrop-filter:blur(14px);border-bottom:1px solid rgba(255,255,255,.08);font-family:var(--mono);font-size:11px;letter-spacing:.04em;color:#cfc6ba;}
+.reviewbar b{color:#fff;font-weight:500;letter-spacing:.12em;text-transform:uppercase;font-size:10px;}
+.rb-group{display:flex;align-items:center;gap:7px;}
+.rb-group>span{color:#8c8478;text-transform:uppercase;letter-spacing:.12em;font-size:9.5px;}
+.rb-seg{display:flex;background:rgba(255,255,255,.06);border:1px solid rgba(255,255,255,.09);border-radius:7px;overflow:hidden;}
+.rb-seg button{font-family:var(--mono);font-size:11px;color:#cfc6ba;background:transparent;border:0;padding:5px 10px;cursor:pointer;letter-spacing:.03em;transition:background .15s,color .15s;}
+.rb-seg button[aria-pressed="true"]{background:rgba(255,255,255,.92);color:#15110c;}
+.rb-sw{display:flex;gap:6px;}
+.rb-sw button{width:22px;height:22px;border-radius:50%;border:1.5px solid rgba(255,255,255,.2);cursor:pointer;padding:0;transition:transform .15s;}
+.rb-sw button[aria-pressed="true"]{border-color:#fff;box-shadow:0 0 0 2px rgba(0,0,0,.4),0 0 0 3.5px rgba(255,255,255,.55);}
+.rb-sw button:hover{transform:scale(1.08);}
+.rb-toggle{display:flex;align-items:center;gap:5px;cursor:pointer;user-select:none;color:#cfc6ba;}
+.rb-toggle input{appearance:none;width:26px;height:15px;border-radius:8px;background:rgba(255,255,255,.14);position:relative;cursor:pointer;transition:background .15s;flex:none;}
+.rb-toggle input::after{content:"";position:absolute;top:2px;left:2px;width:11px;height:11px;border-radius:50%;background:#cfc6ba;transition:transform .18s var(--ease),background .15s;}
+.rb-toggle input:checked{background:rgba(120,200,160,.45);}
+.rb-toggle input:checked::after{transform:translateX(11px);background:#fff;}
+.rb-spacer{flex:1;}
+.rb-sub{color:#6f685d;font-size:9px;letter-spacing:.1em;}
+
+/* ============================== STAGE / FRAME ============================= */
+.stage{padding:64px 0 60px;display:flex;justify-content:center;min-height:100vh;}
+.frame{width:100%;max-width:none;background:var(--paper);container-type:inline-size;transition:max-width .4s var(--ease);box-shadow:0 1px 0 rgba(0,0,0,.04);overflow:hidden;}
+.stage[data-vp="mobile"] .frame{max-width:440px;border-radius:18px;box-shadow:0 40px 90px -30px rgba(0,0,0,.6);}
+.stage[data-vp="desktop"] .frame{max-width:1200px;}
+
+/* ============================== SHARED PRIMITIVES ======================== */
+.wrap{max-width:var(--maxw);margin:0 auto;padding-inline:var(--gutter);}
+section{position:relative;}
+.is-hidden{display:none !important;}
+.eyebrow{display:flex;align-items:center;gap:10px;font-family:var(--mono);font-size:11px;letter-spacing:.16em;text-transform:uppercase;color:var(--ink-soft);}
+.eyebrow .dot{width:6px;height:6px;border-radius:50%;background:var(--signature);flex:none;}
+.eyebrow .idx{color:var(--decorative);font-weight:500;}
+.eyebrow .rule{flex:1;height:1px;background:var(--line-30);min-width:18px;}
+.eyebrow.on-dark{color:#b9b0a3;}
+.eyebrow.on-dark .rule{background:rgba(255,255,255,.14);}
+.headline{font-family:var(--serif);font-weight:500;line-height:1.04;font-size:clamp(30px,7.6cqi,46px);letter-spacing:-.012em;color:var(--ink);margin-top:18px;text-wrap:pretty;}
+.headline em{font-style:italic;font-weight:400;}
+.lead{color:var(--ink-soft);max-width:46ch;margin-top:14px;font-size:clamp(15px,4cqi,17px);line-height:1.5;}
+.block-pad{padding-block:clamp(46px,12cqi,84px);}
+.hr{height:1px;background:var(--line-30);border:0;}
+.brandlink{color:var(--signature-link);font-weight:500;text-decoration:none;border-bottom:1px solid color-mix(in srgb,var(--signature-link) 35%,transparent);padding-bottom:1px;transition:border-color .15s;}
+.brandlink:hover{border-bottom-color:var(--signature-link);}
+.brandlink .arr{display:inline-block;transition:transform .2s var(--ease);}
+.brandlink:hover .arr{transform:translateX(3px);}
+.reveal{opacity:0;transform:translateY(14px);transition:opacity .7s var(--ease),transform .7s var(--ease);}
+.reveal.in{opacity:1;transform:none;}
+
+/* ============================== 1 · HERO ================================= */
+.hero{background:var(--dark-band);}
+.hero__photo{position:relative;aspect-ratio:4/3.5;background:repeating-linear-gradient(135deg,#3a3a40 0 2px,transparent 2px 13px),linear-gradient(160deg,#6f7886,#454b57);}
+.hero__topline{position:absolute;top:14px;left:0;right:0;text-align:center;z-index:2;font-family:var(--mono);font-size:10px;letter-spacing:.2em;text-transform:uppercase;color:rgba(255,255,255,.7);}
+.ph-label{position:absolute;inset:0;display:flex;align-items:center;justify-content:center;font-family:var(--mono);font-size:11px;letter-spacing:.14em;text-transform:uppercase;color:rgba(255,255,255,.55);}
+.hero__band{background:var(--dark-band);color:var(--on-dark);margin-top:-1px;padding:22px var(--gutter) 30px;}
+.hero__band .wrap{padding-inline:0;}
+.hero__forline{display:flex;align-items:center;gap:9px;font-family:var(--mono);font-size:11px;letter-spacing:.14em;text-transform:uppercase;color:var(--on-dark);}
+.hero__forline .dot{width:6px;height:6px;border-radius:50%;background:var(--signature);}
+.hero__sub{display:flex;align-items:center;gap:10px;margin-top:14px;font-family:var(--mono);font-size:10.5px;letter-spacing:.14em;text-transform:uppercase;color:rgba(241,235,224,.6);}
+.hero__sub .rule{width:26px;height:1px;background:rgba(255,255,255,.22);}
+.hero__addr{font-family:var(--serif);font-weight:500;font-size:clamp(34px,9cqi,52px);line-height:1.02;letter-spacing:-.015em;margin-top:8px;color:var(--on-dark);}
+.hero__meta{margin-top:16px;padding-top:14px;border-top:1px solid rgba(255,255,255,.13);font-family:var(--mono);font-size:11px;letter-spacing:.12em;text-transform:uppercase;color:rgba(241,235,224,.55);}
+
+/* ============================== 2 · PRICE =============================== */
+.price{background:var(--paper);}
+.price .eyebrow{margin-bottom:22px;}
+.price__big{font-family:var(--serif);font-weight:500;color:var(--signature);font-size:clamp(66px,21cqi,142px);line-height:.9;letter-spacing:-.03em;font-variant-numeric:tabular-nums;display:flex;align-items:flex-start;}
+.price__big .cur{font-size:.42em;line-height:1;margin-top:.12em;margin-right:.06em;color:var(--signature);font-weight:500;}
+.price__note{margin-top:22px;color:var(--ink-soft);font-size:clamp(15px,4cqi,17px);max-width:34ch;}
+.price__note .b{color:var(--signature-deep);font-weight:600;}
+
+/* ============================== 3 · AGENT NOTE ========================== */
+.note{background:var(--tint-12);}
+.note__video{margin-top:30px;border-radius:14px;overflow:hidden;position:relative;aspect-ratio:9/12;max-width:380px;background:repeating-linear-gradient(135deg,rgba(0,0,0,.06) 0 2px,transparent 2px 13px),linear-gradient(160deg,#7d8794,#525a66);box-shadow:0 24px 50px -28px rgba(0,0,0,.5);}
+.note__play{position:absolute;inset:0;display:flex;align-items:center;justify-content:center;cursor:pointer;}
+.note__play .btn{width:62px;height:62px;border-radius:50%;background:var(--on-dark);display:grid;place-items:center;box-shadow:0 10px 30px -8px rgba(0,0,0,.5);transition:transform .2s var(--ease);}
+.note__play:hover .btn{transform:scale(1.06);}
+.note__play .btn svg{fill:var(--signature);margin-left:3px;}
+.note__cap{position:absolute;left:0;right:0;bottom:0;padding:16px 18px;background:linear-gradient(transparent,rgba(0,0,0,.55));font-family:var(--serif);font-style:italic;font-size:18px;color:#fff;}
+
+/* ============================== 4 · WHY THIS PRICE ====================== */
+.why{background:var(--tint-12);}
+/* count block (digit-beside-sentence, locked round 3 §2). The digit slot renders
+   ONLY the derived numeral; baseline-married to the sentence so the two read as
+   one statement, not a drop-cap + caption. */
+.count{margin-top:32px;}
+.count--beside{display:flex;align-items:baseline;gap:clamp(15px,3.6cqi,22px);}
+.count__digit{font-family:var(--serif);font-weight:500;color:var(--signature);font-variant-numeric:tabular-nums;line-height:.74;letter-spacing:-.035em;font-size:clamp(54px,15.5cqi,76px);flex:none;}
+.count__say{font-family:var(--serif);font-size:clamp(20px,5.2cqi,25px);line-height:1.18;color:var(--ink);max-width:15ch;text-wrap:balance;}
+/* optional agent message — plain INK lead, NEVER the numeral treatment */
+.count__msg{margin-top:20px;color:var(--ink);font-family:var(--serif);font-style:italic;font-size:clamp(16px,4.4cqi,19px);line-height:1.45;max-width:40ch;border-left:2px solid var(--line-30);padding-left:16px;}
+
+.comps{margin-top:30px;border-top:1px solid var(--line-30);}
+.comp{display:grid;grid-template-columns:34px 1fr auto;gap:14px;align-items:start;padding:20px 0;border-bottom:1px solid var(--line-30);}
+.comp__no{font-family:var(--mono);font-size:11px;color:var(--ink-faint);letter-spacing:.1em;padding-top:4px;}
+.comp__addr{font-family:var(--serif);font-size:18px;font-weight:500;color:var(--ink);line-height:1.2;}
+.comp__sub{font-family:var(--mono);font-size:11px;letter-spacing:.04em;color:var(--ink-soft);margin-top:6px;text-transform:uppercase;}
+.comp__price{font-family:var(--serif);font-size:21px;font-weight:500;color:var(--signature-deep);font-variant-numeric:tabular-nums;text-align:right;white-space:nowrap;}
+.comp__tag{display:block;font-family:var(--mono);font-size:9.5px;letter-spacing:.14em;text-transform:uppercase;color:var(--ink-faint);margin-top:5px;text-align:right;}
+.comps__src{font-family:var(--mono);font-size:10.5px;letter-spacing:.12em;text-transform:uppercase;color:var(--ink-faint);margin-top:18px;}
+
+/* ============================== 5 · PITCH POINTS ======================== */
+.pitch{background:var(--tint-12);}
+.pitch__list{margin-top:30px;counter-reset:p;}
+.pitch__item{display:grid;grid-template-columns:auto 1fr;gap:20px;align-items:baseline;padding:22px 0;border-top:1px solid var(--line-30);}
+.pitch__item:last-child{border-bottom:1px solid var(--line-30);}
+.pitch__item::before{counter-increment:p;content:counter(p,decimal-leading-zero);font-family:var(--serif);font-style:italic;font-size:24px;color:var(--decorative);line-height:1;}
+.pitch__h{font-family:var(--serif);font-size:21px;font-weight:500;color:var(--ink);}
+.pitch__p{color:var(--ink-soft);margin-top:5px;font-size:15px;max-width:42ch;}
+
+/* ============================== 6 · REVIEWS (optional) ================== */
+.reviews{background:var(--paper);}
+.quote{font-family:var(--serif);font-weight:400;font-size:clamp(22px,6cqi,30px);line-height:1.32;color:var(--ink);margin-top:30px;text-wrap:pretty;letter-spacing:-.01em;}
+.quote .mark{color:var(--decorative);font-style:italic;}
+.quote__by{display:flex;align-items:center;gap:10px;margin-top:24px;font-family:var(--mono);font-size:11px;letter-spacing:.12em;text-transform:uppercase;color:var(--ink-soft);}
+.quote__by .rule{width:26px;height:1px;background:var(--signature);}
+.reviews__link{margin-top:28px;}
+
+/* ============================== 7 · AREA STATS (optional) =============== */
+.area{background:var(--tint-12);}
+.stats{margin-top:30px;border:1px solid var(--line-30);border-radius:14px;overflow:hidden;background:var(--tint-6);display:grid;grid-template-columns:1fr 1fr;}
+.stat{padding:22px 20px;border-right:1px solid var(--line-30);border-bottom:1px solid var(--line-30);}
+.stat:nth-child(2n){border-right:0;}
+.stat:nth-last-child(-n+2){border-bottom:0;}
+.stat__k{font-family:var(--mono);font-size:9.5px;letter-spacing:.13em;text-transform:uppercase;color:var(--ink-soft);}
+.stat__v{font-family:var(--serif);font-weight:500;font-size:clamp(30px,9cqi,42px);line-height:1;color:var(--signature);margin-top:12px;font-variant-numeric:tabular-nums;letter-spacing:-.02em;}
+.stat__sub{font-family:var(--mono);font-size:10px;letter-spacing:.04em;color:var(--ink-faint);margin-top:6px;}
+/* ---- FROZEN production chart — RESTYLE ONLY (round 3 §1) -------------------
+   Static faithful replica of reference/production_chart.png. Geometry, value
+   scales, label positions, data shape + motion are engineering-owned (frozen);
+   design owns ONLY the 7-role color skin + mono type + card chrome here. */
+.chart{margin-top:18px;border:1px solid var(--line-30);border-radius:16px;background:var(--paper);padding:24px 22px 18px;}
+.chart__head{display:flex;flex-direction:column;gap:4px;}
+.chart__title{font-family:var(--mono);font-size:12px;letter-spacing:.18em;text-transform:uppercase;color:var(--ink-soft);}
+.chart__sub{font-family:var(--mono);font-size:11px;letter-spacing:.16em;text-transform:uppercase;color:var(--ink-faint);}
+.chart__plot{width:100%;height:auto;display:block;overflow:visible;margin-top:10px;}
+.cl-grid{stroke:var(--line-30);stroke-width:1;}
+.cl-axis{font-family:var(--mono);font-size:10px;letter-spacing:.06em;fill:var(--ink-faint);}
+.cl-area{fill:var(--signature);opacity:.08;}
+.cl-line{fill:none;stroke:var(--signature);stroke-width:2.5;stroke-linecap:round;stroke-linejoin:round;}
+.cl-dot{fill:var(--paper);stroke:var(--signature);stroke-width:2;}
+.cl-halo{fill:var(--signature);opacity:.15;}
+.cl-ring{fill:var(--paper);}
+.cl-end{fill:var(--signature);}
+.cl-ref{stroke:var(--signature-deep);stroke-width:1.5;stroke-dasharray:5 5;}
+.cl-pill{fill:var(--tint-12);}
+.cl-refk{font-family:var(--mono);font-size:9px;font-weight:500;letter-spacing:.1em;fill:var(--signature-deep);}
+.cl-refv{font-family:var(--serif);font-size:17px;font-weight:500;fill:var(--signature-deep);}
+.cl-curk{font-family:var(--mono);font-size:9px;letter-spacing:.08em;fill:var(--ink-faint);}
+.cl-curv{font-family:var(--serif);font-size:22px;font-weight:600;fill:var(--signature);}
+/* pending state — calm, never looks broken */
+.area__pending{margin-top:30px;border:1px solid var(--line-30);border-radius:14px;background:var(--tint-6);padding:clamp(34px,9cqi,52px) clamp(22px,6cqi,40px);}
+.area__pending .pk{display:flex;align-items:center;gap:10px;font-family:var(--mono);font-size:10.5px;letter-spacing:.14em;text-transform:uppercase;color:var(--ink-soft);}
+.area__pending .shimmer{position:relative;width:34px;height:1px;background:var(--line-30);overflow:hidden;}
+.area__pending .shimmer::after{content:"";position:absolute;inset:0;width:50%;background:linear-gradient(90deg,transparent,var(--signature),transparent);animation:slide 2.4s var(--ease) infinite;}
+@keyframes slide{0%{transform:translateX(-100%);}100%{transform:translateX(220%);}}
+.area__pending p{font-family:var(--serif);font-size:clamp(20px,5.4cqi,26px);line-height:1.34;color:var(--ink);margin-top:18px;text-wrap:pretty;max-width:26ch;}
+
+/* ============================== 8 · AGENT BAND ========================== */
+.agent{background:var(--dark-band);color:var(--on-dark);}
+.agent__name{font-family:var(--serif);font-weight:500;font-size:clamp(40px,12cqi,64px);line-height:.98;letter-spacing:-.02em;margin-top:18px;color:var(--on-dark);}
+.agent__card{display:flex;align-items:center;gap:16px;margin-top:28px;padding:16px;background:var(--dark-band-2);border:1px solid rgba(255,255,255,.08);border-radius:14px;}
+.agent__avatar{width:62px;height:62px;border-radius:11px;flex:none;background:repeating-linear-gradient(135deg,rgba(255,255,255,.07) 0 2px,transparent 2px 10px),linear-gradient(160deg,#5a6470,#3a4049);display:grid;place-items:center;font-family:var(--mono);font-size:8px;letter-spacing:.1em;color:rgba(255,255,255,.5);text-align:center;border:1px solid rgba(255,255,255,.1);position:relative;}
+.agent__avatar::after{content:"";position:absolute;inset:auto -3px -3px auto;width:16px;height:16px;border-radius:50%;background:var(--signature);border:2px solid var(--dark-band-2);}
+.agent__cardname{font-family:var(--serif);font-size:21px;font-weight:500;color:var(--on-dark);}
+.agent__role{font-family:var(--mono);font-size:11px;letter-spacing:.06em;color:rgba(241,235,224,.6);margin-top:4px;text-transform:uppercase;}
+.agent__bio{font-family:var(--serif);font-style:italic;font-size:clamp(20px,5.5cqi,26px);line-height:1.35;color:var(--on-dark);margin-top:30px;text-wrap:pretty;}
+.agent__contact{display:grid;grid-template-columns:1fr 1fr;gap:1px;margin-top:30px;background:rgba(255,255,255,.08);border:1px solid rgba(255,255,255,.08);border-radius:12px;overflow:hidden;}
+.agent__field{background:var(--dark-band);padding:16px 18px;}
+.agent__fk{font-family:var(--mono);font-size:9.5px;letter-spacing:.14em;text-transform:uppercase;color:rgba(241,235,224,.45);}
+.agent__fv{font-family:var(--sans);font-size:15px;color:var(--on-dark);margin-top:7px;font-weight:500;word-break:break-word;}
+.agent__cta{margin-top:30px;display:flex;flex-direction:column;gap:14px;}
+/* PRIMARY CTA — contract §2: fill = --signature, label = --on-signature */
+.btn-primary{display:flex;align-items:center;justify-content:space-between;gap:14px;background:var(--signature);color:var(--on-signature);padding:16px 16px 16px 24px;border-radius:40px;border:0;cursor:pointer;font-family:var(--sans);font-size:16px;font-weight:600;text-decoration:none;transition:transform .18s var(--ease),box-shadow .18s var(--ease);}
+.btn-primary:hover{transform:translateY(-1px);box-shadow:0 14px 30px -12px rgba(0,0,0,.6);}
+.btn-primary .ic{width:36px;height:36px;border-radius:50%;background:color-mix(in srgb,var(--on-signature) 16%,transparent);display:grid;place-items:center;flex:none;}
+.btn-primary .ic svg{stroke:var(--on-signature);}
+.btn-reassure{text-align:center;font-family:var(--serif);font-style:italic;font-size:15px;color:rgba(241,235,224,.55);}
+/* GHOST CTA — on the dark band, so uses --on-dark (cream), not --on-signature */
+.btn-ghost{display:flex;align-items:center;justify-content:space-between;gap:14px;background:transparent;color:var(--on-dark);padding:15px 20px 15px 24px;border-radius:40px;border:1px solid rgba(241,235,224,.34);cursor:pointer;font-family:var(--sans);font-size:16px;font-weight:500;text-decoration:none;transition:border-color .18s,background .18s;}
+.btn-ghost:hover{border-color:var(--on-dark);background:rgba(255,255,255,.04);}
+.btn-ghost .ic svg{stroke:var(--on-dark);}
+
+/* ============================== 9 · FOOTER ============================== */
+.foot{background:var(--dark-band);color:rgba(241,235,224,.4);padding-top:10px;}
+.foot__inner{border-top:1px solid rgba(255,255,255,.09);padding-top:30px;padding-bottom:40px;}
+/* wordmark is an OPTIONAL slot (white-label off for top-tier agents); the footer
+   reads balanced with it present OR absent — the disclaimer is always present. */
+.foot__word{font-family:var(--serif);font-size:20px;font-weight:500;color:var(--on-dark);letter-spacing:-.01em;margin-bottom:20px;}
+.foot__word em{font-style:italic;font-weight:600;color:var(--signature);}
+.foot__disc{font-family:var(--mono);font-size:10.5px;line-height:1.7;letter-spacing:.02em;color:rgba(241,235,224,.38);max-width:60ch;}
+
+/* ============================== WIDE-FRAME ENHANCE =====================
+   Driven by ACTUAL frame width (container query), not the viewport toggle. */
+@container (min-width: 820px){
+  .wrap{ --maxw:1060px; }
+  .hero__photo{aspect-ratio:21/9;}
+  .hero__band{padding-block:30px 42px;}
+  .price{ --maxw:1060px; }
+  .price__inner{display:grid;grid-template-columns:auto 1fr;gap:54px;align-items:end;}
+  .price__big{font-size:clamp(120px,13cqi,176px);}
+  .price__side{padding-bottom:14px;max-width:30ch;}
+  /* §4: text block optically centered against the video card, nudged slightly
+     above true center; relational (align-items), so a long agent note grows the
+     column and the rule degrades gracefully toward top alignment. */
+  .note__inner{display:grid;grid-template-columns:1fr 360px;gap:54px;align-items:center;}
+  .note__inner > div:first-child{margin-bottom:clamp(0px,3.2cqi,28px);}
+  .note__video{margin-top:0;}
+  /* comps as a two-column ledger */
+  .comps{display:grid;grid-template-columns:1fr 1fr;column-gap:48px;border-top:1px solid var(--line-30);}
+  .comp{border-bottom:1px solid var(--line-30);}
+  .count--beside .count__digit{font-size:96px;}
+  .stats{grid-template-columns:repeat(4,1fr);}
+  .stat{border-bottom:0;}
+  .stat:nth-child(2n){border-right:1px solid var(--line-30);}
+  .stat:last-child{border-right:0;}
+  .agent__contact{grid-template-columns:repeat(4,1fr);}
+  .agent__cta{flex-direction:row;align-items:center;flex-wrap:wrap;}
+  .agent__cta .btn-primary{flex:1;min-width:260px;}
+  .agent__cta .btn-ghost{flex:1;min-width:240px;}
+  .btn-reassure{order:3;flex-basis:100%;text-align:left;margin-top:4px;}
+}
+
+@media (prefers-reduced-motion: reduce){
+  .reveal{opacity:1 !important;transform:none !important;transition:none !important;}
+  .area__pending .shimmer::after{animation:none;}
+  *{scroll-behavior:auto !important;}
+}
+</style>
+</head>
+<body data-signature="blue">
+
+<!-- ============================ REVIEW BAR (engineering strips) ========= -->
+<div class="reviewbar">
+  <b>Mock&nbsp;states</b>
+  <div class="rb-group"><span>view</span>
+    <div class="rb-seg" id="vpSeg"><button data-vp="mobile" aria-pressed="true">Mobile</button><button data-vp="desktop" aria-pressed="false">Desktop</button></div>
+  </div>
+  <div class="rb-group"><span>signature</span>
+    <div class="rb-sw" id="sigSw">
+      <button data-sig="blue" aria-pressed="true" style="background:#037290" title="Blue #037290 — proposed default"></button>
+      <button data-sig="green" aria-pressed="false" style="background:#1c6b45" title="Deep green #1c6b45"></button>
+      <button data-sig="terracotta" aria-pressed="false" style="background:#c26a4e" title="Terracotta #C26A4E — legacy (CTA label resolves dark)"></button>
+      <button data-sig="yellow" aria-pressed="false" style="background:#e8c547" title="Stress: pale yellow — display FAILS 3:1 (engine request)"></button>
+      <button data-sig="navy" aria-pressed="false" style="background:#15263f" title="Stress: near-black navy"></button>
+      <button data-sig="magenta" aria-pressed="false" style="background:#c8197b" title="Stress: high-chroma magenta"></button>
+    </div>
+  </div>
+  <div class="rb-spacer"></div>
+  <div class="rb-group"><span>optional</span>
+    <label class="rb-toggle"><input type="checkbox" data-opt="video" checked />Video</label>
+    <label class="rb-toggle"><input type="checkbox" data-opt="reviews" checked />Reviews</label>
+    <label class="rb-toggle"><input type="checkbox" data-opt="compmsg" />Comp note</label>
+    <label class="rb-toggle"><input type="checkbox" data-opt="wordmark" checked />Wordmark</label>
+  </div>
+  <div class="rb-group"><span>stats</span>
+    <div class="rb-seg" id="statsSeg"><button data-stats="ready" aria-pressed="true">Ready</button><button data-stats="pending" aria-pressed="false">Pending</button><button data-stats="off" aria-pressed="false">Off</button></div>
+  </div>
+</div>
+
+<!-- ============================ STAGE ================================== -->
+<div class="stage" data-vp="mobile" data-stats="ready" id="stage">
+<div class="frame">
+
+  <!-- 1 · HERO -->
+  <section class="hero" data-screen-label="01 hero" data-comment-anchor="hero">
+    <div class="hero__photo"><div class="hero__topline">Prepared for the Harland family</div><div class="ph-label">[ hero photo ]</div></div>
+    <div class="hero__band"><div class="wrap">
+      <div class="hero__forline"><span class="dot"></span>For the Harland family</div>
+      <div class="hero__sub"><span class="rule"></span>A recommendation · Home</div>
+      <h1 class="hero__addr">4427 Dudley Dr&nbsp;NE</h1>
+      <div class="hero__meta">Tacoma, WA 98406</div>
+    </div></div>
+  </section>
+
+  <!-- 2 · RECOMMENDED LIST PRICE -->
+  <section class="price block-pad" data-screen-label="02 price">
+    <div class="wrap">
+      <div class="eyebrow">RECOMMENDED LIST</div>
+      <div class="price__inner">
+        <div class="price__big reveal" id="priceBig" data-target="687298"><span class="cur">$</span><span class="num" id="priceNum">687,298</span></div>
+        <p class="price__note price__side">Based on <span class="b" id="priceNoteCount">4 recent sales</span> nearby.</p>
+      </div>
+    </div>
+  </section>
+
+  <!-- 3 · AGENT NOTE + WALKTHROUGH (video optional) -->
+  <section class="note block-pad tint-quiet" data-screen-label="03 agent note">
+    <div class="wrap note__inner">
+      <div>
+        <div class="eyebrow"><span class="idx">01</span>·<span>A short note from your agent</span></div>
+        <h2 class="headline">Two <em>minutes</em>, on your home.</h2>
+        <p class="lead">A quick walkthrough of how I arrived at this number and what I'd do first — so nothing about the plan is a surprise.</p>
+      </div>
+      <div class="note__video" data-opt-block="video">
+        <div class="ph-label">[ walkthrough video ]</div>
+        <div class="note__play"><span class="btn"><svg width="20" height="22" viewBox="0 0 20 22"><path d="M0 0l20 11L0 22z"/></svg></span></div>
+        <div class="note__cap">Let's walk through your plan.</div>
+      </div>
+    </div>
+  </section>
+
+  <!-- 4 · WHY THIS PRICE — COMPS -->
+  <section class="why block-pad tint-confident" data-screen-label="04 why this price">
+    <div class="wrap">
+      <div class="eyebrow"><span class="idx">02</span>·<span>Why this price</span><span class="rule"></span></div>
+      <h2 class="headline">A confident, <em>defensible</em> number.</h2>
+      <!-- count: digit slot is derived-only; sentence married to it -->
+      <div class="count count--beside"><span class="count__digit" data-comp-digit>4</span><p class="count__say" data-comp-say>recent sales nearby anchor this number.</p></div>
+      <p class="count__msg is-hidden" data-opt-block="compmsg">I weighted the two closest sales most — same street, same era, both closed this spring.</p>
+      <div class="comps" id="compsList">
+        <div class="comp"><div class="comp__no">01</div><div><div class="comp__addr">4210 N 14th St</div><div class="comp__sub">Tacoma, WA · 2,742 sqft · 4 bd 2 ba · Mar 2026</div></div><div><div class="comp__price">$591,000</div><span class="comp__tag">Sold</span></div></div>
+        <div class="comp"><div class="comp__no">02</div><div><div class="comp__addr">1705 N Anderson St</div><div class="comp__sub">Tacoma, WA · 2,034 sqft · 3 bd 2 ba · Mar 2026</div></div><div><div class="comp__price">$580,000</div><span class="comp__tag">Sold</span></div></div>
+        <div class="comp"><div class="comp__no">03</div><div><div class="comp__addr">2109 N Union Ave</div><div class="comp__sub">Tacoma, WA · 1,712 sqft · 3 bd 1 ba · Jul 2026</div></div><div><div class="comp__price">$705,000</div><span class="comp__tag">Sold</span></div></div>
+        <div class="comp"><div class="comp__no">04</div><div><div class="comp__addr">3009 N 22nd St</div><div class="comp__sub">Tacoma, WA · 2,594 sqft · 4 bd 3 ba · Apr 2026</div></div><div><div class="comp__price">$875,000</div><span class="comp__tag">Sold</span></div></div>
+      </div>
+      <div class="comps__src">Source · Public record</div>
+    </div>
+  </section>
+
+  <!-- 5 · PITCH POINTS -->
+  <section class="pitch block-pad tint-quiet" data-screen-label="05 pitch points">
+    <div class="wrap">
+      <div class="eyebrow"><span class="idx">03</span>·<span>What I'll do for you</span><span class="rule"></span></div>
+      <h2 class="headline">A quiet, <em>thorough</em> way to sell.</h2>
+      <div class="pitch__list">
+        <div class="pitch__item"><div><div class="pitch__h">Chef's kitchen</div><p class="pitch__p">Marble countertops and Bosch appliances — leading with the rooms buyers fall for.</p></div></div>
+        <div class="pitch__item"><div><div class="pitch__h">Lake views</div><p class="pitch__p">A five-minute walk to Clear Lake, framed in every photo and the listing headline.</p></div></div>
+        <div class="pitch__item"><div><div class="pitch__h">Brand-new roof</div><p class="pitch__p">Replaced last year — I'll surface it up front to take the question off the table.</p></div></div>
+      </div>
+    </div>
+  </section>
+
+  <!-- 6 · REVIEWS (optional) -->
+  <section class="reviews block-pad" data-screen-label="06 reviews" data-opt-block="reviews">
+    <div class="wrap">
+      <div class="eyebrow"><span class="idx">04</span>·<span>In their words</span><span class="rule"></span></div>
+      <h2 class="headline">From families <em>like yours</em>.</h2>
+      <p class="quote"><span class="mark">"</span>My husband and I thought we'd never be able to sell for what the house was worth — Aaron went above and beyond to make it possible.<span class="mark">"</span></p>
+      <div class="quote__by"><span class="rule"></span>The Hardy family · Sold in Tacoma, 2023</div>
+      <div class="reviews__link"><a class="brandlink" href="#">See all reviews on Zillow <span class="arr">→</span></a></div>
+    </div>
+  </section>
+
+  <!-- 7 · AREA STATS + CHART (optional · ready / pending) -->
+  <section class="area block-pad tint-confident" data-screen-label="07 area stats" data-opt-block="stats">
+    <div class="wrap">
+      <div class="eyebrow"><span class="idx">05</span>·<span>Recent area sales</span><span class="rule"></span></div>
+      <h2 class="headline">A neighborhood that <em>moves</em>.</h2>
+      <div class="area__ready" id="areaReady">
+        <div class="stats">
+          <div class="stat"><div class="stat__k">Median sale</div><div class="stat__v">$675,202</div><div class="stat__sub">Last 90 days</div></div>
+          <div class="stat"><div class="stat__k">Days on market</div><div class="stat__v">14</div><div class="stat__sub">Median</div></div>
+          <div class="stat"><div class="stat__k">Homes sold</div><div class="stat__v">37</div><div class="stat__sub">Last 90 days</div></div>
+          <div class="stat"><div class="stat__k">Sale to list</div><div class="stat__v">101%</div><div class="stat__sub">Median ratio</div></div>
+        </div>
+        <div class="chart" id="chartCard">
+          <div class="chart__head">
+            <div class="chart__title">Median sale price</div>
+            <div class="chart__sub">6 months</div>
+          </div>
+          <svg class="chart__plot" viewBox="0 0 400 234" preserveAspectRatio="xMidYMid meet" role="img" aria-label="Median area sale price over six months, currently $680k, against your recommended list price of $687k.">
+            <!-- gridlines + y-axis (frozen geometry) -->
+            <line class="cl-grid" x1="56" y1="128" x2="384" y2="128"/>
+            <line class="cl-grid" x1="56" y1="156" x2="384" y2="156"/>
+            <line class="cl-grid" x1="56" y1="188" x2="384" y2="188"/>
+            <text class="cl-axis" x="48" y="131" text-anchor="end">$676K</text>
+            <text class="cl-axis" x="48" y="159" text-anchor="end">$668K</text>
+            <text class="cl-axis" x="48" y="191" text-anchor="end">$655K</text>
+            <!-- area under the trend -->
+            <path class="cl-area" d="M56,198 118,197 180,196 242,148 304,131 366,117 366,200 56,200 Z"/>
+            <!-- recommended dashed reference line (at $687k) -->
+            <line class="cl-ref" x1="56" y1="96" x2="384" y2="96"/>
+            <!-- trend line -->
+            <polyline class="cl-line" points="56,198 118,197 180,196 242,148 304,131 366,117"/>
+            <!-- data dots -->
+            <circle class="cl-dot" cx="56" cy="198" r="4.5"/>
+            <circle class="cl-dot" cx="118" cy="197" r="4.5"/>
+            <circle class="cl-dot" cx="180" cy="196" r="4.5"/>
+            <circle class="cl-dot" cx="242" cy="148" r="4.5"/>
+            <circle class="cl-dot" cx="304" cy="131" r="4.5"/>
+            <!-- current end marker (target) -->
+            <circle class="cl-halo" cx="366" cy="117" r="13"/>
+            <circle class="cl-ring" cx="366" cy="117" r="8"/>
+            <circle class="cl-end" cx="366" cy="117" r="5"/>
+            <!-- recommended callout -->
+            <rect class="cl-pill" x="52" y="66" width="58" height="18" rx="3"/>
+            <text class="cl-refk" x="56" y="59">RECOMMENDED</text>
+            <text class="cl-refv" x="57" y="80">$687k</text>
+            <!-- current callout -->
+            <text class="cl-curk" x="384" y="59" text-anchor="end">MAY '26 · CURRENT</text>
+            <text class="cl-curv" x="384" y="81" text-anchor="end">$680k</text>
+            <!-- x-axis -->
+            <text class="cl-axis" x="56" y="222" text-anchor="start">DEC '25</text>
+            <text class="cl-axis" x="180" y="222" text-anchor="middle">FEB '26</text>
+            <text class="cl-axis" x="304" y="222" text-anchor="middle">APR '26</text>
+            <text class="cl-axis" x="384" y="222" text-anchor="end">MAY '26</text>
+          </svg>
+        </div>
+      </div>
+      <div class="area__pending is-hidden" id="areaPending">
+        <div class="pk"><span class="shimmer"></span>Market snapshot</div>
+        <p>A market snapshot is on the way. We're cross-checking the freshest closings before showing them here.</p>
+      </div>
+    </div>
+  </section>
+
+  <!-- 8 · DARK AGENT BAND -->
+  <section class="agent block-pad" data-screen-label="08 agent" data-comment-anchor="agent">
+    <div class="wrap">
+      <div class="eyebrow on-dark"><span class="idx">06</span>·<span>Your agent</span><span class="rule"></span></div>
+      <h2 class="agent__name">Aaron Thomas.</h2>
+      <div class="agent__card">
+        <div class="agent__avatar">[ headshot ]</div>
+        <div><div class="agent__cardname">Aaron Thomas</div><div class="agent__role">Lead broker · Thomas Group</div></div>
+      </div>
+      <p class="agent__bio">Working the Pacific Northwest for over 25 years.</p>
+      <div class="agent__contact">
+        <div class="agent__field"><div class="agent__fk">Direct</div><div class="agent__fv">(253) 555-0188</div></div>
+        <div class="agent__field"><div class="agent__fk">Email</div><div class="agent__fv">aaron@thomasgroup.com</div></div>
+        <div class="agent__field"><div class="agent__fk">License</div><div class="agent__fv">#1234</div></div>
+        <div class="agent__field"><div class="agent__fk">Years here</div><div class="agent__fv">22</div></div>
+      </div>
+      <div class="agent__cta">
+        <a class="btn-primary" href="#">Schedule a listing call<span class="ic"><svg width="16" height="16" viewBox="0 0 16 16" fill="none" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><path d="M3 8h10M9 4l4 4-4 4"/></svg></span></a>
+        <div class="btn-reassure">No pressure, reach out anytime.</div>
+        <a class="btn-ghost" href="#">Call Aaron directly<span class="ic"><svg width="16" height="16" viewBox="0 0 16 16" fill="none" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><path d="M3.5 3h3l1 3.5L6 8a8 8 0 003.5 3.5L11 10l3.5 1v3a1 1 0 01-1 1A11 11 0 013 4.5 1 1 0 013.5 3z"/></svg></span></a>
+      </div>
+    </div>
+  </section>
+
+  <!-- 9 · FOOTER / DISCLAIMER -->
+  <footer class="foot" data-screen-label="09 footer">
+    <div class="wrap">
+      <div class="foot__inner">
+        <div class="foot__word" data-opt-block="wordmark">Studio <em>SEP</em></div>
+        <p class="foot__disc">Prepared privately for the Harland family. The information above is drawn from public record. This page is not an advertisement and does not constitute an offer.</p>
+      </div>
+    </div>
+  </footer>
+
+</div><!-- /frame --></div><!-- /stage -->
+
+<script>
+(function(){
+  var stage=document.getElementById('stage'), body=document.body;
+  function seg(id,attr,target){
+    var el=document.getElementById(id); if(!el) return;
+    el.addEventListener('click',function(e){var b=e.target.closest('button');if(!b)return;
+      (target||stage).setAttribute(attr,b.dataset[Object.keys(b.dataset)[0]]);
+      [].forEach.call(this.children,function(c){c.setAttribute('aria-pressed',c===b);});
+    });
+  }
+  seg('vpSeg','data-vp');
+  document.getElementById('sigSw').addEventListener('click',function(e){var b=e.target.closest('button');if(!b)return;
+    body.setAttribute('data-signature',b.dataset.sig);
+    [].forEach.call(this.children,function(c){c.setAttribute('aria-pressed',c===b);});
+  });
+  document.getElementById('statsSeg').addEventListener('click',function(e){var b=e.target.closest('button');if(!b)return;
+    stage.setAttribute('data-stats',b.dataset.stats);
+    [].forEach.call(this.children,function(c){c.setAttribute('aria-pressed',c===b);}); applyStats();
+  });
+  document.querySelectorAll('.rb-toggle input').forEach(function(inp){
+    inp.addEventListener('change',function(){
+      document.querySelectorAll('[data-opt-block="'+inp.dataset.opt+'"]').forEach(function(el){el.classList.toggle('is-hidden',!inp.checked);});
+    });
+  });
+  function applyStats(){
+    var mode=stage.getAttribute('data-stats');
+    var sec=document.querySelector('.area'), ready=document.getElementById('areaReady'), pend=document.getElementById('areaPending');
+    sec.classList.toggle('is-hidden',mode==='off');
+    ready.classList.toggle('is-hidden',mode!=='ready');
+    pend.classList.toggle('is-hidden',mode!=='pending');
+  }
+
+  var reduce=window.matchMedia('(prefers-reduced-motion: reduce)').matches;
+
+  /* ----- comps count (n-aware grammar; digit slot is derived-only) ----- */
+  function setComps(){
+    var n=document.querySelectorAll('#compsList .comp').length;
+    var digit=String(n);
+    var say=(n===1)?'recent sale nearby anchors this number.':'recent sales nearby anchor this number.';
+    document.querySelectorAll('[data-comp-digit]').forEach(function(el){el.textContent=digit;});
+    document.querySelectorAll('[data-comp-say]').forEach(function(el){el.textContent=say;});
+    var pn=document.getElementById('priceNoteCount');
+    pn.textContent = (n===1)?'1 recent sale':(n+' recent sales');
+    // price note = short subordinate form: "Based on N recent sales nearby."
+    pn.parentNode.lastChild.textContent = ' nearby.';
+  }
+  setComps();
+
+  /* ----- price count-up + generic reveals (scroll/load/resize/print safe) ----- */
+  var priceEl=document.getElementById('priceBig'), numEl=document.getElementById('priceNum');
+  var target=parseInt(priceEl.getAttribute('data-target'),10), from=Math.round(target*0.965);
+  function fmt(n){return n.toLocaleString('en-US');}
+  var reveals=[].slice.call(document.querySelectorAll('.reveal')), priceRan=false;
+  function runPrice(){ if(priceRan)return; priceRan=true;
+    if(reduce){numEl.textContent=fmt(target);return;}
+    var start=performance.now(),dur=1100;
+    (function tick(t){var p=Math.min(1,(t-start)/dur),e=1-Math.pow(1-p,3);numEl.textContent=fmt(Math.round(from+(target-from)*e));if(p<1)requestAnimationFrame(tick);})(start);
+  }
+  if(reduce){reveals.forEach(function(el){el.classList.add('in');});numEl.textContent=fmt(target);} else {numEl.textContent=fmt(from);}
+  function inView(el,frac){var r=el.getBoundingClientRect(),h=window.innerHeight||document.documentElement.clientHeight;return r.top<h*(frac||.86)&&r.bottom>0;}
+  function check(){
+    for(var i=reveals.length-1;i>=0;i--){if(inView(reveals[i])){reveals[i].classList.add('in');reveals.splice(i,1);}}
+    if(!priceRan&&inView(priceEl,.72)) runPrice();
+  }
+
+  window.addEventListener('scroll',check,{passive:true});
+  window.addEventListener('resize',check);
+  window.addEventListener('beforeprint',function(){reveals.forEach(function(el){el.classList.add('in');});reveals.length=0;runPrice();});
+  applyStats(); check(); setTimeout(check,60); window.addEventListener('load',function(){check();});
+})();
+</script>
+
+<template id="__bundler_thumbnail">
+<svg viewBox="0 0 100 100" xmlns="http://www.w3.org/2000/svg"><rect width="100" height="100" fill="#037290"/><rect x="30" y="30" width="40" height="40" rx="6" fill="#f1ebe0"/><text x="50" y="58" text-anchor="middle" font-family="Georgia, serif" font-size="22" font-style="italic" fill="#037290">S</text></svg>
+</template>
+</body>
+</html>

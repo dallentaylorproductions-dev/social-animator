@@ -2,6 +2,7 @@ import { notFound } from "next/navigation";
 import type { HandoutRecord } from "@/lib/share-urls";
 import { SellerPresentationPage } from "@/tools/seller-presentation/output/presentation-page";
 import {
+  FLAGSHIP_PRIVACY_PAYLOAD,
   FULL_PAYLOAD,
   MINIMAL_PAYLOAD,
   OUTLINK_ONLY_PAYLOAD,
@@ -45,12 +46,17 @@ interface PageProps {
     brandAccent?: string;
     brandSecondary?: string;
     embed?: string;
+    // F2 — `?template=flagship` renders the fixture through the flagship (v2)
+    // template (the same read-time override the /h/ route exposes), so the
+    // e2e suite + Dallen's browser smoke can exercise v2 without a v2 publish.
+    template?: string;
   }>;
 }
 
 export default async function SellerPresentationPreview({ searchParams }: PageProps) {
-  const { fixture, brandBg, brandText, brandAccent, brandSecondary, embed } =
+  const { fixture, brandBg, brandText, brandAccent, brandSecondary, embed, template } =
     await searchParams;
+  const templateOverride = template === "flagship" ? "flagship" : undefined;
   // v3 — embed mode: the Brand kit settings preview iframes this route with
   // `embed=1`. EmbedBridge then hides non-page chrome and applies vars pushed
   // live (same-origin postMessage) so dialing a color repaints with no reload.
@@ -69,6 +75,9 @@ export default async function SellerPresentationPreview({ searchParams }: PagePr
     // A7d.8.1 — never-blank fallback fixture: video set but all three
     // poster slots empty (the iOS capture-timeout scenario).
     "poster-none",
+    // F2 — flagship privacy fixture: FULL payload + rogue private keys, to
+    // prove the clamp boundary strips them before the flagship renders.
+    "flagship-privacy",
   ] as const;
   type Variant = (typeof VARIANTS)[number];
   const variant = (VARIANTS as readonly string[]).includes(fixture ?? "")
@@ -93,7 +102,9 @@ export default async function SellerPresentationPreview({ searchParams }: PagePr
               ? POSTER_OVERRIDE_WINS_PAYLOAD
               : variant === "poster-none"
                 ? POSTER_NONE_PAYLOAD
-                : FULL_PAYLOAD;
+                : variant === "flagship-privacy"
+                  ? FLAGSHIP_PRIVACY_PAYLOAD
+                  : FULL_PAYLOAD;
 
   // E.0 — optional brand-color override (drives the brand-colors e2e
   // regression spec + Dallen's browser smoke). Validated hex only; merged
@@ -126,7 +137,7 @@ export default async function SellerPresentationPreview({ searchParams }: PagePr
 
   return (
     <>
-      <SellerPresentationPage handout={handout} />
+      <SellerPresentationPage handout={handout} templateOverride={templateOverride} />
       {isEmbed && <EmbedBridge />}
     </>
   );
