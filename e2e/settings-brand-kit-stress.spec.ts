@@ -6,7 +6,8 @@ import { test, expect, type Page } from "@playwright/test";
  * Reproduces Dallen's stress combo and the reachability edge cases. The
  * contract: every rendered "fix" button produces a REAL change on click (no
  * dead buttons); unreachable foregrounds render the honest background-fix
- * alternative; body text always gets a working fix; the panel stays legible.
+ * alternative; the panel stays legible. (Body text is no longer a readability
+ * row — v2 locks paper+ink — so the prices/links/section-numeral rows remain.)
  *
  * State lives in localStorage under `socanim_brand_settings`. The seed is
  * guarded to the top frame (the same-origin embedded preview iframe shares
@@ -108,30 +109,23 @@ test.describe("Brand kit — hostile-color stress", () => {
     ).toBeVisible();
   });
 
-  test("stress combo: body text gets a working fix (clicking changes a value)", async ({
+  test("body text is no longer a readability row (v2 locks paper+ink)", async ({
     page,
   }) => {
     await seed(page, STRESS);
     await page.goto("/settings/brand");
     await expandReadability(page);
-
-    // the Body chip's row carries at least one fix button
-    const bodyRow = page
-      .locator(".sample")
-      .filter({ hasText: "Body text" });
-    const bodyFix = bodyRow.getByTestId("brand-readability-fix").first();
-    await expect(bodyFix).toBeVisible();
-    await bodyFix.click();
-    // body becomes readable: either the text shade or the background moved
-    await expect
-      .poll(async () => {
-        const s = await readStore(page);
-        return (
-          s?.brandText !== STRESS.brandText.toUpperCase() ||
-          s?.brandBackground !== STRESS.brandBackground.toUpperCase()
-        );
-      })
-      .toBe(true);
+    // The Body-text row is gone; Prices/Links remain.
+    await expect(
+      page.getByTestId("brand-readability-fixes").locator(".sample", {
+        hasText: "Body text",
+      }),
+    ).toHaveCount(0);
+    await expect(
+      page.getByTestId("brand-readability-fixes").locator(".sample", {
+        hasText: "Prices",
+      }),
+    ).toHaveCount(1);
   });
 
   test("reachable case (pale signature on cream): Bump contrast changes the signature", async ({

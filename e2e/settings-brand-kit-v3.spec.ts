@@ -146,31 +146,15 @@ test.describe("Brand kit v3 form", () => {
     await verdict.click();
     await expect(page.getByTestId("brand-readability-fixes")).toBeVisible();
 
-    // low body contrast → warn, expanded by default
-    await seed(page, { brandText: "#c9c2b5" }); // light text on cream → fails
+    // low signature contrast → warn, expanded by default (body text is no
+    // longer a readability concern — v2 locks paper+ink — so the warn is
+    // driven by the Prices/Links rows via a pale signature on cream)
+    await seed(page, { brandAccent: "#f0e0d0" }); // pale signature on cream → fails
     await page.goto("/settings/brand");
     await expect(page.getByTestId("brand-readability-verdict")).toContainText(
       "Readability needs a look",
     );
     await expect(page.getByTestId("brand-readability-fixes")).toBeVisible();
-  });
-
-  test("'adjusted to stay readable' appears ONLY when the body clamp moved a value", async ({
-    page,
-  }) => {
-    // defaults: 15.2:1, no clamp → no adjusted copy (expand to inspect)
-    await page.goto("/settings/brand");
-    await page.getByTestId("brand-readability-verdict").click();
-    await expect(
-      page.getByTestId("brand-readability-fixes").getByText("adjusted to stay readable"),
-    ).toHaveCount(0);
-
-    // low-contrast body → engine clamps body text → honest adjusted copy shows
-    await seed(page, { brandText: "#c9c2b5" });
-    await page.goto("/settings/brand");
-    await expect(
-      page.getByTestId("brand-readability-fixes").getByText("adjusted to stay readable"),
-    ).toBeVisible();
   });
 
   test("Brand ready: complete needs logo + agent name; advisory contrast never downgrades it", async ({
@@ -182,10 +166,13 @@ test.describe("Brand kit v3 form", () => {
       "Almost ready",
     );
 
-    // logo + name present → Brand ready (even with a contrast WARN seeded)
+    // logo + name present → Brand ready (even with a contrast WARN seeded).
+    // The warn comes from a pale signature (prices/links) — body text is no
+    // longer a readability concern. (First arg is the LOGO color; the pale
+    // signature goes in via brandAccent.)
     await seedWithLogo(page, "#2C53C4", {
       agentName: "Aaron Thomas",
-      brandText: "#c9c2b5", // low-contrast body → readability warns
+      brandAccent: "#f0e0d0",
     });
     await page.goto("/settings/brand");
     await expect(page.getByTestId("brand-readability-verdict")).toContainText(
@@ -248,7 +235,7 @@ test.describe("Brand kit v3 form", () => {
     ).toBe("default");
   });
 
-  test("preview is the embedded real template; surface disclosure collapsed; pickers present", async ({
+  test("preview is the embedded real template; page-surface controls removed; signature picker present", async ({
     page,
   }) => {
     await page.goto("/settings/brand");
@@ -258,10 +245,31 @@ test.describe("Brand kit v3 form", () => {
     expect((await frame.evaluate((el) => el.tagName)).toLowerCase()).toBe("iframe");
     await expect(frame).toHaveAttribute("src", /embed=1/);
 
-    // disclosure collapsed by default; native pickers preserved
-    const toggle = page.getByTestId("brand-surface-disclosure");
-    await expect(toggle).toHaveAttribute("aria-expanded", "false");
-    await expect(page.getByTestId("brand-color-background")).toBeHidden();
+    // Page surface controls are GONE (v2 locks paper+ink): no disclosure, no
+    // Background / Body-text rows. The signature picker remains.
+    await expect(page.getByTestId("brand-surface-disclosure")).toHaveCount(0);
+    await expect(page.getByTestId("brand-color-background")).toHaveCount(0);
+    await expect(page.getByTestId("brand-color-text")).toHaveCount(0);
+    await expect(page.getByTestId("brand-color-picker-background")).toHaveCount(0);
+    await expect(page.getByTestId("brand-color-picker-text")).toHaveCount(0);
     await expect(page.getByTestId("brand-color-picker-accent")).toHaveCount(1);
+  });
+
+  test("brandBackground / brandText are retained in storage (frozen v1 pages) even though uneditable", async ({
+    page,
+  }) => {
+    // A stored v1-era surface persists through the form (no control wipes it).
+    await seed(page, { brandBackground: "#101820", brandText: "#e8e2d6" });
+    await page.goto("/settings/brand");
+    // touch an editable field so the form re-saves
+    const sig = page.getByTestId("brand-color-accent");
+    await sig.fill("#2C53C4");
+    await sig.press("Enter");
+    await expect.poll(async () => (await readStore(page))?.brandAccent).toBe(
+      "#2C53C4",
+    );
+    const stored = await readStore(page);
+    expect(String(stored?.brandBackground).toLowerCase()).toBe("#101820");
+    expect(String(stored?.brandText).toLowerCase()).toBe("#e8e2d6");
   });
 });
