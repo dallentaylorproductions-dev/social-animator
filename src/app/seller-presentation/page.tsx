@@ -19,10 +19,7 @@ import { StepEditorial } from "@/tools/seller-presentation/components/StepEditor
 import { StepReview } from "@/tools/seller-presentation/components/StepReview";
 import { StepErrorBoundary } from "@/components/StepErrorBoundary";
 import { SPEntitlementProvider } from "@/tools/seller-presentation/components/SPEntitlementContext";
-import {
-  COHORT_EXAMPLE_URL,
-  COHORT_EXAMPLE_LABEL,
-} from "@/lib/config/cohort-example";
+import { WizardPreview } from "@/tools/seller-presentation/components/WizardPreview";
 import "./sep-wizard.css";
 
 /**
@@ -83,15 +80,10 @@ export default function SellerPresentationPage() {
     );
   }
 
-  // Phase 0 decision 1: the Anticipation chrome link now appears on
-  // Step 1 ONLY. It used to render on every step's chrome; B1 removes it
-  // from the interior steps to keep them calm mid-flow. The reinforced
-  // anchor inside StepProperty itself (cohort-example-link-step1) stays.
-  const isStep1 = currentStep === "property";
-
   return (
     <SPEntitlementProvider>
     <div className="sep-wizard" data-testid="seller-presentation-wizard">
+    <div className="sep-shell">
     <div className="sep-container">
       <header>
         <div className="topnav">
@@ -122,21 +114,9 @@ export default function SellerPresentationPage() {
           <p className="subtitle">
             Listing-appointment prep + premium seller-facing page
           </p>
-          {/* Anticipation Layer — Step 1 only (Phase 0 decision 1).
-              target="_blank" so clicking never costs the agent their
-              in-progress draft. URL routes through the single swappable
-              constant in @/lib/config/cohort-example. */}
-          {isStep1 && (
-            <a
-              href={COHORT_EXAMPLE_URL}
-              target="_blank"
-              rel="noopener noreferrer"
-              data-testid="cohort-example-link"
-              className="example-link inline"
-            >
-              {COHORT_EXAMPLE_LABEL}&nbsp;→
-            </a>
-          )}
+          {/* The static "See an example" link is retired (capstone): the live
+              preview panel IS the example — it shows the fully-filled sample in
+              the agent's brand color until the draft has something to show. */}
         </div>
       </header>
 
@@ -214,6 +194,11 @@ export default function SellerPresentationPage() {
           </a>
         </div>
       )}
+    </div>
+    {/* Live seller-page preview — docked beside the form on desktop, a floating
+        "Preview ↗" button on mobile. Renders the agent's draft (or the badged
+        sample when sparse) from the same draft state the wizard autosaves. */}
+    <WizardPreview draft={instance.draft} currentStep={currentStep} />
     </div>
     </div>
     </SPEntitlementProvider>

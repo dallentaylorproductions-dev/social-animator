@@ -2,6 +2,7 @@
 
 import { useEffect, useRef, useState } from "react";
 import { useBrandSettings } from "@/lib/brand";
+import { brandToPublishInputs } from "./preview/preview-payload";
 import { spStrategyDisplayLabel } from "../content/strategy-display-labels";
 import {
   validateForExport,
@@ -91,46 +92,11 @@ export function StepReview({ draft, goToStep }: StepReviewProps) {
   const { settings: brand } = useBrandSettings();
   const missing = validateForExport(draft);
 
-  const agentContact = {
-    name: brand.agentName || "",
-    brokerage: brand.brokerage || "",
-    phone: brand.contactPhone || "",
-    email: brand.contactEmail || "",
-    licenseNumber: brand.licenseNumber || "",
-    // A7c — Seller Presentation agent-profile extensions captured in
-    // Settings/BrandProfileForm. The publish route forwards
-    // `agentContact` to `toPublicPayload` which projects these onto
-    // `payload.agent.{areasServed, photoUrl, bioShort, yearsInArea,
-    // ctaReassurance}` — the locked-design renderer reads from there.
-    areasServed: brand.agentAreasServed,
-    photoUrl: brand.agentPhotoUrl,
-    bioShort: brand.agentBioShort,
-    yearsInArea: brand.agentYearsInArea,
-    ctaReassurance: brand.agentCtaReassurance,
-  };
-
-  // A7d.2 — curated reviews + the "see all on Zillow" outlink also live
-  // in Settings (agent-constant). Forwarded as a separate payload field
-  // so the projector emits them at the top level (`payload.reviews` +
-  // `payload.reviewsOutlink`), not inside `payload.agent`.
-  const brandReviews = {
-    reviews: brand.agentReviews,
-    reviewsOutlinkUrl: brand.reviewsOutlinkUrl,
-  };
-
-  // E.0 — brand colors are agent-constant (set once in Settings → Brand
-  // kit). Forwarded in the publish body alongside agentContact +
-  // brandReviews; the route hands them to toPublicPayload, which
-  // validates each hex and projects them onto payload.brandColors. When
-  // unset, the consumer /h/<slug> page falls back to the production
-  // Editorial palette via its CSS var() cascade (cohort-safe).
-  const brandColors = {
-    brandBackground: brand.brandBackground,
-    brandText: brand.brandText,
-    brandAccent: brand.brandAccent,
-    // E.1 — optional secondary (decorative role); additive to the E.0 trio.
-    brandSecondary: brand.brandSecondary,
-  };
+  // The publish inputs (agentContact + A7d.2 reviews + E.0/E.1 brand colors)
+  // are built by the SHARED `brandToPublishInputs` so this real publish and the
+  // wizard live preview construct the identical payload — one source, no drift.
+  // The route forwards these to `toPublicPayload`, which projects/validates them.
+  const { agentContact, brandReviews, brandColors } = brandToPublishInputs(brand);
 
   // A7c.4: StepPitch seeds INITIAL_VISIBLE_ROWS empty rows on mount
   // so the agent lands on a finite canvas — those rows persist with
