@@ -5,7 +5,6 @@ import { useListingProfile } from "@/lib/listing-profile";
 import { CurrencyInput } from "@/components/inputs/CurrencyInput";
 import { NumberInput } from "@/components/inputs/NumberInput";
 import { ImageUploadField } from "@/components/ImageUploadField";
-import { COHORT_EXAMPLE_URL } from "@/lib/config/cohort-example";
 import type { SellerPresentationDraft } from "../engine/types";
 
 /**
@@ -28,7 +27,6 @@ import type { SellerPresentationDraft } from "../engine/types";
  *     additive emptyTitle/emptySubtext props (no fork).
  *   - SSR-safe "Loading…" placeholder until useListingProfile hydrates
  *     (React #418 fix, see src/lib/brand.ts:203).
- *   - The reinforced Anticipation anchor (cohort-example-link-step1).
  *   - The legacy `cityState` bridge ("${city}, ${state}") kept in sync
  *     via updateCityState() so older consumers keep rendering.
  *
@@ -138,22 +136,9 @@ export function StepProperty({ draft, setDraft }: StepPropertyProps) {
           A few basics, and we&apos;ll build a polished landing page for your
           seller.
         </p>
-        {/* Anticipation Layer — reinforced at-start anchor. Deliberately
-            framed as an EXAMPLE someone else already made (NOT
-            personalized with preparedFor): the canonical example shows a
-            real agent's listing/photos/video, and the old "your seller
-            receives" phrasing made agents read it as a live preview of
-            THEIR draft. Same swappable URL constant as the wizard chrome;
-            target="_blank" preserves the in-progress draft. */}
-        <a
-          href={COHORT_EXAMPLE_URL}
-          target="_blank"
-          rel="noopener noreferrer"
-          data-testid="cohort-example-link-step1"
-          className="example-link inline"
-        >
-          See an example finished page&nbsp;→
-        </a>
+        {/* The static example anchor is retired (capstone): the live preview
+            panel shows the fully-filled sample in the agent's brand color until
+            the draft has something to render, then becomes their real page. */}
       </div>
 
       <div className="fields">

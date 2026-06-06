@@ -260,18 +260,31 @@ test.describe("Flagship — wordmark slot", () => {
 
 test.describe("Flagship — pale-signature display seat (§D)", () => {
   const PALE_YELLOW = "%23E8C547"; // raw 1.42:1 on paper — can't display at 3:1
-  // The three big informational numbers that get seated.
-  const NUMBERS = [
-    { name: "price", sel: ".fs-page .fs-price__big" },
+  // The SMALLER numbers that get the chip (count digit + stat values). The big
+  // PRICE figure is deliberately NOT chipped — it only deepens (see below).
+  const SEATED = [
     { name: "count digit", sel: ".fs-page .fs-count__digit" },
     { name: "stat value", sel: ".fs-page .fs-stat__v" },
   ];
 
-  test("pale yellow → numbers sit on a chip; each measures ≥ 3:1", async ({
+  // The first non-transparent background up the ancestor chain — what the
+  // (chip-less) price figure actually renders against.
+  const effectiveBg = (loc: ReturnType<Page["locator"]>) =>
+    loc.evaluate((el: HTMLElement) => {
+      let n: HTMLElement | null = el;
+      while (n) {
+        const bg = getComputedStyle(n).backgroundColor;
+        if (bg && bg !== "rgba(0, 0, 0, 0)" && bg !== "transparent") return bg;
+        n = n.parentElement;
+      }
+      return "rgb(255, 255, 255)";
+    });
+
+  test("pale yellow → smaller numbers sit on a chip; each measures ≥ 3:1", async ({
     page,
   }) => {
     await page.goto(`${FLAGSHIP}&brandAccent=${PALE_YELLOW}`);
-    for (const { name, sel } of NUMBERS) {
+    for (const { name, sel } of SEATED) {
       const el = page.locator(sel).first();
       const bg = await read(el, "background-color");
       const fg = await read(el, "color");
@@ -282,11 +295,25 @@ test.describe("Flagship — pale-signature display seat (§D)", () => {
     }
   });
 
-  test("normal signature (#037290) → NO chip (byte-identical render)", async ({
+  test("pale yellow → price has NO chip but still deepens to ≥ 3:1", async ({
+    page,
+  }) => {
+    await page.goto(`${FLAGSHIP}&brandAccent=${PALE_YELLOW}`);
+    const price = page.locator(".fs-page .fs-price__big").first();
+    // No background chip behind the price (the seat artifact is gone).
+    expect(await read(price, "background-color"), "price chip").toBe(TRANSPARENT);
+    // The price figure still clears AA-large against its band via the deepen.
+    const fg = await read(price, "color");
+    const bg = await effectiveBg(price);
+    expect(contrastRatio(fg, bg), "price contrast").toBeGreaterThanOrEqual(3);
+  });
+
+  test("normal signature (#037290) → NO chip anywhere (byte-identical render)", async ({
     page,
   }) => {
     await page.goto(`${FLAGSHIP}&brandAccent=%23037290`);
-    for (const { name, sel } of NUMBERS) {
+    const ALL = [{ name: "price", sel: ".fs-page .fs-price__big" }, ...SEATED];
+    for (const { name, sel } of ALL) {
       const bg = await read(page.locator(sel).first(), "background-color");
       expect(bg, `${name} stays unseated`).toBe(TRANSPARENT);
     }

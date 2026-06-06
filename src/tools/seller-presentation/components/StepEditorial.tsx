@@ -1,6 +1,12 @@
 "use client";
 
-import { useCallback, useEffect, useMemo, useState, useSyncExternalStore } from "react";
+import {
+  useCallback,
+  useEffect,
+  useMemo,
+  useState,
+  useSyncExternalStore,
+} from "react";
 import { ImageUploadField } from "@/components/ImageUploadField";
 import { VideoUploadField } from "@/components/VideoUploadField";
 import { CurrencyInput } from "@/components/inputs/CurrencyInput";

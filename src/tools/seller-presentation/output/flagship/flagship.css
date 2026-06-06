@@ -1010,7 +1010,11 @@
    render is byte-identical. Browsers without style-query support fall back to
    the un-seated number on its band (still the clamped, AA-large signature). */
 @container style(--display-seat: 1) {
-  .fs-page .fs-price__big,
+  /* The SMALLER numbers — count digit + stat values — sit on a --tint-12 chip
+     and deepen to --signature-deep so a washed-out signature stays legible at
+     body scale. The big PRICE figure is NOT chipped: the seat behind it read as
+     a lingering artifact, and at display scale (AA-large 3:1) the deepened
+     signature is already legible without a background. So price deepens only. */
   .fs-page .fs-count__digit,
   .fs-page .fs-stat__v {
     color: var(--signature-deep);
@@ -1018,11 +1022,9 @@
     border-radius: 0.16em;
     padding: 0.06em 0.22em;
   }
-  /* price is a flex run ($ + digits) — shrink the chip to hug the number */
-  .fs-page .fs-price__big {
-    width: fit-content;
-    align-self: flex-start;
-  }
+  /* price: deepen the figure (and its $ / separators) to keep it legible —
+     NO background chip, so the layout is otherwise the un-seated price. */
+  .fs-page .fs-price__big,
   .fs-page .fs-price__cur,
   .fs-page .fs-price__big .sep {
     color: var(--signature-deep);

@@ -1,0 +1,199 @@
+/* wizard-preview.css — the wizard's live seller-page panel (capstone).
+ *
+ * The panel renders the REAL flagship page (`.fs-page`, its own scoped CSS)
+ * inside a phone frame. These rules style ONLY the frame/chrome around it +
+ * the `fs-static` motion-freeze; they never restyle flagship internals. All
+ * selectors are `sep-preview-*` / `fs-static`-prefixed so nothing leaks into
+ * the wizard chrome or the flagship subtree. */
+
+/* ---- shell: form + docked panel side by side on wide screens ---- */
+.sep-shell {
+  display: block;
+}
+@media (min-width: 1200px) {
+  .sep-shell {
+    display: flex;
+    align-items: flex-start;
+    justify-content: center;
+    gap: 40px;
+  }
+  /* keep the form column at its established width; the panel sits beside it */
+  .sep-shell > .sep-container {
+    margin: 0;
+    flex: 0 1 740px;
+  }
+}
+
+/* ---- desktop dock ---- */
+.sep-preview-dock {
+  flex: 0 0 auto;
+  width: 384px;
+  /* Stretch the column to the form's full height so the sticky surface has
+     room to travel — `.sep-shell` sets `align-items: flex-start`, which would
+     otherwise size this column to the surface itself, leaving sticky no slack
+     (the panel would just scroll away with the form). */
+  align-self: stretch;
+}
+.sep-preview-dock .sep-preview-surface {
+  position: sticky;
+  top: 40px;
+  /* Never overlap the wizard chrome or overflow the viewport: cap to the
+     space below the 40px top anchor. The phone screen below scrolls its own
+     content when the previewed page is taller than this. */
+  max-height: calc(100vh - 56px);
+}
+
+/* ---- surface header (eyebrow + EXAMPLE badge / Live pip) ---- */
+.sep-preview-head {
+  display: flex;
+  align-items: center;
+  gap: 12px;
+  margin-bottom: 16px;
+  padding: 0 4px;
+}
+.sep-preview-eyebrow {
+  font-family: var(--mono);
+  font-size: 11px;
+  letter-spacing: 0.22em;
+  text-transform: uppercase;
+  color: var(--faint, #6f6c66);
+}
+/* EXAMPLE badge — mono, small, neutral (same idiom as the Step 5 chart badge) */
+.sep-preview-badge {
+  font-family: var(--mono);
+  font-size: 10px;
+  letter-spacing: 0.12em;
+  text-transform: uppercase;
+  color: var(--muted, #a6a39d);
+  border: 1px solid var(--border-strong, rgba(255, 255, 255, 0.13));
+  border-radius: 999px;
+  padding: 4px 10px;
+  white-space: nowrap;
+  overflow: hidden;
+  text-overflow: ellipsis;
+}
+.sep-preview-live {
+  font-family: var(--mono);
+  font-size: 10.5px;
+  letter-spacing: 0.18em;
+  text-transform: uppercase;
+  color: var(--mint, #6ee7c7);
+  display: inline-flex;
+  align-items: center;
+  gap: 7px;
+}
+.sep-preview-live::before {
+  content: "";
+  width: 7px;
+  height: 7px;
+  border-radius: 50%;
+  background: var(--mint, #6ee7c7);
+  box-shadow: 0 0 8px var(--mint, #6ee7c7);
+}
+.sep-preview-close {
+  margin-left: auto;
+  background: transparent;
+  border: 1px solid var(--border-strong, rgba(255, 255, 255, 0.13));
+  color: var(--text, #f4f2ef);
+  font-size: 14px;
+  line-height: 1;
+  border-radius: 999px;
+  width: 34px;
+  height: 34px;
+  cursor: pointer;
+}
+
+/* ---- phone frame holding the real page ---- */
+.sep-preview-phone {
+  background: #060807;
+  border-radius: 40px;
+  padding: 10px;
+  box-shadow: 0 1px 0 rgba(255, 255, 255, 0.08) inset,
+    0 40px 80px -34px rgba(0, 0, 0, 0.8), 0 0 0 1px rgba(255, 255, 255, 0.04);
+}
+.sep-preview-screen {
+  border-radius: 30px;
+  overflow-y: auto;
+  overflow-x: hidden;
+  height: min(720px, calc(100vh - 150px));
+  background: #f1ebe0;
+  -webkit-overflow-scrolling: touch;
+}
+/* the real flagship page fills the screen edge-to-edge (no page gutter / card
+   chrome inside the frame); its container query reshapes to the narrow width */
+.sep-preview-screen .fs-page {
+  min-height: 100%;
+  padding: 0 !important;
+}
+.sep-preview-screen .fs-frame {
+  max-width: none;
+  border-radius: 0 !important;
+  box-shadow: none !important;
+}
+
+/* ---- fs-static: freeze motion to a legible end-state ----
+   No scroll-driven reveal island runs in these snapshots, so force every
+   reveal/chart to its final state (mirrors the flagship print / reduced-motion
+   contract). Used by BOTH this panel and the Step 5 chart preview. */
+.fs-static .reveal,
+.fs-static .chart .line-stroke,
+.fs-static .chart .area-fill,
+.fs-static .chart .point {
+  opacity: 1 !important;
+  transform: none !important;
+  transition: none !important;
+  stroke-dashoffset: 0 !important;
+}
+.fs-static .chart .area-fill {
+  opacity: 0.08 !important;
+}
+.fs-static .chart .point-current-pulse,
+.fs-static .fs-area__shimmer::after {
+  animation: none !important;
+}
+
+/* ---- mobile: floating button + full-screen overlay ---- */
+.sep-preview-fab {
+  position: fixed;
+  right: 18px;
+  bottom: 18px;
+  z-index: 40;
+  background: var(--mint, #6ee7c7);
+  color: #0e0d0c;
+  font-family: var(--sans);
+  font-size: 14px;
+  font-weight: 700;
+  border: 0;
+  border-radius: 999px;
+  padding: 13px 20px;
+  box-shadow: 0 10px 28px -10px rgba(110, 231, 199, 0.6);
+  cursor: pointer;
+}
+.sep-preview-overlay {
+  position: fixed;
+  inset: 0;
+  z-index: 50;
+  background: #0e0d0c;
+  padding: 16px 14px calc(env(safe-area-inset-bottom, 0px) + 16px);
+  overflow: hidden;
+  display: flex;
+  flex-direction: column;
+}
+.sep-preview-overlay .sep-preview-phone {
+  flex: 1 1 auto;
+  min-height: 0;
+  display: flex;
+  border-radius: 28px;
+}
+.sep-preview-overlay .sep-preview-screen {
+  height: auto;
+  flex: 1 1 auto;
+  border-radius: 20px;
+}
+@media (min-width: 1200px) {
+  /* the FAB/overlay never show on desktop (the dock is live) */
+  .sep-preview-fab,
+  .sep-preview-overlay {
+    display: none;
+  }
+}
