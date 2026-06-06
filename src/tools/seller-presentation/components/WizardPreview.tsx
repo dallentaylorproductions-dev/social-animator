@@ -57,6 +57,68 @@ const STEP_SECTION: Record<StepId, string> = {
   review: "fs-agent",
 };
 
+const INPUT_DEBOUNCE_MS = 200;
+
+// Field → flagship anchor (FIELD-level scroll-sync). When the agent focuses or
+// edits a form field, the preview scrolls the matching flagship element into
+// view so they see what they're changing. Resolved by climbing from the focused
+// element to the nearest identifiable field container; rules are ordered
+// specific → generic and the FIRST with a matching ancestor wins. Every anchor
+// is an EXISTING flagship `data-testid` — no FlagshipPage markup edit. Purely
+// best-effort: a field with no clean anchor simply doesn't scroll.
+const FIELD_ANCHOR_RULES: Array<{
+  match: string;
+  anchor: (el: HTMLElement) => string;
+}> = [
+  // a comp row (the card wraps all its inputs) → that comp in the comps list
+  {
+    match: '[data-testid^="step-comps-card-"]',
+    anchor: (el) => `fs-comp-${el.dataset.testid!.replace("step-comps-card-", "")}`,
+  },
+  // adding / importing comps → the comps section as a whole
+  { match: '[data-testid^="step-comps"]', anchor: () => "fs-why" },
+  // a pitch card → that pitch item
+  {
+    match: '[data-testid^="step-pitch-card-"]',
+    anchor: (el) => `fs-pitch-${el.dataset.testid!.replace("step-pitch-card-", "")}`,
+  },
+  { match: '[data-testid^="step-pitch"]', anchor: () => "fs-pitch-0" },
+  // price / rationale / confidence → the price block
+  { match: '[data-testid^="step-strategy"]', anchor: () => "fs-price" },
+  // the walkthrough video → the agent-note band; area stats → the area band
+  { match: '[data-testid^="step-editorial-video"]', anchor: () => "fs-note" },
+  { match: '[data-testid^="step-editorial-area"]', anchor: () => "fs-area" },
+  // property facts → the hero
+  { match: '[data-testid^="step-property"]', anchor: () => "fs-hero" },
+];
+
+function resolveAnchor(target: EventTarget | null): string | null {
+  if (!(target instanceof Element)) return null;
+  for (const rule of FIELD_ANCHOR_RULES) {
+    const hit = target.closest<HTMLElement>(rule.match);
+    if (hit) return rule.anchor(hit);
+  }
+  return null;
+}
+
+// Scroll the phone screen (NOT the page) so the anchored flagship element is
+// centered. Honors prefers-reduced-motion (jump instead of smooth).
+function scrollScreenToAnchor(screen: HTMLElement, anchor: string) {
+  const target = screen.querySelector<HTMLElement>(
+    `[data-testid="${anchor}"]`,
+  );
+  if (!target) return; // best-effort: no clean anchor → no scroll
+  const reduce = window.matchMedia("(prefers-reduced-motion: reduce)").matches;
+  const sRect = screen.getBoundingClientRect();
+  const tRect = target.getBoundingClientRect();
+  const delta =
+    tRect.top - sRect.top - (screen.clientHeight - tRect.height) / 2;
+  screen.scrollTo({
+    top: screen.scrollTop + delta,
+    behavior: reduce ? "auto" : "smooth",
+  });
+}
+
 function useDebounced<T>(value: T, ms: number): T {
   const [debounced, setDebounced] = useState(value);
   useEffect(() => {
@@ -94,6 +156,35 @@ function PreviewSurface({
       behavior: "auto",
     });
   }, [currentStep, sparse]);
+
+  // Field-level scroll-sync: focusing or editing a form field brings the
+  // matching flagship element into view. A document-level delegated listener
+  // keeps this entirely inside the panel — no wiring into the step components.
+  // Focus scrolls immediately; input is debounced (~200ms) so a typing burst
+  // settles before the jump.
+  useEffect(() => {
+    const screen = screenRef.current;
+    if (!screen) return;
+    let inputTimer: ReturnType<typeof setTimeout> | undefined;
+
+    const go = (target: EventTarget | null) => {
+      const anchor = resolveAnchor(target);
+      if (anchor) scrollScreenToAnchor(screen, anchor);
+    };
+    const onFocusIn = (e: FocusEvent) => go(e.target);
+    const onInput = (e: Event) => {
+      const target = e.target;
+      clearTimeout(inputTimer);
+      inputTimer = setTimeout(() => go(target), INPUT_DEBOUNCE_MS);
+    };
+    document.addEventListener("focusin", onFocusIn);
+    document.addEventListener("input", onInput);
+    return () => {
+      clearTimeout(inputTimer);
+      document.removeEventListener("focusin", onFocusIn);
+      document.removeEventListener("input", onInput);
+    };
+  }, []);
 
   return (
     <div className="sep-preview-surface">

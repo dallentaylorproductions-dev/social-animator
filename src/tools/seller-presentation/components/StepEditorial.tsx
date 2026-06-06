@@ -6,7 +6,6 @@ import {
   useMemo,
   useState,
   useSyncExternalStore,
-  type CSSProperties,
 } from "react";
 import { ImageUploadField } from "@/components/ImageUploadField";
 import { VideoUploadField } from "@/components/VideoUploadField";
@@ -17,7 +16,6 @@ import {
   getVideoUploadSessionState,
   subscribeVideoUploadSession,
 } from "@/lib/video-upload-session";
-import { useBrandSettings } from "@/lib/brand";
 import type {
   AreaStats,
   AreaStatsMonthly,
@@ -25,14 +23,6 @@ import type {
   SellerPresentationDraft,
 } from "../engine/types";
 import { effectivePosterUrl } from "../engine/types";
-import { AreaChart } from "../output/presentation-page";
-import {
-  consumerRoleVars,
-  deriveConsumerRoles,
-} from "../output/consumer-roles";
-import { FULL_PAYLOAD } from "../output/__fixtures__/sample-payload";
-import "../output/flagship/flagship.css";
-import "./wizard-preview.css";
 
 /**
  * A7d.11 — the upload session key used by the walk-through video
@@ -941,70 +931,7 @@ function AreaStatsEditor({ draft, setDraft }: StepEditorialProps) {
           ))}
         </div>
       </div>
-
-      <Step5ChartPreview draft={draft} />
     </>
-  );
-}
-
-// Neutral grays for the EXAMPLE chart — unmistakably NOT the agent's data
-// (the real chart paints in their brand signature).
-const NEUTRAL_SAMPLE_VARS = {
-  "--signature": "#9A9A9A",
-  "--signature-deep": "#6E6E6E",
-  "--decorative": "#9A9A9A",
-} as const;
-
-/**
- * Step 5 area-chart preview — the production flagship chart inline, in two
- * honest states (frozen geometry; this only re-skins via CSS role vars):
- *   • no monthly series yet → the SAMPLE chart (shared fixture) in NEUTRAL gray,
- *     badged EXAMPLE — clearly not their data.
- *   • series entered → the agent's REAL chart in their brand signature (blue).
- * Renders inside a `.fs-page fs-static` scope so the scoped flagship chart CSS
- * applies and the draw-on motion is frozen to its end-state (no motion island
- * runs in the wizard).
- */
-function Step5ChartPreview({ draft }: { draft: SellerPresentationDraft }) {
-  const { settings: brand } = useBrandSettings();
-  const series = draft.areaStats?.monthlySeries;
-  const hasData = Array.isArray(series) && series.length > 0;
-
-  const roleVars = consumerRoleVars(deriveConsumerRoles(brand.brandAccent));
-  const scopeVars = hasData
-    ? roleVars
-    : { ...roleVars, ...NEUTRAL_SAMPLE_VARS };
-
-  const previewSeries = hasData ? series : FULL_PAYLOAD.areaStats?.monthlySeries;
-  const recommended = hasData
-    ? draft.recommendedPrice || ""
-    : FULL_PAYLOAD.recommendedPrice;
-
-  return (
-    <div
-      className="sec5-chart-preview"
-      data-testid="step-editorial-chart-preview"
-      data-state={hasData ? "live" : "example"}
-    >
-      <div className="sec5-chart-head">
-        <span className="sec5-chart-label">Neighborhood chart</span>
-        {hasData ? (
-          <span className="sec5-chart-live" data-testid="step-editorial-chart-live">
-            Live
-          </span>
-        ) : (
-          <span className="sec5-chart-badge" data-testid="step-editorial-chart-badge">
-            EXAMPLE
-          </span>
-        )}
-      </div>
-      <div
-        className="fs-page fs-static sec5-chart-scope"
-        style={scopeVars as CSSProperties}
-      >
-        <AreaChart series={previewSeries} recommended={recommended} />
-      </div>
-    </div>
   );
 }
 
