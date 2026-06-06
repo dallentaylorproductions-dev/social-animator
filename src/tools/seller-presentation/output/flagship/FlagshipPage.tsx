@@ -64,8 +64,9 @@ export function FlagshipPage({ handout }: { handout: HandoutRecord }) {
         <Reviews payload={payload} />
         <AreaStats payload={payload} />
         <AgentBand payload={payload} />
-        {/* Wordmark is a conditional white-label slot (F4 one-line wire-up). */}
-        <Footer payload={payload} showWordmark />
+        {/* Wordmark is a conditional white-label slot (F4): suppressed when the
+            payload's white-label flag is set; the disclaimer always renders. */}
+        <Footer payload={payload} showWordmark={payload.suppressWordmark !== true} />
       </div>
       <PresentationPageMotion />
     </div>

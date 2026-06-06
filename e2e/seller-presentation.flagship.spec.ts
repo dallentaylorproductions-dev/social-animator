@@ -23,6 +23,17 @@ function luminance(rgb: string): number {
   return 0.2126 * r + 0.7152 * g + 0.0722 * b;
 }
 
+// WCAG contrast ratio between two computed-style rgb() strings.
+function contrastRatio(a: string, b: string): number {
+  const la = luminance(a);
+  const lb = luminance(b);
+  const hi = Math.max(la, lb);
+  const lo = Math.min(la, lb);
+  return (hi + 0.05) / (lo + 0.05);
+}
+
+const TRANSPARENT = "rgba(0, 0, 0, 0)"; // computed background-color when unset
+
 test.describe("Flagship — reachability override (v1 byte-identity preserved)", () => {
   test("?template=flagship renders v2; its absence renders v1", async ({
     page,
@@ -223,5 +234,74 @@ test.describe("Flagship — wordmark slot", () => {
     await expect(wordmark).toBeVisible();
     await expect(wordmark).toContainText("Studio");
     await expect(wordmark.locator("em")).toHaveText("SEP");
+  });
+
+  // F4 — white-label flag wired through the payload (`suppressWordmark`).
+  test("suppressWordmark=true → wordmark absent from HTML; disclaimer stays", async ({
+    page,
+  }) => {
+    await page.goto(`${FLAGSHIP}&suppressWordmark=1`);
+    // The wordmark slot is gone entirely (not just hidden).
+    await expect(page.getByTestId("fs-wordmark")).toHaveCount(0);
+    // The footer still renders, and the disclaimer is ALWAYS present.
+    const foot = page.getByTestId("fs-foot");
+    await expect(foot).toBeVisible();
+    await expect(foot).toContainText("drawn from public record");
+  });
+
+  test("no flag (default) → wordmark present", async ({ page }) => {
+    await page.goto(FLAGSHIP);
+    await expect(page.getByTestId("fs-wordmark")).toBeVisible();
+    // A non-"1" value is treated as false → wordmark shows.
+    await page.goto(`${FLAGSHIP}&suppressWordmark=yes`);
+    await expect(page.getByTestId("fs-wordmark")).toBeVisible();
+  });
+});
+
+test.describe("Flagship — pale-signature display seat (§D)", () => {
+  const PALE_YELLOW = "%23E8C547"; // raw 1.42:1 on paper — can't display at 3:1
+  // The three big informational numbers that get seated.
+  const NUMBERS = [
+    { name: "price", sel: ".fs-page .fs-price__big" },
+    { name: "count digit", sel: ".fs-page .fs-count__digit" },
+    { name: "stat value", sel: ".fs-page .fs-stat__v" },
+  ];
+
+  test("pale yellow → numbers sit on a chip; each measures ≥ 3:1", async ({
+    page,
+  }) => {
+    await page.goto(`${FLAGSHIP}&brandAccent=${PALE_YELLOW}`);
+    for (const { name, sel } of NUMBERS) {
+      const el = page.locator(sel).first();
+      const bg = await read(el, "background-color");
+      const fg = await read(el, "color");
+      // A chip is present: the number now has a non-transparent background.
+      expect(bg, `${name} chip background`).not.toBe(TRANSPARENT);
+      // And the seated number clears AA-large against its chip.
+      expect(contrastRatio(fg, bg), `${name} contrast`).toBeGreaterThanOrEqual(3);
+    }
+  });
+
+  test("normal signature (#037290) → NO chip (byte-identical render)", async ({
+    page,
+  }) => {
+    await page.goto(`${FLAGSHIP}&brandAccent=%23037290`);
+    for (const { name, sel } of NUMBERS) {
+      const bg = await read(page.locator(sel).first(), "background-color");
+      expect(bg, `${name} stays unseated`).toBe(TRANSPARENT);
+    }
+  });
+
+  test("the seat gate flips per signature (terracotta/navy/green/magenta unseated)", async ({
+    page,
+  }) => {
+    for (const accent of ["%23c26a4e", "%231f4e79", "%232e7d5b", "%238e2d6b"]) {
+      await page.goto(`${FLAGSHIP}&brandAccent=${accent}`);
+      const bg = await read(
+        page.locator(".fs-page .fs-price__big").first(),
+        "background-color",
+      );
+      expect(bg, accent).toBe(TRANSPARENT);
+    }
   });
 });

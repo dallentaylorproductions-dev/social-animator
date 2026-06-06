@@ -1,6 +1,8 @@
 import { NextResponse } from "next/server";
 import { auth } from "@/lib/auth";
 import { publishHandout } from "@/lib/share-urls";
+import { loadAgentProfile } from "@/lib/entitlements/load-agent-profile";
+import { resolveEntitlements } from "@/lib/entitlements/resolver";
 import { clampDraft } from "@/tools/seller-presentation/engine/types";
 import {
   toPublicPayload,
@@ -125,6 +127,11 @@ export async function POST(req: Request) {
       ? (payload.brandColors as BrandColorsInput)
       : {};
 
+  // F4 — resolve the agent's entitlements to read the `whiteLabel` capability
+  // (false for every access mode today; H-8 billing maps a paid tier to true).
+  // The flag projects onto the payload's `suppressWordmark` 1:1.
+  const entitlements = resolveEntitlements(await loadAgentProfile(email));
+
   // R-1 closed by construction: build the public-only payload and
   // pass ONLY it onward. The raw draft (with pricingStrategyId,
   // confidence, comp notes, private pitch points, etc.) is dropped
@@ -134,6 +141,7 @@ export async function POST(req: Request) {
     agentContact,
     brandReviews,
     brandColors,
+    entitlements.whiteLabel,
   );
 
   try {

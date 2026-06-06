@@ -61,6 +61,18 @@ export interface ConsumerRoles {
   onDark: string;
   darkBand: string;
   darkBand2: string;
+  // ---- derived layout gate (F4 §D) ----
+  /**
+   * F4 — display-seat gate. True iff the agent's RAW signature can't itself
+   * reach 3:1 as a big display number on paper (a very pale signature, e.g.
+   * `#E8C547`). When true, the flagship seats the price figure / count digit /
+   * stat values on a `tint-12` chip and deepens them to `--signature-deep` (the
+   * engine's ≥4.5:1 numerals-on-tint-12 role) so they stay legible — the rule
+   * lives HERE, in one place, and rides the shared role path to the live
+   * preview as `--display-seat`. Normal signatures (blue/green/terracotta/navy/
+   * magenta all reach ≥3:1 raw) → false → byte-identical render.
+   */
+  needsDisplaySeat: boolean;
 }
 
 export function deriveConsumerRoles(
@@ -97,6 +109,12 @@ export function deriveConsumerRoles(
     onDark: LAYOUT.onDark,
     darkBand: LAYOUT.darkBand,
     darkBand2: LAYOUT.darkBand2,
+    // F4 §D — the agent's RAW signature can't serve as a 3:1 display number on
+    // paper. The engine reports this directly (no new color math): when the
+    // unclamped signature-on-surface is < 3:1, the foreground clamp can only
+    // reach legibility by deepening the brand color into mud, so we seat the
+    // big numbers on a chip instead. Normal signatures report ≥ 3:1 here.
+    needsDisplaySeat: d.report.rawSignatureOnSurface < 3.0,
   };
 }
 
@@ -126,5 +144,10 @@ export function consumerRoleVars(roles: ConsumerRoles): Record<string, string> {
     "--on-dark": roles.onDark,
     "--dark-band": roles.darkBand,
     "--dark-band-2": roles.darkBand2,
+    // F4 §D — the display-seat gate as a CSS flag (always emitted as "1"/"0"
+    // so a live bridge push reliably overwrites the prior value). The scoped
+    // `@container style(--display-seat: 1)` block in flagship.css is the ONLY
+    // consumer; "0" matches nothing → byte-identical render.
+    "--display-seat": roles.needsDisplaySeat ? "1" : "0",
   };
 }

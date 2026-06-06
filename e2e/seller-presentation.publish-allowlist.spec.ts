@@ -29,6 +29,7 @@ import { test, expect } from '@playwright/test';
 
 import {
   toPublicPayload,
+  clampPublicPayload,
   type AgentBranding,
   type BrandReviewsInput,
 } from '../src/tools/seller-presentation/output/public-payload';
@@ -1033,5 +1034,113 @@ test.describe('toPublicPayload — brand colors projection (E.0)', () => {
       brandSecondary: 'gold', // not hex — drop
     });
     expect(payload.brandColors).toEqual({ accent: '#1f3a6b' });
+  });
+});
+
+/**
+ * F4 — white-label wordmark flag (`suppressWordmark`). The publish path passes
+ * the resolver's `whiteLabel` capability as `toPublicPayload`'s 5th arg; the
+ * field is projected ONLY when that arg is literally `true`, and the read clamp
+ * lets ONLY a literal boolean `true` survive a tampered KV record. The top-level
+ * allowlist proves no OTHER new key leaked alongside it.
+ */
+test.describe('toPublicPayload — white-label wordmark flag (F4)', () => {
+  function baseDraft(): SellerPresentationDraft {
+    return {
+      comps: [],
+      pitchPoints: [],
+      commitments: [],
+      asks: [],
+    } as unknown as SellerPresentationDraft;
+  }
+
+  // The complete set of keys the serializer is allowed to emit at the top
+  // level of the public payload (PublicPayload). Mirrors the comp/agent
+  // allowlists above — any NEW top-level key must be added here deliberately,
+  // which is what proves "no other new field leaks" alongside suppressWordmark.
+  const ALLOWED_TOP_LEVEL_KEYS = new Set([
+    'templateVersion',
+    'suppressWordmark',
+    'propertyAddress',
+    'propertyCity',
+    'recommendedPrice',
+    'priceRationale',
+    'comps',
+    'agentBranding',
+    'pitchPublicPoints',
+    'property',
+    'preparedFor',
+    'video',
+    'whyPrice',
+    'pitchPublicCards',
+    'reviews',
+    'reviewsOutlink',
+    'areaStats',
+    'agent',
+    'brandColors',
+  ]);
+
+  test('whiteLabel=true → suppressWordmark:true projects onto the payload', () => {
+    const payload = toPublicPayload(
+      baseDraft(),
+      FIXTURE_AGENT_CONTACT,
+      FIXTURE_BRAND_REVIEWS,
+      {},
+      true,
+    );
+    expect(payload.suppressWordmark).toBe(true);
+    expect(JSON.stringify(payload)).toContain('"suppressWordmark":true');
+  });
+
+  test('whiteLabel false / omitted → suppressWordmark absent (today\'s publishes)', () => {
+    const falsePayload = toPublicPayload(
+      baseDraft(),
+      FIXTURE_AGENT_CONTACT,
+      FIXTURE_BRAND_REVIEWS,
+      {},
+      false,
+    );
+    const omittedPayload = toPublicPayload(baseDraft(), FIXTURE_AGENT_CONTACT);
+    for (const payload of [falsePayload, omittedPayload]) {
+      expect(payload.suppressWordmark).toBeUndefined();
+      expect(JSON.stringify(payload)).not.toContain('"suppressWordmark":');
+    }
+  });
+
+  test('read clamp: ONLY a literal boolean true passes; tampered values drop to absent', () => {
+    // A hand-edited KV record could carry any shape. The clamp coerces every
+    // non-boolean-true to absent (→ wordmark shows), never a truthy string.
+    for (const tampered of ['true', 1, 'yes', {}, [], 0, null]) {
+      const clamped = clampPublicPayload({
+        templateVersion: 2,
+        suppressWordmark: tampered,
+      });
+      expect(clamped.suppressWordmark, JSON.stringify(tampered)).toBeUndefined();
+    }
+    // The one value that passes.
+    expect(
+      clampPublicPayload({ templateVersion: 2, suppressWordmark: true })
+        .suppressWordmark,
+    ).toBe(true);
+  });
+
+  test('top-level allowlist: no key outside the known set leaks (incl. with whiteLabel on)', () => {
+    const draft = maxedDraft();
+    const payload = toPublicPayload(
+      draft,
+      FIXTURE_AGENT_CONTACT,
+      FIXTURE_BRAND_REVIEWS,
+      { brandAccent: '#037290' },
+      true, // whiteLabel on → suppressWordmark present, the only new top-level key
+    );
+    const json = JSON.parse(JSON.stringify(payload)) as Record<string, unknown>;
+    for (const key of Object.keys(json)) {
+      expect(
+        ALLOWED_TOP_LEVEL_KEYS.has(key),
+        `unexpected top-level key "${key}" outside allowlist`,
+      ).toBe(true);
+    }
+    // The new field IS present in this whiteLabel-on case.
+    expect(json.suppressWordmark).toBe(true);
   });
 });

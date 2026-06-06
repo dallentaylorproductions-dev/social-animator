@@ -183,6 +183,15 @@ export interface PublicPayload {
    */
   templateVersion?: 1 | 2;
 
+  /**
+   * F4 — white-label flag. When `true`, the flagship footer drops the
+   * "Studio SEP" wordmark slot (the disclaimer always stays). Sourced at
+   * publish from the entitlement resolver's `whiteLabel` capability (false
+   * for every access mode today). Absent / non-`true` → wordmark shows.
+   * The read clamp lets ONLY a literal boolean `true` through.
+   */
+  suppressWordmark?: boolean;
+
   // ---- A6 flat fields (kept for the A6 functional renderer) ----
   propertyAddress: string;
   propertyCity?: string;
@@ -389,6 +398,10 @@ export function toPublicPayload(
   agentContact: AgentBranding,
   brandReviews: BrandReviewsInput = {},
   brandColors: BrandColorsInput = {},
+  // F4 — white-label capability from the entitlement resolver (false for every
+  // access mode today). Only a literal `true` projects `suppressWordmark`;
+  // anything else omits the field, so today's publishes stay byte-identical.
+  whiteLabel: boolean = false,
 ): PublicPayload {
   const propertyAddress = draft.propertyAddress ?? "";
   const recommendedPrice = draft.recommendedPrice ?? "";
@@ -426,6 +439,10 @@ export function toPublicPayload(
     // v1 (PUBLISH_TEMPLATE_VERSION === 1); F3 flips the constant to start
     // shipping the flagship template to new publishes.
     templateVersion: PUBLISH_TEMPLATE_VERSION,
+
+    // F4 — project ONLY when whiteLabel is literally true; omit otherwise so
+    // an unentitled publish carries no `suppressWordmark` key at all.
+    suppressWordmark: whiteLabel === true ? true : undefined,
 
     // ---- A6 flat fields ----
     propertyAddress,
@@ -503,6 +520,9 @@ export function clampPublicPayload(raw: unknown): PublicPayload {
     // is EXACTLY the number 2. Tampered / absent (old slugs) / any other value
     // → 1, which renders today's look.
     templateVersion: r.templateVersion === 2 ? 2 : 1,
+    // F4 — clamp at the trust boundary: ONLY a literal boolean `true` passes.
+    // A tampered string "true" / 1 / anything else → undefined (wordmark shows).
+    suppressWordmark: r.suppressWordmark === true ? true : undefined,
     propertyAddress,
     propertyCity,
     recommendedPrice,

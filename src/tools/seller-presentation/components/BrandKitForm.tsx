@@ -111,19 +111,31 @@ function HexField({
   }
 
   return (
-    <input
-      ref={inputRef}
-      className={"hexin" + (bad ? " is-invalid" : "")}
-      data-testid={testId}
-      value={draft}
-      spellCheck={false}
-      aria-label={testId}
-      onChange={(e) => setDraft(e.target.value)}
-      onBlur={(e) => commit(e.target.value)}
-      onKeyDown={(e) => {
-        if (e.key === "Enter") (e.target as HTMLInputElement).blur();
-      }}
-    />
+    <span className="hexfield">
+      <input
+        ref={inputRef}
+        className={"hexin" + (bad ? " is-invalid" : "")}
+        data-testid={testId}
+        value={draft}
+        spellCheck={false}
+        aria-label={testId}
+        aria-invalid={bad || undefined}
+        onChange={(e) => setDraft(e.target.value)}
+        onBlur={(e) => commit(e.target.value)}
+        onKeyDown={(e) => {
+          if (e.key === "Enter") (e.target as HTMLInputElement).blur();
+        }}
+      />
+      {/* F4 — quiet inline hint on a failed parse (e.g. a 5-char hex). No toast,
+          no blocking; clears on the next valid commit. The old value is kept
+          (commit() didn't call onCommit), so the form never silently "saves"
+          a bad hex while the agent thinks it did. */}
+      {bad && (
+        <span className="hexin-hint" data-testid={testId + "-hint"} role="alert">
+          Not a valid hex — use 6 digits, like #037290.
+        </span>
+      )}
+    </span>
   );
 }
 
