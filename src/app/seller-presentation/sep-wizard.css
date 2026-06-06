@@ -148,8 +148,32 @@
   padding: 0;
 }
 .sep-wizard .rail-item {
+  display: flex;
+}
+/* each rail item is a real button that jumps to its step; it owns the layout
+   + the underline bar (so the bar anchors to the button) and inherits the
+   todo/done/active color from its .rail-item parent */
+.sep-wizard .rail-btn {
   position: relative;
-  padding-bottom: 12px;
+  display: block;
+  width: 100%;
+  padding: 0 0 12px;
+  margin: 0;
+  background: none;
+  border: 0;
+  font: inherit;
+  color: inherit;
+  text-align: left;
+  cursor: pointer;
+  -webkit-tap-highlight-color: transparent;
+}
+.sep-wizard .rail-btn[aria-disabled="true"] {
+  cursor: default;
+}
+.sep-wizard .rail-btn:focus-visible {
+  outline: 2px solid var(--mint);
+  outline-offset: 3px;
+  border-radius: 3px;
 }
 .sep-wizard .rail-num {
   font-size: 13.5px;

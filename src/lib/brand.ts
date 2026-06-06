@@ -53,7 +53,9 @@ export interface BrandSettings {
    * `EDITORIAL_BRAND_DEFAULTS` but does NOT persist them on mount; only
    * an explicit change writes a value here.
    */
+  // no longer user-editable; v2 locks paper+ink; retained for frozen v1 pages
   brandBackground?: string;
+  // no longer user-editable; v2 locks paper+ink; retained for frozen v1 pages
   brandText?: string;
   brandAccent?: string;
   /**

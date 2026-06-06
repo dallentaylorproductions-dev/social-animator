@@ -120,7 +120,11 @@ export default function SellerPresentationPage() {
         </div>
       </header>
 
-      <StepRail currentStep={currentStep} />
+      <StepRail
+        currentStep={currentStep}
+        instance={instance}
+        onNavigate={setCurrentStep}
+      />
 
       {/* StepErrorBoundary (A7c.4.1): scoped to the step body so a
           field that throws during render degrades to an inline
@@ -206,29 +210,64 @@ export default function SellerPresentationPage() {
 }
 
 /**
- * Step rail (Phase B1) — replaces the old StepIndicator. Six equal
- * columns with the redesign's todo / done / active states (a 2px
- * underline that goes hairline → mint-line → solid-mint-glow as the
- * agent advances). DISPLAY-ONLY: the rail items don't navigate (matches
- * production — only Previous/Next move between steps), so they're plain
- * <li>s, not buttons. Mobile collapses to 3 columns via the scoped CSS.
+ * Step rail (Phase B1) — six equal columns with the redesign's todo / done /
+ * active states (a 2px underline that goes hairline → mint-line →
+ * solid-mint-glow as the agent advances). Mobile collapses to 3 columns via
+ * the scoped CSS.
+ *
+ * Each item is a real button that jumps to its step via the SAME `setStep`
+ * Previous/Next drive (so the scroll-to-step-top effect and the live preview's
+ * step→section sync both follow rail jumps with no extra wiring). Rail
+ * navigation REUSES the wizard's existing gating — it never loosens it: a
+ * step is clickable only if every step before it is valid (mirroring the
+ * linear Next-gating). Today only `property` gates; the loop below is written
+ * generally so any future per-step gate governs the rail automatically. A
+ * gated step renders `aria-disabled` (muted, default cursor) and ignores
+ * clicks/keys; the active step carries `aria-current="step"`.
  */
-function StepRail({ currentStep }: { currentStep: StepId }) {
+function StepRail({
+  currentStep,
+  instance,
+  onNavigate,
+}: {
+  currentStep: StepId;
+  instance: WorkflowInstance<SellerPresentationDraft> | null;
+  onNavigate: (id: StepId) => void;
+}) {
   const currentIdx = STEPS.findIndex((s) => s.id === currentStep);
+  // Highest index reachable via Next from the start: walk forward while each
+  // step is valid. Steps at or below this index are clickable.
+  let reachableMax = 0;
+  while (
+    reachableMax < STEPS.length - 1 &&
+    isStepValid(STEPS[reachableMax].id, instance)
+  ) {
+    reachableMax += 1;
+  }
   return (
     <ol className="rail" aria-label="Steps">
       {STEPS.map((step, idx) => {
         const state =
           idx < currentIdx ? "done" : idx === currentIdx ? "active" : "todo";
+        const reachable = idx <= reachableMax;
+        const isCurrent = idx === currentIdx;
         return (
-          <li
-            key={step.id}
-            className={`rail-item ${state}`}
-            aria-current={idx === currentIdx ? "step" : undefined}
-          >
-            <span className="rail-num">{idx + 1}.</span>
-            <span className="rail-label">{step.label}</span>
-            <span className="rail-bar" />
+          <li key={step.id} className={`rail-item ${state}`}>
+            <button
+              type="button"
+              className="rail-btn"
+              data-testid={`rail-step-${step.id}`}
+              aria-current={isCurrent ? "step" : undefined}
+              aria-disabled={reachable ? undefined : true}
+              onClick={() => {
+                if (!reachable || isCurrent) return;
+                onNavigate(step.id);
+              }}
+            >
+              <span className="rail-num">{idx + 1}.</span>
+              <span className="rail-label">{step.label}</span>
+              <span className="rail-bar" />
+            </button>
           </li>
         );
       })}

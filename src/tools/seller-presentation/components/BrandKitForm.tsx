@@ -345,7 +345,6 @@ export function BrandKitForm({
   agentName,
 }: BrandKitFormProps) {
   const DEF = defaults;
-  const [adv, setAdv] = useState(false);
   const [readOpen, setReadOpen] = useState(false);
   const [suggestions, setSuggestions] = useState<string[]>([]);
   const iframeRef = useRef<HTMLIFrameElement>(null);
@@ -432,12 +431,13 @@ export function BrandKitForm({
   const raw = r.rawSignatureOnSurface;
   const pricesPass = raw >= 3.0;
   const linksPass = raw >= 4.5;
-  const bodyPass = r.bodyOnSurface >= 4.5;
-  const bodyAdjusted = r.bodyClamped;
+  // Body text is no longer user-editable (v2 locks paper+ink — the body row
+  // is always the locked ink on paper and can't fail), so it's dropped from
+  // the readability verdict and panel. Prices/Links/Section-numerals remain.
   const secHex = values.secondary ? BrandEngine.normHex(values.secondary) : null;
   const secRatio = secHex ? BrandEngine.contrast(secHex, values.background) : null;
   const secPass = secRatio == null ? true : secRatio >= 3.0;
-  const good = bodyPass && pricesPass && secPass;
+  const good = pricesPass && secPass;
   // The accordion is open iff `readOpen`. A warn force-OPENS it (effect below),
   // and applying a one-tap fix re-runs derivation + updates the chips IN PLACE
   // with the panel still open — it collapses ONLY when the user clicks "Hide
@@ -457,8 +457,6 @@ export function BrandKitForm({
   // alternative) and say so. Body offers both paths, smallest change first.
   const sigHex = BrandEngine.normHex(values.accent) || values.accent;
   const bg = values.background;
-  const dL = (a: string, b: string) =>
-    Math.abs(BrandEngine.rgbToOklch(a).L - BrandEngine.rgbToOklch(b).L);
 
   // signature roles (prices 3.0 / links 4.5) — the foreground IS the signature
   function signatureFixes(target: number): {
@@ -479,33 +477,6 @@ export function BrandKitForm({
     };
   }
 
-  // body role — offer "Use a readable text shade" (ink) + "Soften the
-  // background" (surface); drop the ink fix when it's unreachable.
-  function bodyFixes(): { fixes: SampleFix[]; note?: string } {
-    const inkEx = BrandEngine.clampContrastEx(values.text, bg, 4.5);
-    const soft = BrandEngine.softenSurfaceFor(bg, values.text, 4.5);
-    const cands: Array<SampleFix & { change: number }> = [];
-    if (inkEx.reached) {
-      cands.push({
-        label: "Use a readable text shade",
-        apply: () => set({ text: inkEx.hex }),
-        change: dL(values.text, inkEx.hex),
-      });
-    }
-    cands.push({
-      label: "Soften the background",
-      apply: () => set({ background: soft.hex }),
-      change: dL(bg, soft.hex),
-    });
-    cands.sort((a, b) => a.change - b.change); // smallest change first
-    return {
-      fixes: cands.map(({ label, apply }) => ({ label, apply })),
-      note: inkEx.reached
-        ? undefined
-        : "Your background is too strong for readable text at any shade — soften the background instead.",
-    };
-  }
-
   // secondary (section numerals 3.0) — bump the secondary or soften the bg
   function secondaryFixes(): { fixes: SampleFix[]; note?: string } {
     if (!secHex) return { fixes: [] };
@@ -522,7 +493,6 @@ export function BrandKitForm({
 
   const pricesFix = pricesPass ? null : signatureFixes(3.0);
   const linksFix = linksPass ? null : signatureFixes(4.5);
-  const bodyFix = bodyPass ? null : bodyFixes();
   const secFix = secHex && !secPass ? secondaryFixes() : null;
 
   // ---- brand ready (advisory contrast never downgrades it) ----
@@ -602,42 +572,12 @@ export function BrandKitForm({
           <PaletteStrip hexes={derived.hexes} />
         </div>
 
-        {/* PAGE SURFACE (collapsed disclosure) */}
-        <div className={"adv" + (adv ? " is-open" : "")}>
-          <button
-            type="button"
-            className="adv__toggle"
-            onClick={() => setAdv((a) => !a)}
-            aria-expanded={adv}
-            data-testid="brand-surface-disclosure"
-          >
-            <span className="adv__caret" aria-hidden="true">
-              ▶
-            </span>
-            <span className="adv__t">Page surface</span>
-            <span className="adv__sub">Layout-owned defaults you can override</span>
-          </button>
-          <div className="adv__body">
-            <ColorRow
-              label="Background"
-              color={values.background}
-              onCommit={(v) => set({ background: v })}
-              onReset={() => set({ background: DEF.background })}
-              resetLabel="Reset"
-              testId="brand-color-background"
-              pickerTestId="brand-color-picker-background"
-            />
-            <ColorRow
-              label="Body text"
-              color={values.text}
-              onCommit={(v) => set({ text: v })}
-              onReset={() => set({ text: DEF.text })}
-              resetLabel="Reset"
-              testId="brand-color-text"
-              pickerTestId="brand-color-picker-text"
-            />
-          </div>
-        </div>
+        {/* PAGE SURFACE controls removed (v2 locks paper+ink — the flagship
+            template consumes only the signature ramp, so Background / Body-text
+            overrides no longer affect any new page). The brandBackground /
+            brandText schema fields are RETAINED (see src/lib/brand.ts) so
+            already-published frozen v1 pages still render their stored values;
+            they're simply no longer editable here. */}
 
         {/* DEFAULT LAYOUT — production dropdown (card picker is a future concept) */}
         <div className="field-block">
@@ -700,15 +640,6 @@ export function BrandKitForm({
           {expanded ? (
             <div className="read__samples" data-testid="brand-readability-fixes">
               <Sample
-                label="Body text"
-                ratio={r.bodyOnSurface}
-                target={4.5}
-                roleColor={values.text}
-                adjusted={bodyAdjusted}
-                fixes={bodyFix?.fixes}
-                note={bodyFix?.note}
-              />
-              <Sample
                 label="Prices & big numbers"
                 ratio={raw}
                 target={3.0}
@@ -733,12 +664,6 @@ export function BrandKitForm({
                   fixes={secFix?.fixes}
                   note={secFix?.note}
                 />
-              ) : null}
-              {bodyAdjusted ? (
-                <p className="read__adjusted-note">
-                  We used a deeper shade so your text stays readable — your choices
-                  are untouched.
-                </p>
               ) : null}
             </div>
           ) : null}
