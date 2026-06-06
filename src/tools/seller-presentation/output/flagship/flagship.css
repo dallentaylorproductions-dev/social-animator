@@ -997,6 +997,41 @@
   max-width: 60ch;
 }
 
+/* =================== §D · PALE-SIGNATURE DISPLAY SEAT ==================
+   When the engine reports the agent's RAW signature can't reach 3:1 as a big
+   display number on paper, `deriveConsumerRoles` sets the ONE gate
+   (`needsDisplaySeat` → `--display-seat: 1`, pushed on the shared role path so
+   the live preview inherits this with no extra wiring). The big informational
+   numbers — price figure, count digit, stat values — then sit on a `--tint-12`
+   chip and deepen to `--signature-deep` (the engine's purpose-built ≥4.5:1
+   numerals-on-tint-12 role), so a washed-out signature stays legible without
+   any engine math change. A style query (not a class) keeps this in CSS and
+   live-updatable; normal signatures emit `--display-seat: 0` → no match → the
+   render is byte-identical. Browsers without style-query support fall back to
+   the un-seated number on its band (still the clamped, AA-large signature). */
+@container style(--display-seat: 1) {
+  .fs-page .fs-price__big,
+  .fs-page .fs-count__digit,
+  .fs-page .fs-stat__v {
+    color: var(--signature-deep);
+    background: var(--tint-12);
+    border-radius: 0.16em;
+    padding: 0.06em 0.22em;
+  }
+  /* price is a flex run ($ + digits) — shrink the chip to hug the number */
+  .fs-page .fs-price__big {
+    width: fit-content;
+    align-self: flex-start;
+  }
+  .fs-page .fs-price__cur,
+  .fs-page .fs-price__big .sep {
+    color: var(--signature-deep);
+  }
+  .fs-page .fs-stat__v {
+    display: inline-block;
+  }
+}
+
 /* ============================== MOTION ================================= */
 .fs-page .reveal {
   opacity: 0;
@@ -1144,22 +1179,71 @@
   }
 }
 @media print {
-  .fs-page .reveal {
+  /* Print the brand surfaces — the dark hero/agent/footer bands and the tint
+     panels ARE the design; without exact color-adjust their cream-on-dark text
+     would print as invisible cream on white. `print-color-adjust` inherits, so
+     declaring it on the root covers the whole subtree. */
+  .fs-page {
+    -webkit-print-color-adjust: exact;
+    print-color-adjust: exact;
+    background: var(--paper);
+    padding: 0 !important;
+  }
+  .fs-page .fs-frame {
+    max-width: none;
+    border-radius: 0 !important;
+    box-shadow: none !important;
+    overflow: visible;
+  }
+
+  /* `beforeprint` end-state contract — there is NO JS print handler; motion is
+     CSS transitions off an IntersectionObserver, so a section that never
+     scrolled into view would print mid-reveal. These rules ARE the contract:
+     force every flagship reveal/chart to its final state so a saved PDF is
+     always complete. Mirrors the reduced-motion block above. */
+  .fs-page .reveal,
+  .fs-page .chart .line-stroke,
+  .fs-page .chart .area-fill,
+  .fs-page .chart .point {
     opacity: 1 !important;
     transform: none !important;
-  }
-  .fs-page .chart .line-stroke {
+    /* null the transition so the end-state is SNAPPED, not animated toward —
+       otherwise the PDF captures the reveal/draw-on mid-flight. */
+    transition: none !important;
     stroke-dashoffset: 0 !important;
   }
   .fs-page .chart .area-fill {
     opacity: 0.08 !important;
   }
-  .fs-page .chart .point {
-    opacity: 1 !important;
-    transform: none !important;
-  }
   .fs-page .chart .point-current-pulse,
   .fs-page .fs-area__shimmer::after {
     animation: none !important;
+  }
+
+  /* Page-break rhythm: never split a self-contained unit (a comp row, a stat
+     cell, a pitch item, a quote, the agent card, the chart) across a page
+     fold. Major sections break between rather than through where the printer
+     can — these are hints, so an over-tall section still flows. */
+  .fs-page .fs-comp,
+  .fs-page .fs-stat,
+  .fs-page .fs-pitch__item,
+  .fs-page .fs-quote,
+  .fs-page .fs-agent__card,
+  .fs-page .chart-wrap,
+  .fs-page .fs-note__video,
+  .fs-page .fs-area__pending {
+    break-inside: avoid;
+  }
+  .fs-page .fs-price,
+  .fs-page .fs-why,
+  .fs-page .fs-pitch,
+  .fs-page .fs-reviews,
+  .fs-page .fs-area,
+  .fs-page .fs-agent {
+    break-before: auto;
+  }
+  .fs-page .fs-headline,
+  .fs-page .fs-eyebrow {
+    break-after: avoid;
   }
 }

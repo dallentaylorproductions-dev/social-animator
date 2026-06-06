@@ -93,6 +93,9 @@ export function resolveEntitlements(agent: AgentProfile): EntitlementContext {
     // internal-test is Dallen's QA and also hides it (his own dashboard
     // shouldn't surface upgrade prompts).
     suppressUpgradeUi: accessMode === "team-invite" || accessMode === "internal-test",
+    // F4 — white-label is FALSE for every current access mode (paid included);
+    // it maps to a paid tier when H-8 billing lands the real tier on the sub row.
+    whiteLabel: false,
   };
 }
 

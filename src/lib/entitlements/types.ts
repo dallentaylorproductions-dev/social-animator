@@ -173,6 +173,14 @@ export interface EntitlementContext {
    * so the rule lives in one place (§8.5).
    */
   suppressUpgradeUi: boolean;
+  /**
+   * F4 — white-label capability. True iff the agent may publish seller pages
+   * with the "Studio SEP" wordmark suppressed. False for EVERY access mode
+   * today (paid included); it maps to a paid tier when H-8 billing lands the
+   * real tier on the sub row. The publish path projects this 1:1 onto the
+   * public payload's `suppressWordmark`.
+   */
+  whiteLabel: boolean;
 }
 
 // ----- ResolvedSkill (resolver output, per skill) -----

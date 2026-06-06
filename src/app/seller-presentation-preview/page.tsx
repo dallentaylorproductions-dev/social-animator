@@ -46,6 +46,13 @@ interface PageProps {
     brandAccent?: string;
     brandSecondary?: string;
     embed?: string;
+    /**
+     * F4 — `?suppressWordmark=1` merges `suppressWordmark: true` onto the
+     * fixture payload (routed through the same clamp as a real publish), so the
+     * suite + Dallen's smoke can see the white-labeled flagship footer without
+     * an entitled account. Any other value → wordmark shows.
+     */
+    suppressWordmark?: string;
     // Read-time template override (the same switch the /h/ route exposes):
     //   • `?template=flagship` — render the fixture through the flagship (v2)
     //     template (lets the suite + browser smoke exercise v2).
@@ -57,8 +64,16 @@ interface PageProps {
 }
 
 export default async function SellerPresentationPreview({ searchParams }: PageProps) {
-  const { fixture, brandBg, brandText, brandAccent, brandSecondary, embed, template } =
-    await searchParams;
+  const {
+    fixture,
+    brandBg,
+    brandText,
+    brandAccent,
+    brandSecondary,
+    embed,
+    template,
+    suppressWordmark,
+  } = await searchParams;
   const templateOverride =
     template === "flagship" ? "flagship" : template === "v1" ? "v1" : undefined;
   // v3 — embed mode: the Brand kit settings preview iframes this route with
@@ -130,9 +145,13 @@ export default async function SellerPresentationPreview({ searchParams }: PagePr
   if (isHex(brandText)) brandColors.text = brandText;
   if (isHex(brandAccent)) brandColors.accent = brandAccent;
   if (isHex(brandSecondary)) brandColors.secondary = brandSecondary; // E.1
-  const data = (
-    Object.keys(brandColors).length > 0 ? { ...payload, brandColors } : payload
-  ) as unknown as Record<string, unknown>;
+  // F4 — optional white-label override. Merged onto the fixture payload and
+  // re-clamped by SellerPresentationPage (clampPublicPayload) exactly like a
+  // real publish, so the rendered footer matches the production white-label path.
+  const merged: Record<string, unknown> = { ...payload };
+  if (Object.keys(brandColors).length > 0) merged.brandColors = brandColors;
+  if (suppressWordmark === "1") merged.suppressWordmark = true;
+  const data = merged as Record<string, unknown>;
 
   // Wrap the fixture payload in a HandoutRecord so the renderer's
   // contract matches the production /h/[slug] path exactly. The
