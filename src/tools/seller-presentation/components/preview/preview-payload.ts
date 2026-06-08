@@ -45,6 +45,13 @@ export function brandToPublishInputs(brand: BrandSettings) {
     licenseNumber: brand.licenseNumber || "",
     areasServed: brand.agentAreasServed,
     photoUrl: brand.agentPhotoUrl,
+    // UX-2b — the repositionable-headshot display transform travels with the
+    // photo URL on the same agentContact path (StepReview + PrelistingPublish
+    // both POST this), so the seller page and /why apply the agent's focal
+    // point identically. Unset → undefined → centered (byte-identical).
+    photoFocalX: brand.agentHeadshotFocalX,
+    photoFocalY: brand.agentHeadshotFocalY,
+    photoScale: brand.agentHeadshotScale,
     bioShort: brand.agentBioShort,
     yearsInArea: brand.agentYearsInArea,
     ctaReassurance: brand.agentCtaReassurance,

@@ -29,6 +29,19 @@ export interface BrandSettings {
    * presentation override. Set-once, reused across presentations.
    */
   agentPhotoUrl?: string;
+  /**
+   * UX-2b — repositionable headshot. A pure DISPLAY transform stored
+   * ALONGSIDE `agentPhotoUrl` (the uploaded image is never re-cropped or
+   * re-encoded). `agentHeadshotFocalX` / `agentHeadshotFocalY` are the CSS
+   * object/background-position as 0–100% (default centered 50/50);
+   * `agentHeadshotScale` is a 1.0–2.0 display zoom (default 1). All optional
+   * — unset means centered at no zoom, so every existing agent's published
+   * page renders byte-identical. Set by the Settings reposition control; the
+   * renderer maps them onto the agent band avatar on every surface.
+   */
+  agentHeadshotFocalX?: number;
+  agentHeadshotFocalY?: number;
+  agentHeadshotScale?: number;
   agentBioShort?: string;
   agentAreasServed?: string;
   agentYearsInArea?: string;
@@ -138,6 +151,35 @@ export const DEFAULT_BRAND_THEME_ID = "editorial";
  */
 function clampBrandHex(value: unknown): string | undefined {
   return typeof value === "string" && /^#[0-9a-f]{6}$/i.test(value)
+    ? value
+    : undefined;
+}
+
+/**
+ * UX-2b — headshot focal-point clamp. A finite number in [0, 100] (a CSS
+ * position percentage); anything else → undefined ("centered"). Defense-at-
+ * boundary so a tampered localStorage value can't render the frame off the
+ * edge of the photo.
+ */
+function clampStoredPct(value: unknown): number | undefined {
+  return typeof value === "number" &&
+    Number.isFinite(value) &&
+    value >= 0 &&
+    value <= 100
+    ? value
+    : undefined;
+}
+
+/**
+ * UX-2b — headshot zoom clamp. A finite number in [1.0, 2.0]; anything else
+ * → undefined ("no zoom"). The lower bound of 1 guarantees the photo always
+ * at least covers the frame (never zoomed out to bare edges).
+ */
+function clampStoredScale(value: unknown): number | undefined {
+  return typeof value === "number" &&
+    Number.isFinite(value) &&
+    value >= 1 &&
+    value <= 2
     ? value
     : undefined;
 }
@@ -306,6 +348,13 @@ export function loadBrandSettings(): BrandSettings {
         typeof parsed.agentPhotoUrl === "string" && parsed.agentPhotoUrl.length > 0
           ? parsed.agentPhotoUrl
           : undefined,
+      // UX-2b — clamp the stored display transform at the load boundary:
+      // focal as a 0–100 percentage, scale within the 1.0–2.0 bounds. Any
+      // out-of-range / non-numeric value drops to undefined ("centered, no
+      // zoom"), so a tampered record can never push the frame off the photo.
+      agentHeadshotFocalX: clampStoredPct(parsed.agentHeadshotFocalX),
+      agentHeadshotFocalY: clampStoredPct(parsed.agentHeadshotFocalY),
+      agentHeadshotScale: clampStoredScale(parsed.agentHeadshotScale),
       agentBioShort:
         typeof parsed.agentBioShort === "string" && parsed.agentBioShort.length > 0
           ? parsed.agentBioShort

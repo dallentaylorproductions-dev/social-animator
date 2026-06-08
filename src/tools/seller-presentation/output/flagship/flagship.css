@@ -858,6 +858,28 @@
 .fs-page .fs-agent__avatar--photo::before {
   content: "";
 }
+/* UX-2b — repositionable headshot. The agent's focal point + zoom are a pure
+   DISPLAY transform (no re-crop). The byte-identical default avatar above
+   keeps carrying the photo as its own centered `cover` background; this --adj
+   variant ONLY renders when the agent moved the focal point or zoomed in. The
+   photo rides an inner clip layer so a zoom magnifies WITHOUT spilling past the
+   frame, while the avatar itself stays `overflow: visible` so the signature
+   status dot (::after, -3px outset) is never clipped. */
+.fs-page .fs-agent__avatar--adj {
+  background-image: none;
+}
+.fs-page .fs-agent__avatar-clip {
+  position: absolute;
+  inset: 0;
+  overflow: hidden;
+  border-radius: inherit;
+}
+.fs-page .fs-agent__avatar-img {
+  position: absolute;
+  inset: 0;
+  background-size: cover;
+  background-repeat: no-repeat;
+}
 .fs-page .fs-agent__avatar::after {
   content: "";
   position: absolute;

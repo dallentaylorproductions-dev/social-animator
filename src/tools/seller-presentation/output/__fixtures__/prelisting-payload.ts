@@ -75,6 +75,47 @@ export const PRELISTING_FULL: StandalonePrelistingPayload = {
   brandColors: { accent: "#1f6f5c" },
 };
 
+/**
+ * UX-2b — a headshot with a reposition applied. Identity-focused (so the agent
+ * band is the surface under test) with a hosted photo, the focal point pulled
+ * UP toward the top of the frame (the "face cut off at the top" case Aaron
+ * hit), and a slight zoom. Drives the render spec that proves the agent band
+ * maps the focal point onto the avatar. The image is a 1×1 transparent PNG data
+ * URL — the spec asserts computed `background-position` / `transform`, which the
+ * browser reports without fetching pixels.
+ */
+const HEADSHOT_DATA_URL =
+  "data:image/png;base64,iVBORw0KGgoAAAANSUhEUgAAAAEAAAABCAQAAAC1HAwCAAAAC0lEQVR42mNk+M8AAAMBAQDJ/pLvAAAAAElFTkSuQmCC";
+
+export const PRELISTING_HEADSHOT: StandalonePrelistingPayload = {
+  templateVersion: 2,
+  agent: {
+    name: "Aaron Thomas",
+    brokerage: "Cascade & Co.",
+    email: "aaron@example.com",
+    photoUrl: HEADSHOT_DATA_URL,
+    photoFocalX: 50,
+    photoFocalY: 18,
+    photoScale: 1.3,
+  },
+};
+
+/**
+ * UX-2b — a headshot with NO reposition set (the existing-agent case). Proves
+ * the agent who never touched the control renders the byte-identical default
+ * avatar: a plain `.fs-agent__avatar--photo` with the photo as its own
+ * background, no `--adj` variant and no inner clip/image layer.
+ */
+export const PRELISTING_HEADSHOT_CENTERED: StandalonePrelistingPayload = {
+  templateVersion: 2,
+  agent: {
+    name: "Aaron Thomas",
+    brokerage: "Cascade & Co.",
+    email: "aaron@example.com",
+    photoUrl: HEADSHOT_DATA_URL,
+  },
+};
+
 /** Identity only — every optional block flexes out; the page still reads complete. */
 export const PRELISTING_MINIMAL: StandalonePrelistingPayload = {
   templateVersion: 2,

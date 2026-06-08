@@ -55,17 +55,7 @@ export function AgentBand({
         )}
 
         <div className="fs-agent__card reveal">
-          <div
-            className={`fs-agent__avatar${a.photoUrl ? " fs-agent__avatar--photo" : ""}`}
-            data-monogram={monogram}
-            style={
-              a.photoUrl
-                ? {
-                    backgroundImage: `url("${a.photoUrl.replace(/"/g, '\\"')}")`,
-                  }
-                : undefined
-            }
-          />
+          <AgentAvatar agent={a} monogram={monogram} />
           <div>
             <div className="fs-agent__cardname">{a.name}</div>
             {role && <div className="fs-agent__role">{role}</div>}
@@ -90,6 +80,83 @@ export function AgentBand({
         {showCtas && <AgentCtas agent={a} />}
       </div>
     </section>
+  );
+}
+
+/**
+ * UX-2b — the agent-band avatar. Two rendering paths, chosen so the common
+ * case never changes:
+ *
+ *   • DEFAULT (no photo, OR a photo with no reposition) — renders the exact
+ *     pre-UX-2b markup: a single `.fs-agent__avatar` div whose background is
+ *     the photo (centered `cover`) or, with no photo, the monogram fallback.
+ *     Every already-published page and every agent who never opened the
+ *     reposition control hits THIS path, so their output is byte-identical.
+ *
+ *   • REPOSITIONED (photo + off-center focal OR zoom) — adds an inner clip +
+ *     image layer. The focal point maps to `background-position`; zoom maps to
+ *     `transform: scale()` anchored at the focal point. The photo rides the
+ *     inner layer (clipped to the rounded frame) so a zoom magnifies WITHOUT
+ *     spilling past the frame, while the avatar itself keeps `overflow:
+ *     visible` so the signature status dot (the `::after`, outset -3px) is
+ *     never clipped. Still a pure DISPLAY transform — the image bytes are
+ *     untouched.
+ */
+function AgentAvatar({
+  agent,
+  monogram,
+}: {
+  agent: AgentBranding;
+  monogram: string;
+}) {
+  const photoUrl = agent.photoUrl;
+  const fx = typeof agent.photoFocalX === "number" ? agent.photoFocalX : 50;
+  const fy = typeof agent.photoFocalY === "number" ? agent.photoFocalY : 50;
+  const scale = typeof agent.photoScale === "number" ? agent.photoScale : 1;
+  // Only diverge from the byte-identical default when the agent actually moved
+  // the focal point or zoomed in. Centered + no zoom === today's markup.
+  const repositioned = !!photoUrl && (fx !== 50 || fy !== 50 || scale > 1);
+
+  if (repositioned) {
+    const bg = `url("${photoUrl!.replace(/"/g, '\\"')}")`;
+    return (
+      <div
+        className="fs-agent__avatar fs-agent__avatar--photo fs-agent__avatar--adj"
+        data-monogram={monogram}
+        data-testid="fs-agent-avatar"
+      >
+        <span className="fs-agent__avatar-clip">
+          <span
+            className="fs-agent__avatar-img"
+            data-testid="fs-agent-avatar-img"
+            style={{
+              backgroundImage: bg,
+              backgroundPosition: `${fx}% ${fy}%`,
+              ...(scale > 1
+                ? {
+                    transform: `scale(${scale})`,
+                    transformOrigin: `${fx}% ${fy}%`,
+                  }
+                : null),
+            }}
+          />
+        </span>
+      </div>
+    );
+  }
+
+  // NOTE: the default path is intentionally the EXACT pre-UX-2b markup (no
+  // data-testid, no extra class) so existing pages stay byte-identical.
+  return (
+    <div
+      className={`fs-agent__avatar${photoUrl ? " fs-agent__avatar--photo" : ""}`}
+      data-monogram={monogram}
+      style={
+        photoUrl
+          ? { backgroundImage: `url("${photoUrl.replace(/"/g, '\\"')}")` }
+          : undefined
+      }
+    />
   );
 }
 

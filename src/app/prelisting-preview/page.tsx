@@ -3,6 +3,8 @@ import type { HandoutRecord } from "@/lib/share-urls";
 import { PrelistingPage } from "@/tools/seller-presentation/output/prelisting/PrelistingPage";
 import {
   PRELISTING_FULL,
+  PRELISTING_HEADSHOT,
+  PRELISTING_HEADSHOT_CENTERED,
   PRELISTING_MINIMAL,
   PRELISTING_PARTIAL,
 } from "@/tools/seller-presentation/output/__fixtures__/prelisting-payload";
@@ -26,6 +28,8 @@ interface PageProps {
 
 const FIXTURES = {
   full: PRELISTING_FULL,
+  headshot: PRELISTING_HEADSHOT,
+  "headshot-centered": PRELISTING_HEADSHOT_CENTERED,
   minimal: PRELISTING_MINIMAL,
   partial: PRELISTING_PARTIAL,
 } as const;
