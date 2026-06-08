@@ -131,6 +131,14 @@
   display: flex; align-items: center; justify-content: space-between;
   padding: 8px 0;
 }
+/* PWA standalone (installed home-screen launch): the status bar is
+   black-translucent + viewport-fit=cover, so content paints full-bleed under
+   it. Push the dashboard topbar — the app's start_url surface — below the
+   notch/status bar. Scoped to display-mode: standalone so the normal browser
+   tab is untouched; the fixed ambient orb backdrop fills the inset area. */
+@media (display-mode: standalone) {
+  .sep-studio .topbar { margin-top: env(safe-area-inset-top, 0px); }
+}
 .sep-studio .brand {
   display: flex; align-items: center; gap: 10px;
   font-family: var(--font-geist-mono), monospace;
