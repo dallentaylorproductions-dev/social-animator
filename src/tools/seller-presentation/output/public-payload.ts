@@ -87,6 +87,18 @@ export interface AgentBranding {
   bioShort?: string;
   yearsInArea?: string;
   ctaReassurance?: string;
+  // ---- UX-2b repositionable headshot (pure CSS display transform) ----
+  /**
+   * Focal point for the headshot, as CSS object/background-position
+   * percentages (0–100). Absent ⇒ centered (50/50); a centered value
+   * renders byte-identical to the pre-UX-2b avatar. The image bytes are
+   * never re-cropped — only how the existing photo sits in the circular
+   * frame changes. Paired: both present or both absent after projection.
+   */
+  photoFocalX?: number;
+  photoFocalY?: number;
+  /** Display zoom (1.0–2.0). Absent / 1 ⇒ no zoom (byte-identical). */
+  photoScale?: number;
 }
 
 /**
@@ -421,6 +433,29 @@ function projectAreaStats(s: AreaStats | undefined): AreaStats | undefined {
   };
 }
 
+/**
+ * UX-2b — headshot focal/scale clamps (defense-at-boundary). Mirror the
+ * Settings-side bounds: focal is a finite [0,100] percentage, scale a finite
+ * [1,2] zoom. Anything else → undefined, so a tampered draft / KV record
+ * collapses to "centered, no zoom" rather than rendering an off-frame photo.
+ */
+function clampHeadshotPct(value: unknown): number | undefined {
+  return typeof value === "number" &&
+    Number.isFinite(value) &&
+    value >= 0 &&
+    value <= 100
+    ? value
+    : undefined;
+}
+function clampHeadshotScale(value: unknown): number | undefined {
+  return typeof value === "number" &&
+    Number.isFinite(value) &&
+    value >= 1 &&
+    value <= 2
+    ? value
+    : undefined;
+}
+
 function projectAgent(agent: AgentBranding): AgentBranding {
   // Explicit field-by-field projection — never spread an agent record
   // unverified, so a future agent-side field doesn't accidentally leak.
@@ -435,6 +470,12 @@ function projectAgent(agent: AgentBranding): AgentBranding {
     bioShort: agent.bioShort,
     yearsInArea: agent.yearsInArea,
     ctaReassurance: agent.ctaReassurance,
+    // UX-2b — clamped at projection; undefined values are dropped by
+    // JSON.stringify, so an un-repositioned agent emits no focal/scale keys
+    // and the published record is byte-identical to a pre-UX-2b publish.
+    photoFocalX: clampHeadshotPct(agent.photoFocalX),
+    photoFocalY: clampHeadshotPct(agent.photoFocalY),
+    photoScale: clampHeadshotScale(agent.photoScale),
   };
 }
 
@@ -875,6 +916,11 @@ function clampAgentBranding(raw: unknown): AgentBranding {
       typeof r.yearsInArea === "string" ? r.yearsInArea : undefined,
     ctaReassurance:
       typeof r.ctaReassurance === "string" ? r.ctaReassurance : undefined,
+    // UX-2b — re-clamp the display transform at the read boundary too, so a
+    // hand-edited KV record can't smuggle an off-range focal/scale.
+    photoFocalX: clampHeadshotPct(r.photoFocalX),
+    photoFocalY: clampHeadshotPct(r.photoFocalY),
+    photoScale: clampHeadshotScale(r.photoScale),
   };
 }
 
