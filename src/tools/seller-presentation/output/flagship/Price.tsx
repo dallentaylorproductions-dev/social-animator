@@ -39,7 +39,16 @@ export function Price({ payload }: { payload: PublicPayload }) {
         <Eyebrow label="Recommended list" />
         <div className="fs-price__inner">
           {isRange ? (
+            // UX-2a-followup — distinct stable `key` per mode. The count-up
+            // driver (motion.ts) imperatively rewrites the single-price
+            // branch's `[data-price-digits]` innerHTML; without a key swap,
+            // React would REUSE this <div> when the mode flips and try to
+            // reconcile those driver-mutated children → `removeChild`
+            // NotFoundError. Keying forces a clean unmount/remount of the
+            // whole subtree (one removeChild of a node React still owns),
+            // so the single→range transition never crashes.
             <div
+              key="range"
               className="fs-price__big fs-price__big--range reveal"
               data-testid="fs-price-range"
             >
@@ -50,7 +59,7 @@ export function Price({ payload }: { payload: PublicPayload }) {
               <span>{high}</span>
             </div>
           ) : (
-            <div className="fs-price__big reveal" {...countupAttrs}>
+            <div key="single" className="fs-price__big reveal" {...countupAttrs}>
               {parts.kind === "grouped" ? (
                 <>
                   <span className="fs-price__cur">$</span>
