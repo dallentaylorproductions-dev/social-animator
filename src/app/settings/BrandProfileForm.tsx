@@ -10,6 +10,8 @@ import {
 import type { Review } from "@/tools/seller-presentation/engine/types";
 import { PhoneInput } from "@/components/inputs";
 import { ImageUploadField } from "@/components/ImageUploadField";
+import { defaultWhyUs } from "@/lib/whyus";
+import { WhyUsSection, DraftFromReviews } from "./WhyUsSection";
 
 /**
  * Soft cap on the curated reviews list. Six rows is enough to cover the
@@ -225,6 +227,23 @@ export function BrandProfileForm() {
           />
         </Field>
 
+        <Field label="Tagline">
+          <TextInput
+            value={s.agentTagline ?? ""}
+            onChange={(v) => update("agentTagline", v || undefined)}
+            placeholder="Plain-English guidance, start to close."
+          />
+        </Field>
+
+        {/* B0a — "Draft from your reviews" AI helper. Operates only on the
+            reviews already entered below (plus any pasted); never fetches a
+            URL. Suggestions are editable and applied by the agent into the
+            bio / tagline / reviews-headline fields. */}
+        <DraftFromReviews
+          reviews={s.agentReviews ?? []}
+          onApply={(field, value) => update(field, value || undefined)}
+        />
+
         <Field label="Years in your area">
           <TextInput
             value={s.agentYearsInArea ?? ""}
@@ -267,15 +286,28 @@ export function BrandProfileForm() {
       <ReviewsSection
         reviews={s.agentReviews ?? []}
         outlinkUrl={s.reviewsOutlinkUrl ?? ""}
+        headline={s.reviewsHeadline ?? ""}
         onReviewsChange={(next) =>
           update("agentReviews", next.length ? next : undefined)
         }
         onOutlinkChange={(v) => update("reviewsOutlinkUrl", v || undefined)}
+        onHeadlineChange={(v) => update("reviewsHeadline", v || undefined)}
+      />
+
+      {/* B0a — "Why us" agent-constant pitch package. Seeded from defaults
+          (arrives-done) when never configured; the first edit persists the
+          full object through the same localStorage path. Data-IN only —
+          B0b renders this on the seller page. */}
+      <WhyUsSection
+        whyUs={s.whyUs ?? defaultWhyUs()}
+        onChange={(next) => update("whyUs", next)}
       />
 
       <p className="text-[11px] text-neutral-600 leading-relaxed pt-4 border-t border-neutral-900">
-        Saved automatically. Stored in your browser only. Never uploaded to
-        any server.
+        Saved automatically. Stored in your browser only. The one exception:
+        when you tap &ldquo;Draft from your reviews,&rdquo; the reviews you
+        send are processed to suggest a draft and returned for you to edit —
+        they&apos;re not stored on our servers.
       </p>
     </div>
   );
@@ -284,13 +316,17 @@ export function BrandProfileForm() {
 function ReviewsSection({
   reviews,
   outlinkUrl,
+  headline,
   onReviewsChange,
   onOutlinkChange,
+  onHeadlineChange,
 }: {
   reviews: Review[];
   outlinkUrl: string;
+  headline: string;
   onReviewsChange: (next: Review[]) => void;
   onOutlinkChange: (next: string) => void;
+  onHeadlineChange: (next: string) => void;
 }) {
   const addReview = () => {
     if (reviews.length >= MAX_REVIEWS) return;
@@ -314,6 +350,14 @@ function ReviewsSection({
         Reviews you&apos;ve collected — entered once here, shown on every
         seller page.
       </p>
+
+      <Field label="Reviews headline">
+        <TextInput
+          value={headline}
+          onChange={onHeadlineChange}
+          placeholder="What sellers say"
+        />
+      </Field>
 
       <div className="space-y-3">
         {reviews.length === 0 && (

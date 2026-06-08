@@ -32,6 +32,30 @@ export function dailyCompImportCap(mode: string | undefined): number {
   );
 }
 
+// ----- Daily review-draft cap (B0a) -----
+
+/**
+ * Daily cap for the "Draft from your reviews" AI helper, per access mode.
+ * Mirrors the comp-import cap shape (KV key ai_review_draft_count:<email>:
+ * <YYYY-MM-DD>). Drafting is a one-and-done-per-session action, so the caps
+ * sit a little tighter than comp-import but stay comfortable for testing.
+ */
+export const DAILY_REVIEW_DRAFT_CAPS: Record<AccessMode, number> = {
+  "internal-test": 100, // Dallen testing — generous
+  "team-invite": 30, // cohort agents — plenty for set-once-then-tweak use
+  trial: 10,
+  paid: 20,
+};
+
+export const DAILY_REVIEW_DRAFT_CAP_FALLBACK = 10;
+
+export function dailyReviewDraftCap(mode: string | undefined): number {
+  return (
+    DAILY_REVIEW_DRAFT_CAPS[mode as AccessMode] ??
+    DAILY_REVIEW_DRAFT_CAP_FALLBACK
+  );
+}
+
 // ----- Per-user video upload cap (rolling 30 days) -----
 
 /**
