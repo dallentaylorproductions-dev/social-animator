@@ -838,7 +838,11 @@
 .fs-page .fs-agent__avatar {
   width: 62px;
   height: 62px;
-  border-radius: 11px;
+  /* UX-2b-followup — a full circle (was an 11px rounded square) so the
+     published avatar matches the circular crop editor + Settings preview:
+     true WYSIWYG. The 62×62 box makes 50% a perfect circle; the inner clip
+     inherits this radius, so the focal/scale photo crop is circular too. */
+  border-radius: 50%;
   flex: none;
   background: linear-gradient(160deg, #5a6470, #3a4049);
   background-size: cover;
