@@ -87,6 +87,24 @@ test.describe('review-draft — happy path (E2E fixture)', () => {
 });
 
 test.describe('review-draft — calm failure modes', () => {
+  test('feature-disabled (test header) → 503 with manual-fallback copy', async ({
+    request,
+  }) => {
+    // B0b kill switch (parity with comp-import). The header simulates
+    // REVIEW_DRAFT_ENABLED=false for one request; the route returns 503 with
+    // calm copy that points the agent at writing the fields by hand. Asserted
+    // BEFORE auth/tier so it short-circuits even on a Pro tier.
+    const res = await request.post('/api/draft-from-reviews?testTier=pro', {
+      headers: { 'X-Review-Draft-Test-Disable': '1' },
+      data: { reviews: SAMPLE_REVIEWS },
+    });
+    expect(res.status()).toBe(503);
+    const data = await res.json();
+    expect(data.ok).toBe(false);
+    expect(data.code).toBe('feature-disabled');
+    expect(data.message).toMatch(/by hand/i);
+  });
+
   test('no reviews and no paste → 400 no-reviews', async ({ request }) => {
     const res = await request.post('/api/draft-from-reviews?testTier=pro', {
       data: { reviews: [], pastedReviews: '' },
@@ -129,5 +147,20 @@ test.describe('review-draft — calm failure modes', () => {
     const data = await res.json();
     expect(data.ok).toBe(false);
     expect(data.code).toBe('daily-cap-hit');
+  });
+});
+
+test.describe('review-draft — entitlements/me feature flag exposure', () => {
+  test('GET /api/entitlements/me surfaces reviewDraftEnabled', async ({
+    request,
+  }) => {
+    // The Settings "Draft from your reviews" affordance hides client-side off
+    // this flag (parity with compImportEnabled). The suite runs with
+    // REVIEW_DRAFT_ENABLED=true (playwright.config.ts), so it reads true here.
+    const res = await request.get('/api/entitlements/me');
+    expect(res.ok()).toBe(true);
+    const data = await res.json();
+    expect(data.ok).toBe(true);
+    expect(data.features?.reviewDraftEnabled).toBe(true);
   });
 });

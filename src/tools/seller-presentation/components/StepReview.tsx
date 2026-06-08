@@ -96,7 +96,8 @@ export function StepReview({ draft, goToStep }: StepReviewProps) {
   // are built by the SHARED `brandToPublishInputs` so this real publish and the
   // wizard live preview construct the identical payload — one source, no drift.
   // The route forwards these to `toPublicPayload`, which projects/validates them.
-  const { agentContact, brandReviews, brandColors } = brandToPublishInputs(brand);
+  const { agentContact, brandReviews, brandColors, brandWhyUs } =
+    brandToPublishInputs(brand);
 
   // A7c.4: StepPitch seeds INITIAL_VISIBLE_ROWS empty rows on mount
   // so the agent lands on a finite canvas — those rows persist with
@@ -122,7 +123,13 @@ export function StepReview({ draft, goToStep }: StepReviewProps) {
       const res = await fetch("/api/seller-presentation/publish", {
         method: "POST",
         headers: { "Content-Type": "application/json" },
-        body: JSON.stringify({ draft, agentContact, brandReviews, brandColors }),
+        body: JSON.stringify({
+          draft,
+          agentContact,
+          brandReviews,
+          brandColors,
+          brandWhyUs,
+        }),
       });
       const body = (await res.json().catch(() => ({}))) as {
         ok?: boolean;

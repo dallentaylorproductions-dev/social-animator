@@ -799,6 +799,18 @@
   margin-top: 18px;
   color: var(--on-dark);
 }
+/* B0b — optional agent tagline on the dark band: quiet serif italic in the
+   fixed cream register (never accent — legibility on dark stays layout-locked). */
+.fs-page .fs-agent__tagline {
+  font-family: var(--fs-serif);
+  font-style: italic;
+  font-size: clamp(18px, 4.6cqi, 22px);
+  line-height: 1.4;
+  margin-top: 14px;
+  max-width: 38ch;
+  color: color-mix(in srgb, var(--on-dark) 82%, transparent);
+  text-wrap: pretty;
+}
 .fs-page .fs-agent__card {
   display: flex;
   align-items: center;
@@ -1016,7 +1028,11 @@
      a lingering artifact, and at display scale (AA-large 3:1) the deepened
      signature is already legible without a background. So price deepens only. */
   .fs-page .fs-count__digit,
-  .fs-page .fs-stat__v {
+  .fs-page .fs-stat__v,
+  /* B0b — the why-us big stat figure + the comparison-bar value share the
+     same pale-signature seat so a washed-out signature stays legible. */
+  .fs-page .fs-whyus__bignum,
+  .fs-page .fs-bar__val {
     color: var(--signature-deep);
     background: var(--tint-12);
     border-radius: 0.16em;
@@ -1029,8 +1045,292 @@
   .fs-page .fs-price__big .sep {
     color: var(--signature-deep);
   }
-  .fs-page .fs-stat__v {
+  .fs-page .fs-stat__v,
+  .fs-page .fs-bar__val {
     display: inline-block;
+  }
+  /* keep the chip shrink-wrapped to the figure (not the full grid cell). */
+  .fs-page .fs-whyus__bignum {
+    display: inline-flex;
+  }
+}
+
+/* ============================== B0b · WHY US =========================== */
+/* The agent-constant "why list with us" chapter. Paper-tinted band (tint-6),
+   sitting between the tint-9 pitch above and the paper reviews below for a calm
+   descending tonal step. Substantive numbers carry --signature on tinted
+   tracks/chips (calm ≠ flat); ALL reading text is --ink / --ink-soft. */
+.fs-page .fs-whyus {
+  background: var(--tint-6);
+}
+.fs-page .fs-whyus__subhead {
+  font-family: var(--fs-mono);
+  font-size: 11px;
+  letter-spacing: 0.16em;
+  text-transform: uppercase;
+  color: var(--ink-soft);
+}
+.fs-page .fs-whyus__group {
+  margin-top: clamp(38px, 9cqi, 60px);
+}
+
+/* ---- differentiators: clean accented list, generous whitespace ---------- */
+.fs-page .fs-whyus__diffs {
+  margin-top: 30px;
+  list-style: none;
+  display: grid;
+  gap: 20px;
+}
+.fs-page .fs-whyus__diff {
+  display: grid;
+  grid-template-columns: auto 1fr;
+  gap: 16px;
+  align-items: baseline;
+}
+.fs-page .fs-whyus__diff-mark {
+  width: 20px;
+  height: 2px;
+  background: var(--signature);
+  margin-top: 13px;
+  flex: none;
+}
+.fs-page .fs-whyus__diff-text {
+  font-family: var(--fs-serif);
+  font-size: clamp(18px, 4.6cqi, 22px);
+  line-height: 1.32;
+  color: var(--ink);
+  text-wrap: pretty;
+}
+
+/* ---- comparison bars: THE signature "we do this differently" block ------ */
+.fs-page .fs-bars {
+  margin-top: 22px;
+  display: grid;
+  gap: 28px;
+}
+.fs-page .fs-bar__label {
+  font-family: var(--fs-mono);
+  font-size: 10.5px;
+  letter-spacing: 0.13em;
+  text-transform: uppercase;
+  color: var(--ink-soft);
+  margin-bottom: 12px;
+}
+.fs-page .fs-bar__row {
+  display: grid;
+  grid-template-columns: 1fr auto;
+  gap: 16px;
+  align-items: center;
+}
+.fs-page .fs-bar__row--market {
+  margin-top: 9px;
+}
+.fs-page .fs-bar__track {
+  height: 30px;
+  border-radius: 7px;
+  background: var(--tint-12);
+  overflow: hidden;
+}
+.fs-page .fs-bar__row--market .fs-bar__track {
+  height: 18px;
+}
+.fs-page .fs-bar__fill {
+  height: 100%;
+  border-radius: 7px;
+  background: var(--signature);
+}
+.fs-page .fs-bar__fill--market {
+  background: var(--ink-soft);
+  opacity: 0.5;
+}
+.fs-page .fs-bar__val {
+  font-family: var(--fs-serif);
+  font-weight: 500;
+  font-size: clamp(26px, 7cqi, 36px);
+  line-height: 1;
+  color: var(--signature);
+  font-variant-numeric: tabular-nums;
+  letter-spacing: -0.02em;
+  text-align: right;
+  white-space: nowrap;
+}
+.fs-page .fs-bar__mval {
+  font-family: var(--fs-mono);
+  font-size: 12px;
+  color: var(--ink-soft);
+  text-align: right;
+  white-space: nowrap;
+}
+.fs-page .fs-bar__mtag {
+  color: var(--ink-faint);
+}
+
+/* ---- single big stats (no market comparison) ---------------------------- */
+.fs-page .fs-whyus__bigstats {
+  margin-top: 22px;
+  border: 1px solid var(--line-30);
+  border-radius: 14px;
+  overflow: hidden;
+  background: var(--paper);
+  display: grid;
+  grid-template-columns: 1fr 1fr;
+}
+.fs-page .fs-whyus__bigstat {
+  padding: 22px 20px;
+  border-right: 1px solid var(--line-30);
+  border-bottom: 1px solid var(--line-30);
+}
+.fs-page .fs-whyus__bigstat:nth-child(2n) {
+  border-right: 0;
+}
+.fs-page .fs-whyus__bigstat:nth-last-child(-n + 2) {
+  border-bottom: 0;
+}
+.fs-page .fs-whyus__bignum {
+  font-family: var(--fs-serif);
+  font-weight: 500;
+  font-size: clamp(30px, 9cqi, 42px);
+  line-height: 1;
+  color: var(--signature);
+  font-variant-numeric: tabular-nums;
+  letter-spacing: -0.02em;
+  display: flex;
+  align-items: baseline;
+  gap: 6px;
+  flex-wrap: wrap;
+}
+.fs-page .fs-whyus__bigunit {
+  font-family: var(--fs-mono);
+  font-size: 11px;
+  letter-spacing: 0.08em;
+  text-transform: uppercase;
+  color: var(--ink-faint);
+}
+.fs-page .fs-whyus__biglabel {
+  font-family: var(--fs-mono);
+  font-size: 9.5px;
+  letter-spacing: 0.13em;
+  text-transform: uppercase;
+  color: var(--ink-soft);
+  margin-top: 12px;
+}
+
+/* ---- marketing approach: titled rows ------------------------------------ */
+.fs-page .fs-whyus__mkt-list {
+  margin-top: 20px;
+}
+.fs-page .fs-whyus__mkt-row {
+  padding: 20px 0;
+  border-top: 1px solid var(--line-30);
+}
+.fs-page .fs-whyus__mkt-row:last-child {
+  border-bottom: 1px solid var(--line-30);
+}
+.fs-page .fs-whyus__mkt-title {
+  font-family: var(--fs-serif);
+  font-size: 20px;
+  font-weight: 500;
+  color: var(--ink);
+}
+.fs-page .fs-whyus__mkt-detail {
+  color: var(--ink-soft);
+  margin-top: 5px;
+  font-size: 15px;
+  max-width: 46ch;
+}
+
+/* ---- how we work: calm numbered timeline -------------------------------- */
+.fs-page .fs-whyus__steps {
+  margin-top: 22px;
+  list-style: none;
+  counter-reset: fsw;
+}
+.fs-page .fs-whyus__step {
+  position: relative;
+  padding: 0 0 26px 38px;
+}
+.fs-page .fs-whyus__step:last-child {
+  padding-bottom: 0;
+}
+.fs-page .fs-whyus__step::before {
+  counter-increment: fsw;
+  content: counter(fsw);
+  position: absolute;
+  left: 0;
+  top: 0;
+  width: 24px;
+  height: 24px;
+  border-radius: 50%;
+  border: 1px solid var(--signature);
+  color: var(--signature);
+  background: var(--tint-6);
+  font-family: var(--fs-mono);
+  font-size: 11px;
+  display: flex;
+  align-items: center;
+  justify-content: center;
+}
+.fs-page .fs-whyus__step::after {
+  content: "";
+  position: absolute;
+  left: 11.5px;
+  top: 26px;
+  bottom: 0;
+  width: 1px;
+  background: var(--line-30);
+}
+.fs-page .fs-whyus__step:last-child::after {
+  display: none;
+}
+.fs-page .fs-whyus__step-h {
+  font-family: var(--fs-serif);
+  font-size: 19px;
+  font-weight: 500;
+  color: var(--ink);
+  line-height: 1.25;
+}
+.fs-page .fs-whyus__step-p {
+  color: var(--ink-soft);
+  margin-top: 4px;
+  font-size: 15px;
+  max-width: 44ch;
+}
+
+/* ---- guarantee: a quiet full-width statement ---------------------------- */
+.fs-page .fs-whyus__guarantee {
+  margin-top: clamp(38px, 9cqi, 60px);
+  border-top: 1px solid var(--line-30);
+  padding-top: 26px;
+}
+.fs-page .fs-whyus__guarantee-k {
+  font-family: var(--fs-mono);
+  font-size: 10.5px;
+  letter-spacing: 0.14em;
+  text-transform: uppercase;
+  color: var(--ink-soft);
+}
+.fs-page .fs-whyus__guarantee-p {
+  font-family: var(--fs-serif);
+  font-style: italic;
+  font-size: clamp(19px, 5cqi, 24px);
+  line-height: 1.4;
+  color: var(--ink);
+  margin-top: 14px;
+  max-width: 40ch;
+  text-wrap: pretty;
+}
+
+/* ---- wide frame: cap measure, two-up the differentiators ---------------- */
+@container (min-width: 820px) {
+  .fs-page .fs-whyus__diffs {
+    grid-template-columns: 1fr 1fr;
+    column-gap: 48px;
+    row-gap: 22px;
+  }
+  .fs-page .fs-bars,
+  .fs-page .fs-whyus__mkt-list,
+  .fs-page .fs-whyus__steps {
+    max-width: 760px;
   }
 }
 
@@ -1071,6 +1371,16 @@
 .fs-page .chart.in .point {
   opacity: 1;
   transform: scale(1);
+}
+/* B0b why-us bars draw on once when their row reveals — same shared driver as
+   the chart (the row is a `.reveal`, the fill grows from 0 to its inline --w
+   target). Motivated motion only; no loop, no gratuitous movement. */
+.fs-page .fs-bar__fill {
+  width: 0;
+  transition: width 0.9s var(--fs-ease) 0.1s;
+}
+.fs-page .reveal.in .fs-bar__fill {
+  width: var(--w, 0);
 }
 
 /* ============================== WIDE-FRAME (container query) ============
@@ -1179,6 +1489,11 @@
   .fs-page .fs-area__shimmer::after {
     animation: none !important;
   }
+  /* B0b — land every comparison bar at its target width instantly. */
+  .fs-page .fs-bar__fill {
+    width: var(--w, 0) !important;
+    transition: none !important;
+  }
 }
 @media print {
   /* Print the brand surfaces — the dark hero/agent/footer bands and the tint
@@ -1221,6 +1536,12 @@
   .fs-page .fs-area__shimmer::after {
     animation: none !important;
   }
+  /* B0b — bars must print at full width even if their section never scrolled
+     into view (so `.reveal.in` was never added). Snap to the inline --w. */
+  .fs-page .fs-bar__fill {
+    width: var(--w, 0) !important;
+    transition: none !important;
+  }
 
   /* Page-break rhythm: never split a self-contained unit (a comp row, a stat
      cell, a pitch item, a quote, the agent card, the chart) across a page
@@ -1233,12 +1554,17 @@
   .fs-page .fs-agent__card,
   .fs-page .chart-wrap,
   .fs-page .fs-note__video,
-  .fs-page .fs-area__pending {
+  .fs-page .fs-area__pending,
+  .fs-page .fs-bar,
+  .fs-page .fs-whyus__bigstat,
+  .fs-page .fs-whyus__mkt-row,
+  .fs-page .fs-whyus__step {
     break-inside: avoid;
   }
   .fs-page .fs-price,
   .fs-page .fs-why,
   .fs-page .fs-pitch,
+  .fs-page .fs-whyus,
   .fs-page .fs-reviews,
   .fs-page .fs-area,
   .fs-page .fs-agent {

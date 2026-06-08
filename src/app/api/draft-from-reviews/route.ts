@@ -63,6 +63,7 @@ interface ApiOk {
 interface ApiErr {
   ok: false;
   code:
+    | "feature-disabled"
     | "not-authenticated"
     | "upgrade-required"
     | "rate-limited"
@@ -96,6 +97,26 @@ function buildReviewsText(reviews: ReviewInput[], pasted: string): string {
 }
 
 export async function POST(req: Request): Promise<NextResponse<ApiOk | ApiErr>> {
+  // 0) Feature flag — killable in prod without a redeploy (parity with
+  //    COMP_IMPORT_ENABLED on /api/comp-import). Test-only override: in
+  //    non-production, `X-Review-Draft-Test-Disable: 1` simulates
+  //    REVIEW_DRAFT_ENABLED=false for a single request so the flag-off spec
+  //    needn't restart the dev server. Production ignores the header.
+  const testForceDisabled =
+    process.env.NODE_ENV !== "production" &&
+    req.headers.get("x-review-draft-test-disable") === "1";
+  if (process.env.REVIEW_DRAFT_ENABLED !== "true" || testForceDisabled) {
+    return NextResponse.json(
+      {
+        ok: false,
+        code: "feature-disabled",
+        message:
+          "Drafting from reviews isn't enabled. You can still write your bio, tagline, and headline by hand.",
+      } satisfies ApiErr,
+      { status: 503 },
+    );
+  }
+
   // 1) Auth — same pattern as comp-import. E2E bypass (non-prod only) lets
   //    Playwright reach the route without a session; loadAgentProfile gets
   //    null so KV is never touched, and ?testTier= chooses a tier.

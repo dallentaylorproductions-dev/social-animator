@@ -9,6 +9,7 @@ import {
   type AgentBranding,
   type BrandReviewsInput,
   type BrandColorsInput,
+  type BrandWhyUsInput,
 } from "@/tools/seller-presentation/output/public-payload";
 
 /**
@@ -67,6 +68,14 @@ interface PublishPayload {
    * field-by-field, so a malformed / tampered value never reaches KV.
    */
   brandColors?: unknown;
+  /**
+   * B0b — agent-constant "Why us" marketing layer (+ tagline + reviews
+   * headline) sourced from BrandSettings. Permissive shape on the wire;
+   * `toPublicPayload` clamps it field-by-field via `clampPublicWhyUs`, so
+   * a tampered/legacy record never lands an unbounded list or private key
+   * in KV.
+   */
+  brandWhyUs?: unknown;
 }
 
 export async function POST(req: Request) {
@@ -127,6 +136,16 @@ export async function POST(req: Request) {
       ? (payload.brandColors as BrandColorsInput)
       : {};
 
+  // B0b — `brandWhyUs` is wire-permissive (`unknown`). Forward it as-is;
+  // `toPublicPayload` runs the whyUs sub-record through `clampPublicWhyUs`
+  // (re-validates types, re-applies the soft caps, drops un-renderable rows)
+  // so nothing outside the allowlist reaches KV. Absent / unset → the
+  // projector returns undefined and the v2 Why-us section hides cleanly.
+  const brandWhyUs: BrandWhyUsInput =
+    payload.brandWhyUs && typeof payload.brandWhyUs === "object"
+      ? (payload.brandWhyUs as BrandWhyUsInput)
+      : {};
+
   // F4 — resolve the agent's entitlements to read the `whiteLabel` capability
   // (false for every access mode today; H-8 billing maps a paid tier to true).
   // The flag projects onto the payload's `suppressWordmark` 1:1.
@@ -142,6 +161,7 @@ export async function POST(req: Request) {
     brandReviews,
     brandColors,
     entitlements.whiteLabel,
+    brandWhyUs,
   );
 
   try {

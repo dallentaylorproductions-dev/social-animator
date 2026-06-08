@@ -32,6 +32,13 @@ export function AgentBand({ payload }: { payload: PublicPayload }) {
       <div className="fs-wrap">
         <Eyebrow index="06" label="Your agent" onDark />
         <h2 className="fs-agent__name reveal">{a.name}.</h2>
+        {/* B0b — optional agent-constant tagline, surfaced next to the agent
+            identity. Absent → unchanged (no empty line). */}
+        {payload.agentTagline && (
+          <p className="fs-agent__tagline reveal" data-testid="fs-agent-tagline">
+            {payload.agentTagline}
+          </p>
+        )}
 
         <div className="fs-agent__card reveal">
           <div

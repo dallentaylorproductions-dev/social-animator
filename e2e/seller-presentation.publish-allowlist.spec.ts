@@ -30,10 +30,13 @@ import { test, expect } from '@playwright/test';
 import {
   toPublicPayload,
   clampPublicPayload,
+  clampPublicWhyUs,
   type AgentBranding,
   type BrandReviewsInput,
+  type BrandWhyUsInput,
 } from '../src/tools/seller-presentation/output/public-payload';
 import type { SellerPresentationDraft } from '../src/tools/seller-presentation/engine/types';
+import { WHYUS_CAPS } from '../src/lib/whyus';
 
 // Sentinel values — guaranteed unique substrings that should NEVER
 // appear in the JSON-stringified public payload.
@@ -1078,6 +1081,10 @@ test.describe('toPublicPayload — white-label wordmark flag (F4)', () => {
     'areaStats',
     'agent',
     'brandColors',
+    // B0b — agent-constant "Why us" marketing layer + tagline + reviews headline.
+    'whyUs',
+    'agentTagline',
+    'reviewsHeadline',
   ]);
 
   test('whiteLabel=true → suppressWordmark:true projects onto the payload', () => {
@@ -1142,5 +1149,232 @@ test.describe('toPublicPayload — white-label wordmark flag (F4)', () => {
     }
     // The new field IS present in this whiteLabel-on case.
     expect(json.suppressWordmark).toBe(true);
+  });
+});
+
+// ===========================================================================
+// B0b — "Why us" projection + clamp allowlist (data-OUT boundary).
+// ===========================================================================
+
+const W = {
+  diff: 'PUBLIC_SENTINEL_DIFFERENTIATOR',
+  mktTitle: 'PUBLIC_SENTINEL_MKT_TITLE',
+  mktDetail: 'PUBLIC_SENTINEL_MKT_DETAIL',
+  statLabel: 'PUBLIC_SENTINEL_STAT_LABEL',
+  statYour: '99.4%',
+  statMarket: '97.1%',
+  bigStatLabel: 'PUBLIC_SENTINEL_BIGSTAT_LABEL',
+  bigStatYour: '1,240',
+  stepHeading: 'PUBLIC_SENTINEL_STEP_HEADING',
+  stepDetail: 'PUBLIC_SENTINEL_STEP_DETAIL',
+  guarantee: 'PUBLIC_SENTINEL_GUARANTEE',
+  tagline: 'PUBLIC_SENTINEL_TAGLINE',
+  reviewsHeadline: 'PUBLIC_SENTINEL_REVIEWS_HEADLINE',
+  // Skeleton row the agent never filled (pre-labeled, blank value) — must DROP.
+  skeletonLabel: 'REMOVED_SENTINEL_SKELETON_STAT',
+  // Tampered / non-allowlisted content — must NEVER survive.
+  rogueTop: 'PRIVATE_SENTINEL_WHYUS_ROGUE_TOP',
+  rogueNested: 'PRIVATE_SENTINEL_WHYUS_ROGUE_NESTED',
+  rogueProto: 'PRIVATE_SENTINEL_WHYUS_ROGUE_PROTO',
+};
+
+// A maximally-populated, partly-tampered brandWhyUs record — sentinels in
+// every renderable slot, plus rogue keys at the top level, inside a row, and
+// a __proto__rogue. The projector reads field-by-field, so only the
+// allowlisted fields may survive.
+const FIXTURE_BRAND_WHYUS: BrandWhyUsInput = {
+  whyUs: {
+    differentiators: [W.diff, '   ', ''], // blank/whitespace rows drop
+    marketingApproach: [
+      { title: W.mktTitle, detail: W.mktDetail, rogue: W.rogueNested },
+      { detail: 'detail-only, no title' }, // no title → drops (un-renderable)
+    ],
+    performanceStats: [
+      // Comparison bar (market value present).
+      { label: W.statLabel, yourValue: W.statYour, marketValue: W.statMarket, unit: '%' },
+      // Single big stat (no market value).
+      { label: W.bigStatLabel, yourValue: W.bigStatYour, unit: 'views' },
+      // Arrives-done skeleton row, never filled → drops at the data-out boundary.
+      { label: W.skeletonLabel, yourValue: '' },
+    ],
+    howWeWork: [{ step: W.stepHeading, detail: W.stepDetail }],
+    guarantee: W.guarantee,
+    rogueGroup: W.rogueTop, // non-allowlisted top-level whyUs key → drops
+    ['__proto__rogue']: W.rogueProto,
+  } as unknown as BrandWhyUsInput['whyUs'],
+  agentTagline: W.tagline,
+  reviewsHeadline: W.reviewsHeadline,
+};
+
+test.describe('toPublicPayload — whyUs projection (B0b data-out allowlist)', () => {
+  test('renderable whyUs + tagline + headline round-trip through the projector', () => {
+    const draft = maxedDraft();
+    const payload = toPublicPayload(
+      draft,
+      FIXTURE_AGENT_CONTACT,
+      FIXTURE_BRAND_REVIEWS,
+      {},
+      false,
+      FIXTURE_BRAND_WHYUS,
+    );
+
+    const whyUs = payload.whyUs;
+    expect(whyUs).toBeDefined();
+
+    // Differentiators: blank/whitespace rows dropped, the real one survives.
+    expect(whyUs?.differentiators).toEqual([W.diff]);
+
+    // Marketing: titled row survives (title + detail); the detail-only row drops.
+    expect(whyUs?.marketingApproach).toHaveLength(1);
+    expect(whyUs?.marketingApproach[0]).toEqual({
+      title: W.mktTitle,
+      detail: W.mktDetail,
+    });
+
+    // Performance: the comparison bar + the single big stat survive; the
+    // blank-value skeleton row drops.
+    expect(whyUs?.performanceStats).toHaveLength(2);
+    expect(whyUs?.performanceStats[0]).toEqual({
+      label: W.statLabel,
+      yourValue: W.statYour,
+      marketValue: W.statMarket,
+      unit: '%',
+    });
+    expect(whyUs?.performanceStats[1]).toEqual({
+      label: W.bigStatLabel,
+      yourValue: W.bigStatYour,
+      unit: 'views',
+    });
+
+    expect(whyUs?.howWeWork).toEqual([
+      { step: W.stepHeading, detail: W.stepDetail },
+    ]);
+    expect(whyUs?.guarantee).toBe(W.guarantee);
+
+    expect(payload.agentTagline).toBe(W.tagline);
+    expect(payload.reviewsHeadline).toBe(W.reviewsHeadline);
+  });
+
+  test('tampered whyUs: rogue top-level / nested / __proto__ keys + skeleton stat DROP', () => {
+    const draft = maxedDraft();
+    const payload = toPublicPayload(
+      draft,
+      FIXTURE_AGENT_CONTACT,
+      FIXTURE_BRAND_REVIEWS,
+      {},
+      false,
+      FIXTURE_BRAND_WHYUS,
+    );
+    const serialized = JSON.stringify(payload);
+
+    // Non-allowlisted content — value sentinels absent.
+    for (const rogue of [W.rogueTop, W.rogueNested, W.rogueProto, W.skeletonLabel]) {
+      expect(serialized).not.toContain(rogue);
+    }
+    // Non-allowlisted key NAMES absent (field-by-field projection, no spread).
+    for (const key of ['rogueGroup', 'rogue', '__proto__rogue']) {
+      expect(serialized).not.toContain(`"${key}":`);
+    }
+
+    // Positive control: the allowlisted sentinels DID survive, proving the
+    // absence above is real projection, not a wholesale drop.
+    expect(serialized).toContain(W.diff);
+    expect(serialized).toContain(W.statLabel);
+  });
+
+  test('soft caps re-applied: over-cap lists are hard-clamped', () => {
+    const over = (n: number, make: (i: number) => unknown) =>
+      Array.from({ length: n }, (_, i) => make(i));
+    const draft = maxedDraft();
+    const payload = toPublicPayload(
+      draft,
+      FIXTURE_AGENT_CONTACT,
+      FIXTURE_BRAND_REVIEWS,
+      {},
+      false,
+      {
+        whyUs: {
+          differentiators: over(20, (i) => `diff ${i}`),
+          marketingApproach: over(20, (i) => ({ title: `m ${i}` })),
+          performanceStats: over(20, (i) => ({ label: `s ${i}`, yourValue: '1' })),
+          howWeWork: over(20, (i) => ({ step: `step ${i}` })),
+        },
+      } as unknown as BrandWhyUsInput,
+    );
+
+    expect(payload.whyUs?.differentiators.length).toBe(WHYUS_CAPS.differentiators);
+    expect(payload.whyUs?.marketingApproach.length).toBe(WHYUS_CAPS.marketingApproach);
+    expect(payload.whyUs?.performanceStats.length).toBe(WHYUS_CAPS.performanceStats);
+    expect(payload.whyUs?.howWeWork.length).toBe(WHYUS_CAPS.howWeWork);
+  });
+
+  test('no brandWhyUs arg → whyUs/tagline/headline absent (section flexes out)', () => {
+    const draft = maxedDraft();
+    const payload = toPublicPayload(draft, FIXTURE_AGENT_CONTACT, FIXTURE_BRAND_REVIEWS);
+    const serialized = JSON.stringify(payload);
+
+    expect(payload.whyUs).toBeUndefined();
+    expect(payload.agentTagline).toBeUndefined();
+    expect(payload.reviewsHeadline).toBeUndefined();
+    expect(serialized).not.toContain('"whyUs":');
+    expect(serialized).not.toContain('"agentTagline":');
+    expect(serialized).not.toContain('"reviewsHeadline":');
+  });
+
+  test('whyUs with only empty rows collapses to undefined', () => {
+    const draft = maxedDraft();
+    const payload = toPublicPayload(
+      draft,
+      FIXTURE_AGENT_CONTACT,
+      FIXTURE_BRAND_REVIEWS,
+      {},
+      false,
+      {
+        whyUs: {
+          differentiators: ['', '   '],
+          marketingApproach: [{ detail: 'no title' }],
+          performanceStats: [{ label: 'skeleton', yourValue: '' }],
+          howWeWork: [{ detail: 'no step' }],
+          guarantee: '   ',
+        },
+        agentTagline: '   ',
+        reviewsHeadline: '',
+      } as unknown as BrandWhyUsInput,
+    );
+
+    expect(payload.whyUs).toBeUndefined();
+    expect(payload.agentTagline).toBeUndefined();
+    expect(payload.reviewsHeadline).toBeUndefined();
+  });
+
+  test('clampPublicWhyUs (read boundary) re-runs the same allowlist on a KV record', () => {
+    // A hand-edited KV record glues a private key onto a stored whyUs. The
+    // read-time clamp must drop it exactly as the write-time projector does.
+    const clamped = clampPublicWhyUs({
+      differentiators: [W.diff, ''],
+      marketingApproach: [{ title: W.mktTitle, secretFee: 'PRIVATE_KV_ROGUE' }],
+      performanceStats: [
+        { label: W.statLabel, yourValue: W.statYour, marketValue: W.statMarket },
+        { label: 'unfilled', yourValue: '' }, // drops
+      ],
+      howWeWork: [{ step: W.stepHeading }],
+      guarantee: W.guarantee,
+      tamperedTopKey: 'PRIVATE_KV_TOP_ROGUE',
+    });
+
+    expect(clamped).toBeDefined();
+    const serialized = JSON.stringify(clamped);
+    expect(serialized).not.toContain('PRIVATE_KV_ROGUE');
+    expect(serialized).not.toContain('PRIVATE_KV_TOP_ROGUE');
+    expect(serialized).not.toContain('"secretFee":');
+    expect(serialized).not.toContain('"tamperedTopKey":');
+    expect(clamped?.differentiators).toEqual([W.diff]);
+    expect(clamped?.performanceStats).toHaveLength(1);
+    expect(clamped?.marketingApproach[0]).toEqual({ title: W.mktTitle });
+
+    // A non-object / empty record clamps to undefined (single "no whyUs" state).
+    expect(clampPublicWhyUs(undefined)).toBeUndefined();
+    expect(clampPublicWhyUs('nope')).toBeUndefined();
+    expect(clampPublicWhyUs({})).toBeUndefined();
   });
 });

@@ -9,6 +9,7 @@ import { Price } from "./Price";
 import { AgentNote } from "./AgentNote";
 import { WhyPrice } from "./WhyPrice";
 import { Pitch } from "./Pitch";
+import { WhyUs } from "./WhyUs";
 import { Reviews } from "./Reviews";
 import { AreaStats } from "./AreaStats";
 import { AgentBand } from "./AgentBand";
@@ -61,6 +62,10 @@ export function FlagshipPage({ handout }: { handout: HandoutRecord }) {
         <AgentNote payload={payload} />
         <WhyPrice payload={payload} />
         <Pitch payload={payload} />
+        {/* B0b — the agent-constant "why list with us" chapter, framing the
+            seller's reasons-to-choose alongside the home-specific story. Flexes
+            out entirely when no why-us content was configured. */}
+        <WhyUs payload={payload} />
         <Reviews payload={payload} />
         <AreaStats payload={payload} />
         <AgentBand payload={payload} />

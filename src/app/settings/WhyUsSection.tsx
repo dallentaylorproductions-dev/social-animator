@@ -1,6 +1,6 @@
 "use client";
 
-import { useState } from "react";
+import { useEffect, useState } from "react";
 import { NumberInput, PercentInput } from "@/components/inputs";
 import type { Review } from "@/tools/seller-presentation/engine/types";
 import {
@@ -48,6 +48,28 @@ export function DraftFromReviews({
   const [loading, setLoading] = useState(false);
   const [error, setError] = useState<string | null>(null);
   const [draft, setDraft] = useState<ReviewDraftSuggestions | null>(null);
+  // B0b — kill-switch gate (parity with ImportCompsButton). `null` while the
+  // flag resolves; the affordance stays hidden until the server confirms
+  // REVIEW_DRAFT_ENABLED === 'true', so a disabled feature never flashes a
+  // button that 503s. Manual entry of bio/tagline/headline is unaffected.
+  const [enabled, setEnabled] = useState<boolean | null>(null);
+
+  useEffect(() => {
+    let cancelled = false;
+    fetch("/api/entitlements/me", { credentials: "same-origin" })
+      .then((r) => (r.ok ? r.json() : null))
+      .then((data) => {
+        if (cancelled || !data || !data.ok) return;
+        setEnabled(!!data.features?.reviewDraftEnabled);
+      })
+      .catch(() => {
+        // Network failure → stays hidden; the agent still writes these fields
+        // by hand in the form above.
+      });
+    return () => {
+      cancelled = true;
+    };
+  }, []);
 
   const hasSource = reviews.some((r) => r.body.trim()) || pasted.trim().length > 0;
 
@@ -74,6 +96,9 @@ export function DraftFromReviews({
       setLoading(false);
     }
   };
+
+  // Hidden until the kill switch confirms the feature is on (or still loading).
+  if (enabled !== true) return null;
 
   return (
     <div

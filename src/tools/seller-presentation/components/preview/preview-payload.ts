@@ -58,7 +58,14 @@ export function brandToPublishInputs(brand: BrandSettings) {
     brandAccent: brand.brandAccent,
     brandSecondary: brand.brandSecondary,
   };
-  return { agentContact, brandReviews, brandColors };
+  // B0b — the agent-constant "Why us" marketing layer + tagline + reviews
+  // headline. Same provenance/path as the others; the projector clamps it.
+  const brandWhyUs = {
+    whyUs: brand.whyUs,
+    agentTagline: brand.agentTagline,
+    reviewsHeadline: brand.reviewsHeadline,
+  };
+  return { agentContact, brandReviews, brandColors, brandWhyUs };
 }
 
 /**
@@ -99,6 +106,17 @@ export function draftPreviewPayload(
   draft: SellerPresentationDraft,
   brand: BrandSettings,
 ): PublicPayload {
-  const { agentContact, brandReviews, brandColors } = brandToPublishInputs(brand);
-  return toPublicPayload(clampDraft(draft), agentContact, brandReviews, brandColors);
+  const { agentContact, brandReviews, brandColors, brandWhyUs } =
+    brandToPublishInputs(brand);
+  return toPublicPayload(
+    clampDraft(draft),
+    agentContact,
+    brandReviews,
+    brandColors,
+    // whiteLabel: the live preview never suppresses the wordmark (the agent's
+    // entitlement isn't resolved client-side here) — default false, same as
+    // every preview render today.
+    false,
+    brandWhyUs,
+  );
 }
