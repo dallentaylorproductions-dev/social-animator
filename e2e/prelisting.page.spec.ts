@@ -94,8 +94,20 @@ test.describe("Pre-listing page — flex (minimal fixture)", () => {
     await expect(page.getByTestId("fs-agent-tagline")).toHaveCount(0);
 
     // The page still reads complete: identity, the single CTA, the footer.
+    // This is the realistic published floor — agent name + a contact email and
+    // NOTHING else (no reassurance line). The CTA close (the page's whole
+    // purpose) MUST still render against this minimal data; the bug that
+    // shipped was the live page going reviews → footer with no close, because
+    // earlier coverage only ever asserted the CTA against a fully-populated
+    // fixture. The reassurance line is the ONLY optional piece — it absents.
     await expect(page.getByTestId("fs-agent")).toBeVisible();
-    await expect(page.getByTestId("pl-cta-primary")).toBeVisible();
+    const cta = page.getByTestId("pl-cta-primary");
+    await expect(cta).toBeVisible();
+    await expect(cta).toContainText("Schedule a listing consultation");
+    await expect(cta).toHaveAttribute("href", /^mailto:/);
+    await expect(
+      page.getByTestId("pl-cta").locator(".fs-btn-reassure"),
+    ).toHaveCount(0);
     await expect(page.getByTestId("fs-foot")).toBeVisible();
   });
 });

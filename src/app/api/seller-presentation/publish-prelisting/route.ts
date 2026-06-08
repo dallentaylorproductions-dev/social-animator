@@ -5,6 +5,7 @@ import { loadAgentProfile } from "@/lib/entitlements/load-agent-profile";
 import { resolveEntitlements } from "@/lib/entitlements/resolver";
 import {
   toPrelistingPayload,
+  withAccountEmailFallback,
   type AgentBranding,
   type BrandReviewsInput,
   type BrandColorsInput,
@@ -99,8 +100,13 @@ export async function POST(req: Request) {
   // access mode today). Same posture as the seller page; no new paywall logic.
   const entitlements = resolveEntitlements(await loadAgentProfile(email));
 
+  // The page's single CTA close needs a reachable contact. Brand contact
+  // email/phone are both optional, so fall the authenticated account email in
+  // as the floor — the close always renders. A brand-set email/phone wins.
+  const contact = withAccountEmailFallback(agentContact, email);
+
   const payload = toPrelistingPayload(
-    agentContact,
+    contact,
     brandWhyUs,
     brandReviews,
     brandColors,
