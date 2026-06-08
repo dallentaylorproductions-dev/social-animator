@@ -29,7 +29,7 @@ export function AgentNote({ payload }: { payload: PublicPayload }) {
           </h2>
           <p className="fs-lead reveal">
             A quick walkthrough of how I arrived at this number and what I&apos;d
-            do first — so nothing about the plan is a surprise.
+            do first, so nothing about the plan is a surprise.
           </p>
         </div>
         {hasVideo && (

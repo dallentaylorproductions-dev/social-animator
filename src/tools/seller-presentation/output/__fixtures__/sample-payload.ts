@@ -350,6 +350,22 @@ export const OUTLINK_ONLY_PAYLOAD: PublicPayload = {
 };
 
 /**
+ * LS-1 — partially-filled area snapshot. MINIMAL_PAYLOAD plus an areaStats with
+ * only TWO of the six stat fields set and NO monthly chart series. Proves the
+ * §05 section renders the fields the agent gave (median sale + days on market),
+ * omits the missing ones, mounts no chart (AreaChart no-ops on an empty series),
+ * and shows NO "market snapshot on the way" placeholder. Mirrors the empty case
+ * (which hides the section entirely) on the other side of the field-by-field line.
+ */
+export const AREA_PARTIAL_PAYLOAD: PublicPayload = {
+  ...MINIMAL_PAYLOAD,
+  areaStats: {
+    medianSale: "$642k",
+    daysOnMarket: "14",
+  },
+};
+
+/**
  * A7d.8 — poster-precedence fixtures. Three siblings of MINIMAL_PAYLOAD
  * that each set a different subset of the three poster slots so the
  * renderer's `override > scrub > auto first-frame` cascade can be

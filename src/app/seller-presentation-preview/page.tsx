@@ -2,6 +2,7 @@ import { notFound } from "next/navigation";
 import type { HandoutRecord } from "@/lib/share-urls";
 import { SellerPresentationPage } from "@/tools/seller-presentation/output/presentation-page";
 import {
+  AREA_PARTIAL_PAYLOAD,
   FLAGSHIP_PRIVACY_PAYLOAD,
   FULL_PAYLOAD,
   MINIMAL_PAYLOAD,
@@ -88,6 +89,8 @@ export default async function SellerPresentationPreview({ searchParams }: PagePr
     "full",
     "minimal",
     "outlink-only",
+    // LS-1 — partially-filled area snapshot (two stat fields, no chart series).
+    "area-partial",
     "poster-auto-only",
     "poster-scrub-over-auto",
     "poster-override-wins",
@@ -118,7 +121,9 @@ export default async function SellerPresentationPreview({ searchParams }: PagePr
       ? MINIMAL_PAYLOAD
       : variant === "outlink-only"
         ? OUTLINK_ONLY_PAYLOAD
-        : variant === "poster-auto-only"
+        : variant === "area-partial"
+          ? AREA_PARTIAL_PAYLOAD
+          : variant === "poster-auto-only"
           ? POSTER_AUTO_ONLY_PAYLOAD
           : variant === "poster-scrub-over-auto"
             ? POSTER_SCRUB_OVER_AUTO_PAYLOAD

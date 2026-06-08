@@ -161,3 +161,110 @@ test.describe('shipped default copy', () => {
     ).toEqual([]);
   });
 });
+
+/**
+ * LS-1 — no-em-dash gate over STATIC user-facing copy (the broad scan).
+ *
+ * The hand-listed UX-1 guard and the defaultWhyUs() walk above protect only
+ * specific surfaces. They never saw the static template strings baked into the
+ * published seller-page components or the wizard UI/helper copy — which is how
+ * live em-dashes shipped (the AgentNote "…what I'd do first — so nothing…", the
+ * StepStrategy confidence blurbs, etc.). This guard scans every .ts/.tsx under
+ * the user-facing trees and FAILS on a clause-break em-dash (or an en-dash
+ * misused as one), so a regression can't slip back in.
+ *
+ * Comments are stripped before scanning — the codebase deliberately uses
+ * em-dashes in code comments and JSDoc, which are not user-facing.
+ *
+ * Allow-listed by construction (no hand list needed): a clause break joins two
+ * WORDS, so the matcher requires a LETTER on both sides of the dash. That keeps
+ * two intentional patterns green automatically:
+ *   • numeric-range en-dash — "$720,000 – $780,000" (digits flank the dash)
+ *   • empty-value placeholder — a standalone "—" (quotes/brackets flank it)
+ *
+ * Pure-Node test — no browser.
+ */
+const STATIC_COPY_DIRS = [
+  path.resolve(__dirname, '../src/tools/seller-presentation/components'),
+  path.resolve(__dirname, '../src/tools/seller-presentation/output'),
+  path.resolve(__dirname, '../src/app/settings'),
+];
+
+function collectSource(dir: string): string[] {
+  let out: string[] = [];
+  for (const entry of readdirSync(dir)) {
+    const full = path.join(dir, entry);
+    if (statSync(full).isDirectory()) {
+      // Fixtures are test data, never published — skip them.
+      if (entry === '__fixtures__') continue;
+      out = out.concat(collectSource(full));
+    } else if (
+      // The prep PDF is a SEPARATE surface (the agent's private prep doc, not
+      // the published seller page or the wizard) and is explicitly out of LS-1's
+      // scope. Leave its copy untouched and unscanned here; sweep it under its
+      // own change if/when that surface is in scope.
+      entry !== 'prep-pdf.tsx' &&
+      (entry.endsWith('.tsx') || entry.endsWith('.ts'))
+    ) {
+      out.push(full);
+    }
+  }
+  return out;
+}
+
+// Drop block comments (incl. JSDoc and {/* JSX */}) and line comments, so the
+// scan only sees code + copy. The line-comment strip preserves "//" that follows
+// a colon (e.g. "https://…" inside a string literal).
+function stripComments(src: string): string {
+  return src
+    .replace(/\/\*[\s\S]*?\*\//g, '')
+    .replace(/(^|[^:])\/\/[^\n]*/gm, '$1');
+}
+
+// A clause-break dash joins two words: a LETTER on each side (whitespace, incl.
+// line wraps, allowed between). Matches em-dash (U+2014) and en-dash (U+2013)
+// used the same way. Digit- or punctuation-flanked dashes (numeric ranges, the
+// "—" empty placeholder) never match.
+const CLAUSE_BREAK_DASH = /[A-Za-z]\s*[—–]\s*[A-Za-z]/;
+
+function findClauseBreakDashes(text: string): string[] {
+  const hits: string[] = [];
+  const re = new RegExp(CLAUSE_BREAK_DASH.source, 'g');
+  for (const line of stripComments(text).split('\n')) {
+    if (re.test(line)) hits.push(line.trim());
+    re.lastIndex = 0;
+  }
+  return hits;
+}
+
+test.describe('static copy em-dash gate', () => {
+  test('no clause-break em-dash in published template + wizard copy', () => {
+    const files = STATIC_COPY_DIRS.flatMap(collectSource);
+    expect(files.length).toBeGreaterThan(0);
+
+    const violations: string[] = [];
+    for (const file of files) {
+      for (const line of findClauseBreakDashes(readFileSync(file, 'utf8'))) {
+        violations.push(`${path.relative(process.cwd(), file)} → ${line}`);
+      }
+    }
+
+    expect(
+      violations,
+      `Clause-break em/en-dash in user-facing static copy:\n${violations.join('\n')}`,
+    ).toEqual([]);
+  });
+
+  test('detector fails on a seeded clause-break dash, allow-list stays green', () => {
+    // Fails-before proof: the detector catches a clause-break em-dash and an
+    // en-dash misused as one.
+    expect(findClauseBreakDashes('Pick a lane — it matters.')).toHaveLength(1);
+    expect(findClauseBreakDashes('Pick a lane – it matters.')).toHaveLength(1);
+
+    // Allow-listed by construction: numeric range, standalone empty placeholder,
+    // and a code comment carrying an em-dash all stay green.
+    expect(findClauseBreakDashes('$720,000 – $780,000')).toEqual([]);
+    expect(findClauseBreakDashes('return "—";')).toEqual([]);
+    expect(findClauseBreakDashes('// a comment — with a dash')).toEqual([]);
+  });
+});

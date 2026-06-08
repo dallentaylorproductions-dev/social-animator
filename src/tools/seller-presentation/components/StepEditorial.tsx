@@ -83,7 +83,7 @@ const SECTIONS: SectionDef[] = [
     key: "areaStats",
     title: "Area snapshot",
     purpose:
-      "Builds the animated neighborhood chart and stats block on the seller's page. Every field is optional — fill what you have, skip what you don't.",
+      "Builds the animated neighborhood chart and stats block on the seller's page. Every field is optional. Fill what you have, skip what you don't.",
     addLabel: "+ Add an area snapshot",
   },
 ];
