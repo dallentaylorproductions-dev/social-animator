@@ -26,6 +26,7 @@
  */
 
 import type { Comp } from "@/tools/seller-intelligence-report/engine/types";
+import { isPriceRangeActive } from "./price-range";
 
 export type { Comp };
 
@@ -170,6 +171,15 @@ export interface SellerPresentationDraft {
 
   // ---- Step 3 (A5b): Pricing & strategy ----
   recommendedPrice?: string;
+  /**
+   * UX-2a — optional recommended-price RANGE (Aaron: "times I use this when
+   * I haven't seen the house — you can put your range down"). A range is
+   * ACTIVE only when BOTH are present; a draft with only `recommendedPrice`
+   * (every pre-UX-2a draft) renders the single price unchanged. See
+   * `engine/price-range.ts` for the shared active/valid/format helpers.
+   */
+  recommendedPriceLow?: string;
+  recommendedPriceHigh?: string;
   /** Short public-safe rationale (≠ pricingStrategyId / confidence, which are private). */
   priceRationale?: string;
   pricingStrategyId?: string;
@@ -337,6 +347,8 @@ export function clampDraft(
     subjectYearBuilt: clampString(raw.subjectYearBuilt),
     subjectLotSqft: clampString(raw.subjectLotSqft),
     recommendedPrice: clampString(raw.recommendedPrice),
+    recommendedPriceLow: clampString(raw.recommendedPriceLow),
+    recommendedPriceHigh: clampString(raw.recommendedPriceHigh),
     priceRationale: clampString(raw.priceRationale),
     pricingStrategyId: clampString(raw.pricingStrategyId),
     confidence: VALID_CONFIDENCE.includes(raw.confidence as ConfidenceLevel)
@@ -381,9 +393,11 @@ export function isStepPropertyComplete(draft: SellerPresentationDraft): boolean 
  * "Missing: X → Go back to fix →") read from this.
  *
  * Mirrors the skill record's `inputs.required`: propertyAddress is
- * always required; recommendedPrice is required for export (gates the
- * agent prep PDF + the published web page); comps require at least
- * one row with address + soldPrice (the published page renders the
+ * always required; a recommended PRICE is required for export (gates the
+ * agent prep PDF + the published web page) — satisfied by EITHER the
+ * single `recommendedPrice` OR a complete low–high range (UX-2a: Aaron's
+ * "haven't seen the house, put your range down" case); comps require at
+ * least one row with address + soldPrice (the published page renders the
  * price-justification table from `comps[].public`).
  */
 export function getMissingRequiredInputs(
@@ -391,7 +405,10 @@ export function getMissingRequiredInputs(
 ): string[] {
   const missing: string[] = [];
   if (!draft.propertyAddress?.trim()) missing.push("propertyAddress");
-  if (!draft.recommendedPrice?.trim()) missing.push("recommendedPrice");
+  const hasPrice =
+    !!draft.recommendedPrice?.trim() ||
+    isPriceRangeActive(draft.recommendedPriceLow, draft.recommendedPriceHigh);
+  if (!hasPrice) missing.push("recommendedPrice");
   if (draft.comps.length === 0) {
     missing.push("comps");
   } else if (

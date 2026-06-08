@@ -8,6 +8,10 @@ import {
   validateForExport,
   type SellerPresentationDraft,
 } from "../engine/types";
+import {
+  formatPriceRangeDisplay,
+  isPriceRangeActive,
+} from "../engine/price-range";
 
 type StepId =
   | "property"
@@ -232,7 +236,17 @@ export function StepReview({ draft, goToStep }: StepReviewProps) {
           )}
           <SummaryRow
             label="Recommended price"
-            value={draft.recommendedPrice || "—"}
+            value={
+              isPriceRangeActive(
+                draft.recommendedPriceLow,
+                draft.recommendedPriceHigh,
+              )
+                ? formatPriceRangeDisplay(
+                    draft.recommendedPriceLow!,
+                    draft.recommendedPriceHigh!,
+                  )
+                : draft.recommendedPrice || "—"
+            }
           />
           <SummaryRow
             label="Price rationale"

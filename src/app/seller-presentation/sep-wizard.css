@@ -1348,6 +1348,44 @@
   color: var(--faint);
 }
 
+/* UX-2a — optional low–high recommended-price range */
+.sep-wizard .price-range {
+  display: flex;
+  align-items: center;
+  gap: 10px;
+}
+.sep-wizard .price-range .input {
+  flex: 1 1 0;
+  min-width: 0;
+}
+.sep-wizard .price-range__sep {
+  color: var(--faint);
+  font-size: 18px;
+  line-height: 1;
+  flex: 0 0 auto;
+}
+.sep-wizard .price-range-toggle {
+  align-self: flex-start;
+  margin-top: 2px;
+  padding: 0;
+  background: none;
+  border: none;
+  cursor: pointer;
+  font-family: var(--sans);
+  font-size: 12.5px;
+  color: var(--mint);
+  text-decoration: underline;
+  text-underline-offset: 2px;
+}
+.sep-wizard .price-range-toggle:hover {
+  color: var(--text);
+}
+.sep-wizard .price-range-hint {
+  font-size: 13px;
+  color: var(--warn, #c2683a);
+  line-height: 1.4;
+}
+
 /* from-comps proof line */
 .sep-wizard .from-comps {
   display: flex;

@@ -23,6 +23,10 @@ import {
   type SellerPresentationDraft,
 } from '../engine/types';
 import {
+  formatPriceRangeDisplay,
+  isPriceRangeActive,
+} from '../engine/price-range';
+import {
   getPricingStrategyById,
   type PricingStrategy,
 } from '@/tools/seller-intelligence-report/content/pricing-strategies';
@@ -496,7 +500,18 @@ export function SellerPresentationPrepPdf({
         {/* The designed number moment */}
         <View style={styles.priceHero}>
           <Text style={styles.priceEyebrow}>Recommended list price</Text>
-          <Text style={styles.priceBig}>{dash(draft.recommendedPrice)}</Text>
+          {/* UX-2a — show the low–high range when set; else the single price. */}
+          <Text style={styles.priceBig}>
+            {isPriceRangeActive(
+              draft.recommendedPriceLow,
+              draft.recommendedPriceHigh,
+            )
+              ? formatPriceRangeDisplay(
+                  draft.recommendedPriceLow!,
+                  draft.recommendedPriceHigh!,
+                )
+              : dash(draft.recommendedPrice)}
+          </Text>
           <View style={styles.priceMeta}>
             <View style={styles.priceMetaItem}>
               <Text style={styles.priceMetaLabel}>Strategy</Text>

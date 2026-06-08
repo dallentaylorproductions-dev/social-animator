@@ -33,6 +33,7 @@ import type {
   SellerPresentationDraft,
 } from "../engine/types";
 import { PUBLISH_TEMPLATE_VERSION } from "../config/template-version";
+import { isPriceRangeActive } from "../engine/price-range";
 import {
   WHYUS_CAPS,
   type WhyUs,
@@ -201,6 +202,16 @@ export interface PublicProperty {
   zip?: string;
   heroPhotoUrl?: string;
   recommendedList: string;
+  /**
+   * UX-2a — optional recommended-price RANGE. Present (both set) ONLY when
+   * the agent entered a low–high range; absent otherwise, so a single-price
+   * payload is byte-identical to today. When set, the hero renders
+   * "$low – $high" (static, no count-up) and the area-chart chip reads the
+   * midpoint. `recommendedList` stays the single value for the count-up path
+   * and back-compat; it may be empty when the agent gave only a range.
+   */
+  recommendedListLow?: string;
+  recommendedListHigh?: string;
   rationaleShort?: string;
 }
 
@@ -591,6 +602,18 @@ export function toPublicPayload(
 ): PublicPayload {
   const propertyAddress = draft.propertyAddress ?? "";
   const recommendedPrice = draft.recommendedPrice ?? "";
+  // UX-2a — project the optional low–high range ONLY when both sides are set,
+  // so a single-price draft stays byte-identical (the keys are OMITTED, not
+  // set to undefined — the property block is literally what it was pre-UX-2a).
+  const recommendedRange = isPriceRangeActive(
+    draft.recommendedPriceLow,
+    draft.recommendedPriceHigh,
+  )
+    ? {
+        recommendedListLow: draft.recommendedPriceLow,
+        recommendedListHigh: draft.recommendedPriceHigh,
+      }
+    : {};
   const priceRationale = draft.priceRationale;
 
   // Phase B2 — set-aside comps (counted === false) stay on the prep
@@ -656,6 +679,7 @@ export function toPublicPayload(
       zip: draft.propertyZip,
       heroPhotoUrl: draft.heroPhotoUrl,
       recommendedList: recommendedPrice,
+      ...recommendedRange,
       rationaleShort: priceRationale,
     },
     preparedFor: draft.preparedFor,
@@ -871,6 +895,17 @@ function clampPublicProperty(
       typeof r.recommendedList === "string"
         ? r.recommendedList
         : fallback.recommendedList,
+    // UX-2a — keep the range strictly paired: both strings or neither, so a
+    // tampered/half-present range never renders a lopsided "$X – ".
+    ...(typeof r.recommendedListLow === "string" &&
+    typeof r.recommendedListHigh === "string" &&
+    r.recommendedListLow.trim() &&
+    r.recommendedListHigh.trim()
+      ? {
+          recommendedListLow: r.recommendedListLow,
+          recommendedListHigh: r.recommendedListHigh,
+        }
+      : {}),
     rationaleShort:
       typeof r.rationaleShort === "string"
         ? r.rationaleShort

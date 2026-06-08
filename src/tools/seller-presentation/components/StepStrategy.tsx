@@ -10,6 +10,10 @@ import type {
   ConfidenceLevel,
   SellerPresentationDraft,
 } from "../engine/types";
+import {
+  isPriceRangeActive,
+  isPriceRangeValid,
+} from "../engine/price-range";
 
 /**
  * Seller Presentation Step 3 — Pricing & strategy (Phase B3 redesign).
@@ -145,6 +149,31 @@ export function StepStrategy({ draft, setDraft }: StepStrategyProps) {
 
   const [approachOpen, setApproachOpen] = useState(false);
 
+  // UX-2a — optional low–high recommended-price range. The toggle is local UI
+  // initialized from whether the draft already carries a range (a saved range
+  // reopens expanded). The projection treats "both low+high present" as the
+  // active signal, so turning the toggle OFF CLEARS low/high — keeping what the
+  // agent sees in lockstep with what publishes. Single price stays the default.
+  const [useRange, setUseRange] = useState(
+    () =>
+      !!(
+        draft.recommendedPriceLow?.trim() && draft.recommendedPriceHigh?.trim()
+      ),
+  );
+  const toggleRange = () => {
+    if (useRange) {
+      setDraft({
+        ...draft,
+        recommendedPriceLow: undefined,
+        recommendedPriceHigh: undefined,
+      });
+    }
+    setUseRange((v) => !v);
+  };
+  const rangeLowGtHigh =
+    isPriceRangeActive(draft.recommendedPriceLow, draft.recommendedPriceHigh) &&
+    !isPriceRangeValid(draft.recommendedPriceLow, draft.recommendedPriceHigh);
+
   const selectedId = draft.pricingStrategyId ?? DEFAULT_STRATEGY_ID;
   const selected = PRICING_STRATEGIES.find((s) => s.id === selectedId);
 
@@ -172,18 +201,64 @@ export function StepStrategy({ draft, setDraft }: StepStrategyProps) {
           <IconGlobe /> Shown to your seller
         </span>
         <div className="zone-body">
-          <label
+          <div
             className="strat-field"
             data-testid="step-strategy-recommended-price"
           >
             <span className="field-label">Recommended price</span>
-            <CurrencyInput
-              className="input lg"
-              value={draft.recommendedPrice ?? ""}
-              onChange={(v) => update("recommendedPrice", v)}
-              placeholder="$685,000"
-              aria-label="recommended-price"
-            />
+            {useRange ? (
+              /* UX-2a — low–high range: Aaron's "haven't seen the house, put
+                 your range down" case. Same CurrencyInput as the single field. */
+              <div className="price-range" data-testid="step-strategy-price-range">
+                <CurrencyInput
+                  className="input lg"
+                  value={draft.recommendedPriceLow ?? ""}
+                  onChange={(v) =>
+                    update("recommendedPriceLow", v || undefined)
+                  }
+                  placeholder="$685,000"
+                  aria-label="recommended-price-low"
+                />
+                <span className="price-range__sep" aria-hidden="true">
+                  –
+                </span>
+                <CurrencyInput
+                  className="input lg"
+                  value={draft.recommendedPriceHigh ?? ""}
+                  onChange={(v) =>
+                    update("recommendedPriceHigh", v || undefined)
+                  }
+                  placeholder="$720,000"
+                  aria-label="recommended-price-high"
+                />
+              </div>
+            ) : (
+              <CurrencyInput
+                className="input lg"
+                value={draft.recommendedPrice ?? ""}
+                onChange={(v) => update("recommendedPrice", v)}
+                placeholder="$685,000"
+                aria-label="recommended-price"
+              />
+            )}
+            <button
+              type="button"
+              className="price-range-toggle"
+              onClick={toggleRange}
+              data-testid="step-strategy-range-toggle"
+              aria-pressed={useRange}
+            >
+              {useRange ? "Use a single price" : "Use a price range"}
+            </button>
+            {rangeLowGtHigh && (
+              <span
+                className="price-range-hint"
+                data-testid="step-strategy-range-hint"
+                role="status"
+              >
+                The low price should be at or below the high price.
+              </span>
+            )}
             {medianResult ? (
               <span className="from-comps">
                 <span className="from-comps-chip">From your comps</span>
@@ -199,7 +274,7 @@ export function StepStrategy({ draft, setDraft }: StepStrategyProps) {
                 Add comps on Step 2 to see your comp-based price.
               </span>
             )}
-          </label>
+          </div>
 
           <label className="strat-field">
             <span className="field-label">
