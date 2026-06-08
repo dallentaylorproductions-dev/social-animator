@@ -96,7 +96,7 @@ export function AgentBand({
  *   • REPOSITIONED (photo + off-center focal OR zoom) — adds an inner clip +
  *     image layer. The focal point maps to `background-position`; zoom maps to
  *     `transform: scale()` anchored at the focal point. The photo rides the
- *     inner layer (clipped to the rounded frame) so a zoom magnifies WITHOUT
+ *     inner layer (clipped to the circular frame) so a zoom magnifies WITHOUT
  *     spilling past the frame, while the avatar itself keeps `overflow:
  *     visible` so the signature status dot (the `::after`, outset -3px) is
  *     never clipped. Still a pure DISPLAY transform — the image bytes are
