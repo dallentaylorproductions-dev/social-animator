@@ -9,8 +9,7 @@ import {
 } from "@/lib/brand";
 import type { Review } from "@/tools/seller-presentation/engine/types";
 import { PhoneInput } from "@/components/inputs";
-import { ImageUploadField } from "@/components/ImageUploadField";
-import { HeadshotReposition } from "./HeadshotReposition";
+import { HeadshotField } from "./HeadshotField";
 import { defaultWhyUs } from "@/lib/whyus";
 import { WhyUsSection, DraftFromReviews } from "./WhyUsSection";
 
@@ -204,18 +203,23 @@ export function BrandProfileForm() {
           />
         </Field>
 
-        {/* A7c.2 — replaces the URL-only headshot input with the
-            shared <ImageUploadField>, so agents can pick a photo
-            from their phone's camera roll. Uploads to Vercel Blob;
-            we store the hosted URL in agentPhotoUrl (no data URLs
-            in the brand settings or in the published agent block). */}
-        <ImageUploadField
-          label="Headshot"
-          value={s.agentPhotoUrl ?? ""}
-          onChange={(url) => {
-            // UX-2b — a brand-new image starts centered. Clear any prior
-            // reposition so the focal point from an old photo can't carry
-            // onto a different one (and a Remove clears it too).
+        {/* A7c.2 — the headshot is uploaded via the shared upload pipeline
+            (camera-roll picker → Vercel Blob → hosted URL in agentPhotoUrl; no
+            data URLs in brand settings or the published agent block).
+            UX-2b-followup — once a photo exists, HeadshotField shows it as the
+            CROPPED circular avatar (the published result) with "Adjust", which
+            opens the modal crop editor. The focal/scale is a pure display
+            transform stored alongside agentPhotoUrl, applied on every render. */}
+        <HeadshotField
+          photoUrl={s.agentPhotoUrl}
+          focalX={s.agentHeadshotFocalX ?? 50}
+          focalY={s.agentHeadshotFocalY ?? 50}
+          scale={s.agentHeadshotScale ?? 1}
+          monogramName={s.agentName}
+          onPhotoChange={(url) => {
+            // UX-2b — a brand-new image (or a Replace/Remove) starts centered.
+            // Clear any prior reposition so the focal point from an old photo
+            // can't carry onto a different one.
             const next: BrandSettings = {
               ...s,
               agentPhotoUrl: url || undefined,
@@ -226,45 +230,23 @@ export function BrandProfileForm() {
             setS(next);
             saveBrandSettings(next);
           }}
-          previewAspect="aspect-square"
-          folder="agent-headshots"
-          testIdPrefix="brand-headshot"
-          helpText="Square crops read best. Leave blank for a monogram fallback."
-          urlPlaceholder="https://… (or paste a URL)"
+          onCropChange={({ focalX, focalY, scale }) => {
+            // A centered, un-zoomed crop (the editor's "Reset to centered")
+            // clears the fields entirely rather than storing 50/50/1 — the
+            // publish projection only DROPS undefined keys, so this keeps an
+            // agent who repositioned-then-reset byte-identical to a pre-UX-2b
+            // publish (and renders the byte-identical default avatar).
+            const centered = focalX === 50 && focalY === 50 && scale === 1;
+            const next: BrandSettings = {
+              ...s,
+              agentHeadshotFocalX: centered ? undefined : focalX,
+              agentHeadshotFocalY: centered ? undefined : focalY,
+              agentHeadshotScale: centered ? undefined : scale,
+            };
+            setS(next);
+            saveBrandSettings(next);
+          }}
         />
-
-        {/* UX-2b — reposition control. Shown only once a headshot exists; lets
-            the agent drag the focal point + zoom so an off-center face is
-            centered in the circular frame. Pure display transform — stored as
-            focal/scale alongside agentPhotoUrl, applied on every render. */}
-        {s.agentPhotoUrl && (
-          <HeadshotReposition
-            photoUrl={s.agentPhotoUrl}
-            focalX={s.agentHeadshotFocalX ?? 50}
-            focalY={s.agentHeadshotFocalY ?? 50}
-            scale={s.agentHeadshotScale ?? 1}
-            onChange={({ focalX, focalY, scale }) => {
-              const next: BrandSettings = {
-                ...s,
-                agentHeadshotFocalX: focalX,
-                agentHeadshotFocalY: focalY,
-                agentHeadshotScale: scale,
-              };
-              setS(next);
-              saveBrandSettings(next);
-            }}
-            onReset={() => {
-              const next: BrandSettings = {
-                ...s,
-                agentHeadshotFocalX: undefined,
-                agentHeadshotFocalY: undefined,
-                agentHeadshotScale: undefined,
-              };
-              setS(next);
-              saveBrandSettings(next);
-            }}
-          />
-        )}
 
         <Field label="Short bio (one sentence, italic)">
           <TextAreaInput

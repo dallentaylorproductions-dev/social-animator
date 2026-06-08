@@ -207,7 +207,7 @@ const readBrand = (page: import("@playwright/test").Page) =>
     return raw ? (JSON.parse(raw) as StoredBrand) : null;
   }, STORE);
 
-test.describe("UX-2b headshot — Settings reposition control", () => {
+test.describe("UX-2b-followup headshot — Settings crop editor", () => {
   test.beforeEach(async ({ page }) => {
     // Seed a brand record with a headshot already set, before the app mounts.
     await page.addInitScript(
@@ -221,19 +221,59 @@ test.describe("UX-2b headshot — Settings reposition control", () => {
     );
   });
 
-  test("drag + zoom persist focal/scale to brand settings; reset clears them", async ({
+  test("Settings shows the cropped circular avatar; it reflects a saved crop on load", async ({
+    page,
+  }) => {
+    // Pre-set a non-centered crop so we can assert WYSIWYG on first load.
+    await page.addInitScript(
+      ([k]) => {
+        const raw = window.localStorage.getItem(k);
+        const parsed = raw ? JSON.parse(raw) : {};
+        window.localStorage.setItem(
+          k,
+          JSON.stringify({
+            ...parsed,
+            agentHeadshotFocalX: 50,
+            agentHeadshotFocalY: 20,
+            agentHeadshotScale: 1.4,
+          }),
+        );
+      },
+      [STORE] as const,
+    );
+
+    await page.goto("/settings");
+    const avatarImg = page.getByTestId("brand-headshot-avatar-img");
+    await expect(avatarImg).toBeVisible({ timeout: 10_000 });
+
+    const pos = await avatarImg.evaluate(
+      (el) => getComputedStyle(el).backgroundPosition,
+    );
+    expect(pos).toBe("50% 20%");
+    const transform = await avatarImg.evaluate(
+      (el) => getComputedStyle(el).transform,
+    );
+    expect(transform).toContain("matrix(1.4");
+  });
+
+  test("Adjust → drag + zoom → Apply persists focal/scale and updates the avatar", async ({
     page,
   }) => {
     await page.goto("/settings");
 
-    const frame = page.getByTestId("brand-headshot-reposition-frame");
-    await expect(frame).toBeVisible({ timeout: 10_000 });
-    await frame.scrollIntoViewIfNeeded();
+    const adjust = page.getByTestId("brand-headshot-adjust");
+    await expect(adjust).toBeVisible({ timeout: 10_000 });
+    await adjust.scrollIntoViewIfNeeded();
+    await adjust.click();
+
+    const editor = page.getByTestId("headshot-crop-editor");
+    await expect(editor).toBeVisible();
 
     // Drag the photo right + down → reveals the top-left → focal DECREASES
     // from the centered 50/50.
-    const box = await frame.boundingBox();
-    if (!box) throw new Error("frame has no box");
+    const ws = page.getByTestId("headshot-crop-workspace");
+    const box = await ws.boundingBox();
+    if (!box) throw new Error("workspace has no box");
     const cx = box.x + box.width / 2;
     const cy = box.y + box.height / 2;
     await page.mouse.move(cx, cy);
@@ -241,16 +281,8 @@ test.describe("UX-2b headshot — Settings reposition control", () => {
     await page.mouse.move(cx + 40, cy + 40, { steps: 6 });
     await page.mouse.up();
 
-    await expect
-      .poll(async () => (await readBrand(page))?.agentHeadshotFocalX)
-      .toBeLessThan(50);
-    const afterDrag = await readBrand(page);
-    expect(afterDrag?.agentHeadshotFocalX).toBeGreaterThanOrEqual(0);
-    expect(afterDrag?.agentHeadshotFocalY).toBeLessThan(50);
-    expect(afterDrag?.agentHeadshotFocalY).toBeGreaterThanOrEqual(0);
-
     // Set the zoom slider to 1.5×.
-    await page.getByTestId("brand-headshot-zoom").evaluate((el) => {
+    await page.getByTestId("headshot-crop-zoom").evaluate((el) => {
       const input = el as HTMLInputElement;
       const setter = Object.getOwnPropertyDescriptor(
         window.HTMLInputElement.prototype,
@@ -259,17 +291,83 @@ test.describe("UX-2b headshot — Settings reposition control", () => {
       setter.call(input, "1.5");
       input.dispatchEvent(new Event("input", { bubbles: true }));
     });
+
+    // Nothing persisted until Apply (the editor holds a local draft).
+    expect(await readBrand(page)).not.toHaveProperty("agentHeadshotScale", 1.5);
+
+    await page.getByTestId("headshot-crop-apply").click();
+    await expect(editor).toHaveCount(0);
+
     await expect
       .poll(async () => (await readBrand(page))?.agentHeadshotScale)
       .toBe(1.5);
+    const saved = await readBrand(page);
+    expect(saved?.agentHeadshotFocalX).toBeLessThan(50);
+    expect(saved?.agentHeadshotFocalX).toBeGreaterThanOrEqual(0);
+    expect(saved?.agentHeadshotFocalY).toBeLessThan(50);
+    expect(saved?.agentHeadshotFocalY).toBeGreaterThanOrEqual(0);
 
-    // Reset returns to centered (fields cleared).
-    await page.getByTestId("brand-headshot-reposition-reset").click();
+    // The Settings avatar updates to the new crop → "it worked".
+    const transform = await page
+      .getByTestId("brand-headshot-avatar-img")
+      .evaluate((el) => getComputedStyle(el).transform);
+    expect(transform).toContain("matrix(1.5");
+  });
+
+  test("Cancel discards — no change to brand settings", async ({ page }) => {
+    await page.goto("/settings");
+    await page.getByTestId("brand-headshot-adjust").click();
+    await expect(page.getByTestId("headshot-crop-editor")).toBeVisible();
+
+    // Move the zoom, then Cancel.
+    await page.getByTestId("headshot-crop-zoom").evaluate((el) => {
+      const input = el as HTMLInputElement;
+      const setter = Object.getOwnPropertyDescriptor(
+        window.HTMLInputElement.prototype,
+        "value",
+      )!.set!;
+      setter.call(input, "1.8");
+      input.dispatchEvent(new Event("input", { bubbles: true }));
+    });
+    await page.getByTestId("headshot-crop-cancel").click();
+    await expect(page.getByTestId("headshot-crop-editor")).toHaveCount(0);
+
+    const saved = await readBrand(page);
+    expect(saved?.agentHeadshotScale).toBeUndefined();
+    expect(saved?.agentHeadshotFocalX).toBeUndefined();
+    expect(saved?.agentHeadshotFocalY).toBeUndefined();
+  });
+
+  test("Reset to centered inside the editor, then Apply, clears the crop", async ({
+    page,
+  }) => {
+    await page.addInitScript(
+      ([k]) => {
+        const raw = window.localStorage.getItem(k);
+        const parsed = raw ? JSON.parse(raw) : {};
+        window.localStorage.setItem(
+          k,
+          JSON.stringify({
+            ...parsed,
+            agentHeadshotFocalX: 30,
+            agentHeadshotFocalY: 20,
+            agentHeadshotScale: 1.5,
+          }),
+        );
+      },
+      [STORE] as const,
+    );
+    await page.goto("/settings");
+    await page.getByTestId("brand-headshot-adjust").click();
+    await page.getByTestId("headshot-crop-reset").click();
+    await page.getByTestId("headshot-crop-apply").click();
+
+    // Centered Apply clears the keys (byte-identical to a pre-UX-2b publish).
     await expect
       .poll(async () => (await readBrand(page))?.agentHeadshotScale)
       .toBeUndefined();
-    const afterReset = await readBrand(page);
-    expect(afterReset?.agentHeadshotFocalX).toBeUndefined();
-    expect(afterReset?.agentHeadshotFocalY).toBeUndefined();
+    const saved = await readBrand(page);
+    expect(saved?.agentHeadshotFocalX).toBeUndefined();
+    expect(saved?.agentHeadshotFocalY).toBeUndefined();
   });
 });

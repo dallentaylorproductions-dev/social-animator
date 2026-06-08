@@ -152,12 +152,19 @@ test.describe('ImageUploadField — upload flow (A7c.2)', () => {
       { name: 'headshot.jpg', mimeType: 'image/jpeg', buffer },
     ]);
 
-    const preview = page.getByTestId('brand-headshot-preview');
-    await expect(preview).toBeVisible({ timeout: 10_000 });
-    await expect(preview).toHaveAttribute('src', HEADSHOT_URL);
+    // UX-2b-followup: once a photo exists the headshot field swaps from the
+    // shared <ImageUploadField> to the cropped circular avatar (the published
+    // result), with Adjust/Replace/Remove. Assert the avatar shows the hosted
+    // URL as its background (not a data URL) — the upload pipeline is unchanged.
+    const avatarImg = page.getByTestId('brand-headshot-avatar-img');
+    await expect(avatarImg).toBeVisible({ timeout: 10_000 });
+    const bg = await avatarImg.evaluate(
+      (el) => getComputedStyle(el).backgroundImage,
+    );
+    expect(bg).toContain(HEADSHOT_URL);
 
     // A7c.7: the post-upload URL readout is suppressed on the
-    // headshot field too — same shared ImageUploadField, same rule.
+    // headshot field too — the raw hosted URL is never surfaced.
     await expect(page.getByTestId('brand-headshot-url')).toHaveCount(0);
 
     const stored = await page.evaluate(() => {
