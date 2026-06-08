@@ -359,7 +359,7 @@ function VideoBlock({ payload }: { payload: PublicPayload }) {
           controls
           playsInline
           preload="metadata"
-          aria-label={v.title ?? "Walk-through video"}
+          aria-label={v.title ?? "Video message from your agent"}
           data-testid="sep-video-el"
           data-poster-source={
             v.posterUrl
@@ -1189,7 +1189,7 @@ function AgentMeta({ agent }: { agent: AgentBranding }) {
   if (agent.licenseNumber)
     cells.push({ label: "License", value: agent.licenseNumber, mono: true });
   if (agent.yearsInArea)
-    cells.push({ label: "Years here", value: agent.yearsInArea });
+    cells.push({ label: "Years of experience", value: agent.yearsInArea });
   if (cells.length === 0) return null;
   return (
     <div className="agent-meta">

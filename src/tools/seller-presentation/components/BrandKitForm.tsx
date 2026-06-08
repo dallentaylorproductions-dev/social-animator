@@ -510,7 +510,7 @@ export function BrandKitForm({
           color={values.accent}
           onCommit={(v) => set({ accent: v })}
           onReset={() => set({ accent: DEF.accent })}
-          resetLabel="Reset"
+          resetLabel="Default"
           help="Your one brand color. Everything else — prices, buttons, links, accents and dividers — is derived from it."
           testId="brand-color-accent"
           pickerTestId="brand-color-picker-accent"

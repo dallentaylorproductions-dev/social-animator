@@ -74,9 +74,9 @@ interface SectionDef {
 const SECTIONS: SectionDef[] = [
   {
     key: "video",
-    title: "Walk-through video",
+    title: "Your video message",
     purpose:
-      "A short video of you walking the seller through the plan. Records on your phone, plays inline on the seller's page.",
+      "A 60 to 90 second video walking your seller through your plan. Not a tour of the home.",
     addLabel: "+ Add a video",
   },
   {
@@ -402,7 +402,7 @@ function VideoEditor({ draft, setDraft }: StepEditorialProps) {
           A7d.8: also drives the first-frame auto-capture + scrubber
           (never-blank poster + Instagram-style frame picker). */}
       <VideoUploadField
-        label="Walk-through video"
+        label="Your video message"
         value={v.videoUrl ?? ""}
         onChange={(url, durationSeconds) => {
           // Apply both edits in a SINGLE setVideo call. Two

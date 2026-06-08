@@ -244,7 +244,7 @@ export function BrandProfileForm() {
           onApply={(field, value) => update(field, value || undefined)}
         />
 
-        <Field label="Years in your area">
+        <Field label="Years of experience">
           <TextInput
             value={s.agentYearsInArea ?? ""}
             onChange={(v) => {
