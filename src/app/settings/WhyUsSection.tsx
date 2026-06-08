@@ -91,7 +91,7 @@ export function DraftFromReviews({
       }
       setDraft(data.suggestions);
     } catch {
-      setError("Couldn't draft just now — you can write these yourself or try again.");
+      setError("Couldn't draft just now. You can write these yourself or try again.");
     } finally {
       setLoading(false);
     }
@@ -273,7 +273,7 @@ export function WhyUsSection({
         <span className="text-neutral-600 text-sm">{open ? "−" : "+"}</span>
       </button>
       <p className="-mt-2 text-[11px] text-neutral-600 leading-relaxed">
-        Your pre-listing pitch — set once, shown on every seller page. Edit the
+        Your pre-listing pitch, set once, shown on every seller page. Edit the
         examples below; leave anything blank to hide it.
       </p>
 
@@ -332,7 +332,7 @@ export function WhyUsSection({
             <textarea
               value={whyUs.guarantee ?? ""}
               onChange={(e) => setField("guarantee", e.target.value || undefined)}
-              placeholder="If you're not happy, cancel anytime — no fees, no hard feelings."
+              placeholder="If you're not happy, cancel anytime. No fees, no hard feelings."
               rows={2}
               data-testid="whyus-guarantee"
               className={`${INPUT_CLASS} resize-y`}
@@ -611,7 +611,7 @@ function PerformanceStatsGroup({
     <div className="space-y-3">
       <GroupHeading
         heading="Your results, by the numbers"
-        help="Pre-labeled — just fill in the numbers. Leave any row blank to hide it."
+        help="Pre-labeled: just fill in the numbers. Leave any row blank to hide it."
       />
       {stats.map((stat, idx) => (
         <div

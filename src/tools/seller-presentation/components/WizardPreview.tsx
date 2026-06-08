@@ -192,7 +192,7 @@ function PreviewSurface({
         <span className="sep-preview-eyebrow">Seller page</span>
         {sparse ? (
           <span className="sep-preview-badge" data-testid="wizard-preview-badge">
-            EXAMPLE — this is what your seller receives
+            EXAMPLE: this is what your seller receives
           </span>
         ) : (
           <span className="sep-preview-live" data-testid="wizard-preview-live">

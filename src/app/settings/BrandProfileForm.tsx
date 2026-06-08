@@ -376,7 +376,7 @@ function ReviewsSection({
         Seller Presentation: reviews
       </h3>
       <p className="-mt-2 text-[11px] text-neutral-600 leading-relaxed">
-        Reviews you&apos;ve collected — entered once here, shown on every
+        Reviews you&apos;ve collected, entered once here, shown on every
         seller page.
       </p>
 
@@ -471,7 +471,7 @@ function ReviewsSection({
         )}
       </div>
 
-      <Field label="See all reviews on Zillow — link URL">
+      <Field label="See all reviews on Zillow: link URL">
         <TextInput
           value={outlinkUrl}
           onChange={onOutlinkChange}

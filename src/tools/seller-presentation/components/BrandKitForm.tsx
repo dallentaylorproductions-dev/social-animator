@@ -132,7 +132,7 @@ function HexField({
           a bad hex while the agent thinks it did. */}
       {bad && (
         <span className="hexin-hint" data-testid={testId + "-hint"} role="alert">
-          Not a valid hex — use 6 digits, like #037290.
+          Not a valid hex. Use 6 digits, like #037290.
         </span>
       )}
     </span>
@@ -472,8 +472,8 @@ export function BrandKitForm({
       fixes: [{ label: "Soften the background", apply: () => set({ background: soft.hex }) }],
       note:
         target >= 4.5
-          ? "Your background is too strong for readable links at any shade — soften the background instead."
-          : "Your background is too strong for a readable signature at any shade — soften the background instead.",
+          ? "Your background is too strong for readable links at any shade. Soften the background instead."
+          : "Your background is too strong for a readable signature at any shade. Soften the background instead.",
     };
   }
 
@@ -487,7 +487,7 @@ export function BrandKitForm({
     const soft = BrandEngine.softenSurfaceFor(bg, secHex, 3.0);
     return {
       fixes: [{ label: "Soften the background", apply: () => set({ background: soft.hex }) }],
-      note: "Your background is too strong for readable section numerals at any shade — soften the background instead.",
+      note: "Your background is too strong for readable section numerals at any shade. Soften the background instead.",
     };
   }
 
@@ -511,7 +511,7 @@ export function BrandKitForm({
           onCommit={(v) => set({ accent: v })}
           onReset={() => set({ accent: DEF.accent })}
           resetLabel="Default"
-          help="Your one brand color. Everything else — prices, buttons, links, accents and dividers — is derived from it."
+          help="Your one brand color. Everything else (prices, buttons, links, accents and dividers) is derived from it."
           testId="brand-color-accent"
           pickerTestId="brand-color-picker-accent"
         />

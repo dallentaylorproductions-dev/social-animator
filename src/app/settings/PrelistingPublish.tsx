@@ -72,7 +72,7 @@ export function PrelistingPublish() {
     <div className="space-y-4" data-testid="prelisting-publish">
       {!hasName && (
         <p className="text-[11px] text-amber-400/90 leading-relaxed">
-          Set your agent / team name in the brand profile above first — the
+          Set your agent / team name in the brand profile above first. The
           page leads with your identity.
         </p>
       )}
@@ -99,7 +99,7 @@ export function PrelistingPublish() {
           </div>
           <p className="text-[11px] text-neutral-600 leading-relaxed">
             This is your permanent link. Edit your brand profile and publish
-            again any time — the same link updates, so it stays good to text.
+            again any time. The same link updates, so it stays good to text.
           </p>
           <button
             type="button"

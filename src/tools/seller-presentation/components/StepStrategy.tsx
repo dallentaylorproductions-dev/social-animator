@@ -88,7 +88,7 @@ const CONFIDENCE_OPTIONS: ReadonlyArray<{
   {
     id: "high",
     label: "High",
-    blurb: "Tight comp set, under a 5% spread — you can hold a narrow range.",
+    blurb: "Tight comp set, under a 5% spread. You can hold a narrow range.",
   },
   {
     id: "medium",
@@ -183,7 +183,7 @@ export function StepStrategy({ draft, setDraft }: StepStrategyProps) {
 
   const activeBlurb = draft.confidence
     ? CONFIDENCE_OPTIONS.find((o) => o.id === draft.confidence)?.blurb
-    : "Pick how tight your comp set is — it sets the range you can defend.";
+    : "Pick how tight your comp set is. It sets the range you can defend.";
 
   return (
     <section className="strat" data-testid="step-strategy">

@@ -47,7 +47,7 @@ test.describe("Brand kit — invalid hex hint", () => {
     await field.blur();
 
     await expect(hint).toBeVisible();
-    await expect(hint).toHaveText("Not a valid hex — use 6 digits, like #037290.");
+    await expect(hint).toHaveText("Not a valid hex. Use 6 digits, like #037290.");
     await expect(field).toHaveClass(/is-invalid/);
     // The persisted signature did NOT change to the bad value.
     expect(await readAccent(page)).toBe("#037290");

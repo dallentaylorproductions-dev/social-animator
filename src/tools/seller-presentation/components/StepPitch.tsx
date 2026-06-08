@@ -65,7 +65,7 @@ export const TIER_1_DRAFTS = [
   { id: "storage-more", title: "More storage than it looks", category: "storage" },
   { id: "natural-light", title: "Light, everywhere you'd want it", category: "finishes" },
   { id: "neighborhood-fit", title: "A neighborhood you'd want to be in regardless of the house", category: "neighborhood" },
-  { id: "value-built-in", title: "Value built in — priced where buyers expect, not above", category: "value" },
+  { id: "value-built-in", title: "Value built in: priced where buyers expect, not above", category: "value" },
   { id: "primary-suite", title: "A primary suite that earns its name", category: "layout" },
   { id: "outdoor-low-maintenance", title: "Outdoor space without the upkeep", category: "outdoor" },
   { id: "character-and-charm", title: "Character that doesn't need to be created", category: "history" },

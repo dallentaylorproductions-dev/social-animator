@@ -419,18 +419,28 @@ function projectBrandReviewsOutlink(
 
 function projectAreaStats(s: AreaStats | undefined): AreaStats | undefined {
   if (!s) return undefined;
-  return {
+  const monthlySeries = s.monthlySeries?.map((m) => ({
+    month: m.month,
+    medianPrice: m.medianPrice,
+  }));
+  const projected: AreaStats = {
     medianSale: s.medianSale,
     medianSaleDeltaYoy: s.medianSaleDeltaYoy,
     daysOnMarket: s.daysOnMarket,
     daysOnMarketZipAvg: s.daysOnMarketZipAvg,
     closings90d: s.closings90d,
     listToSaleRatio: s.listToSaleRatio,
-    monthlySeries: s.monthlySeries?.map((m) => ({
-      month: m.month,
-      medianPrice: m.medianPrice,
-    })),
+    monthlySeries: monthlySeries?.length ? monthlySeries : undefined,
   };
+  // LS-1 — data minimization: an "edited but left blank" snapshot arrives as an
+  // all-undefined object (the StepEditorial editor seeds `draft.areaStats = {}`).
+  // Keep it OUT of the at-rest public record entirely rather than writing an
+  // empty husk that the read clamp would later collapse anyway. Mirrors
+  // clampAreaStats's final emptiness check, so the renderer's flex-out and the
+  // serialized payload agree: no snapshot data → no areaStats field.
+  return Object.values(projected).some((v) => v !== undefined)
+    ? projected
+    : undefined;
 }
 
 /**

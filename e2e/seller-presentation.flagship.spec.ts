@@ -124,7 +124,7 @@ test.describe("Flagship — count digit + n-aware grammar", () => {
 });
 
 test.describe("Flagship — optional-slot matrix (minimal reads complete)", () => {
-  test("video / reviews / pitch flex out; area shows pending; wordmark present", async ({
+  test("video / reviews / pitch / area flex out; wordmark present", async ({
     page,
   }) => {
     await page.goto("/seller-presentation-preview?fixture=minimal&template=flagship");
@@ -139,12 +139,39 @@ test.describe("Flagship — optional-slot matrix (minimal reads complete)", () =
     await expect(page.getByTestId("fs-note-video")).toHaveCount(0);
     await expect(page.getByTestId("fs-reviews")).toHaveCount(0);
     await expect(page.getByTestId("fs-pitch")).toHaveCount(0);
-    // Area three-state: pending card, no ready block.
-    await expect(page.getByTestId("fs-area")).toBeVisible();
-    await expect(page.getByTestId("fs-area-pending")).toBeVisible();
+    // LS-1 — with no area-snapshot data the WHOLE §05 section flexes out (no
+    // heading, no pending card, no placeholder). A "market snapshot on the way"
+    // promise must never reach a real seller's published page.
+    await expect(page.getByTestId("fs-area")).toHaveCount(0);
+    await expect(page.getByTestId("fs-area-pending")).toHaveCount(0);
     await expect(page.getByTestId("fs-area-ready")).toHaveCount(0);
-    await expect(page.getByTestId("fs-area-pending")).toContainText(
-      "A market snapshot is on the way.",
+    await expect(page.locator("body")).not.toContainText(
+      "A market snapshot is on the way",
+    );
+  });
+
+  test("LS-1 — partial area snapshot renders the given fields, omits the rest, no placeholder", async ({
+    page,
+  }) => {
+    await page.goto(
+      "/seller-presentation-preview?fixture=area-partial&template=flagship",
+    );
+    // The section renders (it has data), in the ready state — never pending.
+    await expect(page.getByTestId("fs-area")).toBeVisible();
+    await expect(page.getByTestId("fs-area-ready")).toBeVisible();
+    await expect(page.getByTestId("fs-area-pending")).toHaveCount(0);
+    // The two provided stat fields render…
+    const area = page.getByTestId("fs-area");
+    await expect(area).toContainText("Median sale");
+    await expect(area).toContainText("$642k");
+    await expect(area).toContainText("Days on market");
+    // …and the unfilled fields are omitted (no empty cells).
+    await expect(area).not.toContainText("Homes sold");
+    await expect(area).not.toContainText("Sale to list");
+    // No chart (no monthly series) and no "on the way" placeholder.
+    await expect(area.locator(".chart .line-stroke")).toHaveCount(0);
+    await expect(page.locator("body")).not.toContainText(
+      "A market snapshot is on the way",
     );
   });
 
