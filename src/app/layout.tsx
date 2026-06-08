@@ -57,7 +57,10 @@ const jetbrainsMono = JetBrains_Mono({
 });
 
 export const metadata: Metadata = {
-  title: "Social Animator",
+  // Brand the tab / iOS share sheet / add-to-home default to match the PWA
+  // manifest name ("Studio SEP", short_name "SEP"). M-1 — was the stale
+  // "Social Animator" project name. Manifest + icons are unchanged.
+  title: "Studio SEP",
   description:
     "Animated Instagram posts for real estate. Pick a template, fill it in, export.",
   // PWA install metadata (PWA-1). The manifest carries the install name

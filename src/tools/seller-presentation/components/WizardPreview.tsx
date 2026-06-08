@@ -157,6 +157,17 @@ function PreviewSurface({
     });
   }, [currentStep, sparse]);
 
+  // Mobile overlay opens at the TOP of the seller page (from the hero down),
+  // not wherever the step-sync above last parked it — the overlay mounts fresh
+  // per open, so this runs on mount and, defined after the step-sync effect,
+  // wins the initial scroll position. Overlay only (onClose present); the
+  // desktop dock keeps its step wayfinding.
+  useEffect(() => {
+    if (!onClose) return;
+    const screen = screenRef.current;
+    if (screen) screen.scrollTop = 0;
+  }, [onClose]);
+
   // Field-level scroll-sync: focusing or editing a form field brings the
   // matching flagship element into view. A document-level delegated listener
   // keeps this entirely inside the panel — no wiring into the step components.
@@ -192,7 +203,7 @@ function PreviewSurface({
         <span className="sep-preview-eyebrow">Seller page</span>
         {sparse ? (
           <span className="sep-preview-badge" data-testid="wizard-preview-badge">
-            EXAMPLE: this is what your seller receives
+            Example preview
           </span>
         ) : (
           <span className="sep-preview-live" data-testid="wizard-preview-live">
@@ -241,6 +252,7 @@ export function WizardPreview({
   const [mounted, setMounted] = useState(false);
   const [isDesktop, setIsDesktop] = useState(false);
   const [open, setOpen] = useState(false);
+  const [fabHidden, setFabHidden] = useState(false);
 
   useEffect(() => {
     setMounted(true);
@@ -250,6 +262,60 @@ export function WizardPreview({
     mq.addEventListener("change", update);
     return () => mq.removeEventListener("change", update);
   }, []);
+
+  // Lock the wizard's body scroll while the full-screen overlay is open so a
+  // touch-drag scrolls the preview itself (overscroll-behavior: contain on the
+  // screen) instead of the page behind it — the core "preview won't scroll /
+  // background scrolls instead" bug. position:fixed is the iOS-reliable lock;
+  // the prior scroll position is captured and restored exactly on close (so ✕
+  // returns the agent to the same wizard step + offset). Desktop never opens.
+  useEffect(() => {
+    if (!open) return;
+    const body = document.body;
+    const scrollY = window.scrollY;
+    const prev = {
+      position: body.style.position,
+      top: body.style.top,
+      left: body.style.left,
+      right: body.style.right,
+      width: body.style.width,
+      overflow: body.style.overflow,
+    };
+    body.style.position = "fixed";
+    body.style.top = `-${scrollY}px`;
+    body.style.left = "0";
+    body.style.right = "0";
+    body.style.width = "100%";
+    body.style.overflow = "hidden";
+    return () => {
+      body.style.position = prev.position;
+      body.style.top = prev.top;
+      body.style.left = prev.left;
+      body.style.right = prev.right;
+      body.style.width = prev.width;
+      body.style.overflow = prev.overflow;
+      window.scrollTo(0, scrollY);
+    };
+  }, [open]);
+
+  // FAB auto-hide: the floating Preview button "feels in the way" if it sits
+  // there forever, so fade it out ~2.5s after scrolling stops and bring it
+  // back on any scroll (up or down). Starts visible so it's always findable;
+  // mobile only (the desktop dock is live, no FAB). The fade lives in CSS.
+  useEffect(() => {
+    if (isDesktop) return;
+    let timer: ReturnType<typeof setTimeout> | undefined;
+    const onScroll = () => {
+      setFabHidden(false);
+      clearTimeout(timer);
+      timer = setTimeout(() => setFabHidden(true), 2500);
+    };
+    window.addEventListener("scroll", onScroll, { passive: true });
+    return () => {
+      clearTimeout(timer);
+      window.removeEventListener("scroll", onScroll);
+    };
+  }, [isDesktop]);
 
   // Don't render until mounted — matchMedia is client-only, and the panel is
   // non-critical chrome, so a deterministic empty first paint avoids any
@@ -282,6 +348,7 @@ export function WizardPreview({
       <button
         type="button"
         className="sep-preview-fab"
+        data-hidden={fabHidden}
         onClick={() => setOpen(true)}
         data-testid="wizard-preview-fab"
       >
