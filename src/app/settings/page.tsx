@@ -1,6 +1,7 @@
 import { auth } from "@/lib/auth";
 import { getUser } from "@/lib/db";
 import { BrandProfileForm } from "./BrandProfileForm";
+import { PrelistingPublish } from "./PrelistingPublish";
 import { AccountPanel } from "./AccountPanel";
 
 export default async function SettingsPage() {
@@ -40,6 +41,17 @@ export default async function SettingsPage() {
             exports, header on flyers and presentations as those tools ship.
           </p>
           <BrandProfileForm />
+        </section>
+
+        <section className="mb-12">
+          <h2 className="text-lg font-semibold mb-1">Pre-listing page</h2>
+          <p className="text-xs text-neutral-500 mb-6">
+            A standalone &ldquo;why list with us&rdquo; page built from your
+            brand profile above, to text a seller before the appointment. One
+            permanent link per agent; publishing again keeps the same link and
+            refreshes the content.
+          </p>
+          <PrelistingPublish />
         </section>
 
         <section>

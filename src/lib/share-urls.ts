@@ -191,3 +191,99 @@ export async function listOwnerHandouts(
   const slugs = await kv.smembers(ownerIndexKey(ownerEmail));
   return slugs ?? [];
 }
+
+// ===========================================================================
+// B0c — durable per-agent pre-listing page.
+//
+// Unlike the per-publish seller pages (random 8-char `handout:<slug>` records,
+// a NEW url every publish), the standalone "why list with us" page is ONE
+// DURABLE page per agent: republishing updates the SAME url so the agent can
+// text the link once and keep it current (the cohort-example durable-URL
+// lesson). That requires a STABLE slug derived from the agent's identity, not
+// a random one — and a SEPARATE key namespace so a derived slug can never
+// collide with a random seller slug.
+//
+//   • slug      = `deriveAgentPageSlug(email)` — SHA-256(email) → 12-char
+//                 Crockford base32. Deterministic (same agent → same slug),
+//                 opaque (no email in the url), and a DIFFERENT LENGTH from the
+//                 8-char seller slug so the two slug spaces can never overlap.
+//   • key       = `prelisting:<slug>` — its own namespace, never `handout:`.
+//   • publish   = overwrite-in-place (NOT SET NX), preserving the original
+//                 createdAt — republish refreshes `data` + `updatedAt` only.
+// ===========================================================================
+
+/** B0c — handout type discriminator for the standalone pre-listing page. */
+export const PRELISTING_TYPE = 'prelisting' as const;
+
+/** Length of the derived per-agent slug. Distinct from SLUG_LENGTH (8) so the
+ *  durable + random slug spaces never overlap. */
+const PRELISTING_SLUG_LENGTH = 12;
+
+function prelistingKey(slug: string): string {
+  return `prelisting:${slug}`;
+}
+
+/**
+ * Derive the STABLE per-agent pre-listing slug from the agent's email. SHA-256
+ * (Web Crypto — works in both Node and Edge runtimes), mapped byte-by-byte onto
+ * the Crockford base32 alphabet. `256 % 32 === 0`, so the modulo is bias-free.
+ * Deterministic: the same lowercased email always yields the same slug, which
+ * is what makes the published url durable across republishes.
+ */
+export async function deriveAgentPageSlug(email: string): Promise<string> {
+  const normalized = email.trim().toLowerCase();
+  const data = new TextEncoder().encode(`prelisting:${normalized}`);
+  const digest = await globalThis.crypto.subtle.digest('SHA-256', data);
+  const bytes = new Uint8Array(digest);
+  let slug = '';
+  for (let i = 0; i < PRELISTING_SLUG_LENGTH; i++) {
+    slug += SLUG_ALPHABET[bytes[i] % SLUG_ALPHABET.length];
+  }
+  return slug;
+}
+
+/**
+ * Publish (or republish) the agent's durable pre-listing page. Derives the
+ * stable slug, then writes `prelisting:<slug>` IN PLACE — overwriting any
+ * prior record at the same key so the url never changes. The original
+ * `createdAt` is preserved across republishes; only `data` + `updatedAt` move.
+ * A republish also clears any prior `revoked` flag (re-publishing is the
+ * explicit "put it back up" action).
+ */
+export async function publishPrelistingPage(opts: {
+  ownerEmail: string;
+  data: Record<string, unknown>;
+}): Promise<{ ok: true; slug: string }> {
+  const ownerEmail = opts.ownerEmail.toLowerCase();
+  const slug = await deriveAgentPageSlug(ownerEmail);
+  const existing = await kv.get<HandoutRecord>(prelistingKey(slug));
+  const now = new Date().toISOString();
+  const record: HandoutRecord = {
+    slug,
+    type: PRELISTING_TYPE,
+    ownerEmail,
+    createdAt: existing?.createdAt ?? now,
+    updatedAt: now,
+    data: opts.data,
+  };
+  await kv.set(prelistingKey(slug), record);
+  await kv.sadd(ownerIndexKey(ownerEmail), slug);
+  return { ok: true, slug };
+}
+
+/**
+ * Look up a durable pre-listing page by slug. Returns null for missing,
+ * revoked, or expired records — all surface as 404 from the recipient's
+ * perspective, exactly like `fetchHandout`.
+ */
+export async function fetchPrelistingPage(
+  slug: string,
+): Promise<HandoutRecord | null> {
+  const record = await kv.get<HandoutRecord>(prelistingKey(slug));
+  if (!record) return null;
+  if (record.revoked) return null;
+  if (record.expiresAt && new Date(record.expiresAt).getTime() < Date.now()) {
+    return null;
+  }
+  return record;
+}

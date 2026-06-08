@@ -1,0 +1,50 @@
+/* ===========================================================================
+   B0c — standalone pre-listing page ("why list with us"), sent BEFORE the
+   appointment. It reuses the flagship design system wholesale: the `.fs-page`
+   root, every design token, and the AgentBand / WhyUs / Reviews / Footer
+   sections verbatim. The ONLY bespoke surface is the single-CTA close band
+   below — a layout wrapper, per the B0c brief ("compose them; if a layout
+   wrapper is needed, add it without touching the shared components").
+
+   Every selector is `.fs-page`-scoped (same convention as flagship.css) so it
+   can never leak onto another surface, and it is loaded only by PrelistingPage
+   (its own code-split chunk), never by a v1 or seller page.
+   =========================================================================== */
+
+/* The intentional close — ONE decided next step, on a dark band so the reused
+   .fs-btn-primary + .fs-btn-reassure render exactly as they do on the seller
+   page (the reassurance line reads --on-dark). Centered, calm, single action. */
+.fs-page .pl-cta {
+  background: var(--dark-band);
+  color: var(--on-dark);
+  text-align: center;
+}
+.fs-page .pl-cta__head {
+  font-family: var(--fs-serif);
+  font-weight: 500;
+  line-height: 1.06;
+  font-size: clamp(26px, 6.4cqi, 38px);
+  letter-spacing: -0.012em;
+  color: var(--on-dark);
+  text-wrap: pretty;
+}
+.fs-page .pl-cta__head em {
+  font-style: italic;
+  font-weight: 400;
+  color: var(--signature);
+}
+.fs-page .pl-cta__lead {
+  font-family: var(--fs-sans);
+  font-size: clamp(15px, 4cqi, 16px);
+  line-height: 1.55;
+  color: color-mix(in srgb, var(--on-dark) 62%, transparent);
+  max-width: 42ch;
+  margin: 14px auto 0;
+}
+/* Re-center + cap the reused .fs-agent__cta stack (left-aligned on the seller
+   page; centered here for the single-action close). */
+.fs-page .pl-cta .fs-agent__cta {
+  max-width: 400px;
+  margin-inline: auto;
+  margin-top: 28px;
+}

@@ -8,8 +8,22 @@ import { Eyebrow } from "./Eyebrow";
  * PRIMARY CTA label, on the --signature fill (contract §2/§4 — terracotta
  * resolves DARK, blue/green/etc. resolve cream). The ghost CTA is on the dark
  * band, so border + label = --on-dark. Avatar status dot = --signature.
+ *
+ * B0c — two additive, backward-compatible props (defaults preserve the seller
+ * page byte-identically): `eyebrowIndex` overrides the "06" index (pass `""` to
+ * drop it on the un-numbered standalone page — the Eyebrow omits a falsy
+ * index), and `showCtas={false}` suppresses the dual CTA so the standalone page
+ * can present a single intentional close instead of a menu of options.
  */
-export function AgentBand({ payload }: { payload: PublicPayload }) {
+export function AgentBand({
+  payload,
+  eyebrowIndex = "06",
+  showCtas = true,
+}: {
+  payload: PublicPayload;
+  eyebrowIndex?: string;
+  showCtas?: boolean;
+}) {
   const a = payload.agent;
   if (!a.name?.trim()) return null;
 
@@ -30,7 +44,7 @@ export function AgentBand({ payload }: { payload: PublicPayload }) {
   return (
     <section className="fs-agent fs-block" data-testid="fs-agent">
       <div className="fs-wrap">
-        <Eyebrow index="06" label="Your agent" onDark />
+        <Eyebrow index={eyebrowIndex} label="Your agent" onDark />
         <h2 className="fs-agent__name reveal">{a.name}.</h2>
         {/* B0b — optional agent-constant tagline, surfaced next to the agent
             identity. Absent → unchanged (no empty line). */}
@@ -73,7 +87,7 @@ export function AgentBand({ payload }: { payload: PublicPayload }) {
           </div>
         )}
 
-        <AgentCtas agent={a} />
+        {showCtas && <AgentCtas agent={a} />}
       </div>
     </section>
   );
