@@ -67,3 +67,64 @@ test.describe('truthful-copy gate', () => {
     expect(violations, `Forbidden copy found:\n${violations.join('\n')}`).toEqual([]);
   });
 });
+
+/**
+ * Phase UX-1 — no-em-dash guard over the touched copy.
+ *
+ * Dallen reads em-dashes as an AI tell; the codebase is being scrubbed of
+ * them. There is no blanket scan (some older copy still carries em-dashes
+ * outside this phase's scope), so this guard is scoped to the exact strings
+ * UX-1 introduced or relabeled. Each entry asserts (a) the phrase is still
+ * present in its source file — so a silent regression to the old wording
+ * fails loudly — and (b) the phrase itself carries no em-dash.
+ *
+ * Pure-Node test — no browser.
+ */
+const UX1_TOUCHED_COPY: Array<{ file: string; phrase: string }> = [
+  {
+    file: 'src/tools/seller-presentation/components/StepEditorial.tsx',
+    phrase: 'Your video message',
+  },
+  {
+    file: 'src/tools/seller-presentation/components/StepEditorial.tsx',
+    phrase:
+      'A 60 to 90 second video walking your seller through your plan. Not a tour of the home.',
+  },
+  {
+    file: 'src/tools/seller-presentation/components/StepReview.tsx',
+    phrase: 'Now send this to your seller',
+  },
+  {
+    file: 'src/app/settings/BrandProfileForm.tsx',
+    phrase: 'Years of experience',
+  },
+  {
+    file: 'src/tools/seller-presentation/output/presentation-page.tsx',
+    phrase: 'Years of experience',
+  },
+  {
+    file: 'src/tools/seller-presentation/output/flagship/AgentBand.tsx',
+    phrase: 'Years of experience',
+  },
+  {
+    file: 'src/tools/seller-presentation/components/BrandKitForm.tsx',
+    phrase: 'resetLabel="Default"',
+  },
+];
+
+test.describe('UX-1 touched copy', () => {
+  test('relabeled / reworded strings are present and carry no em-dash', () => {
+    const problems: string[] = [];
+    for (const { file, phrase } of UX1_TOUCHED_COPY) {
+      const full = path.resolve(__dirname, '..', file);
+      const src = readFileSync(full, 'utf8');
+      if (!src.includes(phrase)) {
+        problems.push(`${file} → missing expected copy: "${phrase}"`);
+      }
+      if (phrase.includes('—')) {
+        problems.push(`${file} → em-dash in copy: "${phrase}"`);
+      }
+    }
+    expect(problems, `UX-1 copy guard:\n${problems.join('\n')}`).toEqual([]);
+  });
+});

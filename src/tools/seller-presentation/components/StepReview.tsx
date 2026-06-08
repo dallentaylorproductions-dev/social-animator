@@ -366,7 +366,7 @@ function PublishSection({
           />
         </div>
         <div className="sec6-sample">
-          <p className="sec6-sample-eyebrow">Sample text to send</p>
+          <p className="sec6-sample-eyebrow">Now send this to your seller</p>
           <p className="sec6-sample-text" data-testid="step-review-sample-text">
             {sample}
           </p>
@@ -374,7 +374,7 @@ function PublishSection({
             value={sample}
             label="Copy sample text"
             testId="step-review-copy-sample"
-            className="sec6-copy-btn sec6-copy-btn-sm"
+            className="sec6-publish-btn"
           />
         </div>
         <div className="sec6-published-actions">
@@ -520,9 +520,12 @@ export function buildSampleSendText(input: {
   const closing =
     "Take a look when you have a minute, and if anything stands out or you want to talk through the pricing together, I'm happy to walk through it with you.";
 
+  // Blank-line spacing between each paragraph so the message is scannable
+  // when pasted into a text or email, and the link sits on its own line
+  // (not buried mid-sentence). Em-dash-free; see the doc comment above.
   const lines = [greeting, body, link, closing];
   if (agentName) lines.push(agentName);
-  return lines.join("\n");
+  return lines.join("\n\n");
 }
 
 function deriveSellerName(raw?: string): string {

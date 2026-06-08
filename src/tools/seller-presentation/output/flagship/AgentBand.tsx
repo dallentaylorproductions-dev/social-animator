@@ -39,7 +39,7 @@ export function AgentBand({
   if (a.phone) fields.push({ k: "Direct", v: formatPhone(a.phone) });
   if (a.email) fields.push({ k: "Email", v: a.email });
   if (a.licenseNumber) fields.push({ k: "License", v: a.licenseNumber });
-  if (a.yearsInArea) fields.push({ k: "Years here", v: a.yearsInArea });
+  if (a.yearsInArea) fields.push({ k: "Years of experience", v: a.yearsInArea });
 
   return (
     <section className="fs-agent fs-block" data-testid="fs-agent">

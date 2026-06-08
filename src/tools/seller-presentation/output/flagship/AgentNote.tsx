@@ -45,7 +45,7 @@ export function AgentNote({ payload }: { payload: PublicPayload }) {
               controls
               playsInline
               preload="metadata"
-              aria-label={v!.title ?? "Walk-through video"}
+              aria-label={v!.title ?? "Video message from your agent"}
               data-poster-source={
                 v!.posterUrl
                   ? "override"
