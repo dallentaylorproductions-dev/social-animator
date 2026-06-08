@@ -972,3 +972,118 @@ function clampAreaStatsMonthly(raw: unknown): AreaStatsMonthly | null {
   }
   return { month: r.month, medianPrice: r.medianPrice };
 }
+
+// ===========================================================================
+// B0c — standalone pre-listing page payload (agent-constant ONLY).
+//
+// The durable "why list with us" page the agent texts BEFORE the appointment.
+// It carries NONE of the listing-specific data the seller page does — no
+// property, comps, recommended price, hero photo, area stats, video, prepared-
+// for, or pitch points. ONLY the agent-constant brand fields: identity, the
+// "Why us" package, the tagline, the curated reviews + outlink, the reviews
+// headline, and the brand colors.
+//
+// Same privacy posture as `toPublicPayload`: every field is built by EXPLICIT
+// field-by-field projection (never a spread) and re-clamped at the read
+// boundary, so a tampered Settings record or hand-edited KV record can't
+// smuggle a private/listing key into the standalone page. All content here is
+// public marketing by design, but it still rides the allowlist rails.
+// ===========================================================================
+
+/**
+ * The public projection for the standalone pre-listing page. A deliberately
+ * NARROW shape — only the agent-constant marketing fields — so the type itself
+ * documents that no listing data belongs here. The flagship sub-components
+ * (AgentBand / WhyUs / Reviews / Footer) read these same field names off a
+ * `PublicPayload`, so the renderer projects this onto a render view with empty
+ * listing defaults (see prelisting/PrelistingPage.tsx).
+ */
+export interface StandalonePrelistingPayload {
+  /** Always 2 — the standalone page renders ONLY through the flagship template. */
+  templateVersion: 2;
+  /** F4 white-label flag, projected exactly like the seller page (only literal true). */
+  suppressWordmark?: boolean;
+  /** Agent identity (name, brokerage, contact, photo, bio, areas, years, reassurance). */
+  agent: AgentBranding;
+  /** Optional agent tagline surfaced next to the identity. */
+  agentTagline?: string;
+  /** The "Why us" marketing package; undefined when nothing renderable survives the clamp. */
+  whyUs?: WhyUs;
+  /** Curated reviews (Settings-sourced). */
+  reviews?: Review[];
+  /** "See all reviews" outlink. */
+  reviewsOutlink?: ReviewsOutlink;
+  /** Optional reviews headline (overrides the default lead). */
+  reviewsHeadline?: string;
+  /** Brand colors → the flagship signature ramp. Undefined → engine default (blue). */
+  brandColors?: PublicBrandColors;
+}
+
+/**
+ * Build the standalone pre-listing payload from the agent-constant Settings
+ * inputs (the SAME `{agentContact, brandReviews, brandColors, brandWhyUs}` the
+ * shared `brandToPublishInputs` produces — minus any draft). Pure; reuses the
+ * exact projection helpers `toPublicPayload` uses, so the agent block, reviews,
+ * colors, and "Why us" are projected identically on both surfaces.
+ */
+export function toPrelistingPayload(
+  agentContact: AgentBranding,
+  brandWhyUs: BrandWhyUsInput = {},
+  brandReviews: BrandReviewsInput = {},
+  brandColors: BrandColorsInput = {},
+  whiteLabel: boolean = false,
+): StandalonePrelistingPayload {
+  const agent = projectAgent(agentContact);
+
+  const projectedReviews = Array.isArray(brandReviews.reviews)
+    ? brandReviews.reviews
+        .map(projectReview)
+        .filter((r): r is Review => r !== null)
+    : undefined;
+  const projectedOutlink = projectBrandReviewsOutlink(
+    brandReviews.reviewsOutlinkUrl,
+  );
+
+  return {
+    templateVersion: 2,
+    suppressWordmark: whiteLabel === true ? true : undefined,
+    agent,
+    agentTagline: projectPublicWhyUsText(brandWhyUs.agentTagline),
+    whyUs: clampPublicWhyUs(brandWhyUs.whyUs),
+    reviews:
+      projectedReviews && projectedReviews.length ? projectedReviews : undefined,
+    reviewsOutlink: projectedOutlink,
+    reviewsHeadline: projectPublicWhyUsText(brandWhyUs.reviewsHeadline),
+    brandColors: projectBrandColors(brandColors),
+  };
+}
+
+/**
+ * Defense-at-boundary clamp for the standalone page renderer. Reads the
+ * `prelisting:<slug>` KV record's `data` (unknown JSON) and coerces it into the
+ * typed shape, dropping any rogue / listing / private key. Re-runs the SAME
+ * allowlist helpers the projector used, so a hand-edited KV record can't leak.
+ * templateVersion is FORCED to 2 — the standalone page has no v1 form.
+ */
+export function clampPrelistingPayload(
+  raw: unknown,
+): StandalonePrelistingPayload {
+  if (!raw || typeof raw !== "object") {
+    return { templateVersion: 2, agent: {} };
+  }
+  const r = raw as Record<string, unknown>;
+  const reviews = Array.isArray(r.reviews)
+    ? r.reviews.map(clampReview).filter((rev): rev is Review => rev !== null)
+    : undefined;
+  return {
+    templateVersion: 2,
+    suppressWordmark: r.suppressWordmark === true ? true : undefined,
+    agent: clampAgentBranding(r.agent ?? r.agentBranding),
+    agentTagline: projectPublicWhyUsText(r.agentTagline),
+    whyUs: clampPublicWhyUs(r.whyUs),
+    reviews: reviews && reviews.length ? reviews : undefined,
+    reviewsOutlink: clampReviewsOutlink(r.reviewsOutlink),
+    reviewsHeadline: projectPublicWhyUsText(r.reviewsHeadline),
+    brandColors: clampBrandColors(r.brandColors),
+  };
+}

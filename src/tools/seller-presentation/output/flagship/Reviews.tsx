@@ -14,8 +14,18 @@ import { Eyebrow } from "./Eyebrow";
  *  - off        : neither → section omitted entirely (page reads complete).
  * Quote marks = --decorative; attribution rule = --signature; the only
  * brand-colored text run on the page is the link (--signature-link).
+ *
+ * B0c — `eyebrowIndex` (default "04") is an additive override; pass `""` to
+ * drop the index on the un-numbered standalone page. Default keeps the seller
+ * page byte-identical.
  */
-export function Reviews({ payload }: { payload: PublicPayload }) {
+export function Reviews({
+  payload,
+  eyebrowIndex = "04",
+}: {
+  payload: PublicPayload;
+  eyebrowIndex?: string;
+}) {
   const reviews = payload.reviews ?? [];
   const outlink = payload.reviewsOutlink;
   if (reviews.length === 0 && !outlink) return null;
@@ -33,7 +43,7 @@ export function Reviews({ payload }: { payload: PublicPayload }) {
         data-variant="outlink-only"
       >
         <div className="fs-wrap">
-          <Eyebrow index="04" label="In their words" />
+          <Eyebrow index={eyebrowIndex} label="In their words" />
           <a
             className="fs-reviews__card reveal"
             href={outlink.url}
@@ -52,7 +62,7 @@ export function Reviews({ payload }: { payload: PublicPayload }) {
   return (
     <section className="fs-reviews fs-block" data-testid="fs-reviews">
       <div className="fs-wrap">
-        <Eyebrow index="04" label="In their words" />
+        <Eyebrow index={eyebrowIndex} label="In their words" />
         {/* B0b — an agent-constant reviews headline overrides the default lead
             when set; absent → the original copy renders byte-identical. */}
         <h2 className="fs-headline reveal">
