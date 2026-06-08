@@ -1,6 +1,7 @@
 import { test, expect } from '@playwright/test';
 import { readFileSync, readdirSync, statSync } from 'node:fs';
 import path from 'node:path';
+import { defaultWhyUs } from '../src/lib/whyus';
 
 /**
  * B0a — truthful-copy gate.
@@ -126,5 +127,37 @@ test.describe('UX-1 touched copy', () => {
       }
     }
     expect(problems, `UX-1 copy guard:\n${problems.join('\n')}`).toEqual([]);
+  });
+});
+
+/**
+ * B0c-followup — no-em-dash guard over SHIPPED DEFAULT copy.
+ *
+ * `defaultWhyUs()` seeds the "Why us" editor and, unedited, publishes verbatim
+ * onto real /why pages — so it's user-facing copy and must meet the no-em-dash
+ * standard. The UX-1 guard above scans hand-listed source phrases; this one
+ * walks the actual default object's string values, so reintroducing an em-dash
+ * into any default (now or in a new field) fails CI without needing to be
+ * re-listed by hand.
+ *
+ * Pure-Node test — no browser.
+ */
+function collectStrings(value: unknown, out: string[] = []): string[] {
+  if (typeof value === 'string') out.push(value);
+  else if (Array.isArray(value)) for (const v of value) collectStrings(v, out);
+  else if (value && typeof value === 'object')
+    for (const v of Object.values(value)) collectStrings(v, out);
+  return out;
+}
+
+test.describe('shipped default copy', () => {
+  test('defaultWhyUs() carries no em-dash', () => {
+    const offenders = collectStrings(defaultWhyUs()).filter((s) =>
+      s.includes('—'),
+    );
+    expect(
+      offenders,
+      `Em-dash in default why-us copy:\n${offenders.join('\n')}`,
+    ).toEqual([]);
   });
 });

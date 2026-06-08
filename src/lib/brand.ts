@@ -392,10 +392,21 @@ function clampStoredReviews(raw: unknown): Review[] | undefined {
   return out.length ? out : undefined;
 }
 
+/**
+ * Same-tab reactivity channel for brand settings. The native `storage` event
+ * only fires in OTHER tabs, so a component that reads brand state (e.g. the
+ * pre-listing publish gate) would never hear an edit made by another component
+ * in the SAME tab (the brand profile form) until a reload. Every writer goes
+ * through `saveBrandSettings`, so it emits this event and `useBrandSettings`
+ * subscribes — live, no reload.
+ */
+export const BRAND_SETTINGS_EVENT = "socanim:brand-settings";
+
 export function saveBrandSettings(settings: BrandSettings): void {
   if (typeof window === "undefined") return;
   try {
     window.localStorage.setItem(STORAGE_KEY, JSON.stringify(settings));
+    window.dispatchEvent(new Event(BRAND_SETTINGS_EVENT));
   } catch {
     // localStorage disabled or full — silently skip
   }
@@ -418,6 +429,20 @@ export function useBrandSettings() {
 
   useEffect(() => {
     setSettings(loadBrandSettings());
+
+    // Stay live with edits made elsewhere: same-tab writes (BRAND_SETTINGS_EVENT,
+    // emitted by saveBrandSettings) and cross-tab writes (the native storage
+    // event). Both just re-read from localStorage — the single source of truth.
+    const reload = () => setSettings(loadBrandSettings());
+    const onStorage = (e: StorageEvent) => {
+      if (e.key === null || e.key === STORAGE_KEY) reload();
+    };
+    window.addEventListener(BRAND_SETTINGS_EVENT, reload);
+    window.addEventListener("storage", onStorage);
+    return () => {
+      window.removeEventListener(BRAND_SETTINGS_EVENT, reload);
+      window.removeEventListener("storage", onStorage);
+    };
   }, []);
 
   useEffect(() => {

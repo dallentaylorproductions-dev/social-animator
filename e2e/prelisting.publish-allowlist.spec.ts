@@ -19,6 +19,7 @@ import { test, expect } from "@playwright/test";
 import {
   toPrelistingPayload,
   clampPrelistingPayload,
+  withAccountEmailFallback,
   type AgentBranding,
   type BrandWhyUsInput,
   type BrandReviewsInput,
@@ -190,6 +191,43 @@ test.describe("toPrelistingPayload — agent-constant allowlist (B0c)", () => {
     expect(toPrelistingPayload({ name: "A" }, {}, {}, {}, true).suppressWordmark).toBe(true);
     expect(toPrelistingPayload({ name: "A" }, {}, {}, {}, false).suppressWordmark).toBeUndefined();
     expect(JSON.stringify(toPrelistingPayload({ name: "A" }))).not.toContain('"suppressWordmark":');
+  });
+});
+
+test.describe("withAccountEmailFallback — the CTA always has a contact (B0c-followup)", () => {
+  const ACCOUNT = "account@brokerage.com";
+
+  test("no brand contact email or phone → account email becomes the contact", () => {
+    const out = withAccountEmailFallback({ name: "Solo Agent" }, ACCOUNT);
+    expect(out.email).toBe(ACCOUNT);
+    // And it survives projection so the rendered agent carries it (CTA renders).
+    const payload = toPrelistingPayload(out);
+    expect(payload.agent.email).toBe(ACCOUNT);
+  });
+
+  test("a brand contact email wins — the account email never overrides it", () => {
+    const out = withAccountEmailFallback(
+      { name: "A", email: "public@team.com" },
+      ACCOUNT,
+    );
+    expect(out.email).toBe("public@team.com");
+  });
+
+  test("a brand phone (no email) is enough — no account fallback applied", () => {
+    const out = withAccountEmailFallback(
+      { name: "A", phone: "2532028825" },
+      ACCOUNT,
+    );
+    expect(out.email).toBeUndefined();
+    expect(out.phone).toBe("2532028825");
+  });
+
+  test("whitespace-only contact is treated as empty → account email fills in", () => {
+    const out = withAccountEmailFallback(
+      { name: "A", email: "   ", phone: "  " },
+      ACCOUNT,
+    );
+    expect(out.email).toBe(ACCOUNT);
   });
 });
 

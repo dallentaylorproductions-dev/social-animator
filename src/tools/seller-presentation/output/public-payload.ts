@@ -1020,6 +1020,30 @@ export interface StandalonePrelistingPayload {
 }
 
 /**
+ * The pre-listing page exists to drive ONE action: book a consultation. Its CTA
+ * close ("Schedule a listing consultation") is gated on a reachable contact
+ * path (email → mailto, else phone → tel). Both brand contact fields are
+ * OPTIONAL in Settings, so an agent who never filled them would publish a page
+ * with no contact and the CTA — the page's whole purpose — would silently drop.
+ *
+ * The authenticated agent ALWAYS has their account email, so fold it in as the
+ * contact of last resort: if neither a brand contact email nor phone is set,
+ * the account email becomes the contact so the close always renders. A
+ * brand-set email or phone still takes precedence (the agent's chosen public
+ * contact wins; the account login email is only the floor). Pure + side-effect
+ * free so it's unit-testable without auth.
+ */
+export function withAccountEmailFallback(
+  agentContact: AgentBranding,
+  accountEmail: string,
+): AgentBranding {
+  const hasContact =
+    !!agentContact.email?.trim() || !!agentContact.phone?.trim();
+  if (hasContact || !accountEmail.trim()) return agentContact;
+  return { ...agentContact, email: accountEmail.trim() };
+}
+
+/**
  * Build the standalone pre-listing payload from the agent-constant Settings
  * inputs (the SAME `{agentContact, brandReviews, brandColors, brandWhyUs}` the
  * shared `brandToPublishInputs` produces — minus any draft). Pure; reuses the

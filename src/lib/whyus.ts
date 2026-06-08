@@ -80,12 +80,12 @@ export function defaultWhyUs(): WhyUs {
     differentiators: [
       "We average more views per listing than any team in the area.",
       "Professional photography and video on every home, no exceptions.",
-      "You work with us directly — never handed off to an assistant.",
+      "You work with us directly. Never handed off to an assistant.",
     ],
     marketingApproach: [
       {
         title: "Professional photography & video",
-        detail: "Every listing, shot by a pro — stills, video, and twilight when it helps.",
+        detail: "Every listing, shot by a pro. Stills, video, and twilight when it helps.",
       },
       {
         title: "Targeted digital ad funnel",
