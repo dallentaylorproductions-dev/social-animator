@@ -1,4 +1,5 @@
 import type { PublicPayload } from "../public-payload";
+import { priceRangeMidpoint } from "../../engine/price-range";
 import { AreaChart } from "../presentation-page";
 import { Eyebrow } from "./Eyebrow";
 
@@ -18,8 +19,17 @@ import { Eyebrow } from "./Eyebrow";
  */
 export function AreaStats({ payload }: { payload: PublicPayload }) {
   const stats = payload.areaStats;
+  // UX-2a — the chart's recommended line is a FIXED reference banner (A7d.10,
+  // not data-scaled), so a range needs NO geometry change: feed the chip the
+  // range MIDPOINT (renders one compact number, e.g. "$750k"). Single price
+  // path is unchanged.
   const recommended =
-    payload.property.recommendedList || payload.recommendedPrice;
+    priceRangeMidpoint(
+      payload.property.recommendedListLow,
+      payload.property.recommendedListHigh,
+    ) ||
+    payload.property.recommendedList ||
+    payload.recommendedPrice;
 
   const cells: Array<{ k: string; v: string; sub?: string }> = [];
   if (stats?.medianSale)

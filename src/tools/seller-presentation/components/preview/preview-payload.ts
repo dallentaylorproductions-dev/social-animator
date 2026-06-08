@@ -24,6 +24,7 @@ import {
   clampDraft,
   type SellerPresentationDraft,
 } from "../../engine/types";
+import { isPriceRangeActive } from "../../engine/price-range";
 import {
   toPublicPayload,
   type PublicPayload,
@@ -80,7 +81,9 @@ export function isDraftSparse(draft: SellerPresentationDraft): boolean {
     draft.comps.some(
       (c) => !!c?.address?.trim() || !!c?.soldPrice?.trim(),
     );
-  const hasPrice = !!draft.recommendedPrice?.trim();
+  const hasPrice =
+    !!draft.recommendedPrice?.trim() ||
+    isPriceRangeActive(draft.recommendedPriceLow, draft.recommendedPriceHigh);
   return !hasAddress && !hasComp && !hasPrice;
 }
 
