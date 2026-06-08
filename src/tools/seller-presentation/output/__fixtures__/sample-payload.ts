@@ -201,6 +201,76 @@ export const FULL_PAYLOAD: PublicPayload = {
       { month: "May '26", medianPrice: "642000" },
     ],
   },
+  // B0b — the agent-constant "why list with us" layer. Exercises every
+  // sub-block: comparison bars (sale-to-list, days-on-market) + single big
+  // stats (views, homes sold), differentiators, marketing approach, the
+  // numbered process, and a guarantee. Plus the optional tagline + reviews
+  // headline the renderer surfaces near the agent / reviews blocks.
+  whyUs: {
+    differentiators: [
+      "You work with me directly — never handed off to an assistant.",
+      "Professional photography and video on every listing, no exceptions.",
+      "I take on eight families a year so each sale gets real attention.",
+    ],
+    marketingApproach: [
+      {
+        title: "Professional photography & video",
+        detail:
+          "Every listing, shot by a pro — stills, video, and twilight when it helps.",
+      },
+      {
+        title: "Targeted digital ad funnel",
+        detail:
+          "Your home in front of the right buyers on the platforms they actually use.",
+      },
+      {
+        title: "Featured placement & syndication",
+        detail: "Zillow Showcase plus every major portal, the first day it's live.",
+      },
+    ],
+    performanceStats: [
+      {
+        label: "Average sale-to-list",
+        yourValue: "99.4%",
+        marketValue: "97.1%",
+        unit: "%",
+      },
+      {
+        label: "Average days on market",
+        yourValue: "14",
+        marketValue: "27",
+        unit: "days",
+      },
+      { label: "Average listing views", yourValue: "1,240", unit: "views" },
+      { label: "Homes sold (last 12 months)", yourValue: "32" },
+    ],
+    howWeWork: [
+      {
+        step: "Walk the home together",
+        detail: "We see what buyers will see and plan around it.",
+      },
+      {
+        step: "Price it on real comps",
+        detail: "A number grounded in what's actually selling nearby.",
+      },
+      {
+        step: "Prep, shoot, and stage",
+        detail: "Photography, video, and any quick fixes that pay off.",
+      },
+      {
+        step: "Launch the marketing",
+        detail: "Portals, ads, and my network, all on day one.",
+      },
+      {
+        step: "Negotiate and close",
+        detail: "I handle every offer and walk you through to the keys.",
+      },
+    ],
+    guarantee:
+      "If you're not happy, cancel anytime — no fees, no hard feelings.",
+  },
+  agentTagline: "Eight families a year, each one a priority.",
+  reviewsHeadline: "What sellers say",
   agent: {
     name: "Marisol Reyes",
     brokerage: "Howard Hanna Real Estate",

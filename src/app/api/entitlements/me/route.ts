@@ -64,6 +64,10 @@ export async function GET(req: Request) {
     // locks). Server still enforces; the flag is the kill switch.
     features: {
       compImportEnabled: process.env.COMP_IMPORT_ENABLED === "true",
+      // B0b — the "Draft from your reviews" kill switch. When false, the
+      // Settings affordance hides (the route also returns 503). Default OFF
+      // unless explicitly enabled, same as comp-import.
+      reviewDraftEnabled: process.env.REVIEW_DRAFT_ENABLED === "true",
     },
   });
 }

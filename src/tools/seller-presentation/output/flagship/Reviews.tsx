@@ -53,8 +53,16 @@ export function Reviews({ payload }: { payload: PublicPayload }) {
     <section className="fs-reviews fs-block" data-testid="fs-reviews">
       <div className="fs-wrap">
         <Eyebrow index="04" label="In their words" />
+        {/* B0b — an agent-constant reviews headline overrides the default lead
+            when set; absent → the original copy renders byte-identical. */}
         <h2 className="fs-headline reveal">
-          From families <em>like yours</em>.
+          {payload.reviewsHeadline ? (
+            payload.reviewsHeadline
+          ) : (
+            <>
+              From families <em>like yours</em>.
+            </>
+          )}
         </h2>
         <div className="fs-reviews__list">
           {reviews.map((r, i) => {

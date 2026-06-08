@@ -33,6 +33,13 @@ import type {
   SellerPresentationDraft,
 } from "../engine/types";
 import { PUBLISH_TEMPLATE_VERSION } from "../config/template-version";
+import {
+  WHYUS_CAPS,
+  type WhyUs,
+  type MarketingPoint,
+  type PerformanceStat,
+  type ProcessStep,
+} from "@/lib/whyus";
 
 // Re-export the public-safe locked-design types so consumers
 // (publish route, A7b renderer, allowlist spec) can import from one
@@ -45,6 +52,19 @@ export type {
   Review,
   ReviewsOutlink,
 };
+
+/**
+ * B0b — the public projection of the agent-constant "Why us" group.
+ * Structurally identical to the Settings-side `WhyUs` (it is marketing
+ * content the agent authored to be shown publicly), but it travels under
+ * a distinct public name so the renderer + allowlist spec import the
+ * public boundary, never the Settings model. Public-safe BY CONSTRUCTION:
+ * every field is agent-authored "why list with us" copy, no private data.
+ * The projection (`clampPublicWhyUs`) still re-validates types, re-applies
+ * the soft caps, and drops un-renderable rows at BOTH the write and read
+ * boundary — being "public" does NOT skip the allowlist clamp.
+ */
+export type { WhyUs as PublicWhyUs, MarketingPoint, PerformanceStat, ProcessStep };
 
 /**
  * Agent-contact projection passed by the publish route (sourced from
@@ -102,6 +122,22 @@ export interface BrandColorsInput {
   brandAccent?: string;
   /** E.1 — optional secondary (decorative role); additive, field-by-field projected. */
   brandSecondary?: string;
+}
+
+/**
+ * B0b — agent-constant "Why us" + tagline + reviews-headline input, same
+ * provenance as `BrandReviewsInput` / `BrandColorsInput`: read from
+ * BrandSettings on the client (set once in /settings), forwarded by the
+ * publish route, projected field-by-field into the public payload. The
+ * `whyUs` field is wire-permissive (`unknown`) — `clampPublicWhyUs`
+ * coerces every field, re-applies the soft caps, and drops un-renderable
+ * rows, so a tampered or legacy settings record can never smuggle an
+ * unbounded list or a private key downstream.
+ */
+export interface BrandWhyUsInput {
+  whyUs?: unknown;
+  agentTagline?: string;
+  reviewsHeadline?: string;
 }
 
 /**
@@ -216,6 +252,20 @@ export interface PublicPayload {
   // ---- E.0 brand colors (consumer page applies as CSS custom props) ----
   /** Undefined when no brand color was set — the consumer CSS falls back to the Editorial defaults. */
   brandColors?: PublicBrandColors;
+
+  // ---- B0b agent-constant "Why us" marketing layer (v2 renderer only) ----
+  /**
+   * The pre-listing "why list with us" package, snapshotted from brand
+   * Settings at publish time. Undefined when the agent never configured it
+   * OR nothing renderable survived the clamp — the v2 Why-us section then
+   * hides cleanly (flex). Rendered ONLY by `templateVersion === 2`; v1 slugs
+   * ignore it, so an unset/v1 payload is byte-identical to today.
+   */
+  whyUs?: WhyUs;
+  /** B0b — optional agent tagline, surfaced near the agent identity. Absent → unchanged. */
+  agentTagline?: string;
+  /** B0b — optional headline for the reviews block (overrides the default lead when set). */
+  reviewsHeadline?: string;
 }
 
 /**
@@ -377,6 +427,138 @@ function projectAgent(agent: AgentBranding): AgentBranding {
   };
 }
 
+/** B0b — string coerce mirroring the whyus.ts boundary (non-strings → ""). */
+function whyUsStr(v: unknown): string {
+  return typeof v === "string" ? v : "";
+}
+
+/**
+ * B0b — project ONE marketing point. A row needs a title to render (it's a
+ * titled row); a detail-only in-progress row from Settings has no heading to
+ * show, so it drops. Field-by-field — never spread the source row.
+ */
+function projectPublicMarketingPoint(item: unknown): MarketingPoint | null {
+  if (!item || typeof item !== "object") return null;
+  const r = item as Record<string, unknown>;
+  const title = whyUsStr(r.title);
+  if (!title.trim()) return null;
+  const detail = whyUsStr(r.detail);
+  return detail.trim() ? { title, detail } : { title };
+}
+
+/**
+ * B0b — project ONE performance stat. Renderable ONLY with a label AND a
+ * value: the arrives-done skeleton rows (pre-labeled, blank `yourValue`) the
+ * agent never filled are DROPPED here at the data-out boundary so the payload
+ * carries only stats the section can actually draw. `marketValue` / `unit`
+ * survive only when non-empty.
+ */
+function projectPublicPerformanceStat(item: unknown): PerformanceStat | null {
+  if (!item || typeof item !== "object") return null;
+  const r = item as Record<string, unknown>;
+  const label = whyUsStr(r.label);
+  const yourValue = whyUsStr(r.yourValue);
+  if (!label.trim() || !yourValue.trim()) return null;
+  const out: PerformanceStat = { label, yourValue };
+  const marketValue = whyUsStr(r.marketValue);
+  if (marketValue.trim()) out.marketValue = marketValue;
+  const unit = whyUsStr(r.unit);
+  if (unit.trim()) out.unit = unit;
+  return out;
+}
+
+/** B0b — project ONE process step. Needs a `step` heading to render. */
+function projectPublicProcessStep(item: unknown): ProcessStep | null {
+  if (!item || typeof item !== "object") return null;
+  const r = item as Record<string, unknown>;
+  const step = whyUsStr(r.step);
+  if (!step.trim()) return null;
+  const detail = whyUsStr(r.detail);
+  return detail.trim() ? { step, detail } : { step };
+}
+
+/** B0b — clamp + project a list, hard-capping at its soft cap. */
+function projectPublicWhyUsList<T>(
+  raw: unknown,
+  cap: number,
+  project: (item: unknown) => T | null,
+): T[] {
+  if (!Array.isArray(raw)) return [];
+  const out: T[] = [];
+  for (const item of raw) {
+    if (out.length >= cap) break;
+    const projected = project(item);
+    if (projected !== null) out.push(projected);
+  }
+  return out;
+}
+
+/**
+ * B0b — the public "Why us" allowlist boundary, used at BOTH ends: the
+ * publish-time projection (`toPublicPayload`) and the read-time clamp
+ * (`clampPublicPayload`). Coerces every field, hard-clamps each list to its
+ * soft cap, and drops un-renderable rows. Returns `undefined` when nothing
+ * renderable survives so the v2 Why-us section hides cleanly (flex) and the
+ * payload carries no empty `whyUs` husk. Never spreads a sub-record — each
+ * field is built by explicit projection, so a tampered settings record with
+ * extra nested keys cannot leak through.
+ */
+export function clampPublicWhyUs(raw: unknown): WhyUs | undefined {
+  if (!raw || typeof raw !== "object") return undefined;
+  const r = raw as Record<string, unknown>;
+
+  const differentiators = projectPublicWhyUsList<string>(
+    r.differentiators,
+    WHYUS_CAPS.differentiators,
+    (item) => {
+      const v = whyUsStr(item);
+      return v.trim() ? v : null;
+    },
+  );
+  const marketingApproach = projectPublicWhyUsList(
+    r.marketingApproach,
+    WHYUS_CAPS.marketingApproach,
+    projectPublicMarketingPoint,
+  );
+  const performanceStats = projectPublicWhyUsList(
+    r.performanceStats,
+    WHYUS_CAPS.performanceStats,
+    projectPublicPerformanceStat,
+  );
+  const howWeWork = projectPublicWhyUsList(
+    r.howWeWork,
+    WHYUS_CAPS.howWeWork,
+    projectPublicProcessStep,
+  );
+  const guarantee = whyUsStr(r.guarantee).trim()
+    ? whyUsStr(r.guarantee)
+    : undefined;
+
+  if (
+    differentiators.length === 0 &&
+    marketingApproach.length === 0 &&
+    performanceStats.length === 0 &&
+    howWeWork.length === 0 &&
+    !guarantee
+  ) {
+    return undefined;
+  }
+
+  const out: WhyUs = {
+    differentiators,
+    marketingApproach,
+    performanceStats,
+    howWeWork,
+  };
+  if (guarantee) out.guarantee = guarantee;
+  return out;
+}
+
+/** B0b — trim-or-undefined for the scalar tagline / reviews-headline fields. */
+function projectPublicWhyUsText(v: unknown): string | undefined {
+  return typeof v === "string" && v.trim() ? v : undefined;
+}
+
 /**
  * Build the public payload from a raw draft + the agent's contact
  * card + the agent's curated reviews. Pure — same inputs always
@@ -402,6 +584,10 @@ export function toPublicPayload(
   // access mode today). Only a literal `true` projects `suppressWordmark`;
   // anything else omits the field, so today's publishes stay byte-identical.
   whiteLabel: boolean = false,
+  // B0b — agent-constant "Why us" + tagline + reviews-headline, snapshotted
+  // from BrandSettings. Wire-permissive; projected/clamped field-by-field.
+  // Appended last so every existing call site stays valid.
+  brandWhyUs: BrandWhyUsInput = {},
 ): PublicPayload {
   const propertyAddress = draft.propertyAddress ?? "";
   const recommendedPrice = draft.recommendedPrice ?? "";
@@ -432,6 +618,15 @@ export function toPublicPayload(
     : undefined;
   const projectedOutlink = projectBrandReviewsOutlink(
     brandReviews.reviewsOutlinkUrl,
+  );
+
+  // B0b — snapshot the "Why us" marketing layer through the same allowlist
+  // boundary the renderer reads back (`clampPublicWhyUs`), so the projected
+  // payload is byte-identical whether built at publish or re-clamped on read.
+  const projectedWhyUs = clampPublicWhyUs(brandWhyUs.whyUs);
+  const projectedTagline = projectPublicWhyUsText(brandWhyUs.agentTagline);
+  const projectedReviewsHeadline = projectPublicWhyUsText(
+    brandWhyUs.reviewsHeadline,
   );
 
   return {
@@ -479,6 +674,12 @@ export function toPublicPayload(
     // when nothing valid was supplied, so the consumer page falls back to
     // the production Editorial palette via its CSS var() cascade.
     brandColors: projectBrandColors(brandColors),
+
+    // B0b — the "Why us" marketing layer. Undefined when never configured /
+    // nothing renderable; the v2 section flexes out and v1 ignores it.
+    whyUs: projectedWhyUs,
+    agentTagline: projectedTagline,
+    reviewsHeadline: projectedReviewsHeadline,
   };
 }
 
@@ -557,6 +758,12 @@ export function clampPublicPayload(raw: unknown): PublicPayload {
     areaStats: clampAreaStats(r.areaStats),
     agent,
     brandColors: clampBrandColors(r.brandColors),
+    // B0b — re-clamp the "Why us" layer at the read boundary (same allowlist
+    // the projector used at publish), so a hand-edited KV record can't smuggle
+    // an unbounded list or a private key into the renderer.
+    whyUs: clampPublicWhyUs(r.whyUs),
+    agentTagline: projectPublicWhyUsText(r.agentTagline),
+    reviewsHeadline: projectPublicWhyUsText(r.reviewsHeadline),
   };
 }
 
