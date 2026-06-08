@@ -3,6 +3,7 @@
 import { useEffect, useState } from "react";
 import { drawImageContain } from "@/engine/draw";
 import type { Review } from "@/tools/seller-presentation/engine/types";
+import { type WhyUs, clampWhyUs } from "@/lib/whyus";
 
 export interface BrandSettings {
   logoDataUrl: string | null;
@@ -42,6 +43,27 @@ export interface BrandSettings {
   agentReviews?: Review[];
   /** A7d.2 — outlink URL for the reviews block (renderer pairs with a fixed "See all reviews on Zillow" label). */
   reviewsOutlinkUrl?: string;
+  /**
+   * B0a — short agent tagline. AGENT-CONSTANT, set once. One of the three
+   * text fields the "Draft from your reviews" helper can suggest (alongside
+   * `agentBioShort` and `reviewsHeadline`); the agent applies/edits, never
+   * auto-overwritten. Data-IN only this phase — B0b renders it.
+   */
+  agentTagline?: string;
+  /**
+   * B0a — headline for the reviews block (e.g. "What sellers say"). The
+   * third "Draft from your reviews" suggestion target. Optional; B0b renders.
+   */
+  reviewsHeadline?: string;
+  /**
+   * B0a — "Why us" agent-constant content group (differentiators, marketing
+   * approach, performance stats, how-we-work, guarantee). Set once in
+   * Settings; flows into every Seller Presentation in B0b. `undefined` means
+   * "never configured" — the form seeds blank state from `defaultWhyUs()` but
+   * does NOT persist on mount (mirrors the E.0 brand-color contract). See
+   * `src/lib/whyus.ts`.
+   */
+  whyUs?: WhyUs;
   /**
    * E.0 — Brand Kit color foundation. Three optional brand colors that
    * flow into every published seller page as CSS custom properties on
@@ -307,6 +329,18 @@ export function loadBrandSettings(): BrandSettings {
         parsed.reviewsOutlinkUrl.length > 0
           ? parsed.reviewsOutlinkUrl
           : undefined,
+      agentTagline:
+        typeof parsed.agentTagline === "string" && parsed.agentTagline.length > 0
+          ? parsed.agentTagline
+          : undefined,
+      reviewsHeadline:
+        typeof parsed.reviewsHeadline === "string" &&
+        parsed.reviewsHeadline.length > 0
+          ? parsed.reviewsHeadline
+          : undefined,
+      // B0a — clamp the "Why us" group to its declared shape + soft caps on
+      // load; undefined means "never configured" (form seeds from defaults).
+      whyUs: clampWhyUs(parsed.whyUs),
       // E.0 — brand colors are hex-validated on load; invalid drops to
       // undefined ("use Editorial default" via the consumer CSS cascade).
       brandBackground: clampBrandHex(parsed.brandBackground),
