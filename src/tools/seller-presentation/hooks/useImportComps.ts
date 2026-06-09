@@ -157,6 +157,10 @@ export function useImportComps({
       soldDate: c.soldDate,
       squareFeet: c.squareFeet,
       yearBuilt: c.yearBuilt,
+      // FR-2 — carry the richer imported fields onto the Comp so the §05
+      // area snapshot can auto-derive DOM + list-to-sale ratio.
+      daysOnMarket: c.daysOnMarket,
+      saleToListPercent: c.saleToListPercent,
       source: c.source,
       fieldConfidence: c.fieldConfidence,
       counted: true,

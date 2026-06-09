@@ -37,6 +37,11 @@ export interface ImportedComp {
   soldDate?: string;
   squareFeet?: string;
   yearBuilt?: number;
+  /** FR-2 — feeds the §05 area-snapshot "Days on market" cell. */
+  daysOnMarket?: string;
+  /** FR-2 — sale-to-list %, computed from list_price ÷ sold_price (we store
+   *  only the ratio on the Comp shape, never the raw list price). */
+  saleToListPercent?: string;
   /** Display-only on the review screen; not persisted to the Comp shape (no bedrooms field on the substrate Comp). */
   bedrooms?: string;
   /** Display-only on the review screen; not persisted to the Comp shape. */
@@ -114,12 +119,34 @@ function projectOneRow(
   const bathrooms = formatDecimalString(
     readByMapping(row, indexByName, mapping.bathrooms.column),
   );
+  const daysOnMarket = formatIntegerString(
+    readByMapping(row, indexByName, mapping.days_on_market.column),
+  );
+  // FR-2 — derive the sale-to-list ratio from list_price ÷ sold_price. We
+  // keep only the ratio on the Comp (the list price itself is never stored).
+  const listPriceNum = parsePriceNumber(
+    readByMapping(row, indexByName, mapping.list_price.column),
+  );
+  const soldPriceNum = parsePriceNumber(soldPriceRaw);
+  const saleToListPercent =
+    listPriceNum && soldPriceNum
+      ? `${Math.round((soldPriceNum / listPriceNum) * 100)}%`
+      : undefined;
 
   const fieldConfidence: Partial<Record<CompFieldName, ConfidenceLevel>> = {
     address: confidenceFromAddress(mapping.address_components, row, indexByName),
     soldPrice: bucketConfidence(mapping.sold_price.confidence, !!soldPrice),
     soldDate: bucketConfidence(mapping.sold_date.confidence, !!soldDate),
     squareFeet: bucketConfidence(mapping.sqft.confidence, !!sqft),
+    daysOnMarket: bucketConfidence(
+      mapping.days_on_market.confidence,
+      !!daysOnMarket,
+    ),
+    // The ratio is only as trustworthy as the weaker of its two inputs.
+    saleToListPercent: bucketConfidence(
+      Math.min(mapping.list_price.confidence, mapping.sold_price.confidence),
+      !!saleToListPercent,
+    ),
   };
 
   return {
@@ -130,9 +157,22 @@ function projectOneRow(
     yearBuilt,
     bedrooms,
     bathrooms,
+    daysOnMarket,
+    saleToListPercent,
     source: 'imported',
     fieldConfidence,
   };
+}
+
+/** Parse a raw price cell ("$258,888.88" / "270000.00") → a positive
+ *  number, or null when empty / unparseable / non-positive. */
+function parsePriceNumber(raw: string): number | null {
+  if (!raw) return null;
+  const cleaned = raw.replace(/[^0-9.\-]/g, '');
+  if (!cleaned) return null;
+  const n = parseFloat(cleaned);
+  if (!Number.isFinite(n) || n <= 0) return null;
+  return n;
 }
 
 function readByMapping(
@@ -288,5 +328,7 @@ function buildMappingNotes(mapping: ColumnMapping): MappingNote[] {
     { schemaField: 'yearBuilt', sourceColumn: mapping.year_built.column, confidence: mapping.year_built.confidence },
     { schemaField: 'bedrooms', sourceColumn: mapping.bedrooms.column, confidence: mapping.bedrooms.confidence },
     { schemaField: 'bathrooms', sourceColumn: mapping.bathrooms.column, confidence: mapping.bathrooms.confidence },
+    { schemaField: 'daysOnMarket', sourceColumn: mapping.days_on_market.column, confidence: mapping.days_on_market.confidence },
+    { schemaField: 'saleToListPercent', sourceColumn: mapping.list_price.column, confidence: mapping.list_price.confidence },
   ];
 }

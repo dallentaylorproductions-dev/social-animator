@@ -1438,6 +1438,42 @@
   line-height: 1.5;
 }
 
+/* FR-2 — area-snapshot auto-fill affordances. The banner reuses the mint
+ * from-comps language; each derivable field gets a one-tap "Use" chip that
+ * promotes the comp-derived value to a manual override. */
+.sep-wizard .area-derived-note {
+  margin: 2px 0 16px;
+}
+.sep-wizard .area-derived-fill {
+  appearance: none;
+  background: transparent;
+  border: 0;
+  margin: 5px 0 0;
+  padding: 0;
+  font-size: 12.5px;
+  line-height: 1.4;
+  color: var(--mint);
+  cursor: pointer;
+  text-align: left;
+}
+.sep-wizard .area-derived-fill strong {
+  color: var(--text);
+  font-weight: 700;
+}
+.sep-wizard .area-derived-fill:hover {
+  text-decoration: underline;
+}
+.sep-wizard .area-derived-monthly {
+  margin-top: 8px;
+  font-size: 13px;
+  color: var(--muted);
+  line-height: 1.5;
+}
+.sep-wizard .area-derived-monthly strong {
+  color: var(--text);
+  font-weight: 700;
+}
+
 /* pricing approach — "arrives chosen" + reveal */
 .sep-wizard .approach-chosen {
   display: flex;

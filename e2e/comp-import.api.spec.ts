@@ -84,6 +84,10 @@ test.describe('/api/comp-import — happy path', () => {
     expect(first.yearBuilt).toBe(1968);
     expect(first.bedrooms).toBe('1');
     expect(first.bathrooms).toBe('1');
+    // FR-2 — richer fields: DOM passes through; sale-to-list ratio is
+    // computed from List Price ÷ Selling Price ($258,888.88 / $265,000 → 98%).
+    expect(first.daysOnMarket).toBe('7');
+    expect(first.saleToListPercent).toBe('98%');
     expect(first.source).toBe('imported');
     expect(first.fieldConfidence).toBeDefined();
 
@@ -402,12 +406,12 @@ test.describe('AI column-mapping — canonical override + cache versioning (Lane
     expect(logs.some((l) => l.includes('canonical override'))).toBe(false);
   });
 
-  test('cache key is versioned: comp_import_mapping_cache:v3:<64-hex-sha>', () => {
-    expect(PROMPT_VERSION).toBe(3);
+  test('cache key is versioned: comp_import_mapping_cache:v4:<64-hex-sha>', () => {
+    expect(PROMPT_VERSION).toBe(4);
     const fakeHash = 'a'.repeat(64);
     const key = buildCacheKey(fakeHash);
-    expect(key).toBe(`comp_import_mapping_cache:v3:${fakeHash}`);
-    expect(key).toMatch(/^comp_import_mapping_cache:v3:[0-9a-f]{64}$/);
+    expect(key).toBe(`comp_import_mapping_cache:v4:${fakeHash}`);
+    expect(key).toMatch(/^comp_import_mapping_cache:v4:[0-9a-f]{64}$/);
   });
 });
 
@@ -446,6 +450,9 @@ test.describe('/api/comp-import — PDF (vision-mode) dispatch (v1.48)', () => {
     expect(first.squareFeet).toBe('2,742');
     expect(first.yearBuilt).toBe(1951);
     expect(first.bedrooms).toBe('5');
+    // FR-2 — DOM + sale-to-list ratio (SP $591,000 ÷ LP $575,000 → 103%).
+    expect(first.daysOnMarket).toBe('6');
+    expect(first.saleToListPercent).toBe('103%');
     expect(first.source).toBe('imported');
 
     // Synthetic PDF mappingNotes surface field provenance (no source columns).
@@ -463,12 +470,12 @@ test.describe('/api/comp-import — PDF (vision-mode) dispatch (v1.48)', () => {
     expect(data.ai?.source).toBe('fixture');
   });
 
-  test('PDF cache key is its own namespace: comp_import_mapping_cache:v1:pdf:<64-hex-sha>', () => {
-    expect(PROMPT_VERSION_PDF).toBe(1);
+  test('PDF cache key is its own namespace: comp_import_mapping_cache:v2:pdf:<64-hex-sha>', () => {
+    expect(PROMPT_VERSION_PDF).toBe(2);
     const fakeHash = 'a'.repeat(64);
     const key = buildPdfCacheKey(fakeHash);
-    expect(key).toBe(`comp_import_mapping_cache:v1:pdf:${fakeHash}`);
-    expect(key).toMatch(/^comp_import_mapping_cache:v1:pdf:[0-9a-f]{64}$/);
+    expect(key).toBe(`comp_import_mapping_cache:v2:pdf:${fakeHash}`);
+    expect(key).toMatch(/^comp_import_mapping_cache:v2:pdf:[0-9a-f]{64}$/);
 
     // Cross-mode collision check: CSV key with the same hash has no `:pdf:` discriminator.
     expect(buildCacheKey(fakeHash)).not.toContain(':pdf:');
