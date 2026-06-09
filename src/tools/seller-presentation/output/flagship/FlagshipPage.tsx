@@ -8,7 +8,6 @@ import { Hero } from "./Hero";
 import { Price } from "./Price";
 import { AgentNote } from "./AgentNote";
 import { WhyPrice } from "./WhyPrice";
-import { Pitch } from "./Pitch";
 import { WhyUs } from "./WhyUs";
 import { Reviews } from "./Reviews";
 import { AreaStats } from "./AreaStats";
@@ -60,10 +59,11 @@ export function FlagshipPage({ handout }: { handout: HandoutRecord }) {
         <Price payload={payload} />
         <AgentNote payload={payload} />
         <WhyPrice payload={payload} />
-        <Pitch payload={payload} />
-        {/* B0b — the agent-constant "why list with us" chapter, framing the
-            seller's reasons-to-choose alongside the home-specific story. Flexes
-            out entirely when no why-us content was configured. */}
+        {/* D1-CONSOLIDATE — the agent-constant "why list with us" chapter. The
+            per-listing pitch cards (formerly their own overlapping grid) are now
+            routed INTO WhyUs's two card sections by auto-icon theme, so there is
+            no standalone pitch section. Flexes out entirely when neither a why-us
+            package nor any pitch card is present. */}
         <WhyUs payload={payload} />
         <Reviews payload={payload} />
         <AreaStats payload={payload} />

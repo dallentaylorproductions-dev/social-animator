@@ -52,7 +52,9 @@ const STEP_SECTION: Record<StepId, string> = {
   property: "fs-hero",
   comps: "fs-why",
   strategy: "fs-price",
-  pitch: "fs-pitch",
+  // D1-CONSOLIDATE — pitch cards no longer have a standalone section; they're
+  // routed into the "why list with us" chapter, so wayfind there.
+  pitch: "fs-whyus",
   editorial: "fs-area",
   review: "fs-agent",
 };
@@ -77,12 +79,16 @@ const FIELD_ANCHOR_RULES: Array<{
   },
   // adding / importing comps → the comps section as a whole
   { match: '[data-testid^="step-comps"]', anchor: () => "fs-why" },
-  // a pitch card → that pitch item
+  // a pitch card → that routed pitch item in the why-list-with-us chapter
+  // (D1-CONSOLIDATE keeps the original pitch index as the routed card's testid
+  // suffix). A card that de-duped against a dedicated card has no anchor —
+  // best-effort, so it simply doesn't scroll.
   {
     match: '[data-testid^="step-pitch-card-"]',
-    anchor: (el) => `fs-pitch-${el.dataset.testid!.replace("step-pitch-card-", "")}`,
+    anchor: (el) =>
+      `fs-whyus-pitch-${el.dataset.testid!.replace("step-pitch-card-", "")}`,
   },
-  { match: '[data-testid^="step-pitch"]', anchor: () => "fs-pitch-0" },
+  { match: '[data-testid^="step-pitch"]', anchor: () => "fs-whyus" },
   // price / rationale / confidence → the price block
   { match: '[data-testid^="step-strategy"]', anchor: () => "fs-price" },
   // the walkthrough video → the agent-note band; area stats → the area band

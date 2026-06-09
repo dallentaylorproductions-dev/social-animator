@@ -68,12 +68,54 @@ export const RULES: ReadonlyArray<{ icon: IconName; kw: readonly string[] }> = [
   { icon: "heart", kw: ["hands-on", "personal", "dedicat", "attentive", "care", "boutique", "small", "one-on-one", "start to finish", "yourself"] },
 ];
 
-export function pickIcon(title?: string, body?: string): IconName {
+/**
+ * The resolved icon plus the keyword that triggered it (`kw` is `null` for the
+ * neutral fallback). D1-CONSOLIDATE uses the matched keyword as the de-dup
+ * signal when routing pitch cards into the dedicated sections: two cards that
+ * resolve to the SAME icon via the SAME keyword are the same point (e.g. both
+ * "photograph" → camera), so the duplicate is dropped — whereas two cards that
+ * share an icon via DIFFERENT keywords (e.g. "offer" vs "negotiat" → doc) are
+ * distinct points and both survive.
+ */
+export function matchIcon(
+  title?: string,
+  body?: string,
+): { icon: IconName; kw: string | null } {
   const t = (title || "").toLowerCase();
   const b = (body || "").toLowerCase();
-  for (const r of RULES) if (r.kw.some((k) => t.includes(k))) return r.icon; // title first
-  for (const r of RULES) if (r.kw.some((k) => b.includes(k))) return r.icon; // body as tiebreaker
-  return "sparkle"; // neutral universal fallback
+  for (const r of RULES) {
+    const k = r.kw.find((kw) => t.includes(kw)); // title first
+    if (k) return { icon: r.icon, kw: k };
+  }
+  for (const r of RULES) {
+    const k = r.kw.find((kw) => b.includes(kw)); // body as tiebreaker
+    if (k) return { icon: r.icon, kw: k };
+  }
+  return { icon: "sparkle", kw: null }; // neutral universal fallback
+}
+
+export function pickIcon(title?: string, body?: string): IconName {
+  return matchIcon(title, body).icon;
+}
+
+/**
+ * D1-CONSOLIDATE — the two destination card sections, keyed by icon theme. A
+ * routed pitch card lands in "How we market your home" when its auto-icon is a
+ * MARKETING glyph, else in "Why work with us" (the service/relationship glyphs:
+ * key, home, phone, chat, people, doc, medal, star, shield, heart, sparkle).
+ * Pure theme lookup — no AI, no new copy.
+ */
+const MARKETING_ICONS: ReadonlySet<IconName> = new Set<IconName>([
+  "camera",
+  "target",
+  "broadcast",
+  "megaphone",
+  "chart",
+  "tag",
+]);
+
+export function iconSection(icon: IconName): "marketing" | "service" {
+  return MARKETING_ICONS.has(icon) ? "marketing" : "service";
 }
 
 /** Render the resolved icon glyph; picks from (title, body) unless `name` is given. */

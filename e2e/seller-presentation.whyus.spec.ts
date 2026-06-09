@@ -54,8 +54,13 @@ test.describe("Why-us — per-block render (full fixture)", () => {
       await expect(page.getByTestId(`fs-whyus-step-${i}`)).toBeVisible();
     }
 
-    // Guarantee.
+    // Guarantee — D1-CONSOLIDATE folds it in as the closing LINE of "Why work
+    // with us" (no standalone band), but it still renders. The service section
+    // is the first present block, so its container testid resolves to "fs-whyus".
     await expect(page.getByTestId("fs-whyus-guarantee")).toBeVisible();
+    await expect(
+      page.getByTestId("fs-whyus").getByTestId("fs-whyus-guarantee"),
+    ).toBeVisible();
   });
 
   test("reading text stays ink; the bar numeral carries the signature", async ({
@@ -101,6 +106,102 @@ test.describe("Why-us — per-block render (full fixture)", () => {
     await expect(
       page.getByTestId("fs-reviews").locator("h2.head"),
     ).toContainText("What sellers say");
+  });
+});
+
+test.describe("By the numbers — agent track record framing (D1-CONSOLIDATE)", () => {
+  test("reads 'My listings' vs 'Market' — never 'This home'", async ({
+    page,
+  }) => {
+    await page.goto(FLAGSHIP_FULL);
+    const stats = page.getByTestId("fs-whyus-stats");
+    await expect(stats).toBeVisible();
+
+    // The stats are the agent's record across PAST listings (this home hasn't
+    // sold), so no "this home" framing may remain anywhere on the page.
+    await expect(page.locator("body")).not.toContainText("This home");
+    await expect(stats).toContainText("My listings");
+    await expect(stats).toContainText("Market");
+  });
+
+  test("ONE big headline (sale-to-list, with the signature track) + a compact supporting row keeps all four figures", async ({
+    page,
+  }) => {
+    await page.goto(FLAGSHIP_FULL);
+
+    // Headline = the sale-to-list percentage, at the big .cmp scale, with the
+    // animated fill track (the one signature punch).
+    const headline = page.getByTestId("fs-whyus-bar-0");
+    await expect(headline).toBeVisible();
+    await expect(headline).toContainText("99.4");
+    await expect(headline.locator(".cmp__col--you .cmp__v")).toBeVisible();
+    await expect(page.getByTestId("fs-whyus-bar-0-you")).toBeVisible(); // track
+
+    // The remaining three figures move to the compact supporting row — smaller,
+    // but every value is kept.
+    const sub = page.locator(".fs-page .bynum__sub");
+    await expect(sub).toBeVisible();
+    await expect(page.getByTestId("fs-whyus-bar-1")).toContainText("14"); // days on market
+    await expect(page.getByTestId("fs-whyus-bigstat-0")).toContainText("1,240"); // views
+    await expect(page.getByTestId("fs-whyus-bigstat-1")).toContainText("32"); // homes sold
+    // The standalone stats carry NO fabricated market column.
+    await expect(page.getByTestId("fs-whyus-bigstat-0")).not.toContainText(
+      "Market",
+    );
+  });
+});
+
+test.describe("Pitch routing — collapse into the two card sections (D1-CONSOLIDATE)", () => {
+  test("pitch cards route into the dedicated sections by auto-icon theme; the photography duplicate drops", async ({
+    page,
+  }) => {
+    await page.goto(FLAGSHIP_FULL);
+
+    const why = page.getByTestId("fs-whyus"); // service section (first present)
+    const mkt = page.getByTestId("fs-whyus-mkt-sec");
+
+    // Both destination sections receive routed pitch cards (service-themed icons
+    // → "Why work with us"; marketing-themed icons → "How we market your home").
+    const inWhy = why.locator('[data-testid^="fs-whyus-pitch-"]');
+    const inMkt = mkt.locator('[data-testid^="fs-whyus-pitch-"]');
+    await expect(inWhy.first()).toBeVisible();
+    await expect(inMkt.first()).toBeVisible();
+
+    // The "A photographer the magazines use." pitch card resolves to the SAME
+    // camera icon via the SAME keyword ("photo") as the dedicated marketing
+    // photography card → it is the duplicate and is dropped, not rendered.
+    await expect(page.getByTestId("fs-whyus-pitch-0")).toHaveCount(0);
+    await expect(page.locator("body")).not.toContainText(
+      "A photographer the magazines use",
+    );
+  });
+
+  test("no standalone pitch grid; each routed pitch point renders once, never in both sections", async ({
+    page,
+  }) => {
+    await page.goto(FLAGSHIP_FULL);
+
+    // The old standalone pitch section ("A quiet, thorough way to sell") is gone.
+    await expect(page.getByTestId("fs-pitch")).toHaveCount(0);
+    await expect(page.locator("body")).not.toContainText(
+      "A quiet, thorough way to sell",
+    );
+
+    // Every routed pitch card sits in EXACTLY one section — a card routes by its
+    // single icon, so the same point can never appear in both grids.
+    const total = await page
+      .locator('[data-testid^="fs-whyus-pitch-"]')
+      .count();
+    const inWhy = await page
+      .getByTestId("fs-whyus")
+      .locator('[data-testid^="fs-whyus-pitch-"]')
+      .count();
+    const inMkt = await page
+      .getByTestId("fs-whyus-mkt-sec")
+      .locator('[data-testid^="fs-whyus-pitch-"]')
+      .count();
+    expect(total).toBeGreaterThan(0);
+    expect(inWhy + inMkt).toBe(total); // no card double-rendered across sections
   });
 });
 

@@ -126,17 +126,25 @@ test.describe("D1 — auto-icons on why-us + how-we-market cards", () => {
   test("each card renders an auto-assigned line icon", async ({ page }) => {
     await page.goto(FLAGSHIP);
 
-    // Why-work-with-us: 3 differentiator cards, each with a resolved icon.
-    const diffIcons = page.locator('[data-testid^="fs-whyus-diff-"] [data-icon]');
-    await expect(diffIcons).toHaveCount(3);
+    // Why-work-with-us: the 3 dedicated differentiator cards each resolve an
+    // icon. (D1-CONSOLIDATE also routes theme-matched pitch cards into this
+    // section under their own fs-whyus-pitch-* testids — checked separately.)
+    for (const i of [0, 1, 2]) {
+      await expect(
+        page.getByTestId(`fs-whyus-diff-${i}`).locator("[data-icon]"),
+      ).toHaveCount(1);
+    }
     // The photography differentiator resolves to the camera icon.
     await expect(
       page.getByTestId("fs-whyus-diff-1").locator("[data-icon]"),
     ).toHaveAttribute("data-icon", "camera");
 
-    // How-we-market: 3 feature cards, each with a resolved icon.
-    const mktIcons = page.locator('[data-testid^="fs-whyus-mkt-"] [data-icon]');
-    await expect(mktIcons).toHaveCount(3);
+    // How-we-market: the 3 dedicated feature cards each resolve an icon.
+    for (const i of [0, 1, 2]) {
+      await expect(
+        page.getByTestId(`fs-whyus-mkt-${i}`).locator("[data-icon]"),
+      ).toHaveCount(1);
+    }
     await expect(
       page.getByTestId("fs-whyus-mkt-1").locator("[data-icon]"),
     ).toHaveAttribute("data-icon", "target");

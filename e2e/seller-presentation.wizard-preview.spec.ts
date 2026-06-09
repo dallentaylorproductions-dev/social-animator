@@ -154,14 +154,16 @@ test.describe("Wizard live preview — field-level scroll-sync", () => {
     await page.getByLabel("recommended-price").focus();
     await expect.poll(() => anchorInView(screen, "fs-price")).toBe(true);
 
-    // Pitch → cards seed on entry; focusing point 0 reveals fs-pitch-0.
+    // Pitch → cards seed on entry; D1-CONSOLIDATE routes each pitch point into
+    // the why-list-with-us chapter (keeping its index), so point 0 reveals
+    // fs-whyus-pitch-0.
     await page.getByTestId("wizard-next").click();
     await expect(page.getByTestId("step-pitch")).toBeVisible();
     await expect(page.getByTestId("step-pitch-card-0")).toBeVisible();
-    await expect(screen.getByTestId("fs-pitch-0")).toBeAttached();
+    await expect(screen.getByTestId("fs-whyus-pitch-0")).toBeAttached();
     await scrollScreenTop(screen);
     await page.getByTestId("step-pitch-title-0").focus();
-    await expect.poll(() => anchorInView(screen, "fs-pitch-0")).toBe(true);
+    await expect.poll(() => anchorInView(screen, "fs-whyus-pitch-0")).toBe(true);
   });
 });
 
