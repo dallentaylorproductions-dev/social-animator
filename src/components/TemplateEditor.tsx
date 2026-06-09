@@ -340,7 +340,12 @@ export function TemplateEditor({ template }: TemplateEditorProps) {
 
   return (
     <main className="min-h-screen bg-neutral-950 text-white">
-      <div className="max-w-6xl mx-auto p-6 lg:p-10">
+      {/* M-2: in installed standalone the iOS status bar painted over the
+          "← Social Animator" back link once a template was open. Replace the
+          symmetric p-6/p-10 top with a safe-area-aware top pad so the header
+          clears the status bar; the main's bg-neutral-950 fills behind it.
+          max() keeps the 24px/40px in a normal browser (insets = 0). */}
+      <div className="max-w-6xl mx-auto px-6 pb-6 lg:px-10 lg:pb-10 pt-[max(1.5rem,env(safe-area-inset-top))] lg:pt-[max(2.5rem,env(safe-area-inset-top))]">
         <header className="mb-8">
           <Link
             href="/social-animator"
