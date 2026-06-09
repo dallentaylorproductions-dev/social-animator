@@ -36,8 +36,12 @@ export function Price({ payload }: { payload: PublicPayload }) {
   return (
     <section className="fs-price fs-block" data-testid="fs-price">
       <div className="fs-wrap">
-        <Eyebrow label="Recommended list" />
-        <div className="fs-price__inner">
+        {/* The white price panel pulls UP onto the dark hero band (overlap
+            depth), teal accent rule on its left edge — the hero typographic
+            moment per the locked design. */}
+        <div className="fs-price__panel reveal">
+          <Eyebrow label="Recommended list" />
+          <div className="fs-price__inner">
           {isRange ? (
             // UX-2a-followup — distinct stable `key` per mode. The count-up
             // driver (motion.ts) imperatively rewrites the single-price
@@ -78,13 +82,14 @@ export function Price({ payload }: { payload: PublicPayload }) {
               )}
             </div>
           )}
-          {hasCount(n) && (
-            <p className="fs-price__note fs-price__side reveal">
-              Based on{" "}
-              <span className="fs-price__note-b">{priceNoteCountLabel(n)}</span>{" "}
-              nearby.
-            </p>
-          )}
+            {hasCount(n) && (
+              <p className="fs-price__note fs-price__side reveal">
+                Based on{" "}
+                <span className="fs-price__note-b">{priceNoteCountLabel(n)}</span>{" "}
+                nearby.
+              </p>
+            )}
+          </div>
         </div>
       </div>
     </section>

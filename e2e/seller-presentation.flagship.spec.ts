@@ -7,7 +7,7 @@ import { test, expect, type Page } from "@playwright/test";
  * assertions (font-drift-immune).
  */
 
-const INK = "rgb(26, 22, 18)"; // --ink #1a1612 (layout-locked, every signature)
+const INK = "rgb(27, 42, 46)"; // --ink #1B2A2E (D1 locked neutral, every signature)
 
 const FLAGSHIP = "/seller-presentation-preview?fixture=full&template=flagship";
 

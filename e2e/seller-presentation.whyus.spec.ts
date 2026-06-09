@@ -14,7 +14,7 @@ import { test, expect, type Page } from "@playwright/test";
  *   - v1 cohort — an unset/v1 payload never mounts the section or leaks the copy.
  */
 
-const INK = "rgb(26, 22, 18)"; // --ink #1a1612 (layout-locked, every signature)
+const INK = "rgb(27, 42, 46)"; // --ink #1B2A2E (D1 locked neutral, every signature)
 
 const FLAGSHIP_FULL =
   "/seller-presentation-preview?fixture=full&template=flagship";
@@ -66,13 +66,13 @@ test.describe("Why-us — per-block render (full fixture)", () => {
     // Body copy (a differentiator) is ink — legibility never rides the accent.
     const diffText = page
       .getByTestId("fs-whyus-diff-0")
-      .locator(".fs-whyus__diff-text");
+      .locator(".fs-whyus__card-text");
     expect(await read(diffText, "color")).toBe(INK);
 
     // The substantive bar value is NOT ink (it carries --signature, deepened on
     // pale-signature pages). Proving it differs from ink keeps the design intent
     // honest without hardcoding a specific signature hex.
-    const barVal = page.getByTestId("fs-whyus-bar-0").locator(".fs-bar__val");
+    const barVal = page.getByTestId("fs-whyus-bar-0").locator(".fs-bynum__home");
     expect(await read(barVal, "color")).not.toBe(INK);
   });
 

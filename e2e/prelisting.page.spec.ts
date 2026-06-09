@@ -14,7 +14,7 @@ import { test, expect, type Page } from "@playwright/test";
  *   - NO listing surfaces (price / hero / comps) ever render on this page.
  */
 
-const INK = "rgb(26, 22, 18)"; // --ink #1a1612, layout-locked across every signature
+const INK = "rgb(27, 42, 46)"; // --ink #1B2A2E (D1 locked neutral), layout-locked across every signature
 
 const FULL = "/prelisting-preview?fixture=full";
 const MINIMAL = "/prelisting-preview?fixture=minimal";
@@ -66,7 +66,7 @@ test.describe("Pre-listing page — full fixture", () => {
     await page.goto(FULL);
     const diffText = page
       .getByTestId("fs-whyus-diff-0")
-      .locator(".fs-whyus__diff-text");
+      .locator(".fs-whyus__card-text");
     expect(await read(diffText, "color")).toBe(INK);
   });
 

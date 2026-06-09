@@ -4,31 +4,32 @@ import type {
   PublicWhyUs,
 } from "../public-payload";
 import { Eyebrow } from "./Eyebrow";
+import { AutoIcon } from "./icons";
 
 /**
- * B0b · Why us — the agent-constant "why list with us" chapter (paper-tinted
- * band). The FIRST piece of the Beacon-grade consumer page: the differentiation
- * the seller actually sees. Sourced from brand Settings, snapshotted into the
- * payload at publish (`payload.whyUs`), rendered ONLY on the flagship (v2)
- * template — v1 slugs never mount this.
+ * B0b / D1 · Why us — the agent-constant "why list with us" chapter. The B0b
+ * monolith is split into the LOCKED design's distinct banded beats so the
+ * 4-dark-beat rhythm and the warm/cool tint variation land, WITHOUT changing
+ * any data point or word:
  *
- * FLEX (sep-flex-in-out-optional-blocks): every sub-block hides cleanly when
- * its list is empty. The page reads complete with all of why-us, some, or none
- * — no empty headers, no "coming soon." The whole section is absent when the
- * clamp returned no renderable content (`payload.whyUs === undefined`).
+ *   1. Why work with us   — cream band, elevated WHITE cards w/ auto-icons (diffs)
+ *   2. By the numbers     — DARK beat, the 98.3-vs-market comparison (performanceStats)
+ *   3. How we market       — WARM sand band, prominent auto-icon feature cards
+ *   4. How we work         — COOL mist band, horizontal stepper / vertical timeline
+ *   5. Our guarantee       — quiet paper statement (preserved verbatim)
  *
- * COLOR / LEGIBILITY (sep-template-image-text-legibility-rule): the substantive
- * numbers — the comparison bars + single big stats — carry the agent's
- * `--signature`; ALL reading text stays `--ink` / `--ink-soft`. The bars sit on
- * tinted tracks (real tonal range, calm ≠ flat); body legibility never depends
- * on the accent. Pale signatures fall through the shared `--display-seat` gate
- * (flagship.css §D), which deepens + chips the big numerals.
+ * FLEX (sep-flex-in-out-optional-blocks): every beat hides cleanly when its
+ * list is empty; the whole chapter is absent when `payload.whyUs === undefined`.
+ * `data-testid="fs-whyus"` rides the FIRST beat that renders, so it marks the
+ * chapter's presence regardless of which blocks the agent configured.
  *
- * MOTION (sep-consumer-template-motion-direction): motivated only. Each row is a
- * `.reveal` the shared driver keys on; the comparison-bar FILLS draw on once
- * when their row reveals (CSS `.reveal.in .fs-bar__fill { width: var(--w) }`),
- * mirroring the chart's draw-on. No gratuitous movement; reduced-motion lands
- * every bar at full width instantly.
+ * COLOR / LEGIBILITY: substantive numbers carry the agent `--signature` (the
+ * by-the-numbers headline figure pops in `--mint` on the dark beat); ALL reading
+ * text stays ink / on-dark. Body legibility never rides the accent.
+ *
+ * MOTION: each row is a `.reveal` the shared driver keys on; the comparison-bar
+ * fills draw on once when their row reveals. Reduced-motion lands everything at
+ * its final state.
  */
 export function WhyUs({ payload }: { payload: PublicPayload }) {
   const whyUs = payload.whyUs;
@@ -37,112 +38,157 @@ export function WhyUs({ payload }: { payload: PublicPayload }) {
   const { differentiators, marketingApproach, howWeWork, guarantee } = whyUs;
   const { bars, bigStats } = splitStats(whyUs.performanceStats);
 
+  // The flagship testid rides the first beat that actually renders, so the
+  // chapter is always marked present (and absent when nothing renders).
+  const present = {
+    diffs: differentiators.length > 0,
+    stats: bars.length > 0 || bigStats.length > 0,
+    mkt: marketingApproach.length > 0,
+    work: howWeWork.length > 0,
+    guarantee: !!guarantee,
+  };
+  const firstKey = (
+    ["diffs", "stats", "mkt", "work", "guarantee"] as const
+  ).find((k) => present[k]);
+  const chapterTid = (k: typeof firstKey) =>
+    k === firstKey ? { "data-testid": "fs-whyus" } : {};
+
   return (
-    <section className="fs-whyus fs-block" data-testid="fs-whyus">
-      <div className="fs-wrap">
-        {/* Label-only eyebrow (no index) — the same un-numbered grammar the hero
-            and price sections use, so inserting this chapter leaves every
-            numbered section's eyebrow untouched. */}
-        <Eyebrow label="Why work with us" />
-        <h2 className="fs-headline reveal">
-          A few reasons to <em>list with us</em>.
-        </h2>
+    <>
+      {present.diffs && (
+        <section
+          className="fs-whyus fs-block"
+          data-testid="fs-whyus-diffs"
+          {...chapterTid("diffs")}
+        >
+          <div className="fs-wrap">
+            <Eyebrow label="Why work with us" />
+            <h2 className="fs-headline reveal">
+              A few reasons to <em>list with us</em>.
+            </h2>
+            <div className="fs-whyus__cards">
+              {differentiators.map((d, i) => (
+                <div
+                  className="fs-whyus__card reveal"
+                  key={i}
+                  data-testid={`fs-whyus-diff-${i}`}
+                >
+                  <span className="fs-iconmark fs-iconmark--sm" aria-hidden="true">
+                    <AutoIcon title={d} />
+                  </span>
+                  <p className="fs-whyus__card-text">{emphasizeFigure(d)}</p>
+                </div>
+              ))}
+            </div>
+          </div>
+        </section>
+      )}
 
-        {differentiators.length > 0 && (
-          <ul className="fs-whyus__diffs" data-testid="fs-whyus-diffs">
-            {differentiators.map((d, i) => (
-              <li
-                className="fs-whyus__diff reveal"
-                key={i}
-                data-testid={`fs-whyus-diff-${i}`}
-              >
-                <span className="fs-whyus__diff-mark" aria-hidden="true" />
-                <span className="fs-whyus__diff-text">{d}</span>
-              </li>
-            ))}
-          </ul>
-        )}
-
-        {(bars.length > 0 || bigStats.length > 0) && (
-          <div className="fs-whyus__group" data-testid="fs-whyus-stats">
-            <SubHead>By the numbers</SubHead>
+      {present.stats && (
+        <section
+          className="fs-bynum fs-block"
+          data-testid="fs-whyus-stats"
+          {...chapterTid("stats")}
+        >
+          <div className="fs-wrap">
+            <Eyebrow label="By the numbers" onDark />
             {bars.length > 0 && (
-              <div className="fs-bars">
+              <div className="fs-bynum__bars">
                 {bars.map((b, i) => (
                   <CompareBar key={i} bar={b} index={i} />
                 ))}
               </div>
             )}
             {bigStats.length > 0 && (
-              <div className="fs-whyus__bigstats">
+              <div className="fs-bynum__big">
                 {bigStats.map((s, i) => (
                   <BigStat key={i} stat={s} index={i} />
                 ))}
               </div>
             )}
           </div>
-        )}
+        </section>
+      )}
 
-        {marketingApproach.length > 0 && (
-          <div className="fs-whyus__group" data-testid="fs-whyus-mkt">
-            <SubHead>How we market your home</SubHead>
-            <div className="fs-whyus__mkt-list">
+      {present.mkt && (
+        <section
+          className="fs-mkt fs-block tint-warm"
+          data-testid="fs-whyus-mkt-sec"
+          {...chapterTid("mkt")}
+        >
+          <div className="fs-wrap">
+            <Eyebrow label="How we market your home" />
+            <div className="fs-mkt__grid">
               {marketingApproach.map((m, i) => (
                 <div
-                  className="fs-whyus__mkt-row reveal"
+                  className="fs-mkt__card reveal"
                   key={i}
                   data-testid={`fs-whyus-mkt-${i}`}
                 >
-                  <div className="fs-whyus__mkt-title">{m.title}</div>
-                  {m.detail && (
-                    <p className="fs-whyus__mkt-detail">{m.detail}</p>
-                  )}
+                  <span className="fs-iconmark fs-iconmark--lg" aria-hidden="true">
+                    <AutoIcon title={m.title} body={m.detail} />
+                  </span>
+                  <div className="fs-mkt__title">{m.title}</div>
+                  {m.detail && <p className="fs-mkt__detail">{m.detail}</p>}
                 </div>
               ))}
             </div>
           </div>
-        )}
+        </section>
+      )}
 
-        {howWeWork.length > 0 && (
-          <div className="fs-whyus__group" data-testid="fs-whyus-process">
-            <SubHead>How we work</SubHead>
-            <ol className="fs-whyus__steps">
+      {present.work && (
+        <section
+          className="fs-work fs-block tint-cool"
+          data-testid="fs-whyus-process"
+          {...chapterTid("work")}
+        >
+          <div className="fs-wrap">
+            <Eyebrow label="How we work" />
+            <h2 className="fs-headline reveal">
+              From hello to <em>handed keys</em>.
+            </h2>
+            <ol className="fs-stepper">
               {howWeWork.map((s, i) => (
                 <li
-                  className="fs-whyus__step reveal"
+                  className="fs-step reveal"
                   key={i}
                   data-testid={`fs-whyus-step-${i}`}
                 >
-                  <div className="fs-whyus__step-h">{s.step}</div>
-                  {s.detail && (
-                    <p className="fs-whyus__step-p">{s.detail}</p>
-                  )}
+                  <span className="fs-step__badge" aria-hidden="true">
+                    {i + 1}
+                  </span>
+                  <div className="fs-step__h">{s.step}</div>
+                  {s.detail && <p className="fs-step__p">{s.detail}</p>}
                 </li>
               ))}
             </ol>
           </div>
-        )}
+        </section>
+      )}
 
-        {guarantee && (
-          <div
-            className="fs-whyus__guarantee reveal"
-            data-testid="fs-whyus-guarantee"
-          >
-            <div className="fs-whyus__guarantee-k">Our guarantee</div>
-            <p className="fs-whyus__guarantee-p">{guarantee}</p>
+      {present.guarantee && guarantee && (
+        <section
+          className="fs-guarantee fs-block"
+          data-testid="fs-whyus-guarantee"
+          {...chapterTid("guarantee")}
+        >
+          <div className="fs-wrap">
+            <div className="fs-guarantee__k">Our guarantee</div>
+            <p className="fs-guarantee__p reveal">{guarantee}</p>
           </div>
-        )}
-      </div>
-    </section>
+        </section>
+      )}
+    </>
   );
 }
 
-/** A quiet mono sub-heading that opens each why-us sub-block. */
-function SubHead({ children }: { children: string }) {
-  return <div className="fs-whyus__subhead reveal">{children}</div>;
-}
-
-/** A single quantified comparison row — the Beacon "we do this differently" block. */
+/**
+ * The signature "we do this differently" comparison — on the DARK by-the-numbers
+ * beat. The "this home" value is the earned MINT moment (huge); the market value
+ * is muted; a track fills from signature→mint to the home magnitude with a tick
+ * at the market magnitude. Labels clear the numbers at every width.
+ */
 interface BarModel {
   stat: PerformanceStat;
   your: number;
@@ -152,92 +198,97 @@ interface BarModel {
 function CompareBar({ bar, index }: { bar: BarModel; index: number }) {
   const { stat, your, market } = bar;
   const max = Math.max(your, market) || 1;
-  // Floor a non-zero magnitude to a visible sliver so a small-but-real value
-  // never disappears; a true zero stays empty.
-  const width = (v: number) => (v <= 0 ? 0 : Math.max(4, (v / max) * 100));
+  const pct = (v: number) => (v <= 0 ? 0 : Math.max(4, (v / max) * 100));
 
   return (
-    <div
-      className="fs-bar reveal"
-      data-testid={`fs-whyus-bar-${index}`}
-    >
-      <div className="fs-bar__label">{stat.label}</div>
-
-      <div className="fs-bar__row">
-        <div className="fs-bar__track">
-          <div
-            className="fs-bar__fill"
-            style={barStyle(width(your))}
-            data-testid={`fs-whyus-bar-${index}-you`}
-          />
+    <div className="fs-bynum__bar reveal" data-testid={`fs-whyus-bar-${index}`}>
+      <div className="fs-bynum__bar-label">{stat.label}</div>
+      <div className="fs-bynum__bar-vals">
+        <div className="fs-bynum__col">
+          <div className="fs-bynum__home">
+            {displayStat(stat.yourValue, stat.unit)}
+          </div>
+          <div className="fs-bynum__caption">This home</div>
         </div>
-        <div className="fs-bar__val">{displayStat(stat.yourValue, stat.unit)}</div>
+        <div className="fs-bynum__col fs-bynum__col--market">
+          <div className="fs-bynum__mkt">
+            {displayStat(stat.marketValue ?? "", stat.unit)}
+          </div>
+          <div className="fs-bynum__caption">Market avg</div>
+        </div>
       </div>
-
-      <div className="fs-bar__row fs-bar__row--market">
-        <div className="fs-bar__track">
-          <div
-            className="fs-bar__fill fs-bar__fill--market"
-            style={barStyle(width(market))}
-          />
-        </div>
-        <div className="fs-bar__mval">
-          {displayStat(stat.marketValue ?? "", stat.unit)}
-          <span className="fs-bar__mtag"> market avg</span>
-        </div>
+      <div className="fs-bynum__track">
+        <div
+          className="fs-bynum__fill"
+          style={barStyle(pct(your))}
+          data-testid={`fs-whyus-bar-${index}-you`}
+        />
+        <div
+          className="fs-bynum__tick"
+          style={tickStyle(pct(market))}
+          aria-hidden="true"
+        />
       </div>
     </div>
   );
 }
 
-/** A stat with no market comparison — rendered as a single big figure. */
+/** A stat with no market comparison — a single big figure on the dark beat. */
 function BigStat({ stat, index }: { stat: PerformanceStat; index: number }) {
   const suffix = wordUnit(stat.unit);
   return (
-    <div
-      className="fs-whyus__bigstat reveal"
-      data-testid={`fs-whyus-bigstat-${index}`}
-    >
-      <div className="fs-whyus__bignum">
+    <div className="fs-bynum__bigstat reveal" data-testid={`fs-whyus-bigstat-${index}`}>
+      <div className="fs-bynum__bignum">
         {stat.yourValue}
-        {suffix && <span className="fs-whyus__bigunit">{suffix}</span>}
+        {suffix && <span className="fs-bynum__bigunit">{suffix}</span>}
       </div>
-      <div className="fs-whyus__biglabel">{stat.label}</div>
+      <div className="fs-bynum__biglabel">{stat.label}</div>
     </div>
   );
 }
 
 /**
- * Inline CSS custom property the draw-on keys on. The fill is width:0 until its
- * `.reveal` row gets `.in`, then transitions to `--w`. Typed for the style
- * prop without leaking a non-standard key into the public CSSProperties.
+ * Wrap the FIRST standalone figure (a number, optionally with % / a trailing
+ * unit word) in `.emph` so each why-us card carries one emphasized figure (the
+ * "one emphasis per block" craft) — purely presentational, the text is verbatim.
+ * No figure → the string renders unchanged.
  */
+function emphasizeFigure(text: string): React.ReactNode {
+  const m = text.match(/(\d[\d,.]*\s?%?)/);
+  if (!m || m.index === undefined) return text;
+  const start = m.index;
+  const end = start + m[0].length;
+  return (
+    <>
+      {text.slice(0, start)}
+      <span className="emph">{text.slice(start, end)}</span>
+      {text.slice(end)}
+    </>
+  );
+}
+
 function barStyle(pct: number): React.CSSProperties {
   return { ["--w" as string]: `${pct}%` } as React.CSSProperties;
 }
+function tickStyle(pct: number): React.CSSProperties {
+  return { ["--tick" as string]: `${pct}%` } as React.CSSProperties;
+}
 
-/** A word unit (days / views) shown as a quiet suffix; "%" rides inside the value already. */
 function wordUnit(unit?: string): string | undefined {
   if (!unit) return undefined;
   const u = unit.trim();
   return u && u !== "%" ? u : undefined;
 }
 
-/**
- * Display a stat value verbatim (PercentInput already carries its own "%",
- * NumberInput stores the comma-grouped figure), appending a word unit when one
- * applies. Never re-formats the number — the agent typed exactly this.
- */
 function displayStat(value: string, unit?: string): string {
   const suffix = wordUnit(unit);
   return suffix ? `${value} ${suffix}` : value;
 }
 
 /**
- * Partition the stats into comparison bars (a market value present and both
- * sides parse to a number) vs single big stats (everything else). Keeps the
- * signature comparison block coherent and never tries to draw a bar it can't
- * measure.
+ * Partition stats into comparison bars (a market value present and both sides
+ * parse to a number) vs single big stats (everything else). Keeps the signature
+ * comparison block coherent and never tries to draw a bar it can't measure.
  */
 function splitStats(stats: PublicWhyUs["performanceStats"]): {
   bars: BarModel[];
@@ -262,7 +313,6 @@ function splitStats(stats: PublicWhyUs["performanceStats"]): {
   return { bars, bigStats };
 }
 
-/** Parse the leading magnitude from a display value ("98.2%" → 98.2, "1,240" → 1240). */
 function parseStatNum(raw: string): number | null {
   const cleaned = raw.replace(/[^0-9.]/g, "");
   if (!cleaned) return null;

@@ -54,12 +54,13 @@ test.describe("F3 — Brand-kit live preview shows the flagship rhythm", () => {
     );
     expect(priceBig).toBe(hexToRgb(roles.signature));
 
-    // The §4 "why this price" band is a --tint-12 confident band.
-    const bandTint = await read(
-      page.locator(".fs-page .fs-why").first(),
+    // The auto-icon mark wash is the --tint-12 role (D1 locked design uses the
+    // accent tints for marks/pills/tracks, never full section bands).
+    const tintMark = await read(
+      page.locator(".fs-page .fs-iconmark").first(),
       "background-color",
     );
-    expect(bandTint).toBe(hexToRgb(roles.tint12));
+    expect(tintMark).toBe(hexToRgb(roles.tint12));
 
     // The role var is declared on the flagship root itself (the live path).
     const rootSig = await read(

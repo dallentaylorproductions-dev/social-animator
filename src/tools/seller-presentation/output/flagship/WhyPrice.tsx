@@ -62,8 +62,17 @@ export function WhyPrice({ payload }: { payload: PublicPayload }) {
   );
 }
 
+/**
+ * D1 — redesigned comp card with a PHOTO SLOT that flexes:
+ *  - with a photo  → a 16:10 image on top (desktop) / slim 116px strip (mobile);
+ *  - without       → the photo block is omitted and the text-only card sits
+ *    cleanly beside a photo card (grid `align-items:start`).
+ * D1 ships the slot; comps stay text-only until D3 wires the real upload. Photos
+ * are agent-uploaded/URL only (never scraped).
+ */
 function CompRow({ comp, index }: { comp: PublicComp; index: number }) {
   const no = String(index + 1).padStart(2, "0");
+  const hasPhoto = !!comp.photoUrl;
   const sub = [
     comp.sqft ? `${comp.sqft} sqft` : null,
     comp.yearBuilt !== undefined ? `Built ${comp.yearBuilt}` : null,
@@ -73,15 +82,28 @@ function CompRow({ comp, index }: { comp: PublicComp; index: number }) {
     .join(" · ");
 
   return (
-    <div className="fs-comp reveal" data-testid={`fs-comp-${index}`}>
-      <div className="fs-comp__no">{no}</div>
-      <div>
-        <div className="fs-comp__addr">{comp.address || "—"}</div>
-        {sub && <div className="fs-comp__sub">{sub}</div>}
-      </div>
-      <div>
-        <div className="fs-comp__price">{comp.soldPrice || "—"}</div>
-        <span className="fs-comp__tag">Sold</span>
+    <div
+      className={`fs-comp reveal${hasPhoto ? " fs-comp--photo" : ""}`}
+      data-testid={`fs-comp-${index}`}
+    >
+      {hasPhoto && (
+        <div
+          className="fs-comp__photo"
+          data-testid={`fs-comp-${index}-photo`}
+          style={{ backgroundImage: `url("${comp.photoUrl!.replace(/"/g, '\\"')}")` }}
+          aria-hidden="true"
+        />
+      )}
+      <div className="fs-comp__body">
+        <div className="fs-comp__no">{no}</div>
+        <div className="fs-comp__main">
+          <div className="fs-comp__addr">{comp.address || "—"}</div>
+          {sub && <div className="fs-comp__sub">{sub}</div>}
+        </div>
+        <div className="fs-comp__pricewrap">
+          <div className="fs-comp__price">{comp.soldPrice || "—"}</div>
+          <span className="fs-comp__tag">Sold</span>
+        </div>
       </div>
     </div>
   );

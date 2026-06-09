@@ -191,6 +191,14 @@ export interface PublicComp {
   soldDate?: string;
   sqft?: string;
   yearBuilt?: number;
+  /**
+   * D1 — agent-uploaded/URL comp photo SLOT. The flagship comp card renders a
+   * photo when this is set and a clean text-only card when it is absent (the
+   * slot flexes in/out). D1 ships the slot only; `projectComp` does NOT populate
+   * it yet, so every D1 comp stays text-only — D3 wires the real upload. Photos
+   * are never scraped.
+   */
+  photoUrl?: string;
   // ---- A6 deprecated — never populated by toPublicPayload post-A7a.
   //      Type kept for A6 functional renderer back-compat ONLY.
   /** @deprecated A7a removed from public emit. Will be removed once A7b ships. */

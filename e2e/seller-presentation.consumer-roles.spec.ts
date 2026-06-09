@@ -11,8 +11,8 @@ import { test, expect } from "@playwright/test";
 import { deriveConsumerRoles } from "../src/tools/seller-presentation/output/consumer-roles";
 import { BrandEngine } from "../src/lib/brand/color-engine";
 
-const PAPER = "#F1EBE0";
-const INK = "#1A1612";
+const PAPER = "#F1EADC";
+const INK = "#1B2A2E";
 const DEFAULT_SIG = "#037290"; // F3 engine default signature (flagship blue)
 
 function hueDist(a: number, b: number): number {
