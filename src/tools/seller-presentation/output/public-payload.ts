@@ -35,6 +35,10 @@ import type {
 import { PUBLISH_TEMPLATE_VERSION } from "../config/template-version";
 import { isPriceRangeActive } from "../engine/price-range";
 import {
+  deriveAreaStatsFromComps,
+  mergeAreaStats,
+} from "@/lib/seller-presentation/area-stats-from-comps";
+import {
   WHYUS_CAPS,
   type WhyUs,
   type MarketingPoint,
@@ -417,19 +421,27 @@ function projectBrandReviewsOutlink(
   return { label: REVIEWS_OUTLINK_LABEL, url: trimmed };
 }
 
-function projectAreaStats(s: AreaStats | undefined): AreaStats | undefined {
-  if (!s) return undefined;
-  const monthlySeries = s.monthlySeries?.map((m) => ({
+function projectAreaStats(
+  s: AreaStats | undefined,
+  comps: Comp[],
+): AreaStats | undefined {
+  // FR-2 — auto-fill the snapshot from the comp set, then let any
+  // manually-entered field override the derived one. `mergeAreaStats`
+  // returns undefined when neither comps nor manual entry yield anything
+  // renderable, so the empty case still collapses to no §05 (LS-1).
+  const merged = mergeAreaStats(s, deriveAreaStatsFromComps(comps));
+  if (!merged) return undefined;
+  const monthlySeries = merged.monthlySeries?.map((m) => ({
     month: m.month,
     medianPrice: m.medianPrice,
   }));
   const projected: AreaStats = {
-    medianSale: s.medianSale,
-    medianSaleDeltaYoy: s.medianSaleDeltaYoy,
-    daysOnMarket: s.daysOnMarket,
-    daysOnMarketZipAvg: s.daysOnMarketZipAvg,
-    closings90d: s.closings90d,
-    listToSaleRatio: s.listToSaleRatio,
+    medianSale: merged.medianSale,
+    medianSaleDeltaYoy: merged.medianSaleDeltaYoy,
+    daysOnMarket: merged.daysOnMarket,
+    daysOnMarketZipAvg: merged.daysOnMarketZipAvg,
+    closings90d: merged.closings90d,
+    listToSaleRatio: merged.listToSaleRatio,
     monthlySeries: monthlySeries?.length ? monthlySeries : undefined,
   };
   // LS-1 — data minimization: an "edited but left blank" snapshot arrives as an
@@ -742,7 +754,7 @@ export function toPublicPayload(
     pitchPublicCards: publicCards,
     reviews: projectedReviews && projectedReviews.length ? projectedReviews : undefined,
     reviewsOutlink: projectedOutlink,
-    areaStats: projectAreaStats(draft.areaStats),
+    areaStats: projectAreaStats(draft.areaStats, draft.comps),
     agent,
 
     // E.0 — brand colors validated + projected field-by-field. Undefined

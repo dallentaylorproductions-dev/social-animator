@@ -42,6 +42,12 @@ export interface ColumnMapping {
   year_built: FieldMapping;
   bedrooms: FieldMapping;
   bathrooms: FieldMapping;
+  // FR-2 — richer comp fields that unlock the §05 area-snapshot auto-fill.
+  // `days_on_market` feeds the snapshot's DOM cell; `list_price` is paired
+  // with `sold_price` in the projector to compute the list-to-sale ratio
+  // (we store the ratio, never the raw list price, on the Comp shape).
+  days_on_market: FieldMapping;
+  list_price: FieldMapping;
 }
 
 interface MapColumnsArgs {
@@ -67,8 +73,9 @@ const TIMEOUT_MS = 12_000;
  *
  * v1 → original prompt. v2 → a35ec44 sample-value-inspection rule
  * (untracked constant). v3 → DISQUALIFY rule + NWMLS canonical override.
+ * v4 → FR-2 days_on_market + list_price targets (area-snapshot auto-fill).
  */
-export const PROMPT_VERSION = 3;
+export const PROMPT_VERSION = 4;
 
 /** KV cache key for a file's mapping, versioned by PROMPT_VERSION. */
 export function buildCacheKey(fileHash: string): string {
@@ -91,7 +98,9 @@ type FieldMappingKey =
   | 'sqft'
   | 'year_built'
   | 'bedrooms'
-  | 'bathrooms';
+  | 'bathrooms'
+  | 'days_on_market'
+  | 'list_price';
 
 const KNOWN_CANONICAL_OVERRIDES: Array<{
   target: FieldMappingKey;
@@ -156,6 +165,10 @@ const NWMLS_FIXTURE_MAPPING: ColumnMapping = {
   year_built: { column: 'Year Built', confidence: 0.98 },
   bedrooms: { column: 'Bedrooms', confidence: 0.98 },
   bathrooms: { column: 'Bathrooms', confidence: 0.95 },
+  // FR-2 — NWMLS Matrix "Full" carries DOM + List Price alongside the
+  // sale fields; the synthetic fixture mirrors that shape.
+  days_on_market: { column: 'DOM', confidence: 0.95 },
+  list_price: { column: 'List Price', confidence: 0.95 },
 };
 
 export async function mapColumnsWithAI(
@@ -245,6 +258,8 @@ Here is the TARGET SCHEMA (the only fields that matter):
 - year_built            (4-digit year)
 - bedrooms              (integer)
 - bathrooms             (decimal, e.g. 2.5 = 2 full + 1 half)
+- days_on_market        (integer, days the listing was active before it sold; often "DOM" or "CDOM"/"Cumulative DOM" — prefer the plain DOM)
+- list_price            (numeric, the asking/list price the home was sold against; often "List Price", "Current Price", or "LP". NOT the sold/selling price)
 
 Here is the HEADER ROW of the agent's export:
 ${headerLine}
@@ -260,7 +275,9 @@ Return ONLY a JSON object with this exact shape:
   "sqft":         { "column": "<source column name>", "confidence": 0.0–1.0 },
   "year_built":   { "column": "<source column name>", "confidence": 0.0–1.0 },
   "bedrooms":     { "column": "<source column name>", "confidence": 0.0–1.0 },
-  "bathrooms":    { "column": "<source column name>", "confidence": 0.0–1.0 }
+  "bathrooms":    { "column": "<source column name>", "confidence": 0.0–1.0 },
+  "days_on_market": { "column": "<source column name>", "confidence": 0.0–1.0 },
+  "list_price":     { "column": "<source column name>", "confidence": 0.0–1.0 }
 }
 
 Rules:
@@ -268,6 +285,7 @@ Rules:
 - If multiple source columns could match (e.g. "Selling Price" vs "Current Price"), pick the one that most directly matches the target's intent (sold = closed = Selling Price), confidence 0.7–0.9.
 - **DISQUALIFY columns whose sample values are consistently empty / 0 / null across the sample rows.** A column whose name matches the target perfectly but whose values are all 0 or empty is NOT a valid candidate for that target. Drop it from consideration entirely; pick the next-best populated alternative even if its name match is less direct. This rule OVERRIDES the "direct name match = higher confidence" rule above.
 - **MLS-schema gotcha (NWMLS-specific but general principle):** if the header contains both \`Square Footage\` and \`Finished Sqft\`, prefer \`Square Footage\` for the sqft target. The verbose-named \`Square Footage\` column is the headline finished-area value in NWMLS Matrix exports; \`Finished Sqft\` is a legacy sub-field that is often 0 or duplicative. The same logic applies when a schema has a "headline" vs a "sub-field" pair for any target — prefer the one whose sample values are populated AND look like the actual headline number for the property type.
+- \`days_on_market\` and \`list_price\` are OPTIONAL enrichments — many exports omit them. If the header has no DOM column, or no list/asking price column distinct from the sold price, return { "column": null, "confidence": 0 } for that field rather than forcing a wrong match. NEVER map \`list_price\` to the same column you chose for \`sold_price\`.
 - If no source column matches, return { "column": null, "confidence": 0 } for that field.
 - Never invent column names. Only use names that appear verbatim in the header row.
 - For address_components, prefer the most granular set (Street Number, Modifier, Direction, Name, Suffix, Post Direction, Unit, City, State, Zip Code) when available. Skip components that are uniformly empty in the sample rows.
@@ -282,7 +300,16 @@ function tryParse(raw: string): ColumnMapping | null {
   try {
     const obj = JSON.parse(stripped) as unknown;
     if (!isColumnMapping(obj)) return null;
-    return obj;
+    // FR-2 — days_on_market / list_price are OPTIONAL enrichments. A model
+    // (or an older cached shape) that omits them is still a valid mapping;
+    // default the missing field to "unmapped" so the projector reads '' and
+    // simply yields no DOM / ratio for that import.
+    const NONE: FieldMapping = { column: null, confidence: 0 };
+    return {
+      ...obj,
+      days_on_market: obj.days_on_market ?? NONE,
+      list_price: obj.list_price ?? NONE,
+    };
   } catch {
     return null;
   }
@@ -293,6 +320,8 @@ function isColumnMapping(o: unknown): o is ColumnMapping {
   const m = o as Record<string, unknown>;
   if (!Array.isArray(m.address_components)) return false;
   if (!m.address_components.every((c) => typeof c === 'string')) return false;
+  // Core fields are required; days_on_market / list_price are validated only
+  // when present (defaulted in tryParse otherwise).
   for (const key of [
     'sold_price',
     'sold_date',
@@ -302,6 +331,14 @@ function isColumnMapping(o: unknown): o is ColumnMapping {
     'bathrooms',
   ] as const) {
     const f = m[key];
+    if (!f || typeof f !== 'object') return false;
+    const fm = f as Record<string, unknown>;
+    if (fm.column !== null && typeof fm.column !== 'string') return false;
+    if (typeof fm.confidence !== 'number') return false;
+  }
+  for (const key of ['days_on_market', 'list_price'] as const) {
+    const f = m[key];
+    if (f === undefined) continue;
     if (!f || typeof f !== 'object') return false;
     const fm = f as Record<string, unknown>;
     if (fm.column !== null && typeof fm.column !== 'string') return false;

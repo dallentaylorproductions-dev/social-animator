@@ -33,7 +33,9 @@ import type {
  *     touches disk.
  */
 
-export const PROMPT_VERSION_PDF = 1;
+// v1 → original NWMLS Resi Agent Detail extraction.
+// v2 → FR-2 days_on_market + list_price capture (area-snapshot auto-fill).
+export const PROMPT_VERSION_PDF = 2;
 
 /**
  * KV cache key — independent namespace from the CSV mapper's
@@ -63,6 +65,9 @@ interface ExtractedComp {
   bedrooms: number | null;
   bathrooms: number | null;
   year_built: number | null;
+  // FR-2 — optional enrichments for the §05 area-snapshot auto-fill.
+  days_on_market: number | null;
+  list_price: number | null;
   confidence: number;
 }
 
@@ -103,6 +108,8 @@ const PDF_FIXTURE: ExtractedPayload = {
       bedrooms: 5,
       bathrooms: 2,
       year_built: 1951,
+      days_on_market: 6,
+      list_price: 575000,
       confidence: 0.95,
     },
     {
@@ -113,6 +120,8 @@ const PDF_FIXTURE: ExtractedPayload = {
       bedrooms: 2,
       bathrooms: 1,
       year_built: 1919,
+      days_on_market: 12,
+      list_price: 569000,
       confidence: 0.95,
     },
   ],
@@ -242,6 +251,8 @@ Return ONLY a JSON object with this exact shape — no markdown, no prose:
       "bedrooms":    <integer> | null,
       "bathrooms":   <decimal, e.g. 2.5> | null,
       "year_built":  <4-digit year> | null,
+      "days_on_market": <integer, days on market before sale> | null,
+      "list_price":  <number, USD list/asking price, no commas, no $> | null,
       "confidence":  0.0–1.0
     }
   ]
@@ -270,9 +281,10 @@ Field abbreviations (map exactly as listed):
 
   Listing #<n>      → mlsNumber (skip — not in output shape)
   STAT: Sold        → only return rows where STAT is "Sold"
-  LP:               → list price (not in output)
+  LP:               → list_price        (the asking price; pair with SP)
   SP:               → sold_price        (this is the headline number)
   SLDT:             → sold_date         (parse MM/DD/YYYY → YYYY-MM-DD)
+  DOM: / CDOM:      → days_on_market    (prefer DOM; integer days)
   BR:               → bedrooms          (the SINGLE total, e.g. "BR: 4",
                                          NOT the per-floor breakdown row
                                          that looks like "BR: 2 3 0 0 0 0")
@@ -331,11 +343,27 @@ function projectExtracted(extracted: ExtractedComp[]): {
 }
 
 function buildImportedComp(row: ExtractedComp): ImportedComp {
+  const daysOnMarket =
+    row.days_on_market !== null && Number.isFinite(row.days_on_market)
+      ? String(Math.max(0, Math.round(row.days_on_market)))
+      : undefined;
+  // FR-2 — sale-to-list ratio from list_price ÷ sold_price (ratio stored,
+  // raw list price discarded). Both must be present + positive.
+  const saleToListPercent =
+    row.list_price !== null &&
+    row.list_price > 0 &&
+    row.sold_price !== null &&
+    row.sold_price > 0
+      ? `${Math.round((row.sold_price / row.list_price) * 100)}%`
+      : undefined;
+
   const fieldConfidence: Partial<Record<CompFieldName, ConfidenceLevel>> = {
     address: bucketConfidence(row.confidence, !!row.address),
     soldPrice: bucketConfidence(row.confidence, row.sold_price !== null),
     soldDate: bucketConfidence(row.confidence, !!row.sold_date),
     squareFeet: bucketConfidence(row.confidence, row.sqft !== null),
+    daysOnMarket: bucketConfidence(row.confidence, !!daysOnMarket),
+    saleToListPercent: bucketConfidence(row.confidence, !!saleToListPercent),
   };
 
   return {
@@ -350,6 +378,8 @@ function buildImportedComp(row: ExtractedComp): ImportedComp {
     yearBuilt: row.year_built ?? undefined,
     bedrooms: row.bedrooms !== null ? String(row.bedrooms) : undefined,
     bathrooms: row.bathrooms !== null ? String(row.bathrooms) : undefined,
+    daysOnMarket,
+    saleToListPercent,
     source: "imported",
     fieldConfidence,
   };
@@ -378,6 +408,8 @@ export function buildPdfMappingNotes(): MappingNote[] {
     { schemaField: "yearBuilt", sourceColumn: "YBT", confidence: 0.95 },
     { schemaField: "bedrooms", sourceColumn: "BR", confidence: 0.9 },
     { schemaField: "bathrooms", sourceColumn: "BTH", confidence: 0.9 },
+    { schemaField: "daysOnMarket", sourceColumn: "DOM", confidence: 0.9 },
+    { schemaField: "saleToListPercent", sourceColumn: "LP", confidence: 0.9 },
   ];
 }
 
@@ -407,6 +439,20 @@ function isExtractedPayload(o: unknown): o is ExtractedPayload {
     if (r.bedrooms !== null && typeof r.bedrooms !== "number") return false;
     if (r.bathrooms !== null && typeof r.bathrooms !== "number") return false;
     if (r.year_built !== null && typeof r.year_built !== "number") return false;
+    // FR-2 enrichments — optional + tolerant: present-but-wrong-type fails,
+    // absent is fine (normalized to null below).
+    if (
+      r.days_on_market !== undefined &&
+      r.days_on_market !== null &&
+      typeof r.days_on_market !== "number"
+    )
+      return false;
+    if (
+      r.list_price !== undefined &&
+      r.list_price !== null &&
+      typeof r.list_price !== "number"
+    )
+      return false;
     if (typeof r.confidence !== "number") return false;
   }
   return true;

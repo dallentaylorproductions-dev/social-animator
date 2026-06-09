@@ -23,6 +23,7 @@ import type {
   SellerPresentationDraft,
 } from "../engine/types";
 import { effectivePosterUrl } from "../engine/types";
+import { deriveAreaStatsFromComps } from "@/lib/seller-presentation/area-stats-from-comps";
 
 /**
  * A7d.11 — the upload session key used by the walk-through video
@@ -657,6 +658,20 @@ function deriveMonthlyEditorState(
 function AreaStatsEditor({ draft, setDraft }: StepEditorialProps) {
   const stats: AreaStats = draft.areaStats ?? {};
 
+  // FR-2 — derive the snapshot from the comp set the agent already entered/
+  // imported on Step 2. These values auto-publish (projectAreaStats merges
+  // them under any manual entry), so the §05 chart + stats come for free.
+  // Here in the editor they're surfaced as a one-tap "Use" override per
+  // field; the live preview already renders the populated section.
+  const derived = useMemo(
+    () => deriveAreaStatsFromComps(draft.comps ?? []),
+    [draft.comps],
+  );
+  const countedComps = (draft.comps ?? []).filter((c) => c.counted !== false)
+    .length;
+  const hasDerived =
+    Object.keys(derived).length > 0 && countedComps > 0;
+
   const update = (patch: Partial<AreaStats>) => {
     const next: AreaStats = { ...stats, ...patch };
     const hasAny = Object.entries(next).some(([, v]) => {
@@ -798,12 +813,59 @@ function AreaStatsEditor({ draft, setDraft }: StepEditorialProps) {
     persistSeries(labels, nextPrices);
   };
 
+  // FR-2 — one-tap "Use" affordance for a comp-derived value. Renders only
+  // for an empty field that has a derived value: tapping it promotes the
+  // derived value to a manual entry (so it "sticks" visibly). Even untapped,
+  // the value still publishes via projectAreaStats — this is purely the
+  // visible override handle.
+  const renderDerivedFill = (
+    field: "medianSale" | "daysOnMarket" | "closings90d" | "listToSaleRatio",
+    current: string | undefined,
+    testid: string,
+  ) => {
+    const value = derived[field];
+    if ((current && current.trim()) || typeof value !== "string" || !value) {
+      return null;
+    }
+    return (
+      <button
+        type="button"
+        className="area-derived-fill"
+        data-testid={testid}
+        onClick={() => update({ [field]: value })}
+      >
+        From your comps: <strong>{value}</strong> · Use
+      </button>
+    );
+  };
+
+  const manualSeries = stats.monthlySeries ?? [];
+  const showDerivedMonthly =
+    !!derived.monthlySeries && derived.monthlySeries.length > 0 &&
+    manualSeries.length === 0;
+
   return (
     <>
       {/* Discovery framing — make the chart payoff unmistakable so the
           agent realizes this section is what populates the animated
           neighborhood chart on the published page. */}
       <AreaChartHint />
+
+      {/* FR-2 — auto-fill provenance. When the comp set yields a snapshot,
+          tell the agent it's pre-filled + publishes automatically. */}
+      {hasDerived && (
+        <div
+          className="from-comps area-derived-note"
+          data-testid="step-editorial-area-derived-note"
+        >
+          <span className="from-comps-chip">From your comps</span>
+          <span className="from-comps-line">
+            Pre-filled from your <strong>{countedComps}</strong>{" "}
+            {countedComps === 1 ? "comp" : "comps"}. These publish
+            automatically. Type to override any field.
+          </span>
+        </div>
+      )}
 
       <div className="sec5-grid">
         <label className="field-block">
@@ -812,9 +874,14 @@ function AreaStatsEditor({ draft, setDraft }: StepEditorialProps) {
             className="input"
             value={stats.medianSale ?? ""}
             onChange={(v) => update({ medianSale: v || undefined })}
-            placeholder="$642,000"
+            placeholder={derived.medianSale ?? "$642,000"}
             aria-label="area-median-sale"
           />
+          {renderDerivedFill(
+            "medianSale",
+            stats.medianSale,
+            "step-editorial-area-derived-medianSale",
+          )}
         </label>
         <label className="field-block">
           <span className="field-label">Year-over-year change</span>
@@ -833,9 +900,14 @@ function AreaStatsEditor({ draft, setDraft }: StepEditorialProps) {
             className="input"
             value={stats.daysOnMarket ?? ""}
             onChange={(v) => update({ daysOnMarket: v || undefined })}
-            placeholder="14"
+            placeholder={derived.daysOnMarket ?? "14"}
             aria-label="area-dom"
           />
+          {renderDerivedFill(
+            "daysOnMarket",
+            stats.daysOnMarket,
+            "step-editorial-area-derived-daysOnMarket",
+          )}
         </label>
         <label className="field-block">
           <span className="field-label">Area DOM comparison</span>
@@ -856,9 +928,14 @@ function AreaStatsEditor({ draft, setDraft }: StepEditorialProps) {
             className="input"
             value={stats.closings90d ?? ""}
             onChange={(v) => update({ closings90d: v || undefined })}
-            placeholder="38"
+            placeholder={derived.closings90d ?? "38"}
             aria-label="area-closings"
           />
+          {renderDerivedFill(
+            "closings90d",
+            stats.closings90d,
+            "step-editorial-area-derived-closings90d",
+          )}
         </label>
         <label className="field-block">
           <span className="field-label">List-to-sale ratio</span>
@@ -866,9 +943,14 @@ function AreaStatsEditor({ draft, setDraft }: StepEditorialProps) {
             className="input"
             value={stats.listToSaleRatio ?? ""}
             onChange={(v) => update({ listToSaleRatio: v || undefined })}
-            placeholder="101%"
+            placeholder={derived.listToSaleRatio ?? "101%"}
             aria-label="area-ratio"
           />
+          {renderDerivedFill(
+            "listToSaleRatio",
+            stats.listToSaleRatio,
+            "step-editorial-area-derived-listToSaleRatio",
+          )}
         </label>
       </div>
 
@@ -878,6 +960,19 @@ function AreaStatsEditor({ draft, setDraft }: StepEditorialProps) {
           We label the months automatically. Pick the latest month + how many
           months of history you have, then fill in the prices you know.
         </p>
+
+        {showDerivedMonthly && (
+          <p
+            className="area-derived-monthly"
+            data-testid="step-editorial-area-derived-monthly"
+          >
+            From your comps: median price across{" "}
+            <strong>{derived.monthlySeries!.length}</strong> months (
+            {derived.monthlySeries![0].month} to{" "}
+            {derived.monthlySeries![derived.monthlySeries!.length - 1].month})
+            charts automatically. Fill the months below to override.
+          </p>
+        )}
 
         <div className="sec5-grid">
           <label className="field-block">
