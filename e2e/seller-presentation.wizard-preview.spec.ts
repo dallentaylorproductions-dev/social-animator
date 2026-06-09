@@ -31,7 +31,7 @@ test.describe("Wizard live preview — desktop dock", () => {
     // Sparse → EXAMPLE badge + the real flagship rendered inside.
     const badge = page.getByTestId("wizard-preview-badge");
     await expect(badge).toBeVisible();
-    await expect(badge).toContainText("EXAMPLE");
+    await expect(badge).toContainText("Example");
     await expect(dock.getByTestId("seller-presentation-flagship")).toBeVisible();
 
     // The sample renders in the agent's brand color = the blue default, never
@@ -172,15 +172,30 @@ test.describe("Wizard live preview — mobile", () => {
     await expect(fab).toBeVisible();
 
     await fab.click();
-    await expect(page.getByTestId("wizard-preview-overlay")).toBeVisible();
-    await expect(page.getByTestId("wizard-preview-screen")).toBeVisible();
+    const overlay = page.getByTestId("wizard-preview-overlay");
+    await expect(overlay).toBeVisible();
+    const screen = overlay.getByTestId("wizard-preview-screen");
+    await expect(screen).toBeVisible();
     await expect(
-      page.getByTestId("wizard-preview-overlay").getByTestId(
-        "seller-presentation-flagship",
-      ),
+      overlay.getByTestId("seller-presentation-flagship"),
     ).toBeVisible();
 
+    // M-1 B3: the preview screen is the scroll container (its own overflow),
+    // so a touch-drag scrolls the page inside the frame, not the body behind.
+    expect(await read(screen, "overflow-y")).toBe("auto");
+
+    // M-1 B3: background body scroll is locked while the overlay is open
+    // (position:fixed lock) so the page behind can't scroll instead.
+    expect(
+      await page.evaluate(() => getComputedStyle(document.body).position),
+    ).toBe("fixed");
+
+    // M-1 B1/B4: the ✕ is reachable and closes the overlay (no back-swipe
+    // needed); closing restores the normal body scroll.
     await page.getByTestId("wizard-preview-close").click();
-    await expect(page.getByTestId("wizard-preview-overlay")).toHaveCount(0);
+    await expect(overlay).toHaveCount(0);
+    expect(
+      await page.evaluate(() => getComputedStyle(document.body).position),
+    ).not.toBe("fixed");
   });
 });

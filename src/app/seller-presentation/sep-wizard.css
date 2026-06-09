@@ -44,6 +44,14 @@
 
   min-height: 100vh;
   padding: 40px 24px 96px;
+  /* M-1: in installed standalone mode the iOS status bar paints over the top
+     nav (← Dashboard / + Start a new presentation) and makes it untappable.
+     Clear it with the safe-area inset; max() keeps the existing 40px/24px in a
+     normal browser (insets = 0) so nothing shifts there. left/right cover the
+     landscape notch on a full-width row. */
+  padding-top: max(40px, env(safe-area-inset-top, 0px));
+  padding-left: max(24px, env(safe-area-inset-left, 0px));
+  padding-right: max(24px, env(safe-area-inset-right, 0px));
   color: var(--text);
   font-family: var(--sans);
   -webkit-font-smoothing: antialiased;

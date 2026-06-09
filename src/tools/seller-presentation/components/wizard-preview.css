@@ -95,11 +95,17 @@
   background: transparent;
   border: 1px solid var(--border-strong, rgba(255, 255, 255, 0.13));
   color: var(--text, #f4f2ef);
-  font-size: 14px;
+  font-size: 15px;
   line-height: 1;
   border-radius: 999px;
-  width: 34px;
-  height: 34px;
+  /* M-1: comfortable, top-most tap target (the handler already worked — it was
+     just covered by the status bar / undersized). The overlay's safe-area top
+     inset now keeps the whole header clear of the status bar in standalone. */
+  width: 40px;
+  height: 40px;
+  flex: 0 0 auto;
+  position: relative;
+  z-index: 1;
   cursor: pointer;
 }
 
@@ -155,8 +161,10 @@
 /* ---- mobile: floating button + full-screen overlay ---- */
 .sep-preview-fab {
   position: fixed;
-  right: 18px;
-  bottom: 18px;
+  /* M-1: clear the home indicator / landscape notch in standalone; max() keeps
+     the 18px in a normal browser (insets = 0). */
+  right: max(18px, env(safe-area-inset-right, 0px));
+  bottom: max(18px, env(safe-area-inset-bottom, 0px));
   z-index: 40;
   background: var(--mint, #6ee7c7);
   color: #0e0d0c;
@@ -168,13 +176,35 @@
   padding: 13px 20px;
   box-shadow: 0 10px 28px -10px rgba(110, 231, 199, 0.6);
   cursor: pointer;
+  /* M-1 auto-hide: gentle fade/slide out a few seconds after scrolling stops,
+     back in on any scroll (state driven from WizardPreview). Motion matches the
+     wizard --ease token. */
+  transition: opacity 0.32s cubic-bezier(0.22, 1, 0.36, 1),
+    transform 0.32s cubic-bezier(0.22, 1, 0.36, 1);
+}
+.sep-preview-fab[data-hidden="true"] {
+  opacity: 0;
+  transform: translateY(10px);
+  pointer-events: none;
+}
+@media (prefers-reduced-motion: reduce) {
+  .sep-preview-fab {
+    transition: none;
+  }
 }
 .sep-preview-overlay {
   position: fixed;
   inset: 0;
   z-index: 50;
   background: #0e0d0c;
-  padding: 16px 14px calc(env(safe-area-inset-bottom, 0px) + 16px);
+  /* M-1: top inset clears the status bar in standalone so the header + ✕ are
+     reachable; bottom keeps the home-indicator gap; left/right cover the
+     landscape notch. max() leaves the normal-browser layout (insets = 0)
+     identical to the prior 16px 14px box. */
+  padding: max(16px, env(safe-area-inset-top, 0px))
+    max(14px, env(safe-area-inset-right, 0px))
+    calc(env(safe-area-inset-bottom, 0px) + 16px)
+    max(14px, env(safe-area-inset-left, 0px));
   overflow: hidden;
   display: flex;
   flex-direction: column;
@@ -188,6 +218,11 @@
 .sep-preview-overlay .sep-preview-screen {
   height: auto;
   flex: 1 1 auto;
+  /* min-height: 0 lets the flex child actually shrink below content size so the
+     overflow region exists and momentum-scrolls on iOS; overscroll-behavior
+     contain stops the touch-drag from chaining to the (locked) page behind. */
+  min-height: 0;
+  overscroll-behavior: contain;
   border-radius: 20px;
 }
 @media (min-width: 1200px) {
