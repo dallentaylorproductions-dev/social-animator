@@ -40,8 +40,19 @@ export function Price({ payload }: { payload: PublicPayload }) {
             depth), teal accent rule on its left edge — the hero typographic
             moment per the locked design. */}
         <div className="fs-price__panel reveal">
-          <Eyebrow label="Recommended list" />
-          <div className="fs-price__inner">
+          {/* Meta row FIRST (spec §6 / mock): RECOMMENDED LIST label + the
+              "Based on N recent sale(s) nearby." subline, with the big number
+              BELOW at hero scale. */}
+          <div className="fs-price__meta">
+            <Eyebrow label="Recommended list" />
+            {hasCount(n) && (
+              <p className="fs-price__note reveal">
+                Based on{" "}
+                <span className="fs-price__note-b">{priceNoteCountLabel(n)}</span>{" "}
+                nearby.
+              </p>
+            )}
+          </div>
           {isRange ? (
             // UX-2a-followup — distinct stable `key` per mode. The count-up
             // driver (motion.ts) imperatively rewrites the single-price
@@ -82,14 +93,6 @@ export function Price({ payload }: { payload: PublicPayload }) {
               )}
             </div>
           )}
-            {hasCount(n) && (
-              <p className="fs-price__note fs-price__side reveal">
-                Based on{" "}
-                <span className="fs-price__note-b">{priceNoteCountLabel(n)}</span>{" "}
-                nearby.
-              </p>
-            )}
-          </div>
         </div>
       </div>
     </section>

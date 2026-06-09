@@ -56,6 +56,51 @@ test.describe("D1 — auto-icon keyword map (deterministic, pure)", () => {
   });
 });
 
+test.describe("D1-FIX — price card (order + containment)", () => {
+  test("meta row (label + based-on) precedes the number; number stays inside the card", async ({
+    page,
+  }) => {
+    await page.setViewportSize({ width: 360, height: 780 });
+    await page.goto(FLAGSHIP);
+    const price = page.getByTestId("fs-price");
+
+    // Meta row carries BOTH the label and the based-on subline, above the number.
+    const meta = price.locator(".fs-price__meta");
+    await expect(meta).toContainText("Based on");
+    await expect(meta).toContainText("nearby");
+
+    // The number is fully contained within the price panel at 360px — even when
+    // forced to a 7-figure value (the overflow bug this fix closes).
+    const fits = await page.evaluate(() => {
+      const big = document.querySelector<HTMLElement>(".fs-page .fs-price__big");
+      const panel = document.querySelector<HTMLElement>(".fs-page .fs-price__panel");
+      const digits = big?.querySelector<HTMLElement>("[data-price-digits]");
+      if (digits)
+        digits.innerHTML =
+          '<span>1</span><span><span class="sep">,</span>250</span><span><span class="sep">,</span>000</span>';
+      if (!big || !panel) return false;
+      const b = big.getBoundingClientRect();
+      const p = panel.getBoundingClientRect();
+      return b.right <= p.right + 1 && b.left >= p.left - 1;
+    });
+    expect(fits, "7-figure price must not escape the card at 360px").toBe(true);
+  });
+});
+
+test.describe("D1-FIX — desktop hero is side-by-side", () => {
+  test("photo + dark band sit in two columns on a wide frame", async ({
+    page,
+  }) => {
+    await page.setViewportSize({ width: 1280, height: 1000 });
+    await page.goto(FLAGSHIP);
+    const cols = await page
+      .getByTestId("fs-hero")
+      .evaluate((el) => getComputedStyle(el).gridTemplateColumns);
+    // Two resolved track widths → photo / band side-by-side (not the mobile stack).
+    expect(cols.trim().split(/\s+/).length).toBe(2);
+  });
+});
+
 test.describe("D1 — four dark beats, evenly spaced, none adjacent", () => {
   test("hero · by-the-numbers · reviews · agent are dark; the bands between are light", async ({
     page,

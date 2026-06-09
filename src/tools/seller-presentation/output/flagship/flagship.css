@@ -266,19 +266,34 @@
   padding: clamp(28px, 7cqi, 60px);
   box-shadow: var(--lift-2);
 }
-.fs-page .fs-price .fs-eyebrow {
-  margin-bottom: 22px;
+/* meta row — RECOMMENDED LIST label + the "Based on N…" subline above the
+   number (spec §6 / mock). Wraps the subline below the label on narrow frames. */
+.fs-page .fs-price__meta {
+  display: flex;
+  flex-wrap: wrap;
+  align-items: baseline;
+  gap: 10px 22px;
+  margin-bottom: clamp(16px, 3cqi, 26px);
+}
+.fs-page .fs-price__meta .fs-eyebrow {
+  flex: 1 1 auto;
+  min-width: 0;
 }
 .fs-page .fs-price__big {
   font-family: var(--fs-serif);
   font-weight: 500;
   color: var(--signature);
-  font-size: clamp(66px, 21cqi, 142px);
+  /* contained at all widths — a 7-figure value never clips/escapes the card
+     (verified at 360px). The cqi tracks the frame so the number scales down on
+     narrow frames; the desktop hero scale is restored in the wide-frame block. */
+  font-size: clamp(40px, 13cqi, 96px);
   line-height: 0.9;
   letter-spacing: -0.03em;
-  font-variant-numeric: tabular-nums;
+  font-variant-numeric: lining-nums tabular-nums;
   display: flex;
   align-items: flex-start;
+  max-width: 100%;
+  min-width: 0;
 }
 .fs-page .fs-price__cur {
   font-size: 0.42em;
@@ -296,7 +311,9 @@
    extra `.fs-price` ancestor lifts specificity above the base/wide
    `.fs-price__big` font-size rules so the range size always wins. */
 .fs-page .fs-price .fs-price__big--range {
-  font-size: clamp(34px, 10cqi, 72px);
+  /* both legs stay at DISPLAY scale (never caption-sized); wrap-tolerant so a
+     long low–high pair stacks on narrow frames instead of clipping. */
+  font-size: clamp(44px, 11cqi, 104px);
   flex-wrap: wrap;
   align-items: baseline;
   gap: 0.14em;
@@ -306,10 +323,11 @@
   color: color-mix(in srgb, var(--signature) 62%, var(--ink-faint));
 }
 .fs-page .fs-price__note {
-  margin-top: 22px;
   color: var(--ink-soft);
-  font-size: clamp(15px, 4cqi, 17px);
+  font-size: clamp(14px, 3.6cqi, 16px);
   max-width: 34ch;
+  text-align: right;
+  margin-left: auto;
 }
 .fs-page .fs-price__note-b {
   color: var(--signature-deep);
@@ -1325,10 +1343,10 @@
   display: flex;
   flex-direction: column;
 }
-/* labels CLEAR the numbers at every width (the spacing fix) */
+/* labels CLEAR the numbers at every width (≥16px gap, spec §6) */
 .fs-page .fs-bynum__caption {
   order: 2;
-  margin-top: 10px;
+  margin-top: 16px;
   font-family: var(--fs-mono);
   font-size: 10px;
   letter-spacing: 0.16em;
@@ -1341,7 +1359,7 @@
   font-weight: 500;
   /* the rare --mint moment */
   color: var(--mint);
-  font-size: clamp(60px, 18cqi, 128px);
+  font-size: clamp(64px, 18cqi, 128px);
   line-height: 0.92;
   letter-spacing: -0.02em;
   font-variant-numeric: lining-nums tabular-nums;
@@ -1354,7 +1372,7 @@
   font-family: var(--fs-serif);
   font-weight: 500;
   color: var(--on-dark-mute);
-  font-size: clamp(36px, 10cqi, 80px);
+  font-size: clamp(40px, 10cqi, 80px);
   line-height: 0.92;
   letter-spacing: -0.02em;
   font-variant-numeric: lining-nums tabular-nums;
@@ -1646,29 +1664,33 @@
   .fs-page .fs-wrap {
     --fs-maxw: 1060px;
   }
+  /* Desktop hero — side by side: 1.15fr photo / .85fr dark band (spec §6 / mock),
+     not the mobile photo-on-top stack. */
+  .fs-page .fs-hero {
+    display: grid;
+    grid-template-columns: 1.15fr 0.85fr;
+    align-items: stretch;
+    min-height: 480px;
+  }
   .fs-page .fs-hero__photo {
-    aspect-ratio: 21 / 9;
+    aspect-ratio: auto;
+    height: 100%;
   }
   .fs-page .fs-hero__band {
-    padding-block: 30px 42px;
+    margin-top: 0;
+    display: flex;
+    flex-direction: column;
+    justify-content: center;
+    padding: clamp(40px, 5cqi, 72px);
   }
-  .fs-page .fs-price__inner {
-    display: grid;
-    grid-template-columns: auto 1fr;
-    gap: 54px;
-    align-items: end;
-  }
+  /* desktop hero scale, capped at the spec's 144px max */
   .fs-page .fs-price__big {
-    font-size: clamp(120px, 13cqi, 176px);
+    font-size: clamp(96px, 12cqi, 144px);
   }
-  /* UX-2a — range scales up at wide frames but stays well below the single
-     figure so both amounts fit on one line. */
+  /* UX-2a — range scales up at wide frames but stays below the single figure so
+     both amounts fit on one line (display scale, never caption-sized). */
   .fs-page .fs-price .fs-price__big--range {
-    font-size: clamp(56px, 7cqi, 92px);
-  }
-  .fs-page .fs-price__side {
-    padding-bottom: 14px;
-    max-width: 30ch;
+    font-size: clamp(60px, 7cqi, 104px);
   }
   /* §01 note text optically centered against the video, nudged above center;
      relational so a long note grows the column and degrades toward top. */
