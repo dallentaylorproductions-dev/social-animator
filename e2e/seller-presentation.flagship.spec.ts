@@ -83,7 +83,7 @@ test.describe("Flagship — per-section render (full fixture)", () => {
       await expect(page.getByTestId(id), id).toBeVisible();
     }
     // Frozen chart is mounted (the reused production AreaChart).
-    await expect(page.locator(".fs-page .chart .line-stroke")).toHaveCount(1);
+    await expect(page.locator(".fs-page .chart .line")).toHaveCount(1);
     // §02 agent message is the seller-visible rationale, bound as the ink lead.
     await expect(page.getByTestId("fs-count-msg")).toContainText(
       "anchor the recommendation",
@@ -160,16 +160,18 @@ test.describe("Flagship — optional-slot matrix (minimal reads complete)", () =
     await expect(page.getByTestId("fs-area")).toBeVisible();
     await expect(page.getByTestId("fs-area-ready")).toBeVisible();
     await expect(page.getByTestId("fs-area-pending")).toHaveCount(0);
-    // The two provided stat fields render…
+    // LOCKED SPLIT — §05 shows ONLY the neighborhood MEDIAN SALE PRICE (+ the
+    // chart when a series exists). The duplicate days-on-market / homes-sold /
+    // sale-to-list cells are hidden (they live in "By the numbers").
     const area = page.getByTestId("fs-area");
-    await expect(area).toContainText("Median sale");
+    await expect(area).toContainText("Median Sale");
     await expect(area).toContainText("$642k");
-    await expect(area).toContainText("Days on market");
-    // …and the unfilled fields are omitted (no empty cells).
+    // The neighborhood overlap cells are suppressed here.
+    await expect(area).not.toContainText("Days on market");
     await expect(area).not.toContainText("Homes sold");
     await expect(area).not.toContainText("Sale to list");
     // No chart (no monthly series) and no "on the way" placeholder.
-    await expect(area.locator(".chart .line-stroke")).toHaveCount(0);
+    await expect(area.locator(".chart .line")).toHaveCount(0);
     await expect(page.locator("body")).not.toContainText(
       "A market snapshot is on the way",
     );
@@ -215,42 +217,42 @@ test.describe("Flagship — CTA on-signature contrast (contract §2/§4)", () =>
 test.describe("Flagship — signature sweep (role distribution; body stays ink)", () => {
   const SIGS = ["%23c26a4e", "%23037290", "%23c8197b"]; // terracotta · blue · magenta
 
-  test("signature role is consistent; deep differs; body text stays ink", async ({
+  test("the earned price/count figures re-hue per signature; stats + body stay neutral ink", async ({
     page,
   }) => {
-    const signatureColors: string[] = [];
+    const priceColors: string[] = [];
+    const statColors: string[] = [];
     for (const accent of SIGS) {
       await page.goto(`${FLAGSHIP}&brandAccent=${accent}`);
+      // The earned moments — price figure + the §02 count digit — carry the
+      // deep teal (--teal-900, a signature mix), so they re-hue together.
       const priceBig = await read(
-        page.locator(".fs-page .fs-price__big").first(),
+        page.locator(".fs-page .price__single").first(),
         "color",
       );
       const countDigit = await read(page.getByTestId("fs-count-digit"), "color");
+      expect(countDigit, accent).toBe(priceBig);
+
+      // Area stat values + comp prices + comp address are NEUTRAL ink — the
+      // locked design keeps quiet figures off the accent.
       const statValue = await read(
-        page.locator(".fs-page .fs-stat__v").first(),
-        "color",
-      );
-      const compPrice = await read(
-        page.locator(".fs-page .fs-comp__price").first(),
+        page.locator(".fs-page .stat__val").first(),
         "color",
       );
       const compAddr = await read(
-        page.locator(".fs-page .fs-comp__addr").first(),
+        page.locator(".fs-page .comp-card__addr").first(),
         "color",
       );
-
-      // Substantive big numbers all carry the SAME --signature role.
-      expect(countDigit, accent).toBe(priceBig);
-      expect(statValue, accent).toBe(priceBig);
-      // Comp price is --signature-deep — a distinct (darker) role.
-      expect(compPrice, accent).not.toBe(priceBig);
-      // Body text is layout-locked --ink under EVERY signature.
+      expect(statValue, accent).toBe(INK);
       expect(compAddr, accent).toBe(INK);
 
-      signatureColors.push(priceBig);
+      priceColors.push(priceBig);
+      statColors.push(statValue);
     }
-    // The three signatures produce three distinct signature colors.
-    expect(new Set(signatureColors).size).toBe(3);
+    // The price figure re-hues → three distinct colors; the neutral stat value
+    // is constant across all three signatures.
+    expect(new Set(priceColors).size).toBe(3);
+    expect(new Set(statColors).size).toBe(1);
   });
 });
 
@@ -282,80 +284,5 @@ test.describe("Flagship — wordmark slot", () => {
     // A non-"1" value is treated as false → wordmark shows.
     await page.goto(`${FLAGSHIP}&suppressWordmark=yes`);
     await expect(page.getByTestId("fs-wordmark")).toBeVisible();
-  });
-});
-
-test.describe("Flagship — pale-signature display seat (§D)", () => {
-  const PALE_YELLOW = "%23E8C547"; // raw 1.42:1 on paper — can't display at 3:1
-  // The SMALLER numbers that get the chip (count digit + stat values). The big
-  // PRICE figure is deliberately NOT chipped — it only deepens (see below).
-  const SEATED = [
-    { name: "count digit", sel: ".fs-page .fs-count__digit" },
-    { name: "stat value", sel: ".fs-page .fs-stat__v" },
-  ];
-
-  // The first non-transparent background up the ancestor chain — what the
-  // (chip-less) price figure actually renders against.
-  const effectiveBg = (loc: ReturnType<Page["locator"]>) =>
-    loc.evaluate((el: HTMLElement) => {
-      let n: HTMLElement | null = el;
-      while (n) {
-        const bg = getComputedStyle(n).backgroundColor;
-        if (bg && bg !== "rgba(0, 0, 0, 0)" && bg !== "transparent") return bg;
-        n = n.parentElement;
-      }
-      return "rgb(255, 255, 255)";
-    });
-
-  test("pale yellow → smaller numbers sit on a chip; each measures ≥ 3:1", async ({
-    page,
-  }) => {
-    await page.goto(`${FLAGSHIP}&brandAccent=${PALE_YELLOW}`);
-    for (const { name, sel } of SEATED) {
-      const el = page.locator(sel).first();
-      const bg = await read(el, "background-color");
-      const fg = await read(el, "color");
-      // A chip is present: the number now has a non-transparent background.
-      expect(bg, `${name} chip background`).not.toBe(TRANSPARENT);
-      // And the seated number clears AA-large against its chip.
-      expect(contrastRatio(fg, bg), `${name} contrast`).toBeGreaterThanOrEqual(3);
-    }
-  });
-
-  test("pale yellow → price has NO chip but still deepens to ≥ 3:1", async ({
-    page,
-  }) => {
-    await page.goto(`${FLAGSHIP}&brandAccent=${PALE_YELLOW}`);
-    const price = page.locator(".fs-page .fs-price__big").first();
-    // No background chip behind the price (the seat artifact is gone).
-    expect(await read(price, "background-color"), "price chip").toBe(TRANSPARENT);
-    // The price figure still clears AA-large against its band via the deepen.
-    const fg = await read(price, "color");
-    const bg = await effectiveBg(price);
-    expect(contrastRatio(fg, bg), "price contrast").toBeGreaterThanOrEqual(3);
-  });
-
-  test("normal signature (#037290) → NO chip anywhere (byte-identical render)", async ({
-    page,
-  }) => {
-    await page.goto(`${FLAGSHIP}&brandAccent=%23037290`);
-    const ALL = [{ name: "price", sel: ".fs-page .fs-price__big" }, ...SEATED];
-    for (const { name, sel } of ALL) {
-      const bg = await read(page.locator(sel).first(), "background-color");
-      expect(bg, `${name} stays unseated`).toBe(TRANSPARENT);
-    }
-  });
-
-  test("the seat gate flips per signature (terracotta/navy/green/magenta unseated)", async ({
-    page,
-  }) => {
-    for (const accent of ["%23c26a4e", "%231f4e79", "%232e7d5b", "%238e2d6b"]) {
-      await page.goto(`${FLAGSHIP}&brandAccent=${accent}`);
-      const bg = await read(
-        page.locator(".fs-page .fs-price__big").first(),
-        "background-color",
-      );
-      expect(bg, accent).toBe(TRANSPARENT);
-    }
   });
 });

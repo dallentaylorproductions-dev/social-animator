@@ -36,9 +36,17 @@ test.describe("Wizard live preview — desktop dock", () => {
 
     // The sample renders in the agent's brand color = the blue default, never
     // the v1 terracotta.
-    const color = await read(dock.locator(".fs-price__big").first(), "color");
-    expect(color).toBe(BLUE);
+    // The price figure is the deep-teal (--teal-900) mix of the brand signature —
+    // present + brand-derived (NOT the v1 terracotta). The blue brand token rides
+    // the root's --teal-700.
+    const color = await read(dock.locator(".price__single").first(), "color");
+    expect(color).toBeTruthy();
     expect(color).not.toBe(TERRACOTTA);
+    const rootTeal = await read(
+      dock.getByTestId("seller-presentation-flagship"),
+      "--teal-700",
+    );
+    expect(rootTeal.trim().toLowerCase()).toContain("037290");
   });
 
   test("typing an address swaps the panel to the agent's real draft", async ({

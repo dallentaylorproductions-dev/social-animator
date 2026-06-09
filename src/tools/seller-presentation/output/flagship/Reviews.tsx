@@ -48,6 +48,11 @@ export function Reviews({
         <div className="eyebrow on-dark">
           In Their Words <span className="rule" aria-hidden="true" />
         </div>
+        {/* B0b — an agent-constant reviews headline (preserved): surfaced as the
+            section head when set; absent → just the eyebrow, as the prototype. */}
+        {payload.reviewsHeadline && (
+          <h2 className="head">{payload.reviewsHeadline}</h2>
+        )}
       </div>
       <div className="reviews__layout">
         <div className="reveal">

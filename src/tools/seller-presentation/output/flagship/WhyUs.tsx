@@ -39,9 +39,13 @@ export function WhyUs({ payload }: { payload: PublicPayload }) {
   const tid = (k: typeof firstKey) =>
     k === firstKey ? { "data-testid": "fs-whyus" } : {};
 
+  // Partition into comparison bars (a market value present) vs single big stats,
+  // each indexed separately so the testids are stable (bar-0/1, bigstat-0/1).
+  const bars = stats.filter((s) => !!s.marketValue);
+  const bigStats = stats.filter((s) => !s.marketValue);
   // headline track rides the first PERCENTAGE comparison (higher-is-better)
-  const headlineIdx = stats.findIndex(
-    (s) => s.marketValue && /%/.test(s.yourValue + (s.unit ?? "")),
+  const headlineBar = bars.findIndex((s) =>
+    /%/.test(s.yourValue + (s.unit ?? "")),
   );
 
   return (
@@ -88,12 +92,20 @@ export function WhyUs({ payload }: { payload: PublicPayload }) {
               By The Numbers <span className="rule" aria-hidden="true" />
             </div>
           </div>
-          {stats.map((s, i) => (
+          {bars.map((s, i) => (
             <CmpStat
-              key={i}
+              key={`bar-${i}`}
               stat={s}
-              index={i}
-              withTrack={i === headlineIdx}
+              testid={`fs-whyus-bar-${i}`}
+              withTrack={i === headlineBar}
+            />
+          ))}
+          {bigStats.map((s, i) => (
+            <CmpStat
+              key={`big-${i}`}
+              stat={s}
+              testid={`fs-whyus-bigstat-${i}`}
+              withTrack={false}
             />
           ))}
         </section>
@@ -186,17 +198,16 @@ export function WhyUs({ payload }: { payload: PublicPayload }) {
  */
 function CmpStat({
   stat,
-  index,
+  testid,
   withTrack,
 }: {
   stat: PerformanceStat;
-  index: number;
+  testid: string;
   withTrack: boolean;
 }) {
   const you = splitVal(stat.yourValue, stat.unit);
   const hasMkt = !!stat.marketValue;
   const mkt = hasMkt ? splitVal(stat.marketValue!, stat.unit) : null;
-  const isBig = !hasMkt;
 
   // percentage track (higher-is-better) — floor a touch below the lower value.
   let fill = 0.5;
@@ -216,7 +227,7 @@ function CmpStat({
   return (
     <div
       className="cmp reveal"
-      data-testid={isBig ? `fs-whyus-bigstat-${index}` : `fs-whyus-bar-${index}`}
+      data-testid={testid}
       style={withTrack ? ({ "--fill": fill } as React.CSSProperties) : undefined}
     >
       <div className="cmp__label">{stat.label}</div>
@@ -245,7 +256,7 @@ function CmpStat({
         <div className="bynum__track">
           <div
             className="bynum__fill"
-            data-testid={`fs-whyus-bar-${index}-you`}
+            data-testid={`${testid}-you`}
             style={{ "--fill": fill } as React.CSSProperties}
           />
           <div className="bynum__mktmark" style={{ left: `${markPct}%` }}>

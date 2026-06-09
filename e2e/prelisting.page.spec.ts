@@ -39,7 +39,7 @@ test.describe("Pre-listing page — full fixture", () => {
 
     await expect(page.getByTestId("fs-reviews")).toBeVisible();
     await expect(
-      page.getByTestId("fs-reviews").locator(".fs-headline"),
+      page.getByTestId("fs-reviews").locator("h2.head"),
     ).toContainText("What sellers say");
   });
 
@@ -66,7 +66,7 @@ test.describe("Pre-listing page — full fixture", () => {
     await page.goto(FULL);
     const diffText = page
       .getByTestId("fs-whyus-diff-0")
-      .locator(".fs-whyus__card-text");
+      .locator(".rcard__title");
     expect(await read(diffText, "color")).toBe(INK);
   });
 

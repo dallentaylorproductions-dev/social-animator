@@ -22,7 +22,6 @@ export function Price({ payload }: { payload: PublicPayload }) {
   const isRange = !!(low && high);
   const parts = priceParts(value);
   const countupAttrs = isRange ? {} : priceCountupAttrs(value);
-  const stripDollar = (s?: string) => (s ?? "").replace(/^\$/, "");
 
   return (
     <section className="price" data-testid="fs-price">
@@ -46,20 +45,14 @@ export function Price({ payload }: { payload: PublicPayload }) {
             <div className="price__rangerow">
               <div className="price__leg">
                 <span className="cap">Low</span>
-                <span className="val">
-                  <span className="cur">$</span>
-                  {stripDollar(low)}
-                </span>
+                <span className="val">{low}</span>
               </div>
               <div className="price__dash" aria-hidden="true">
                 –
               </div>
               <div className="price__leg">
                 <span className="cap">High</span>
-                <span className="val">
-                  <span className="cur">$</span>
-                  {stripDollar(high)}
-                </span>
+                <span className="val">{high}</span>
               </div>
             </div>
             <div className="price__bar" aria-hidden="true">

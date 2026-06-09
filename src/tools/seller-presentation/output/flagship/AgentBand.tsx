@@ -42,7 +42,7 @@ export function AgentBand({
   if (a.phone) fields.push({ k: "Phone", v: formatPhone(a.phone) });
   if (a.email) fields.push({ k: "Email", v: a.email });
   if (a.licenseNumber) fields.push({ k: "License", v: a.licenseNumber });
-  if (a.yearsInArea) fields.push({ k: "Years Here", v: a.yearsInArea });
+  if (a.yearsInArea) fields.push({ k: "Years of experience", v: a.yearsInArea });
 
   const preparedFor = payload.preparedFor?.trim();
   const disclaimer = preparedFor
@@ -118,6 +118,12 @@ export function AgentBand({
   );
 }
 
+/**
+ * UX-2b — the agent-band avatar. Default = a plain centered `cover` photo (or the
+ * monogram). REPOSITIONED (off-center focal OR zoom) = an inner clip + image
+ * layer so the focal point maps to background-position and zoom maps to a scale
+ * anchored at the focal point — a pure DISPLAY transform (image bytes untouched).
+ */
 function Avatar({
   agent,
   monogram,
@@ -125,13 +131,43 @@ function Avatar({
   agent: AgentBranding;
   monogram: string;
 }) {
-  if (agent.photoUrl) {
+  const photoUrl = agent.photoUrl;
+  const fx = typeof agent.photoFocalX === "number" ? agent.photoFocalX : 50;
+  const fy = typeof agent.photoFocalY === "number" ? agent.photoFocalY : 50;
+  const scale = typeof agent.photoScale === "number" ? agent.photoScale : 1;
+  const repositioned = !!photoUrl && (fx !== 50 || fy !== 50 || scale > 1);
+
+  if (repositioned) {
+    const bg = `url("${photoUrl!.replace(/"/g, '\\"')}")`;
+    return (
+      <div
+        className="agent__avatar agent__avatar--adj"
+        data-testid="fs-agent-avatar"
+      >
+        <span className="agent__avatar-clip">
+          <span
+            className="agent__avatar-img"
+            data-testid="fs-agent-avatar-img"
+            style={{
+              backgroundImage: bg,
+              backgroundPosition: `${fx}% ${fy}%`,
+              ...(scale > 1
+                ? { transform: `scale(${scale})`, transformOrigin: `${fx}% ${fy}%` }
+                : null),
+            }}
+          />
+        </span>
+      </div>
+    );
+  }
+
+  if (photoUrl) {
     return (
       <div
         className="agent__avatar"
         data-testid="fs-agent-avatar"
         style={{
-          backgroundImage: `url("${agent.photoUrl.replace(/"/g, '\\"')}")`,
+          backgroundImage: `url("${photoUrl.replace(/"/g, '\\"')}")`,
           backgroundSize: "cover",
           backgroundPosition: "center",
         }}

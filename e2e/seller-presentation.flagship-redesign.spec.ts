@@ -65,15 +65,15 @@ test.describe("D1-FIX — price card (order + containment)", () => {
     const price = page.getByTestId("fs-price");
 
     // Meta row carries BOTH the label and the based-on subline, above the number.
-    const meta = price.locator(".fs-price__meta");
+    const meta = price.locator(".price__meta");
     await expect(meta).toContainText("Based on");
     await expect(meta).toContainText("nearby");
 
     // The number is fully contained within the price panel at 360px — even when
     // forced to a 7-figure value (the overflow bug this fix closes).
     const fits = await page.evaluate(() => {
-      const big = document.querySelector<HTMLElement>(".fs-page .fs-price__big");
-      const panel = document.querySelector<HTMLElement>(".fs-page .fs-price__panel");
+      const big = document.querySelector<HTMLElement>(".fs-page .price__single");
+      const panel = document.querySelector<HTMLElement>(".fs-page .price__card");
       const digits = big?.querySelector<HTMLElement>("[data-price-digits]");
       if (digits)
         digits.innerHTML =
@@ -127,7 +127,7 @@ test.describe("D1 — auto-icons on why-us + how-we-market cards", () => {
     await page.goto(FLAGSHIP);
 
     // Why-work-with-us: 3 differentiator cards, each with a resolved icon.
-    const diffIcons = page.locator(".fs-page .fs-whyus__card [data-icon]");
+    const diffIcons = page.locator('[data-testid^="fs-whyus-diff-"] [data-icon]');
     await expect(diffIcons).toHaveCount(3);
     // The photography differentiator resolves to the camera icon.
     await expect(
@@ -135,7 +135,7 @@ test.describe("D1 — auto-icons on why-us + how-we-market cards", () => {
     ).toHaveAttribute("data-icon", "camera");
 
     // How-we-market: 3 feature cards, each with a resolved icon.
-    const mktIcons = page.locator(".fs-page .fs-mkt__card [data-icon]");
+    const mktIcons = page.locator('[data-testid^="fs-whyus-mkt-"] [data-icon]');
     await expect(mktIcons).toHaveCount(3);
     await expect(
       page.getByTestId("fs-whyus-mkt-1").locator("[data-icon]"),
@@ -146,11 +146,11 @@ test.describe("D1 — auto-icons on why-us + how-we-market cards", () => {
     page,
   }) => {
     await page.goto(FLAGSHIP);
-    const home = page.locator(".fs-page .fs-bynum__home").first();
+    const home = page.locator(".fs-page .cmp__col--you .spark").first();
     await expect(home).toContainText("99.4");
     const homeColor = await read(home, "color");
     const mktColor = await read(
-      page.locator(".fs-page .fs-bynum__mkt").first(),
+      page.locator(".fs-page .cmp__col--mkt .cmp__v").first(),
       "color",
     );
     // The home figure is bright (the mint light-tip) and distinct from the muted
@@ -172,12 +172,12 @@ test.describe("D1 — comp photo slot flexes out cleanly (text-only default)", (
     // D1 ships the slot only — projectComp never sets photoUrl, so the photo
     // block is absent and the card reads as a clean text-only card.
     await expect(page.getByTestId("fs-comp-0-photo")).toHaveCount(0);
-    await expect(comp).not.toHaveClass(/fs-comp--photo/);
+    await expect(comp).not.toHaveClass(/has-photo/);
     // The comp data is still present.
-    await expect(comp.locator(".fs-comp__addr")).not.toBeEmpty();
-    await expect(comp.locator(".fs-comp__price")).not.toBeEmpty();
+    await expect(comp.locator(".comp-card__addr")).not.toBeEmpty();
+    await expect(comp.locator(".comp-card__price")).not.toBeEmpty();
     // SOURCE · PUBLIC RECORD line is preserved.
-    await expect(page.getByTestId("fs-why")).toContainText("Public record");
+    await expect(page.getByTestId("fs-why")).toContainText("Public Record");
   });
 });
 
@@ -197,7 +197,7 @@ test.describe("D1 — reviews dark beat (5.0 stars + confidence card + logo slot
     const conf = page.getByTestId("fs-reviews-confidence");
     await expect(conf).toBeVisible();
     await expect(conf).toContainText("5.0");
-    await expect(conf.locator(".fs-star")).toHaveCount(5);
+    await expect(conf.locator(".stars").first()).toContainText("★★★★★");
 
     // The logo slot (D4 swaps the official SVG) carries the detected source.
     const logo = page.getByTestId("fs-reviews-logo-slot");
@@ -206,7 +206,7 @@ test.describe("D1 — reviews dark beat (5.0 stars + confidence card + logo slot
     // The pull-quote copy is preserved verbatim.
     await expect(reviews).toContainText("She knew the neighborhood cold");
     // The reviews headline override surfaces.
-    await expect(reviews.locator(".fs-headline")).toContainText(
+    await expect(reviews.locator("h2.head")).toContainText(
       "What sellers say",
     );
   });
@@ -219,7 +219,7 @@ test.describe("D1 — reviews dark beat (5.0 stars + confidence card + logo slot
     );
     const reviews = page.getByTestId("fs-reviews");
     await expect(reviews).toHaveAttribute("data-variant", "outlink-only");
-    await expect(reviews.locator(".fs-star")).toHaveCount(5);
+    await expect(reviews.locator(".stars").first()).toContainText("★★★★★");
     await expect(page.getByTestId("fs-reviews-outlink")).toBeVisible();
   });
 });

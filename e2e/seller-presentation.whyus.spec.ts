@@ -66,13 +66,13 @@ test.describe("Why-us — per-block render (full fixture)", () => {
     // Body copy (a differentiator) is ink — legibility never rides the accent.
     const diffText = page
       .getByTestId("fs-whyus-diff-0")
-      .locator(".fs-whyus__card-text");
+      .locator(".rcard__title");
     expect(await read(diffText, "color")).toBe(INK);
 
     // The substantive bar value is NOT ink (it carries --signature, deepened on
     // pale-signature pages). Proving it differs from ink keeps the design intent
     // honest without hardcoding a specific signature hex.
-    const barVal = page.getByTestId("fs-whyus-bar-0").locator(".fs-bynum__home");
+    const barVal = page.getByTestId("fs-whyus-bar-0").locator(".cmp__col--you .spark");
     expect(await read(barVal, "color")).not.toBe(INK);
   });
 
@@ -84,7 +84,7 @@ test.describe("Why-us — per-block render (full fixture)", () => {
     // regardless of whether the IntersectionObserver has fired yet.
     const fill = page.getByTestId("fs-whyus-bar-0-you");
     const style = (await fill.getAttribute("style")) ?? "";
-    expect(style).toContain("--w");
+    expect(style).toContain("--fill");
   });
 
   test("agent tagline + reviews headline surface (additive, near their blocks)", async ({
@@ -99,7 +99,7 @@ test.describe("Why-us — per-block render (full fixture)", () => {
 
     // The reviews headline overrides the default "From families like yours".
     await expect(
-      page.getByTestId("fs-reviews").locator(".fs-headline"),
+      page.getByTestId("fs-reviews").locator("h2.head"),
     ).toContainText("What sellers say");
   });
 });

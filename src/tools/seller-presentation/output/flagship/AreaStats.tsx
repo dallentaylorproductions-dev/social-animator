@@ -58,9 +58,7 @@ export function AreaStats({ payload }: { payload: PublicPayload }) {
             </div>
           </div>
         )}
-        {hasChart && (
-          <AreaChart series={series} recK={recK} recLabel={recommended} />
-        )}
+        {hasChart && <AreaChart series={series} recK={recK} />}
       </div>
     </section>
   );
@@ -70,11 +68,9 @@ export function AreaStats({ payload }: { payload: PublicPayload }) {
 function AreaChart({
   series,
   recK,
-  recLabel,
 }: {
   series: Array<{ month: string; v: number }>;
   recK: number | null;
-  recLabel: string;
 }) {
   const W = 640,
     H = 250,
