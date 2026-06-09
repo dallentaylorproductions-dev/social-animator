@@ -1,0 +1,2352 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+<meta charset="UTF-8" />
+<meta name="viewport" content="width=device-width, initial-scale=1.0" />
+<title>Studio SEP — Seller Page</title>
+<link rel="preconnect" href="https://fonts.googleapis.com" />
+<link rel="preconnect" href="https://fonts.gstatic.com" crossorigin />
+<link href="https://fonts.googleapis.com/css2?family=Newsreader:ital,opsz,wght@0,6..72,400;0,6..72,500;1,6..72,400;1,6..72,500&family=Spectral:ital,wght@0,400;0,500;1,400;1,500&family=Hanken+Grotesk:wght@400;500;600&family=IBM+Plex+Mono:wght@400;500&display=swap" rel="stylesheet" />
+<style>
+/* ============================================================
+   Studio SEP — Seller Page  ·  Round 3 (the elevation round)
+   Bright/airy light-dominant base + 5 light tonal steps, now with
+   2 confident DARK proof bands (by-the-numbers, reviews) plus the
+   hero & agent for dark/light spine. ONE teal ramp reserved for the
+   earned moments. One depth token set. Container-query layout.
+   ============================================================ */
+
+:root {
+  /* ---- LIGHT tonal ladder ---- */
+  --white:    #FCFAF4;
+  --offwhite: #F8F3E8;
+  --paper:    #F1EADC;
+  --sand:     #ECE1CC;
+  --mist:     #E3ECEC;
+
+  /* ---- DARK punctuation ---- */
+  --ink:      #0C1518;
+  --ink-2:    #14242B;
+  --ink-3:    #21383F;
+
+  /* ---- ONE teal ramp (mint is the light tip only) ---- */
+  --teal-700: #06647D;
+  --teal-900: color-mix(in oklab, var(--teal-700), #021216 55%);
+  --teal-500: color-mix(in oklab, var(--teal-700), #ffffff 24%);
+  --teal-200: color-mix(in oklab, var(--teal-700) 24%, var(--paper));
+  --teal-100: color-mix(in oklab, var(--teal-700) 12%, var(--paper));
+  --mint:     #4EF2D9;
+  --accent:   var(--teal-700);
+
+  /* ---- Text ---- */
+  --t-ink:      #1B2A2E;
+  --t-body:     #2C3C40;
+  --t-soft:     #4C5D61;
+  --t-mute:     #74858A;
+  --t-pap:      #EFE9DC;
+  --t-pap-soft: #B4C0C1;
+  --t-pap-mute: #7C8D90;
+
+  /* ---- Hairlines ---- */
+  --line:     rgba(20,36,40,.13);
+  --line-2:   rgba(20,36,40,.22);
+  --line-pap: rgba(239,233,220,.16);
+
+  /* ---- Type ---- */
+  --f-display: "Newsreader", Georgia, serif;
+  --f-body:    "Hanken Grotesk", system-ui, sans-serif;
+  --f-mono:    "IBM Plex Mono", ui-monospace, monospace;
+
+  /* ---- Spacing ---- */
+  --s-1:4px; --s-2:8px; --s-3:12px; --s-4:16px; --s-5:24px;
+  --s-6:32px; --s-7:48px; --s-8:64px; --s-9:96px; --s-10:128px;
+
+  /* ---- Depth ---- */
+  --r-sm:10px; --r-md:16px; --r-lg:22px; --r-xl:30px;
+  --lift-1: 0 1px 2px rgba(16,28,30,.05), 0 10px 26px -16px rgba(16,28,30,.28);
+  --lift-2: 0 2px 4px rgba(16,28,30,.06), 0 22px 50px -24px rgba(16,28,30,.40);
+  --lift-dark: 0 30px 60px -30px rgba(0,0,0,.6);
+
+  /* ---- Motion ---- */
+  --ease: cubic-bezier(.2,.6,.2,1);
+  --dur: .7s;
+}
+
+.pair-spectral { --f-display: "Spectral", Georgia, serif; }
+
+* { box-sizing: border-box; }
+html, body { margin: 0; padding: 0; }
+
+/* ---------- PROTOTYPE SHELL ---------- */
+.stage { min-height: 100vh; background: #26261f; background-image: radial-gradient(circle at 50% -8%, #34332b 0%, #201f1a 72%); display: flex; flex-direction: column; align-items: center; padding: 0 0 80px; font-family: var(--f-body); }
+.topbar { position: sticky; top: 0; z-index: 50; width: 100%; display: flex; align-items: center; justify-content: center; gap: 18px; padding: 14px 18px; background: rgba(18,18,15,.8); backdrop-filter: blur(10px); border-bottom: 1px solid rgba(255,255,255,.06); }
+.topbar .brandtag { position: absolute; left: 20px; font-family: var(--f-mono); font-size: 11px; letter-spacing: .16em; color: #8b8a82; text-transform: uppercase; }
+.seg { display: inline-flex; background: rgba(255,255,255,.06); border: 1px solid rgba(255,255,255,.09); border-radius: 999px; padding: 3px; }
+.seg button { font-family: var(--f-mono); font-size: 11px; letter-spacing: .12em; text-transform: uppercase; color: #b9b8b0; background: transparent; border: 0; cursor: pointer; padding: 7px 16px; border-radius: 999px; transition: all .18s ease; }
+.seg button.on { background: var(--paper); color: #1c1c1a; }
+.hint { position: absolute; right: 20px; font-family: var(--f-mono); font-size: 10.5px; letter-spacing: .1em; color: #6f6e67; text-transform: uppercase; }
+
+.frame-wrap { width: 100%; display: flex; justify-content: center; padding: 34px 20px 0; }
+.frame { position: relative; background: var(--paper); overflow: hidden; transition: width .42s cubic-bezier(.7,0,.2,1); box-shadow: 0 40px 90px -30px rgba(0,0,0,.65), 0 6px 20px rgba(0,0,0,.3); }
+.frame.mobile { width: 402px; border-radius: 44px; padding: 0; border: 9px solid #0c0c0d; }
+.frame.desktop { width: 1180px; max-width: 100%; border-radius: 16px; border: 1px solid #0c0c0d; }
+
+.sep { container-type: inline-size; container-name: page; background: var(--paper); color: var(--t-body); font-family: var(--f-body); -webkit-font-smoothing: antialiased; font-size: 17px; line-height: 1.6; }
+.frame.mobile .sep { border-radius: 35px; overflow: hidden; }
+
+/* ---------- SHARED PRIMITIVES ---------- */
+.eyebrow { font-family: var(--f-mono); font-size: 11.5px; letter-spacing: .2em; text-transform: uppercase; color: var(--t-mute); font-weight: 500; display: flex; align-items: center; gap: 10px; }
+.eyebrow .num { color: var(--t-soft); }
+.eyebrow.on-dark { color: var(--t-pap-mute); }
+.eyebrow .rule { flex: 1; height: 1px; background: var(--line); }
+.eyebrow.on-dark .rule { background: var(--line-pap); }
+
+h2.head { font-family: var(--f-display); font-weight: 400; font-size: clamp(33px, 6.6cqi, 54px); line-height: 1.05; letter-spacing: -.015em; color: var(--t-ink); margin: var(--s-5) 0 0; text-wrap: balance; }
+h2.head em { font-style: italic; }
+.on-dark h2.head, h2.head.on-dark, .z-ink h2.head { color: var(--t-pap); }
+
+.body-lg { font-size: clamp(16.5px, 2.1cqi, 18.5px); line-height: 1.62; color: var(--t-body); }
+.lede { font-family: var(--f-display); font-weight: 400; font-size: clamp(20px, 2.9cqi, 26px); line-height: 1.4; color: var(--t-ink); letter-spacing: -.005em; text-wrap: pretty; }
+.emph { color: var(--teal-700); }
+.body-lg .emph { font-weight: 600; }
+
+.section { padding: clamp(46px, 9cqi, 104px) clamp(22px, 6cqi, 84px); position: relative; }
+
+.z-white { background: var(--white); }
+.z-offwhite { background: var(--offwhite); }
+.z-paper { background: var(--paper); }
+.z-sand { background: var(--sand); }
+.z-mist { background: var(--mist); }
+.z-ink { background: var(--ink); color: var(--t-pap); }
+
+/* ============================================================ HERO ============================================================ */
+.hero { background: var(--ink); color: var(--t-pap); padding-bottom: clamp(70px, 9cqi, 96px); }
+.hero__photo { position: relative; width: 100%; aspect-ratio: 4 / 3; background: var(--ink-2); overflow: hidden; }
+.hero__photo image-slot { width: 100%; height: 100%; display: block; }
+.hero__slot { position: absolute; inset: 0; z-index: 1; }
+.hero__pers { position: absolute; top: 16px; left: 0; right: 0; z-index: 2; text-align: center; font-family: var(--f-mono); font-size: 10.5px; letter-spacing: .22em; text-transform: uppercase; color: var(--t-pap-soft); display: flex; align-items: center; justify-content: center; gap: 9px; }
+.hero__pers .dot { width: 4px; height: 4px; border-radius: 50%; background: var(--mint); }
+.hero__band { padding: clamp(28px,6cqi,48px) clamp(22px,6cqi,84px) 0; }
+.hero__eyebrow { font-family: var(--f-mono); font-size: 11px; letter-spacing: .2em; text-transform: uppercase; color: var(--t-pap-mute); margin-bottom: 18px; }
+.hero__addr { font-family: var(--f-display); font-weight: 400; font-size: clamp(38px, 8.6cqi, 80px); line-height: 1.0; letter-spacing: -.02em; margin: 0; color: var(--t-pap); }
+.hero__loc { font-family: var(--f-mono); font-size: 12px; letter-spacing: .14em; text-transform: uppercase; color: var(--t-pap-mute); margin-top: 16px; }
+.hero__empty { position: absolute; inset: 0; display: flex; align-items: center; justify-content: center; background: repeating-linear-gradient(135deg, #16262d 0 2px, transparent 2px 11px), linear-gradient(160deg, #16272e, #0e1a1f); }
+.hero__empty span { font-family: var(--f-mono); font-size: 11px; letter-spacing: .22em; text-transform: uppercase; color: #5e767c; }
+
+/* ============================================================ PRICE ============================================================ */
+.price { background: var(--paper); padding-top: 0; padding-bottom: clamp(40px,7cqi,84px); }
+.price__card { position: relative; z-index: 3; margin-top: clamp(-58px, -7cqi, -88px); background: var(--white); border: 1px solid var(--line-2); border-radius: var(--r-lg); box-shadow: var(--lift-2); padding: clamp(28px,5.5cqi,56px); }
+.price__accentbar { position: absolute; left: 0; top: 22px; bottom: 22px; width: 4px; border-radius: 0 4px 4px 0; background: linear-gradient(var(--teal-700), var(--teal-500)); }
+.price__meta { display: flex; justify-content: space-between; align-items: baseline; gap: 16px 28px; flex-wrap: wrap; }
+.price__label { font-family: var(--f-mono); font-size: 11.5px; letter-spacing: .24em; text-transform: uppercase; color: var(--teal-700); font-weight: 500; white-space: nowrap; }
+.price__sub { font-size: 15.5px; color: var(--t-soft); margin: 0; max-width: 32ch; }
+.price__sub b { color: var(--teal-900); font-weight: 600; }
+.price__single { font-family: var(--f-display); font-weight: 400; font-size: clamp(60px, 18cqi, 144px); line-height: .9; letter-spacing: -.03em; color: var(--teal-900); margin: 20px 0 0; font-variant-numeric: lining-nums tabular-nums; }
+.price__single .cur { font-size: .5em; vertical-align: .34em; color: var(--teal-500); }
+.price__range { margin-top: 20px; }
+.price__rangerow { display: flex; flex-direction: column; align-items: flex-start; gap: 12px; }
+.price__leg { display: flex; flex-direction: column; gap: 4px; }
+.price__leg .cap { font-family: var(--f-mono); font-size: 10.5px; letter-spacing: .2em; text-transform: uppercase; color: var(--teal-700); }
+.price__leg .val { font-family: var(--f-display); font-weight: 400; font-size: clamp(46px, 13cqi, 104px); line-height: .88; letter-spacing: -.03em; color: var(--teal-900); font-variant-numeric: lining-nums tabular-nums; }
+.price__leg .val .cur { font-size: .48em; vertical-align: .36em; color: var(--teal-500); }
+.price__dash { display: none; font-family: var(--f-display); color: var(--teal-500); font-size: clamp(28px,8cqi,60px); line-height: 1; padding-bottom: .12em; }
+.price__bar { margin-top: 22px; height: 6px; border-radius: 99px; background: var(--teal-100); position: relative; overflow: hidden; }
+@keyframes barGrow { from { transform: scaleX(0); } to { transform: scaleX(1); } }
+.price__bar i { position: absolute; inset: 0; border-radius: 99px; background: linear-gradient(90deg, var(--teal-500), var(--teal-700)); transform-origin: left; transform: scaleX(1); animation: barGrow 1.1s var(--ease) .25s both; }
+
+/* ============================================================ 01 NOTE ============================================================ */
+.note { background: var(--offwhite); }
+.note__grid { display: grid; gap: clamp(28px,5cqi,56px); align-items: center; }
+.note__copy .lede { margin-top: 20px; max-width: 26ch; }
+.note__copy .body-lg { margin-top: 16px; max-width: 42ch; }
+.video { position: relative; aspect-ratio: 4 / 5; border-radius: var(--r-lg); overflow: hidden; background: linear-gradient(165deg, var(--teal-200), var(--mist)); border: 1px solid var(--line); box-shadow: var(--lift-1); }
+.video::before { content: ""; position: absolute; inset: 0; background: repeating-linear-gradient(135deg, rgba(5,56,69,.04) 0 2px, transparent 2px 12px); }
+.video__play { position: absolute; top: 50%; left: 50%; transform: translate(-50%,-50%); width: 66px; height: 66px; border-radius: 50%; background: var(--white); display: flex; align-items: center; justify-content: center; box-shadow: 0 10px 30px rgba(5,56,69,.25); }
+.video__play::after { content: ""; border-left: 16px solid var(--teal-700); border-top: 10px solid transparent; border-bottom: 10px solid transparent; margin-left: 4px; }
+.video__cap { position: absolute; left: 20px; bottom: 18px; font-family: var(--f-display); font-style: italic; font-size: 15px; color: var(--teal-900); }
+
+/* ============================================================ 02 WHY PRICE — comps (slim mobile thumb) ============================================================ */
+.whyprice { background: var(--paper); }
+.why__lead { display: grid; gap: clamp(20px,4cqi,40px); align-items: end; margin-top: clamp(26px,4cqi,40px); }
+.why__numblock { display: flex; gap: 18px; align-items: flex-start; }
+.why__num { font-family: var(--f-display); font-weight: 400; font-size: clamp(58px, 13cqi, 108px); line-height: .8; color: var(--teal-900); letter-spacing: -.03em; }
+.why__numtext { font-size: clamp(16.5px,2.2cqi,19px); line-height: 1.32; color: var(--t-ink); max-width: 16ch; align-self: center; }
+.why__agentnote { font-family: var(--f-display); font-style: italic; font-size: clamp(16px,2.2cqi,19px); color: var(--t-soft); line-height: 1.5; max-width: 44ch; }
+
+.comps { margin-top: clamp(30px,5cqi,52px); display: grid; gap: 12px; }
+.comp-card { background: var(--white); border: 1px solid var(--line); border-radius: var(--r-md); box-shadow: var(--lift-1); overflow: hidden; display: flex; flex-direction: row; align-items: stretch; transition: transform .25s var(--ease), box-shadow .25s var(--ease); }
+.comp-card:hover { transform: translateY(-3px); box-shadow: var(--lift-2); }
+.comp-card__photo { position: relative; flex: none; width: 116px; align-self: stretch; min-height: 96px; background: var(--mist); }
+.comp-card__photo image-slot { position: absolute; inset: 0; width: 100%; height: 100%; display: block; }
+.comp-card__body { flex: 1; min-width: 0; padding: clamp(15px,2.4cqi,18px) clamp(16px,2.6cqi,20px); display: flex; align-items: center; justify-content: space-between; gap: 14px; }
+.comp-card__info { min-width: 0; }
+.comp-card__idx { font-family: var(--f-mono); font-size: 10.5px; letter-spacing: .14em; color: var(--t-mute); display: block; margin-bottom: 5px; }
+.comp-card__addr { font-family: var(--f-display); font-size: clamp(18px,2.6cqi,22px); color: var(--t-ink); line-height: 1.1; }
+.comp-card__meta { font-family: var(--f-mono); font-size: 10px; letter-spacing: .07em; color: var(--t-mute); text-transform: uppercase; margin-top: 6px; }
+.comp-card__price { text-align: right; flex: none; }
+.comp-card__price b { font-family: var(--f-display); font-size: clamp(18px,2.6cqi,23px); color: var(--t-ink); font-weight: 400; display: block; font-variant-numeric: lining-nums tabular-nums; }
+.comp-card__price span { font-family: var(--f-mono); font-size: 9.5px; letter-spacing: .18em; color: var(--t-mute); text-transform: uppercase; }
+.comp__src { font-family: var(--f-mono); font-size: 10.5px; letter-spacing: .18em; text-transform: uppercase; color: var(--t-mute); margin-top: 20px; }
+
+/* ============================================================ WHY WORK WITH US — cream cards ============================================================ */
+.reasons { background: var(--offwhite); }
+.rcards { margin-top: clamp(28px,5cqi,48px); display: grid; gap: 14px; }
+.rcard { background: var(--white); border: 1px solid var(--line); border-radius: var(--r-md); box-shadow: var(--lift-1); padding: clamp(22px,3cqi,30px); transition: transform .25s var(--ease), box-shadow .25s var(--ease); }
+.rcard:hover { transform: translateY(-3px); box-shadow: var(--lift-2); }
+.rcard__idx { font-family: var(--f-mono); font-size: 12px; letter-spacing: .12em; color: var(--teal-700); }
+.rcard__title { font-family: var(--f-display); font-size: clamp(21px,2.8cqi,26px); color: var(--t-ink); margin-top: 16px; line-height: 1.12; }
+.rcard__body { font-size: 16px; color: var(--t-body); margin-top: 10px; line-height: 1.55; max-width: 46ch; }
+
+/* ============================================================ BY THE NUMBERS — dark band, us vs market ============================================================ */
+.bynum { background: var(--ink); color: var(--t-pap); }
+.cmp { margin-top: clamp(22px,3.5cqi,34px); }
+.cmp__label { font-family: var(--f-mono); font-size: 11.5px; letter-spacing: .22em; text-transform: uppercase; color: var(--t-pap-soft); }
+.cmp__row { display: flex; align-items: flex-end; gap: clamp(20px,5cqi,56px); margin-top: 22px; flex-wrap: wrap; }
+.card-mark { width: 48px; height: 48px; border-radius: 13px; background: var(--teal-100); border: 1px solid color-mix(in oklab, var(--teal-700) 18%, transparent); display: flex; align-items: center; justify-content: center; color: var(--teal-700); flex: none; }
+.card-mark svg { width: 24px; height: 24px; display: block; }
+
+.cmp__col { display: flex; flex-direction: column; gap: 16px; }
+.cmp__k { font-family: var(--f-mono); font-size: 10.5px; letter-spacing: .16em; text-transform: uppercase; }
+.cmp__col--you .cmp__k { color: var(--teal-500); }
+.cmp__col--mkt .cmp__k { color: var(--t-pap-mute); }
+.cmp__v { font-family: var(--f-display); line-height: .92; letter-spacing: -.02em; display: flex; align-items: baseline; }
+.cmp__v i { font-style: normal; font-size: .4em; margin-left: .04em; }
+.cmp__col--you .cmp__v { font-size: clamp(64px,15cqi,128px); color: var(--t-pap); }
+.cmp__col--you .cmp__v i { color: var(--t-pap-soft); }
+.cmp__col--you .spark { color: var(--mint); }
+.cmp__col--mkt .cmp__v { font-size: clamp(40px,9cqi,80px); color: var(--t-pap-mute); }
+.cmp__col--mkt .cmp__v i { color: var(--t-pap-mute); }
+.cmp__vs { font-family: var(--f-display); font-style: italic; color: var(--t-pap-mute); font-size: clamp(18px,3cqi,28px); padding-bottom: .5em; }
+.bynum__track { margin-top: clamp(30px,5cqi,46px); height: 12px; border-radius: 99px; background: rgba(255,255,255,.08); position: relative; }
+@keyframes fillGrow { from { transform: scaleX(0); } to { transform: scaleX(var(--fill, .983)); } }
+.bynum__fill { position: absolute; inset: 0; border-radius: 99px; background: linear-gradient(90deg, var(--teal-500), var(--mint)); transform-origin: left; transform: scaleX(var(--fill, .983)); animation: fillGrow 1.3s var(--ease) .3s both; }
+.bynum__mktmark { position: absolute; top: -7px; bottom: -7px; width: 2px; background: var(--t-pap-soft); }
+.bynum__mktmark span { position: absolute; top: -22px; left: 50%; transform: translateX(-50%); white-space: nowrap; font-family: var(--f-mono); font-size: 9.5px; letter-spacing: .1em; color: var(--t-pap-mute); text-transform: uppercase; }
+
+/* ============================================================ HOW WE MARKET — warm-tint FEATURE moment (prominent icons, bolder) ============================================================ */
+.mkt { background: var(--sand); }
+.mcards { margin-top: clamp(28px,5cqi,48px); display: grid; gap: 14px; }
+.mcard { background: var(--white); border: 1px solid var(--line); border-radius: var(--r-lg); box-shadow: var(--lift-1); padding: clamp(26px,3.6cqi,40px); transition: transform .25s var(--ease), box-shadow .25s var(--ease); }
+.mcard:hover { transform: translateY(-3px); box-shadow: var(--lift-2); }
+.mcard .card-mark { width: 58px; height: 58px; border-radius: 17px; }
+.mcard .card-mark svg { width: 30px; height: 30px; }
+.mcard__title { font-family: var(--f-display); font-size: clamp(22px,3.1cqi,30px); color: var(--t-ink); margin-top: 22px; line-height: 1.08; }
+.mcard__body { font-size: 16.5px; color: var(--t-body); margin-top: 12px; line-height: 1.55; max-width: 42ch; }
+
+/* ============================================================ HOW WE WORK — stepper / mobile timeline ============================================================ */
+.work { background: var(--mist); }
+.flow { margin-top: clamp(28px,5cqi,48px); display: grid; gap: 14px; position: relative; }
+.flow::before { content: ""; position: absolute; left: 33px; top: 26px; bottom: 26px; width: 2px; background: var(--line-2); z-index: 0; }
+.fstep { position: relative; z-index: 1; background: var(--white); border: 1px solid var(--line); border-radius: var(--r-md); box-shadow: var(--lift-1); padding: clamp(18px,2.6cqi,22px) clamp(18px,2.6cqi,22px) clamp(18px,2.6cqi,22px) 66px; transition: transform .25s var(--ease), box-shadow .25s var(--ease); }
+.fstep:hover { transform: translateY(-2px); box-shadow: var(--lift-2); }
+.fstep__badge { position: absolute; left: 16px; top: clamp(18px,2.6cqi,22px); width: 34px; height: 34px; border-radius: 50%; background: var(--teal-700); color: #eafcff; font-family: var(--f-mono); font-size: 13px; display: flex; align-items: center; justify-content: center; }
+.fstep__title { font-family: var(--f-display); font-size: clamp(19px,2.6cqi,23px); color: var(--t-ink); line-height: 1.12; }
+.fstep__body { font-size: 15.5px; color: var(--t-body); margin-top: 6px; line-height: 1.5; }
+
+/* ============================================================ REVIEWS — dark band, pull-quote + confidence ============================================================ */
+.reviews { background: var(--ink); color: var(--t-pap); }
+.reviews__layout { margin-top: clamp(24px,4cqi,40px); display: grid; gap: clamp(28px,5cqi,48px); align-items: center; }
+.stars { color: var(--teal-500); letter-spacing: 4px; font-size: 17px; }
+.stars.sm { font-size: 13px; letter-spacing: 2px; }
+.review__q { font-family: var(--f-display); font-size: clamp(24px,3.8cqi,38px); line-height: 1.3; color: var(--t-pap); letter-spacing: -.012em; margin: 16px 0 0; max-width: 22ch; text-wrap: pretty; }
+.review__q .mark { color: var(--teal-500); }
+.review__attr { font-family: var(--f-mono); font-size: 11px; letter-spacing: .16em; text-transform: uppercase; color: var(--t-pap-mute); margin-top: 22px; }
+.rev-conf { background: var(--ink-2); border: 1px solid var(--line-pap); border-radius: var(--r-lg); padding: clamp(24px,3.5cqi,32px); }
+.rev-logos { display: flex; flex-wrap: wrap; align-items: center; gap: 12px 22px; margin-top: 20px; }
+.plogo { display: inline-flex; align-items: center; gap: 9px; text-decoration: none; color: var(--t-pap); }
+.plogo + .plogo { padding-left: 22px; border-left: 1px solid var(--line-pap); }
+.plogo__name { font-family: var(--f-body); font-weight: 600; font-size: clamp(18px,2.3cqi,21px); letter-spacing: -.01em; }
+.plogo:hover .plogo__name { color: var(--mint); }
+.rev-conf__rating { display: flex; align-items: center; gap: 12px; }
+.rev-conf__num { font-family: var(--f-display); font-size: clamp(40px,7cqi,58px); color: var(--t-pap); line-height: 1; }
+.rev-conf__count { font-family: var(--f-mono); font-size: 12px; letter-spacing: .08em; text-transform: uppercase; color: var(--t-pap-soft); margin-top: 14px; }
+.rev-conf__count .emph { color: var(--mint); font-weight: 600; }
+.rev-conf .zillow { margin-top: 22px; display: flex; flex-direction: column; gap: 8px; background: var(--ink-3); border: 1px solid var(--line-pap); border-radius: var(--r-md); box-shadow: none; padding: 20px 22px; text-decoration: none; transition: transform .25s var(--ease); }
+.rev-conf .zillow:hover { transform: translateY(-2px); }
+.rev-conf .zillow .lead { font-family: var(--f-display); font-size: clamp(17px,2.2cqi,20px); color: var(--t-pap); }
+.rev-conf .zillow .go { font-family: var(--f-mono); font-size: 10.5px; letter-spacing: .18em; text-transform: uppercase; color: var(--teal-500); display: flex; align-items: center; gap: 8px; }
+
+/* ============================================================ 05 AREA SALES — bigger stats + chart ============================================================ */
+.area { background: var(--paper); }
+.area__stats { margin-top: clamp(28px,5cqi,48px); display: grid; gap: clamp(12px,1.6cqi,16px); }
+.stat { background: var(--white); border: 1px solid var(--line); border-radius: var(--r-md); box-shadow: var(--lift-1); padding: clamp(20px,3cqi,28px) clamp(18px,3cqi,24px); }
+.stat__val { font-family: var(--f-display); font-size: clamp(36px,6.4cqi,56px); color: var(--t-ink); line-height: .92; font-variant-numeric: lining-nums tabular-nums; }
+.stat__label { font-family: var(--f-mono); font-size: 10px; letter-spacing: .16em; text-transform: uppercase; color: var(--t-mute); margin-top: 14px; }
+.stat__sub { font-family: var(--f-mono); font-size: 10px; letter-spacing: .08em; text-transform: uppercase; color: var(--t-mute); margin-top: 7px; }
+
+.chart { margin-top: clamp(16px,2.4cqi,24px); background: var(--white); border: 1px solid var(--line); border-radius: var(--r-lg); box-shadow: var(--lift-1); padding: clamp(22px,4cqi,34px); }
+.chart__head { display: flex; justify-content: space-between; gap: 12px; }
+.chart__cap { display: flex; flex-direction: column; }
+.chart__cap.r { text-align: right; align-items: flex-end; }
+.chart__cap .k { font-family: var(--f-mono); font-size: 9.5px; letter-spacing: .14em; text-transform: uppercase; color: var(--t-mute); }
+.chart__cap .v { font-family: var(--f-display); font-size: clamp(20px,3.4cqi,30px); color: var(--teal-900); margin-top: 4px; }
+.chart__cap .v.pill { background: var(--teal-100); border-radius: 6px; padding: 1px 8px; align-self: flex-start; }
+.chart__plot { margin-top: 22px; position: relative; }
+.chart svg { width: 100%; height: auto; display: block; overflow: visible; }
+.chart .gridline { stroke: var(--line); stroke-width: 1; }
+.chart .ylabel { font-family: var(--f-mono); font-size: 9px; letter-spacing: .03em; fill: var(--t-mute); }
+.chart .dropline { stroke: var(--teal-500); stroke-width: 1.4; stroke-dasharray: 3 4; opacity: .5; }
+.chart .halo { fill: none; stroke: var(--teal-700); stroke-opacity: .22; stroke-width: 2; }
+.chart .xlabel { font-family: var(--f-mono); font-size: 9px; letter-spacing: .12em; fill: var(--t-mute); text-transform: uppercase; }
+.chart .area-fill { fill: rgba(6,100,125,.07); }
+@keyframes drawLine { from { stroke-dashoffset: var(--len,200); } to { stroke-dashoffset: 0; } }
+.chart .line { fill: none; stroke: var(--teal-700); stroke-width: 2.5; stroke-linecap: round; stroke-linejoin: round; stroke-dasharray: var(--len,200); stroke-dashoffset: 0; animation: drawLine 1.6s var(--ease) .3s both; }
+.chart .dot { fill: var(--white); stroke: var(--teal-700); stroke-width: 2; }
+.chart .dot.cur { fill: var(--teal-700); }
+.chart .dashline { stroke: var(--teal-500); stroke-width: 1.5; stroke-dasharray: 4 4; }
+
+/* ============================================================ 06 AGENT ============================================================ */
+.agent { background: var(--ink); color: var(--t-pap); }
+.agent__name { font-family: var(--f-display); font-size: clamp(38px,8cqi,72px); letter-spacing: -.02em; color: var(--t-pap); margin: var(--s-4) 0 0; line-height: 1; }
+.agent__tag { font-family: var(--f-display); font-style: italic; font-size: clamp(16px,2.4cqi,21px); color: var(--teal-500); margin-top: 12px; }
+.agent__card { margin-top: clamp(28px,4cqi,40px); display: flex; align-items: center; gap: 16px; background: var(--ink-2); border: 1px solid var(--line-pap); border-radius: var(--r-md); padding: 16px 18px; }
+.agent__avatar { width: 52px; height: 52px; border-radius: 50%; background: var(--ink-3); display: flex; align-items: center; justify-content: center; font-family: var(--f-display); font-size: 19px; color: var(--t-pap); overflow: hidden; flex: none; }
+.agent__avatar image-slot { width: 100%; height: 100%; }
+.agent__who .n { font-family: var(--f-display); font-size: 19px; color: var(--t-pap); }
+.agent__who .r { font-family: var(--f-mono); font-size: 10px; letter-spacing: .14em; text-transform: uppercase; color: var(--t-pap-mute); margin-top: 4px; }
+.agent__bio { font-family: var(--f-display); font-style: italic; font-size: clamp(16px,2.3cqi,21px); color: var(--t-pap-soft); margin-top: clamp(22px,3cqi,30px); }
+.agent__meta { margin-top: clamp(22px,3cqi,30px); display: grid; gap: 1px; background: var(--line-pap); border-radius: var(--r-md); overflow: hidden; }
+.agent__field { background: var(--ink); padding: 16px 18px; }
+.agent__field .k { font-family: var(--f-mono); font-size: 9.5px; letter-spacing: .16em; text-transform: uppercase; color: var(--t-pap-mute); }
+.agent__field .v { font-size: 15px; color: var(--t-pap); margin-top: 6px; word-break: break-word; }
+.agent__cta { margin-top: clamp(24px,3cqi,34px); display: grid; gap: 12px; }
+.btn { font-family: var(--f-body); font-size: 15px; border-radius: 999px; padding: 16px 22px; display: flex; align-items: center; justify-content: space-between; gap: 12px; cursor: pointer; border: 1px solid transparent; text-decoration: none; transition: transform .12s var(--ease); }
+.btn:active { transform: scale(.985); }
+.btn__lbl { flex: 1; }
+.btn--primary { background: var(--teal-700); color: #eafcff; border-color: var(--teal-700); }
+.btn--ghost { background: transparent; color: var(--t-pap); border-color: var(--line-pap); }
+.btn .ar { font-family: var(--f-mono); }
+.agent__note { font-family: var(--f-mono); font-size: 10.5px; letter-spacing: .08em; text-transform: uppercase; color: var(--t-pap-mute); margin-top: 14px; }
+.agent__foot { margin-top: clamp(34px,5cqi,56px); padding-top: clamp(22px,3cqi,30px); border-top: 1px solid var(--line-pap); }
+.agent__brand { font-family: var(--f-display); font-size: 22px; color: var(--t-pap); }
+.agent__brand em { font-style: italic; color: var(--teal-500); }
+.agent__disc { font-family: var(--f-mono); font-size: 10px; letter-spacing: .06em; line-height: 1.8; color: var(--t-pap-mute); text-transform: uppercase; margin-top: 16px; max-width: 60ch; }
+
+/* ============================================================ MOTION ============================================================ */
+.motion [data-reveal] { opacity: 1; transform: none; }
+@media (prefers-reduced-motion: reduce) { .price__bar i, .bynum__fill, .chart .line { animation: none !important; } }
+
+/* ============================================================ DESKTOP (container >= 720) ============================================================ */
+@container page (min-width: 720px) {
+  .sep { font-size: 18px; }
+  .hero { display: grid; grid-template-columns: 1.15fr .85fr; align-items: stretch; padding-bottom: 0; }
+  .hero__photo { aspect-ratio: auto; min-height: 560px; }
+  .hero__band { display: flex; flex-direction: column; justify-content: flex-end; padding-bottom: clamp(80px,9cqi,110px); }
+
+  .price { padding-left: clamp(40px,6cqi,84px); padding-right: clamp(40px,6cqi,84px); }
+  .price__card { margin-top: clamp(-92px,-9cqi,-120px); padding: clamp(40px,5cqi,60px); }
+  .price__rangerow { flex-direction: row; align-items: flex-end; gap: 44px; }
+  .price__dash { display: block; }
+
+  .note__grid { grid-template-columns: 1fr .72fr; }
+  .video { aspect-ratio: 3 / 4; }
+
+  .why__lead { grid-template-columns: 1fr 1fr; }
+  .comps { grid-template-columns: 1fr 1fr; gap: clamp(16px,2cqi,22px); align-items: start; }
+  .comp-card { flex-direction: column; align-items: stretch; }
+  .comp-card__photo { width: 100%; aspect-ratio: 16 / 10; align-self: auto; min-height: 0; }
+  .comp-card__body { padding: clamp(16px,2.6cqi,22px); }
+
+  .rcards { grid-template-columns: repeat(auto-fit, minmax(220px, 1fr)); gap: 18px; }
+  .mcards { grid-template-columns: repeat(auto-fit, minmax(220px, 1fr)); gap: 18px; }
+
+  /* horizontal stepper */
+  .flow { grid-auto-flow: column; grid-auto-columns: 1fr; gap: 16px; }
+  .flow::before { left: 9%; right: 9%; top: 38px; bottom: auto; width: auto; height: 2px; }
+  .fstep { text-align: center; padding: 64px 18px 26px; }
+  .fstep__badge { left: 50%; transform: translateX(-50%); top: 20px; }
+  .fstep__body { max-width: 26ch; margin-left: auto; margin-right: auto; }
+
+  .reviews__layout { grid-template-columns: 1.25fr .75fr; align-items: center; }
+  .area__stats { grid-template-columns: repeat(4, 1fr); }
+
+  .agent__top { display: grid; grid-template-columns: 1fr 1fr; gap: 40px; align-items: end; }
+  .agent__meta { grid-template-columns: repeat(4, 1fr); }
+  .agent__cta { grid-template-columns: 1fr 1fr; }
+  .agent__lower { display: grid; grid-template-columns: 1fr 1fr; gap: 40px; align-items: start; }
+}
+
+</style>
+</head>
+<body>
+<div id="root"></div>
+
+<script src="https://unpkg.com/react@18.3.1/umd/react.development.js" integrity="sha384-hD6/rw4ppMLGNu3tX5cjIb+uRZ7UkRJ6BPkLpg4hAu/6onKUg4lLsHAs9EBPT82L" crossorigin="anonymous"></script>
+<script src="https://unpkg.com/react-dom@18.3.1/umd/react-dom.development.js" integrity="sha384-u6aeetuaXnQ38mYT8rp6sbXaQe3NL9t+IBXmnYxwkUI2Hw4bsp2Wvmx4yRQF1uAm" crossorigin="anonymous"></script>
+<script src="https://unpkg.com/@babel/standalone@7.29.0/babel.min.js" integrity="sha384-m08KidiNqLdpJqLq95G/LEi8Qvjl/xUYll3QILypMoQ65QorJ9Lvtp2RXYGBFj1y" crossorigin="anonymous"></script>
+
+<script>
+// @ds-adherence-ignore -- omelette starter scaffold (raw elements/hex/px by design)
+/* BEGIN USAGE */
+/**
+ * <image-slot> — user-fillable image placeholder.
+ *
+ * Drop this into a deck, mockup, or page wherever you want the user to
+ * supply an image. You control the slot's shape and size; the user fills it
+ * by dragging an image file onto it (or clicking to browse). The dropped
+ * image persists across reloads via a .image-slots.state.json sidecar —
+ * same read-via-fetch / write-via-window.omelette pattern as
+ * design_canvas.jsx, so the filled slot shows on share links, downloaded
+ * zips, and PPTX export. Outside the omelette runtime the slot is read-only.
+ *
+ * The host bridge only allows sidecar writes at the project root, so the
+ * HTML that uses this component is assumed to live at the project root too
+ * (same constraint as design_canvas.jsx).
+ *
+ * Attributes:
+ *   id           Persistence key. REQUIRED for the drop to survive reload —
+ *                every slot on the page needs a distinct id.
+ *   shape        'rect' | 'rounded' | 'circle' | 'pill'   (default 'rounded')
+ *                'circle' applies 50% border-radius; on a non-square slot
+ *                that's an ellipse — set equal width and height for a true
+ *                circle.
+ *   radius       Corner radius in px for 'rounded'.       (default 12)
+ *   mask         Any CSS clip-path value. Overrides `shape` — use this for
+ *                hexagons, blobs, arbitrary polygons.
+ *   fit          object-fit: cover | contain | fill.       (default 'cover')
+ *                With cover (the default) double-clicking the filled slot
+ *                enters a reframe mode: the whole image spills past the mask
+ *                (translucent outside, opaque inside), drag to reposition,
+ *                corner-drag to scale. The crop persists alongside the image
+ *                in the sidecar. contain/fill stay static.
+ *   position     object-position for fit=contain|fill.     (default '50% 50%')
+ *   placeholder  Empty-state caption.                      (default 'Drop an image')
+ *   src          Optional initial/fallback image URL. A user drop overrides
+ *                it; clearing the drop reveals src again.
+ *
+ * Size and layout come from ordinary CSS on the element — width/height
+ * inline or from a parent grid — so it composes with any layout.
+ *
+ * Usage:
+ *   <image-slot id="hero"   style="width:800px;height:450px" shape="rounded" radius="20"
+ *               placeholder="Drop a hero image"></image-slot>
+ *   <image-slot id="avatar" style="width:120px;height:120px" shape="circle"></image-slot>
+ *   <image-slot id="kite"   style="width:300px;height:300px"
+ *               mask="polygon(50% 0, 100% 50%, 50% 100%, 0 50%)"></image-slot>
+ */
+/* END USAGE */
+
+(() => {
+  const STATE_FILE = '.image-slots.state.json';
+  // 2× a ~600px slot in a 1920-wide deck — retina-sharp without making the
+  // sidecar enormous. A 1200px WebP at q=0.85 is ~150-300KB.
+  const MAX_DIM = 1200;
+  // Raster formats only. SVG is excluded (can carry script; createImageBitmap
+  // on SVG blobs is inconsistent). GIF is excluded because the canvas
+  // re-encode keeps only the first frame, so an animated GIF would silently
+  // go still — better to reject than surprise.
+  const ACCEPT = ['image/png', 'image/jpeg', 'image/webp', 'image/avif'];
+
+  // ── Shared sidecar store ────────────────────────────────────────────────
+  // One fetch + immediate write-on-change for every <image-slot> on the
+  // page. Reads via fetch() so viewing works anywhere the HTML and sidecar
+  // are served together; writes go through window.omelette.writeFile, which
+  // the host allowlists to *.state.json basenames only.
+  const subs = new Set();
+  let slots = {};
+  // ids explicitly cleared before the sidecar fetch resolved — otherwise
+  // the merge below can't tell "never set" from "just deleted" and would
+  // resurrect the sidecar's stale value.
+  const tombstones = new Set();
+  let loaded = false;
+  let loadP = null;
+
+  function load() {
+    if (loadP) return loadP;
+    loadP = fetch(STATE_FILE)
+      .then((r) => (r.ok ? r.json() : null))
+      .then((j) => {
+        // Merge: sidecar loses to any in-memory change that raced ahead of
+        // the fetch (drop or clear) so neither is clobbered by hydration.
+        if (j && typeof j === 'object') {
+          const merged = Object.assign({}, j, slots);
+          // A framing-only write that raced ahead of hydration must not
+          // drop a user image that's only on disk — inherit u from the
+          // sidecar for any in-memory entry that lacks one.
+          for (const k in slots) {
+            if (merged[k] && !merged[k].u && j[k]) {
+              merged[k].u = typeof j[k] === 'string' ? j[k] : j[k].u;
+            }
+          }
+          for (const id of tombstones) delete merged[id];
+          slots = merged;
+        }
+        tombstones.clear();
+      })
+      .catch(() => {})
+      .then(() => { loaded = true; subs.forEach((fn) => fn()); });
+    return loadP;
+  }
+
+  // Serialize writes so two near-simultaneous drops on different slots
+  // can't reorder at the backend and leave the sidecar with only the
+  // first. A save requested mid-flight just marks dirty and re-fires on
+  // completion with the then-current slots.
+  let saving = false;
+  let saveDirty = false;
+  function save() {
+    if (saving) { saveDirty = true; return; }
+    const w = window.omelette && window.omelette.writeFile;
+    if (!w) return;
+    saving = true;
+    Promise.resolve(w(STATE_FILE, JSON.stringify(slots)))
+      .catch(() => {})
+      .then(() => { saving = false; if (saveDirty) { saveDirty = false; save(); } });
+  }
+
+  const S_MAX = 5;
+  const clampS = (s) => Math.max(1, Math.min(S_MAX, s));
+
+  // Normalize a stored slot value. Pre-reframe sidecars stored a bare
+  // data-URL string; newer ones store {u, s, x, y}. Either shape is valid.
+  function getSlot(id) {
+    const v = slots[id];
+    if (!v) return null;
+    return typeof v === 'string' ? { u: v, s: 1, x: 0, y: 0 } : v;
+  }
+
+  function setSlot(id, val) {
+    if (!id) return;
+    if (val) { slots[id] = val; tombstones.delete(id); }
+    else { delete slots[id]; if (!loaded) tombstones.add(id); }
+    subs.forEach((fn) => fn());
+    // A drop is rare + high-value — write immediately so nav-away can't lose
+    // it. Gate on the initial read so we don't overwrite a sidecar we haven't
+    // merged yet; the merge in load() keeps this change once the read lands.
+    if (loaded) save(); else load().then(save);
+  }
+
+  // ── Image downscale ─────────────────────────────────────────────────────
+  // Encode through a canvas so the sidecar carries resized bytes, not the
+  // raw upload. Longest side is capped at 2× the slot's rendered width
+  // (retina) and at MAX_DIM. WebP keeps alpha and is ~10× smaller than PNG
+  // for photos, so there's no need for per-image format picking.
+  async function toDataUrl(file, targetW) {
+    const bitmap = await createImageBitmap(file);
+    try {
+      const cap = Math.min(MAX_DIM, Math.max(1, Math.round(targetW * 2)) || MAX_DIM);
+      const scale = Math.min(1, cap / Math.max(bitmap.width, bitmap.height));
+      const w = Math.max(1, Math.round(bitmap.width * scale));
+      const h = Math.max(1, Math.round(bitmap.height * scale));
+      const canvas = document.createElement('canvas');
+      canvas.width = w; canvas.height = h;
+      canvas.getContext('2d').drawImage(bitmap, 0, 0, w, h);
+      return canvas.toDataURL('image/webp', 0.85);
+    } finally {
+      bitmap.close && bitmap.close();
+    }
+  }
+
+  // ── Custom element ──────────────────────────────────────────────────────
+  const stylesheet =
+    ':host{display:inline-block;position:relative;vertical-align:top;' +
+    '  font:13px/1.3 system-ui,-apple-system,sans-serif;color:rgba(0,0,0,.55);width:240px;height:160px}' +
+    '.frame{position:absolute;inset:0;overflow:hidden;background:rgba(0,0,0,.04)}' +
+    // .frame img (clipped) and .spill (unclipped ghost + handles) share the
+    // same left/top/width/height in frame-%, computed by _applyView(), so the
+    // inside-mask crop and the outside-mask spill stay pixel-aligned.
+    '.frame img{position:absolute;max-width:none;transform:translate(-50%,-50%);' +
+    '  -webkit-user-drag:none;user-select:none;touch-action:none}' +
+    // Reframe mode (double-click): the full image spills past the mask. The
+    // spill layer is sized to the IMAGE bounds so its corners are where the
+    // resize handles belong. The ghost <img> inside is translucent; the real
+    // clipped <img> underneath shows the opaque in-mask crop.
+    '.spill{position:absolute;transform:translate(-50%,-50%);display:none;z-index:1;' +
+    '  cursor:grab;touch-action:none}' +
+    ':host([data-panning]) .spill{cursor:grabbing}' +
+    '.spill .ghost{position:absolute;inset:0;width:100%;height:100%;opacity:.35;' +
+    '  pointer-events:none;-webkit-user-drag:none;user-select:none;' +
+    '  box-shadow:0 0 0 1px rgba(0,0,0,.2),0 12px 32px rgba(0,0,0,.2)}' +
+    '.spill .handle{position:absolute;width:12px;height:12px;border-radius:50%;' +
+    '  background:#fff;box-shadow:0 0 0 1.5px #c96442,0 1px 3px rgba(0,0,0,.3);' +
+    '  transform:translate(-50%,-50%)}' +
+    '.spill .handle[data-c=nw]{left:0;top:0;cursor:nwse-resize}' +
+    '.spill .handle[data-c=ne]{left:100%;top:0;cursor:nesw-resize}' +
+    '.spill .handle[data-c=sw]{left:0;top:100%;cursor:nesw-resize}' +
+    '.spill .handle[data-c=se]{left:100%;top:100%;cursor:nwse-resize}' +
+    ':host([data-reframe]){z-index:10}' +
+    ':host([data-reframe]) .spill{display:block}' +
+    ':host([data-reframe]) .frame{box-shadow:0 0 0 2px #c96442}' +
+    '.empty{position:absolute;inset:0;display:flex;flex-direction:column;align-items:center;' +
+    '  justify-content:center;gap:6px;text-align:center;padding:12px;box-sizing:border-box;' +
+    '  cursor:pointer;user-select:none}' +
+    '.empty svg{opacity:.45}' +
+    '.empty .cap{max-width:90%;font-weight:500;letter-spacing:.01em}' +
+    '.empty .sub{font-size:11px}' +
+    '.empty .sub u{text-underline-offset:2px;text-decoration-color:rgba(0,0,0,.25)}' +
+    '.empty:hover .sub u{color:rgba(0,0,0,.75);text-decoration-color:currentColor}' +
+    ':host([data-over]) .frame{outline:2px solid #c96442;outline-offset:-2px;' +
+    '  background:rgba(201,100,66,.10)}' +
+    '.ring{position:absolute;inset:0;pointer-events:none;border:1.5px dashed rgba(0,0,0,.25);' +
+    '  transition:border-color .12s}' +
+    ':host([data-over]) .ring{border-color:#c96442}' +
+    ':host([data-filled]) .ring{display:none}' +
+    // Controls sit BELOW the mask (top:100%), absolutely positioned so the
+    // author-declared slot height is unaffected. The gap is padding, not a
+    // top offset, so the hover target stays contiguous with the frame.
+    '.ctl{position:absolute;top:100%;left:50%;transform:translateX(-50%);padding-top:8px;' +
+    '  display:flex;gap:6px;opacity:0;pointer-events:none;transition:opacity .12s;z-index:2;' +
+    '  white-space:nowrap}' +
+    ':host([data-filled][data-editable]:hover) .ctl,:host([data-reframe]) .ctl' +
+    '  {opacity:1;pointer-events:auto}' +
+    '.ctl button{appearance:none;border:0;border-radius:6px;padding:5px 10px;cursor:pointer;' +
+    '  background:rgba(0,0,0,.65);color:#fff;font:11px/1 system-ui,-apple-system,sans-serif;' +
+    '  backdrop-filter:blur(6px)}' +
+    '.ctl button:hover{background:rgba(0,0,0,.8)}' +
+    '.err{position:absolute;left:8px;bottom:8px;right:8px;color:#b3261e;font-size:11px;' +
+    '  background:rgba(255,255,255,.85);padding:4px 6px;border-radius:5px;pointer-events:none}';
+
+  const icon =
+    '<svg width="28" height="28" viewBox="0 0 24 24" fill="none" stroke="currentColor" ' +
+    'stroke-width="1.6" stroke-linecap="round" stroke-linejoin="round">' +
+    '<rect x="3" y="3" width="18" height="18" rx="2"/><circle cx="8.5" cy="8.5" r="1.5"/>' +
+    '<path d="m21 15-5-5L5 21"/></svg>';
+
+  class ImageSlot extends HTMLElement {
+    static get observedAttributes() {
+      return ['shape', 'radius', 'mask', 'fit', 'position', 'placeholder', 'src', 'id'];
+    }
+
+    constructor() {
+      super();
+      const root = this.attachShadow({ mode: 'open' });
+      // .spill and .ctl sit OUTSIDE .frame so overflow:hidden + border-radius
+      // on the frame (circle, pill, rounded) can't clip them.
+      root.innerHTML =
+        '<style>' + stylesheet + '</style>' +
+        '<div class="frame" part="frame">' +
+        '  <img part="image" alt="" draggable="false" style="display:none">' +
+        '  <div class="empty" part="empty">' + icon +
+        '    <div class="cap"></div>' +
+        '    <div class="sub">or <u>browse files</u></div></div>' +
+        '  <div class="ring" part="ring"></div>' +
+        '</div>' +
+        '<div class="spill">' +
+        '  <img class="ghost" alt="" draggable="false">' +
+        '  <div class="handle" data-c="nw"></div><div class="handle" data-c="ne"></div>' +
+        '  <div class="handle" data-c="sw"></div><div class="handle" data-c="se"></div>' +
+        '</div>' +
+        '<div class="ctl"><button data-act="replace" title="Replace image">Replace</button>' +
+        '  <button data-act="clear" title="Remove image">Remove</button></div>' +
+        '<input type="file" accept="' + ACCEPT.join(',') + '" hidden>';
+      this._frame = root.querySelector('.frame');
+      this._ring = root.querySelector('.ring');
+      this._img = root.querySelector('.frame img');
+      this._empty = root.querySelector('.empty');
+      this._cap = root.querySelector('.cap');
+      this._sub = root.querySelector('.sub');
+      this._spill = root.querySelector('.spill');
+      this._ghost = root.querySelector('.ghost');
+      this._err = null;
+      this._input = root.querySelector('input');
+      this._depth = 0;
+      this._gen = 0;
+      this._view = { s: 1, x: 0, y: 0 };
+      this._subFn = () => this._render();
+      // Shadow-DOM listeners live with the shadow DOM — bound once here so
+      // disconnect/reconnect (e.g. React remount) doesn't stack handlers.
+      this._empty.addEventListener('click', () => this._input.click());
+      root.addEventListener('click', (e) => {
+        const act = e.target && e.target.getAttribute && e.target.getAttribute('data-act');
+        if (act === 'replace') { this._exitReframe(true); this._input.click(); }
+        if (act === 'clear') {
+          this._exitReframe(false);
+          this._gen++;
+          this._local = null;
+          if (this.id) setSlot(this.id, null); else this._render();
+        }
+      });
+      this._input.addEventListener('change', () => {
+        const f = this._input.files && this._input.files[0];
+        if (f) this._ingest(f);
+        this._input.value = '';
+      });
+      // naturalWidth/Height aren't known until load — re-apply so the cover
+      // baseline is computed from real dimensions, not the 100%×100% fallback.
+      this._img.addEventListener('load', () => this._applyView());
+      // Gated on editable + fit=cover so share links and contain/fill slots
+      // stay static.
+      this.addEventListener('dblclick', (e) => {
+        if (!this.hasAttribute('data-editable') || !this._reframes()) return;
+        e.preventDefault();
+        if (this.hasAttribute('data-reframe')) this._exitReframe(true);
+        else this._enterReframe();
+      });
+      // Pan + resize both originate on the spill layer. A handle pointerdown
+      // drives an aspect-locked resize anchored at the opposite corner; any
+      // other pointerdown on the spill pans. Offsets are frame-% so a
+      // reframed slot survives responsive resize / PPTX export.
+      this._spill.addEventListener('pointerdown', (e) => {
+        if (e.button !== 0 || !this.hasAttribute('data-reframe')) return;
+        e.preventDefault();
+        e.stopPropagation();
+        this._spill.setPointerCapture(e.pointerId);
+        const rect = this.getBoundingClientRect();
+        const fw = rect.width || 1, fh = rect.height || 1;
+        const corner = e.target.getAttribute && e.target.getAttribute('data-c');
+        let move;
+        if (corner) {
+          // Resize about the OPPOSITE corner. Viewport-px throughout (rect
+          // fw/fh, not clientWidth) so the math survives a transform:scale()
+          // ancestor — deck_stage renders slides scaled-to-fit.
+          const iw = this._img.naturalWidth || 1, ih = this._img.naturalHeight || 1;
+          const base = Math.max(fw / iw, fh / ih);
+          const sx = corner.includes('e') ? 1 : -1;
+          const sy = corner.includes('s') ? 1 : -1;
+          const s0 = this._view.s;
+          const w0 = iw * base * s0, h0 = ih * base * s0;
+          const cx0 = (50 + this._view.x) / 100 * fw;
+          const cy0 = (50 + this._view.y) / 100 * fh;
+          const ox = cx0 - sx * w0 / 2, oy = cy0 - sy * h0 / 2;
+          const diag0 = Math.hypot(w0, h0);
+          const ux = sx * w0 / diag0, uy = sy * h0 / diag0;
+          move = (ev) => {
+            const proj = (ev.clientX - rect.left - ox) * ux +
+                         (ev.clientY - rect.top - oy) * uy;
+            const s = clampS(s0 * proj / diag0);
+            const d = diag0 * s / s0;
+            this._view.s = s;
+            this._view.x = (ox + ux * d / 2) / fw * 100 - 50;
+            this._view.y = (oy + uy * d / 2) / fh * 100 - 50;
+            this._clampView();
+            this._applyView();
+          };
+        } else {
+          this.setAttribute('data-panning', '');
+          const start = { px: e.clientX, py: e.clientY, x: this._view.x, y: this._view.y };
+          move = (ev) => {
+            this._view.x = start.x + (ev.clientX - start.px) / fw * 100;
+            this._view.y = start.y + (ev.clientY - start.py) / fh * 100;
+            this._clampView();
+            this._applyView();
+          };
+        }
+        const up = () => {
+          try { this._spill.releasePointerCapture(e.pointerId); } catch {}
+          this._spill.removeEventListener('pointermove', move);
+          this._spill.removeEventListener('pointerup', up);
+          this._spill.removeEventListener('pointercancel', up);
+          this.removeAttribute('data-panning');
+          this._dragUp = null;
+        };
+        // Stashed so _exitReframe (Escape / outside-click mid-drag) can
+        // tear the capture + listeners down synchronously.
+        this._dragUp = up;
+        this._spill.addEventListener('pointermove', move);
+        this._spill.addEventListener('pointerup', up);
+        this._spill.addEventListener('pointercancel', up);
+      });
+      // Wheel zoom stays available inside reframe mode as a trackpad nicety —
+      // zooms toward the cursor (offset' = cursor·(1-k) + offset·k).
+      this.addEventListener('wheel', (e) => {
+        if (!this.hasAttribute('data-reframe')) return;
+        e.preventDefault();
+        const r = this.getBoundingClientRect();
+        const cx = (e.clientX - r.left) / r.width * 100 - 50;
+        const cy = (e.clientY - r.top) / r.height * 100 - 50;
+        const prev = this._view.s;
+        const next = clampS(prev * Math.pow(1.0015, -e.deltaY));
+        if (next === prev) return;
+        const k = next / prev;
+        this._view.s = next;
+        this._view.x = cx * (1 - k) + this._view.x * k;
+        this._view.y = cy * (1 - k) + this._view.y * k;
+        this._clampView();
+        this._applyView();
+      }, { passive: false });
+    }
+
+    connectedCallback() {
+      // Warn once per page — an id-less slot works for the session but
+      // cannot persist, and two id-less slots would share nothing.
+      if (!this.id && !ImageSlot._warned) {
+        ImageSlot._warned = true;
+        console.warn('<image-slot> without an id will not persist its dropped image.');
+      }
+      this.addEventListener('dragenter', this);
+      this.addEventListener('dragover', this);
+      this.addEventListener('dragleave', this);
+      this.addEventListener('drop', this);
+      subs.add(this._subFn);
+      // width%/height% in _applyView encode the frame aspect at call time —
+      // a host resize (responsive grid, pane divider) would stretch the
+      // image until the next _render. Re-render on size change: _render()
+      // re-seeds _view from stored before clamp/apply, so a shrink→grow
+      // cycle round-trips instead of ratcheting x/y toward the narrower
+      // frame's clamp range.
+      this._ro = new ResizeObserver(() => this._render());
+      this._ro.observe(this);
+      load();
+      this._render();
+    }
+
+    disconnectedCallback() {
+      subs.delete(this._subFn);
+      this.removeEventListener('dragenter', this);
+      this.removeEventListener('dragover', this);
+      this.removeEventListener('dragleave', this);
+      this.removeEventListener('drop', this);
+      if (this._ro) { this._ro.disconnect(); this._ro = null; }
+      this._exitReframe(false);
+    }
+
+    _enterReframe() {
+      if (this.hasAttribute('data-reframe')) return;
+      this.setAttribute('data-reframe', '');
+      this._applyView();
+      // Close on click outside (the spill handler stopPropagation()s so
+      // in-image drags don't reach this) and on Escape. Listeners are held
+      // on the instance so _exitReframe / disconnectedCallback can detach
+      // exactly what was attached.
+      this._outside = (e) => {
+        if (e.composedPath && e.composedPath().includes(this)) return;
+        this._exitReframe(true);
+      };
+      this._esc = (e) => { if (e.key === 'Escape') this._exitReframe(true); };
+      document.addEventListener('pointerdown', this._outside, true);
+      document.addEventListener('keydown', this._esc, true);
+    }
+
+    _exitReframe(commit) {
+      if (!this.hasAttribute('data-reframe')) return;
+      if (this._dragUp) this._dragUp();
+      this.removeAttribute('data-reframe');
+      this.removeAttribute('data-panning');
+      if (this._outside) document.removeEventListener('pointerdown', this._outside, true);
+      if (this._esc) document.removeEventListener('keydown', this._esc, true);
+      this._outside = this._esc = null;
+      if (commit) this._commitView();
+    }
+
+    attributeChangedCallback() { if (this.shadowRoot) this._render(); }
+
+    // handleEvent — one listener object for all four drag events keeps the
+    // add/remove symmetric and the depth counter correct.
+    handleEvent(e) {
+      if (e.type === 'dragenter' || e.type === 'dragover') {
+        // Without preventDefault the browser never fires 'drop'.
+        e.preventDefault();
+        e.stopPropagation();
+        if (e.dataTransfer) e.dataTransfer.dropEffect = 'copy';
+        if (e.type === 'dragenter') this._depth++;
+        this.setAttribute('data-over', '');
+      } else if (e.type === 'dragleave') {
+        // dragenter/leave fire for every descendant crossing — count depth
+        // so hovering the icon inside the empty state doesn't flicker.
+        if (--this._depth <= 0) { this._depth = 0; this.removeAttribute('data-over'); }
+      } else if (e.type === 'drop') {
+        e.preventDefault();
+        e.stopPropagation();
+        this._depth = 0;
+        this.removeAttribute('data-over');
+        const f = e.dataTransfer && e.dataTransfer.files && e.dataTransfer.files[0];
+        if (f) this._ingest(f);
+      }
+    }
+
+    async _ingest(file) {
+      this._setError(null);
+      if (!file || ACCEPT.indexOf(file.type) < 0) {
+        this._setError('Drop a PNG, JPEG, WebP, or AVIF image.');
+        return;
+      }
+      // toDataUrl can take hundreds of ms on a large photo. A Clear or a
+      // newer drop during that window would be clobbered when this await
+      // resumes — bump + capture a generation so stale encodes bail.
+      const gen = ++this._gen;
+      try {
+        const w = this.clientWidth || this.offsetWidth || MAX_DIM;
+        const url = await toDataUrl(file, w);
+        if (gen !== this._gen) return;
+        // Only exit reframe once the new image is in hand — a rejected type
+        // or decode failure leaves the in-progress crop untouched.
+        this._exitReframe(false);
+        const val = { u: url, s: 1, x: 0, y: 0 };
+        setSlot(this.id || '', val);
+        // Keep a session-local copy for id-less slots so the drop still
+        // shows, even though it cannot persist.
+        if (!this.id) { this._local = val; this._render(); }
+      } catch (err) {
+        if (gen !== this._gen) return;
+        this._setError('Could not read that image.');
+        console.warn('<image-slot> ingest failed:', err);
+      }
+    }
+
+    _setError(msg) {
+      if (this._err) { this._err.remove(); this._err = null; }
+      if (!msg) return;
+      const d = document.createElement('div');
+      d.className = 'err'; d.textContent = msg;
+      this.shadowRoot.appendChild(d);
+      this._err = d;
+      setTimeout(() => { if (this._err === d) { d.remove(); this._err = null; } }, 3000);
+    }
+
+    // Reframing (pan/resize) is only meaningful for fit=cover — contain/fill
+    // keep the old object-fit path and double-click is a no-op.
+    _reframes() {
+      return this.hasAttribute('data-filled') &&
+        (this.getAttribute('fit') || 'cover') === 'cover';
+    }
+
+    // Cover-baseline geometry, shared by clamp/apply/resize. Null until the
+    // img has loaded (naturalWidth is 0 before that) or when the slot has no
+    // layout box — ResizeObserver fires with a 0×0 rect under display:none,
+    // and clamping against a degenerate 1×1 frame would silently pull the
+    // stored pan toward zero.
+    _geom() {
+      const iw = this._img.naturalWidth, ih = this._img.naturalHeight;
+      const fw = this.clientWidth, fh = this.clientHeight;
+      if (!iw || !ih || !fw || !fh) return null;
+      return { iw, ih, fw, fh, base: Math.max(fw / iw, fh / ih) };
+    }
+
+    _clampView() {
+      // Pan range on each axis is half the overflow past the frame edge.
+      const g = this._geom();
+      if (!g) return;
+      const mx = Math.max(0, (g.iw * g.base * this._view.s / g.fw - 1) * 50);
+      const my = Math.max(0, (g.ih * g.base * this._view.s / g.fh - 1) * 50);
+      this._view.x = Math.max(-mx, Math.min(mx, this._view.x));
+      this._view.y = Math.max(-my, Math.min(my, this._view.y));
+    }
+
+    _applyView() {
+      const g = this._geom();
+      const fit = this.getAttribute('fit') || 'cover';
+      if (fit !== 'cover' || !g) {
+        // Non-cover, or dimensions not known yet (before img load).
+        this._img.style.width = '100%';
+        this._img.style.height = '100%';
+        this._img.style.left = '50%';
+        this._img.style.top = '50%';
+        this._img.style.objectFit = fit;
+        this._img.style.objectPosition = this.getAttribute('position') || '50% 50%';
+        return;
+      }
+      // Cover baseline: img fills the frame on its tighter axis at s=1, so
+      // pan works immediately on the overflowing axis without zooming first.
+      // Width/height and left/top are all frame-% — depends only on the
+      // frame aspect ratio, so a responsive resize keeps the same crop. The
+      // spill layer mirrors the same box so its corners = image corners.
+      const k = g.base * this._view.s;
+      const w = (g.iw * k / g.fw * 100) + '%';
+      const h = (g.ih * k / g.fh * 100) + '%';
+      const l = (50 + this._view.x) + '%';
+      const t = (50 + this._view.y) + '%';
+      this._img.style.width = w; this._img.style.height = h;
+      this._img.style.left = l; this._img.style.top = t;
+      this._img.style.objectFit = '';
+      this._spill.style.width = w; this._spill.style.height = h;
+      this._spill.style.left = l; this._spill.style.top = t;
+    }
+
+    _commitView() {
+      const v = { s: this._view.s, x: this._view.x, y: this._view.y };
+      if (this._userUrl) v.u = this._userUrl;
+      // Framing-only (no u) persists too so an author-src slot remembers its
+      // crop; clearing the sidecar still falls through to src=.
+      if (this.id) setSlot(this.id, v);
+      else { this._local = v; }
+    }
+
+    _render() {
+      // Shape / mask. Presets use border-radius so the dashed ring can
+      // follow the rounded outline; clip-path is only applied for an
+      // explicit `mask` (the ring is hidden there since a rectangle
+      // dashed border chopped by an arbitrary polygon looks broken).
+      const mask = this.getAttribute('mask');
+      const shape = (this.getAttribute('shape') || 'rounded').toLowerCase();
+      let radius = '';
+      if (shape === 'circle') radius = '50%';
+      else if (shape === 'pill') radius = '9999px';
+      else if (shape === 'rounded') {
+        const n = parseFloat(this.getAttribute('radius'));
+        radius = (Number.isFinite(n) ? n : 12) + 'px';
+      }
+      this._frame.style.borderRadius = mask ? '' : radius;
+      this._frame.style.clipPath = mask || '';
+      this._ring.style.borderRadius = mask ? '' : radius;
+      this._ring.style.display = mask ? 'none' : '';
+
+      // Controls and reframe entry gate on this so share links stay read-only.
+      const editable = !!(window.omelette && window.omelette.writeFile);
+      this.toggleAttribute('data-editable', editable);
+      this._sub.style.display = editable ? '' : 'none';
+
+      // Content. The sidecar is also writable by the agent's write_file
+      // tool, so its value isn't guaranteed canvas-originated — only accept
+      // data:image/ URLs from it. The `src` attribute is author-controlled
+      // (Claude wrote it into the HTML) so it passes through unchanged.
+      let stored = this.id ? getSlot(this.id) : this._local;
+      if (stored && stored.u && !/^data:image\//i.test(stored.u)) stored = null;
+      const srcAttr = this.getAttribute('src') || '';
+      this._userUrl = (stored && stored.u) || null;
+      const url = this._userUrl || srcAttr;
+      // Don't clobber an in-flight reframe with a store-triggered re-render.
+      if (!this.hasAttribute('data-reframe')) {
+        this._view = {
+          s: stored && Number.isFinite(stored.s) ? clampS(stored.s) : 1,
+          x: stored && Number.isFinite(stored.x) ? stored.x : 0,
+          y: stored && Number.isFinite(stored.y) ? stored.y : 0,
+        };
+      }
+      this._cap.textContent = this.getAttribute('placeholder') || 'Drop an image';
+      // Toggle via style.display — the [hidden] attribute alone loses to
+      // the display:flex / display:block rules in the stylesheet above.
+      if (url) {
+        if (this._img.getAttribute('src') !== url) {
+          this._img.src = url;
+          this._ghost.src = url;
+        }
+        this._img.style.display = 'block';
+        this._empty.style.display = 'none';
+        this.setAttribute('data-filled', '');
+        this._clampView();
+        this._applyView();
+      } else {
+        this._img.style.display = 'none';
+        this._img.removeAttribute('src');
+        this._ghost.removeAttribute('src');
+        this._empty.style.display = 'flex';
+        this.removeAttribute('data-filled');
+      }
+    }
+  }
+
+  if (!customElements.get('image-slot')) {
+    customElements.define('image-slot', ImageSlot);
+  }
+})();
+
+</script>
+<script type="text/babel" data-presets="react">
+// @ds-adherence-ignore -- omelette starter scaffold (raw elements/hex/px by design)
+
+/* BEGIN USAGE */
+// tweaks-panel.jsx
+// Reusable Tweaks shell + form-control helpers.
+// Exports (to window): useTweaks, TweaksPanel, TweakSection, TweakRow, TweakSlider,
+//   TweakToggle, TweakRadio, TweakSelect, TweakText, TweakNumber, TweakColor, TweakButton.
+//
+// Owns the host protocol (listens for __activate_edit_mode / __deactivate_edit_mode,
+// posts __edit_mode_available / __edit_mode_set_keys / __edit_mode_dismissed) so
+// individual prototypes don't re-roll it. Ships a consistent set of controls so you
+// don't hand-draw <input type="range">, segmented radios, steppers, etc.
+//
+// Usage (in an HTML file that loads React + Babel):
+//
+//   const TWEAK_DEFAULTS = /*EDITMODE-BEGIN*/{
+//     "primaryColor": "#D97757",
+//     "palette": ["#D97757", "#29261b", "#f6f4ef"],
+//     "fontSize": 16,
+//     "density": "regular",
+//     "dark": false
+//   }/*EDITMODE-END*/;
+//
+//   function App() {
+//     const [t, setTweak] = useTweaks(TWEAK_DEFAULTS);
+//     return (
+//       <div style={{ fontSize: t.fontSize, color: t.primaryColor }}>
+//         Hello
+//         <TweaksPanel>
+//           <TweakSection label="Typography" />
+//           <TweakSlider label="Font size" value={t.fontSize} min={10} max={32} unit="px"
+//                        onChange={(v) => setTweak('fontSize', v)} />
+//           <TweakRadio  label="Density" value={t.density}
+//                        options={['compact', 'regular', 'comfy']}
+//                        onChange={(v) => setTweak('density', v)} />
+//           <TweakSection label="Theme" />
+//           <TweakColor  label="Primary" value={t.primaryColor}
+//                        options={['#D97757', '#2A6FDB', '#1F8A5B', '#7A5AE0']}
+//                        onChange={(v) => setTweak('primaryColor', v)} />
+//           <TweakColor  label="Palette" value={t.palette}
+//                        options={[['#D97757', '#29261b', '#f6f4ef'],
+//                                  ['#475569', '#0f172a', '#f1f5f9']]}
+//                        onChange={(v) => setTweak('palette', v)} />
+//           <TweakToggle label="Dark mode" value={t.dark}
+//                        onChange={(v) => setTweak('dark', v)} />
+//         </TweaksPanel>
+//       </div>
+//     );
+//   }
+//
+// TweakRadio is the segmented control for 2–3 short options (auto-falls-back to
+// TweakSelect past ~16/~10 chars per label); reach for TweakSelect directly when
+// options are many or long. For color tweaks always curate 3-4 options rather than
+// a free picker; an option can also be a whole 2–5 color palette (the stored value
+// is the array). The Tweak* controls are a floor, not a ceiling — build custom
+// controls inside the panel if a tweak calls for UI they don't cover.
+/* END USAGE */
+// ─────────────────────────────────────────────────────────────────────────────
+
+const __TWEAKS_STYLE = `
+  .twk-panel{position:fixed;right:16px;bottom:16px;z-index:2147483646;width:280px;
+    max-height:calc(100vh - 32px);display:flex;flex-direction:column;
+    transform:scale(var(--dc-inv-zoom,1));transform-origin:bottom right;
+    background:rgba(250,249,247,.78);color:#29261b;
+    -webkit-backdrop-filter:blur(24px) saturate(160%);backdrop-filter:blur(24px) saturate(160%);
+    border:.5px solid rgba(255,255,255,.6);border-radius:14px;
+    box-shadow:0 1px 0 rgba(255,255,255,.5) inset,0 12px 40px rgba(0,0,0,.18);
+    font:11.5px/1.4 ui-sans-serif,system-ui,-apple-system,sans-serif;overflow:hidden}
+  .twk-hd{display:flex;align-items:center;justify-content:space-between;
+    padding:10px 8px 10px 14px;cursor:move;user-select:none}
+  .twk-hd b{font-size:12px;font-weight:600;letter-spacing:.01em}
+  .twk-x{appearance:none;border:0;background:transparent;color:rgba(41,38,27,.55);
+    width:22px;height:22px;border-radius:6px;cursor:default;font-size:13px;line-height:1}
+  .twk-x:hover{background:rgba(0,0,0,.06);color:#29261b}
+  .twk-body{padding:2px 14px 14px;display:flex;flex-direction:column;gap:10px;
+    overflow-y:auto;overflow-x:hidden;min-height:0;
+    scrollbar-width:thin;scrollbar-color:rgba(0,0,0,.15) transparent}
+  .twk-body::-webkit-scrollbar{width:8px}
+  .twk-body::-webkit-scrollbar-track{background:transparent;margin:2px}
+  .twk-body::-webkit-scrollbar-thumb{background:rgba(0,0,0,.15);border-radius:4px;
+    border:2px solid transparent;background-clip:content-box}
+  .twk-body::-webkit-scrollbar-thumb:hover{background:rgba(0,0,0,.25);
+    border:2px solid transparent;background-clip:content-box}
+  .twk-row{display:flex;flex-direction:column;gap:5px}
+  .twk-row-h{flex-direction:row;align-items:center;justify-content:space-between;gap:10px}
+  .twk-lbl{display:flex;justify-content:space-between;align-items:baseline;
+    color:rgba(41,38,27,.72)}
+  .twk-lbl>span:first-child{font-weight:500}
+  .twk-val{color:rgba(41,38,27,.5);font-variant-numeric:tabular-nums}
+
+  .twk-sect{font-size:10px;font-weight:600;letter-spacing:.06em;text-transform:uppercase;
+    color:rgba(41,38,27,.45);padding:10px 0 0}
+  .twk-sect:first-child{padding-top:0}
+
+  .twk-field{appearance:none;box-sizing:border-box;width:100%;min-width:0;height:26px;padding:0 8px;
+    border:.5px solid rgba(0,0,0,.1);border-radius:7px;
+    background:rgba(255,255,255,.6);color:inherit;font:inherit;outline:none}
+  .twk-field:focus{border-color:rgba(0,0,0,.25);background:rgba(255,255,255,.85)}
+  select.twk-field{padding-right:22px;
+    background-image:url("data:image/svg+xml;utf8,<svg xmlns='http://www.w3.org/2000/svg' width='10' height='6' viewBox='0 0 10 6'><path fill='rgba(0,0,0,.5)' d='M0 0h10L5 6z'/></svg>");
+    background-repeat:no-repeat;background-position:right 8px center}
+
+  .twk-slider{appearance:none;-webkit-appearance:none;width:100%;height:4px;margin:6px 0;
+    border-radius:999px;background:rgba(0,0,0,.12);outline:none}
+  .twk-slider::-webkit-slider-thumb{-webkit-appearance:none;appearance:none;
+    width:14px;height:14px;border-radius:50%;background:#fff;
+    border:.5px solid rgba(0,0,0,.12);box-shadow:0 1px 3px rgba(0,0,0,.2);cursor:default}
+  .twk-slider::-moz-range-thumb{width:14px;height:14px;border-radius:50%;
+    background:#fff;border:.5px solid rgba(0,0,0,.12);box-shadow:0 1px 3px rgba(0,0,0,.2);cursor:default}
+
+  .twk-seg{position:relative;display:flex;padding:2px;border-radius:8px;
+    background:rgba(0,0,0,.06);user-select:none}
+  .twk-seg-thumb{position:absolute;top:2px;bottom:2px;border-radius:6px;
+    background:rgba(255,255,255,.9);box-shadow:0 1px 2px rgba(0,0,0,.12);
+    transition:left .15s cubic-bezier(.3,.7,.4,1),width .15s}
+  .twk-seg.dragging .twk-seg-thumb{transition:none}
+  .twk-seg button{appearance:none;position:relative;z-index:1;flex:1;border:0;
+    background:transparent;color:inherit;font:inherit;font-weight:500;min-height:22px;
+    border-radius:6px;cursor:default;padding:4px 6px;line-height:1.2;
+    overflow-wrap:anywhere}
+
+  .twk-toggle{position:relative;width:32px;height:18px;border:0;border-radius:999px;
+    background:rgba(0,0,0,.15);transition:background .15s;cursor:default;padding:0}
+  .twk-toggle[data-on="1"]{background:#34c759}
+  .twk-toggle i{position:absolute;top:2px;left:2px;width:14px;height:14px;border-radius:50%;
+    background:#fff;box-shadow:0 1px 2px rgba(0,0,0,.25);transition:transform .15s}
+  .twk-toggle[data-on="1"] i{transform:translateX(14px)}
+
+  .twk-num{display:flex;align-items:center;box-sizing:border-box;min-width:0;height:26px;padding:0 0 0 8px;
+    border:.5px solid rgba(0,0,0,.1);border-radius:7px;background:rgba(255,255,255,.6)}
+  .twk-num-lbl{font-weight:500;color:rgba(41,38,27,.6);cursor:ew-resize;
+    user-select:none;padding-right:8px}
+  .twk-num input{flex:1;min-width:0;height:100%;border:0;background:transparent;
+    font:inherit;font-variant-numeric:tabular-nums;text-align:right;padding:0 8px 0 0;
+    outline:none;color:inherit;-moz-appearance:textfield}
+  .twk-num input::-webkit-inner-spin-button,.twk-num input::-webkit-outer-spin-button{
+    -webkit-appearance:none;margin:0}
+  .twk-num-unit{padding-right:8px;color:rgba(41,38,27,.45)}
+
+  .twk-btn{appearance:none;height:26px;padding:0 12px;border:0;border-radius:7px;
+    background:rgba(0,0,0,.78);color:#fff;font:inherit;font-weight:500;cursor:default}
+  .twk-btn:hover{background:rgba(0,0,0,.88)}
+  .twk-btn.secondary{background:rgba(0,0,0,.06);color:inherit}
+  .twk-btn.secondary:hover{background:rgba(0,0,0,.1)}
+
+  .twk-swatch{appearance:none;-webkit-appearance:none;width:56px;height:22px;
+    border:.5px solid rgba(0,0,0,.1);border-radius:6px;padding:0;cursor:default;
+    background:transparent;flex-shrink:0}
+  .twk-swatch::-webkit-color-swatch-wrapper{padding:0}
+  .twk-swatch::-webkit-color-swatch{border:0;border-radius:5.5px}
+  .twk-swatch::-moz-color-swatch{border:0;border-radius:5.5px}
+
+  .twk-chips{display:flex;gap:6px}
+  .twk-chip{position:relative;appearance:none;flex:1;min-width:0;height:46px;
+    padding:0;border:0;border-radius:6px;overflow:hidden;cursor:default;
+    box-shadow:0 0 0 .5px rgba(0,0,0,.12),0 1px 2px rgba(0,0,0,.06);
+    transition:transform .12s cubic-bezier(.3,.7,.4,1),box-shadow .12s}
+  .twk-chip:hover{transform:translateY(-1px);
+    box-shadow:0 0 0 .5px rgba(0,0,0,.18),0 4px 10px rgba(0,0,0,.12)}
+  .twk-chip[data-on="1"]{box-shadow:0 0 0 1.5px rgba(0,0,0,.85),
+    0 2px 6px rgba(0,0,0,.15)}
+  .twk-chip>span{position:absolute;top:0;bottom:0;right:0;width:34%;
+    display:flex;flex-direction:column;box-shadow:-1px 0 0 rgba(0,0,0,.1)}
+  .twk-chip>span>i{flex:1;box-shadow:0 -1px 0 rgba(0,0,0,.1)}
+  .twk-chip>span>i:first-child{box-shadow:none}
+  .twk-chip svg{position:absolute;top:6px;left:6px;width:13px;height:13px;
+    filter:drop-shadow(0 1px 1px rgba(0,0,0,.3))}
+`;
+
+// ── useTweaks ───────────────────────────────────────────────────────────────
+// Single source of truth for tweak values. setTweak persists via the host
+// (__edit_mode_set_keys → host rewrites the EDITMODE block on disk).
+function useTweaks(defaults) {
+  const [values, setValues] = React.useState(defaults);
+  // Accepts either setTweak('key', value) or setTweak({ key: value, ... }) so a
+  // useState-style call doesn't write a "[object Object]" key into the persisted
+  // JSON block.
+  const setTweak = React.useCallback((keyOrEdits, val) => {
+    const edits = typeof keyOrEdits === 'object' && keyOrEdits !== null
+      ? keyOrEdits : { [keyOrEdits]: val };
+    setValues((prev) => ({ ...prev, ...edits }));
+    window.parent.postMessage({ type: '__edit_mode_set_keys', edits }, '*');
+    // Same-window signal so in-page listeners (deck-stage rail thumbnails)
+    // can react — the parent message only reaches the host, not peers.
+    window.dispatchEvent(new CustomEvent('tweakchange', { detail: edits }));
+  }, []);
+  return [values, setTweak];
+}
+
+// ── TweaksPanel ─────────────────────────────────────────────────────────────
+// Floating shell. Registers the protocol listener BEFORE announcing
+// availability — if the announce ran first, the host's activate could land
+// before our handler exists and the toolbar toggle would silently no-op.
+// The close button posts __edit_mode_dismissed so the host's toolbar toggle
+// flips off in lockstep; the host echoes __deactivate_edit_mode back which
+// is what actually hides the panel.
+function TweaksPanel({ title = 'Tweaks', children }) {
+  const [open, setOpen] = React.useState(false);
+  const dragRef = React.useRef(null);
+  const offsetRef = React.useRef({ x: 16, y: 16 });
+  const PAD = 16;
+
+  const clampToViewport = React.useCallback(() => {
+    const panel = dragRef.current;
+    if (!panel) return;
+    const w = panel.offsetWidth, h = panel.offsetHeight;
+    const maxRight = Math.max(PAD, window.innerWidth - w - PAD);
+    const maxBottom = Math.max(PAD, window.innerHeight - h - PAD);
+    offsetRef.current = {
+      x: Math.min(maxRight, Math.max(PAD, offsetRef.current.x)),
+      y: Math.min(maxBottom, Math.max(PAD, offsetRef.current.y)),
+    };
+    panel.style.right = offsetRef.current.x + 'px';
+    panel.style.bottom = offsetRef.current.y + 'px';
+  }, []);
+
+  React.useEffect(() => {
+    if (!open) return;
+    clampToViewport();
+    if (typeof ResizeObserver === 'undefined') {
+      window.addEventListener('resize', clampToViewport);
+      return () => window.removeEventListener('resize', clampToViewport);
+    }
+    const ro = new ResizeObserver(clampToViewport);
+    ro.observe(document.documentElement);
+    return () => ro.disconnect();
+  }, [open, clampToViewport]);
+
+  React.useEffect(() => {
+    const onMsg = (e) => {
+      const t = e?.data?.type;
+      if (t === '__activate_edit_mode') setOpen(true);
+      else if (t === '__deactivate_edit_mode') setOpen(false);
+    };
+    window.addEventListener('message', onMsg);
+    window.parent.postMessage({ type: '__edit_mode_available' }, '*');
+    return () => window.removeEventListener('message', onMsg);
+  }, []);
+
+  const dismiss = () => {
+    setOpen(false);
+    window.parent.postMessage({ type: '__edit_mode_dismissed' }, '*');
+  };
+
+  const onDragStart = (e) => {
+    const panel = dragRef.current;
+    if (!panel) return;
+    const r = panel.getBoundingClientRect();
+    const sx = e.clientX, sy = e.clientY;
+    const startRight = window.innerWidth - r.right;
+    const startBottom = window.innerHeight - r.bottom;
+    const move = (ev) => {
+      offsetRef.current = {
+        x: startRight - (ev.clientX - sx),
+        y: startBottom - (ev.clientY - sy),
+      };
+      clampToViewport();
+    };
+    const up = () => {
+      window.removeEventListener('mousemove', move);
+      window.removeEventListener('mouseup', up);
+    };
+    window.addEventListener('mousemove', move);
+    window.addEventListener('mouseup', up);
+  };
+
+  if (!open) return null;
+  return (
+    <>
+      <style>{__TWEAKS_STYLE}</style>
+      <div ref={dragRef} className="twk-panel" data-omelette-chrome=""
+           style={{ right: offsetRef.current.x, bottom: offsetRef.current.y }}>
+        <div className="twk-hd" onMouseDown={onDragStart}>
+          <b>{title}</b>
+          <button className="twk-x" aria-label="Close tweaks"
+                  onMouseDown={(e) => e.stopPropagation()}
+                  onClick={dismiss}>✕</button>
+        </div>
+        <div className="twk-body">
+          {children}
+        </div>
+      </div>
+    </>
+  );
+}
+
+// ── Layout helpers ──────────────────────────────────────────────────────────
+
+function TweakSection({ label, children }) {
+  return (
+    <>
+      <div className="twk-sect">{label}</div>
+      {children}
+    </>
+  );
+}
+
+function TweakRow({ label, value, children, inline = false }) {
+  return (
+    <div className={inline ? 'twk-row twk-row-h' : 'twk-row'}>
+      <div className="twk-lbl">
+        <span>{label}</span>
+        {value != null && <span className="twk-val">{value}</span>}
+      </div>
+      {children}
+    </div>
+  );
+}
+
+// ── Controls ────────────────────────────────────────────────────────────────
+
+function TweakSlider({ label, value, min = 0, max = 100, step = 1, unit = '', onChange }) {
+  return (
+    <TweakRow label={label} value={`${value}${unit}`}>
+      <input type="range" className="twk-slider" min={min} max={max} step={step}
+             value={value} onChange={(e) => onChange(Number(e.target.value))} />
+    </TweakRow>
+  );
+}
+
+function TweakToggle({ label, value, onChange }) {
+  return (
+    <div className="twk-row twk-row-h">
+      <div className="twk-lbl"><span>{label}</span></div>
+      <button type="button" className="twk-toggle" data-on={value ? '1' : '0'}
+              role="switch" aria-checked={!!value}
+              onClick={() => onChange(!value)}><i /></button>
+    </div>
+  );
+}
+
+function TweakRadio({ label, value, options, onChange }) {
+  const trackRef = React.useRef(null);
+  const [dragging, setDragging] = React.useState(false);
+  // The active value is read by pointer-move handlers attached for the lifetime
+  // of a drag — ref it so a stale closure doesn't fire onChange for every move.
+  const valueRef = React.useRef(value);
+  valueRef.current = value;
+
+  // Segments wrap mid-word once per-segment width runs out. The track is
+  // ~248px (280 panel − 28 body pad − 4 seg pad), each button loses 12px
+  // to its own padding, and 11.5px system-ui averages ~6.3px/char — so 2
+  // options fit ~16 chars each, 3 fit ~10. Past that (or >3 options), fall
+  // back to a dropdown rather than wrap.
+  const labelLen = (o) => String(typeof o === 'object' ? o.label : o).length;
+  const maxLen = options.reduce((m, o) => Math.max(m, labelLen(o)), 0);
+  const fitsAsSegments = maxLen <= ({ 2: 16, 3: 10 }[options.length] ?? 0);
+  if (!fitsAsSegments) {
+    // <select> emits strings — map back to the original option value so the
+    // fallback stays type-preserving (numbers, booleans) like the segment path.
+    const resolve = (s) => {
+      const m = options.find((o) => String(typeof o === 'object' ? o.value : o) === s);
+      return m === undefined ? s : typeof m === 'object' ? m.value : m;
+    };
+    return <TweakSelect label={label} value={value} options={options}
+                        onChange={(s) => onChange(resolve(s))} />;
+  }
+  const opts = options.map((o) => (typeof o === 'object' ? o : { value: o, label: o }));
+  const idx = Math.max(0, opts.findIndex((o) => o.value === value));
+  const n = opts.length;
+
+  const segAt = (clientX) => {
+    const r = trackRef.current.getBoundingClientRect();
+    const inner = r.width - 4;
+    const i = Math.floor(((clientX - r.left - 2) / inner) * n);
+    return opts[Math.max(0, Math.min(n - 1, i))].value;
+  };
+
+  const onPointerDown = (e) => {
+    setDragging(true);
+    const v0 = segAt(e.clientX);
+    if (v0 !== valueRef.current) onChange(v0);
+    const move = (ev) => {
+      if (!trackRef.current) return;
+      const v = segAt(ev.clientX);
+      if (v !== valueRef.current) onChange(v);
+    };
+    const up = () => {
+      setDragging(false);
+      window.removeEventListener('pointermove', move);
+      window.removeEventListener('pointerup', up);
+    };
+    window.addEventListener('pointermove', move);
+    window.addEventListener('pointerup', up);
+  };
+
+  return (
+    <TweakRow label={label}>
+      <div ref={trackRef} role="radiogroup" onPointerDown={onPointerDown}
+           className={dragging ? 'twk-seg dragging' : 'twk-seg'}>
+        <div className="twk-seg-thumb"
+             style={{ left: `calc(2px + ${idx} * (100% - 4px) / ${n})`,
+                      width: `calc((100% - 4px) / ${n})` }} />
+        {opts.map((o) => (
+          <button key={o.value} type="button" role="radio" aria-checked={o.value === value}>
+            {o.label}
+          </button>
+        ))}
+      </div>
+    </TweakRow>
+  );
+}
+
+function TweakSelect({ label, value, options, onChange }) {
+  return (
+    <TweakRow label={label}>
+      <select className="twk-field" value={value} onChange={(e) => onChange(e.target.value)}>
+        {options.map((o) => {
+          const v = typeof o === 'object' ? o.value : o;
+          const l = typeof o === 'object' ? o.label : o;
+          return <option key={v} value={v}>{l}</option>;
+        })}
+      </select>
+    </TweakRow>
+  );
+}
+
+function TweakText({ label, value, placeholder, onChange }) {
+  return (
+    <TweakRow label={label}>
+      <input className="twk-field" type="text" value={value} placeholder={placeholder}
+             onChange={(e) => onChange(e.target.value)} />
+    </TweakRow>
+  );
+}
+
+function TweakNumber({ label, value, min, max, step = 1, unit = '', onChange }) {
+  const clamp = (n) => {
+    if (min != null && n < min) return min;
+    if (max != null && n > max) return max;
+    return n;
+  };
+  const startRef = React.useRef({ x: 0, val: 0 });
+  const onScrubStart = (e) => {
+    e.preventDefault();
+    startRef.current = { x: e.clientX, val: value };
+    const decimals = (String(step).split('.')[1] || '').length;
+    const move = (ev) => {
+      const dx = ev.clientX - startRef.current.x;
+      const raw = startRef.current.val + dx * step;
+      const snapped = Math.round(raw / step) * step;
+      onChange(clamp(Number(snapped.toFixed(decimals))));
+    };
+    const up = () => {
+      window.removeEventListener('pointermove', move);
+      window.removeEventListener('pointerup', up);
+    };
+    window.addEventListener('pointermove', move);
+    window.addEventListener('pointerup', up);
+  };
+  return (
+    <div className="twk-num">
+      <span className="twk-num-lbl" onPointerDown={onScrubStart}>{label}</span>
+      <input type="number" value={value} min={min} max={max} step={step}
+             onChange={(e) => onChange(clamp(Number(e.target.value)))} />
+      {unit && <span className="twk-num-unit">{unit}</span>}
+    </div>
+  );
+}
+
+// Relative-luminance contrast pick — checkmarks drawn over a swatch need to
+// read on both #111 and #fafafa without per-option configuration. Hex input
+// only (#rgb / #rrggbb); named or rgb()/hsl() colors fall through to "light".
+function __twkIsLight(hex) {
+  const h = String(hex).replace('#', '');
+  const x = h.length === 3 ? h.replace(/./g, (c) => c + c) : h.padEnd(6, '0');
+  const n = parseInt(x.slice(0, 6), 16);
+  if (Number.isNaN(n)) return true;
+  const r = (n >> 16) & 255, g = (n >> 8) & 255, b = n & 255;
+  return r * 299 + g * 587 + b * 114 > 148000;
+}
+
+const __TwkCheck = ({ light }) => (
+  <svg viewBox="0 0 14 14" aria-hidden="true">
+    <path d="M3 7.2 5.8 10 11 4.2" fill="none" strokeWidth="2.2"
+          strokeLinecap="round" strokeLinejoin="round"
+          stroke={light ? 'rgba(0,0,0,.78)' : '#fff'} />
+  </svg>
+);
+
+// TweakColor — curated color/palette picker. Each option is either a single
+// hex string or an array of 1-5 hex strings; the card adapts — a lone color
+// renders solid, a palette renders colors[0] as the hero (left ~2/3) with the
+// rest stacked in a sharp column on the right. onChange emits the
+// option in the shape it was passed (string stays string, array stays array).
+// Without options it falls back to the native color input for back-compat.
+function TweakColor({ label, value, options, onChange }) {
+  if (!options || !options.length) {
+    return (
+      <div className="twk-row twk-row-h">
+        <div className="twk-lbl"><span>{label}</span></div>
+        <input type="color" className="twk-swatch" value={value}
+               onChange={(e) => onChange(e.target.value)} />
+      </div>
+    );
+  }
+  // Native <input type=color> emits lowercase hex per the HTML spec, so
+  // compare case-insensitively. String() guards JSON.stringify(undefined),
+  // which returns the primitive undefined (no .toLowerCase).
+  const key = (o) => String(JSON.stringify(o)).toLowerCase();
+  const cur = key(value);
+  return (
+    <TweakRow label={label}>
+      <div className="twk-chips" role="radiogroup">
+        {options.map((o, i) => {
+          const colors = Array.isArray(o) ? o : [o];
+          const [hero, ...rest] = colors;
+          const sup = rest.slice(0, 4);
+          const on = key(o) === cur;
+          return (
+            <button key={i} type="button" className="twk-chip" role="radio"
+                    aria-checked={on} data-on={on ? '1' : '0'}
+                    aria-label={colors.join(', ')} title={colors.join(' · ')}
+                    style={{ background: hero }}
+                    onClick={() => onChange(o)}>
+              {sup.length > 0 && (
+                <span>
+                  {sup.map((c, j) => <i key={j} style={{ background: c }} />)}
+                </span>
+              )}
+              {on && <__TwkCheck light={__twkIsLight(hero)} />}
+            </button>
+          );
+        })}
+      </div>
+    </TweakRow>
+  );
+}
+
+function TweakButton({ label, onClick, secondary = false }) {
+  return (
+    <button type="button" className={secondary ? 'twk-btn secondary' : 'twk-btn'}
+            onClick={onClick}>{label}</button>
+  );
+}
+
+Object.assign(window, {
+  useTweaks, TweaksPanel, TweakSection, TweakRow,
+  TweakSlider, TweakToggle, TweakRadio, TweakSelect,
+  TweakText, TweakNumber, TweakColor, TweakButton,
+});
+
+</script>
+<script type="text/babel" data-presets="react">
+// data.jsx — content model for the Studio SEP seller page.
+// Template copy is FIXED (preserve verbatim). Agent data values are illustrative samples.
+// Optional sections carry `present` flags so the page can flex them in/out.
+
+window.SEP_DATA = {
+  // ——— HERO (always present) ———
+  hero: {
+    city: "TACOMA",
+    address: "4427 Dudley Dr NE",
+    cityStateZip: "Tacoma, WA 98406",
+    family: "Harlake", // null when "Prepared for" not filled
+  },
+
+  // ——— RECOMMENDED PRICE (always present) ———
+  price: {
+    single: "$687,298",
+    range: { low: "$720,000", high: "$780,000" },
+    compCount: 4,
+  },
+
+  // ——— 01 · A SHORT NOTE FROM YOUR AGENT (optional) ———
+  note: {
+    present: true,
+    body:
+      "A quick walkthrough of how I arrived at this number and what I'd do first, so nothing about the plan is a surprise.",
+    videoCaption: "Let's walk through your plan.",
+  },
+
+  // ——— 02 · WHY THIS PRICE (present when comps exist) ———
+  whyPrice: {
+    present: true,
+    compCount: 4,
+    agentNote:
+      "I weighted the two closest sales most — same street, same era, both closed this spring.",
+    comps: [
+      { idx: "01", address: "4210 N 34th St", meta: "2,740 SQFT · BUILT 2016", price: "$591,000", hasPhoto: true },
+      { idx: "02", address: "1705 N Anderson St", meta: "2,015 SQFT · BUILT 2008", price: "$580,000", hasPhoto: false },
+      { idx: "03", address: "2109 N Union Ave", meta: "1,710 SQFT · BUILT 2004", price: "$705,000", hasPhoto: true },
+      { idx: "04", address: "3009 N 22nd St", meta: "2,360 SQFT · BUILT 2019", price: "$875,000", hasPhoto: false },
+    ],
+  },
+
+  // ——— WHY WORK WITH US (optional) — agent's own words ———
+  reasons: {
+    present: true,
+    items: [
+      {
+        title: "25 years in the Pacific Northwest",
+        body: "I've sold across Tacoma's north end since before it was the market it is now.",
+      },
+      {
+        title: "Sold 37 homes in this neighborhood",
+        body: "I know which blocks buyers compete for and how to price into that demand.",
+      },
+      {
+        title: "A small, hands-on practice",
+        body: "You work with me start to finish — no handoffs to a junior or a team inbox.",
+      },
+    ],
+  },
+
+  // ——— BY THE NUMBERS (optional) — signature animated bar ———
+  byNumbers: {
+    present: true,
+    label: "AVERAGE SALE-TO-LIST",
+    value: 98.3,
+    marketAvg: 96.8,
+    marketLabel: "market avg",
+  },
+
+  // ——— HOW WE MARKET YOUR HOME (optional) ———
+  marketing: {
+    present: true,
+    items: [
+      {
+        title: "Professional photography & video",
+        body: "A full shoot — stills, twilight, and a walkthrough film — before we ever go live.",
+      },
+      {
+        title: "Targeted digital ad funnel",
+        body: "Paid placement aimed at the buyers most likely to move on your block.",
+      },
+      {
+        title: "Featured placement & syndication",
+        body: "Front-of-feed positioning across the portals buyers actually search.",
+      },
+    ],
+  },
+
+  // ——— HOW WE WORK (optional) — 5-step process ———
+  howWeWork: {
+    present: true,
+    steps: [
+      { title: "Walk the home together", body: "We start in person, room by room, so the plan fits your house." },
+      { title: "Price it on real comps", body: "A number anchored in recent sales you can stand behind." },
+      { title: "Prep, shoot, and stage", body: "We make it photograph and show at its very best." },
+      { title: "Launch the marketing", body: "A coordinated open across every channel that matters." },
+      { title: "Negotiate and close", body: "I hold the line on your terms straight through to keys." },
+    ],
+  },
+
+  // ——— REVIEWS (optional) — bundled platform logos + agent-entered counts ———
+  reviews: {
+    present: true,
+    rating: 5.0,        // agent-level rating, defaults to 5.0, agent-adjustable (truthful)
+    agentName: "Aaron", // "Read {Agent}'s reviews on …"
+    // multi-select: only platforms where the agent ACTUALLY has reviews. Official
+    // brand logo assets are bundled at build; per-source count is agent-entered (never scraped).
+    sources: [
+      { key: "zillow", label: "Zillow", count: 47 },
+      { key: "google", label: "Google", count: 31 },
+    ],
+    quotes: [
+      {
+        body:
+          "My husband and I thought we'd never be able to sell for what the house was worth — Aaron went above and beyond to make it possible.",
+        attribution: "THE BARRY FAMILY · SOLD IN TACOMA, 2025",
+      },
+    ],
+  },
+
+  // ——— 05 · RECENT AREA SALES (optional) ———
+  areaSales: {
+    present: true,
+    stats: [
+      { label: "MEDIAN SALE", value: "$675,202", sub: "Last 90 days" },
+      { label: "DAYS ON MARKET", value: "14", sub: "Median" },
+      { label: "HOMES SOLD", value: "37", sub: "Last 90 days" },
+      { label: "LIST-TO-SALE", value: "101%", sub: "Median ratio" },
+    ],
+    chart: {
+      seriesLabel: "MEDIAN SALE PRICE",
+      seriesSub: "6 months",
+      recommendedLabel: "RECOMMENDED",
+      recommendedValue: "$687k",
+      currentLabel: "MAY '26 · CURRENT",
+      currentValue: "$680k",
+      // monthly series — value in thousands; null = absent cell (partial-data proof)
+      points: [
+        { month: "DEC '25", v: 654 },
+        { month: "JAN '26", v: 655 },
+        { month: "FEB '26", v: 656 },
+        { month: "MAR '26", v: 670 },
+        { month: "APR '26", v: 676 },
+        { month: "MAY '26", v: 680 },
+      ],
+      yTicks: ["$676K", "$668K", "$655K"],
+    },
+  },
+
+  // ——— 06 · YOUR AGENT (always present) — footer ———
+  agent: {
+    name: "Aaron Thomas",
+    tagline: "Bringing You Home",
+    monogram: "AT",
+    role: "LEAD BROKER · THOMAS GROUP",
+    bio: "Working the Pacific Northwest for over 25 years.",
+    phone: "(253) 555-0188",
+    email: "aaron@thomasgroup.com",
+    license: "#1534",
+    yearsHere: "22",
+    brand: "Studio SEP",
+    disclaimer:
+      "The information above is drawn from public record. This page is not an advertisement and does not constitute an offer.",
+  },
+};
+
+</script>
+<script type="text/babel" data-presets="react">
+// icons.jsx — cohesive editorial line-icon library + deterministic
+// keyword→icon auto-assignment. One consistent line style (1.6 stroke,
+// round joins, currentColor). Shared by "How we market" and "Why work
+// with us" cards. NO AI — ordered keyword rules, first/strongest match
+// wins, neutral universal fallback (never a placeholder shape).
+
+(function () {
+  const P = { fill: "none", stroke: "currentColor", strokeWidth: 1.6, strokeLinecap: "round", strokeLinejoin: "round" };
+  const svg = (children) => (
+    <svg viewBox="0 0 24 24" width="100%" height="100%" {...P}>{children}</svg>
+  );
+
+  const GLYPHS = {
+    camera: svg(<><path d="M4 8h2.5L8 6h8l1.5 2H20a1 1 0 011 1v9a1 1 0 01-1 1H4a1 1 0 01-1-1V9a1 1 0 011-1z" /><circle cx="12" cy="13" r="3.2" /></>),
+    target: svg(<><circle cx="12" cy="12" r="8.5" /><circle cx="12" cy="12" r="4.4" /><circle cx="12" cy="12" r="0.9" fill="currentColor" stroke="none" /></>),
+    broadcast: svg(<><circle cx="12" cy="12" r="1.6" fill="currentColor" stroke="none" /><path d="M8.6 8.6a5 5 0 000 6.8" /><path d="M15.4 8.6a5 5 0 010 6.8" /><path d="M6.2 6.2a8.4 8.4 0 000 11.6" /><path d="M17.8 6.2a8.4 8.4 0 010 11.6" /></>),
+    megaphone: svg(<><path d="M4 10v4h3l8 4V6L7 10H4z" /><path d="M17 9.2a4 4 0 010 5.6" /></>),
+    chart: svg(<><path d="M4 4v16h16" /><path d="M8 15l3-4 3 2 4-6" /></>),
+    tag: svg(<><path d="M4 4h7l9 9-7 7-9-9V4z" /><circle cx="8.2" cy="8.2" r="1.4" /></>),
+    key: svg(<><circle cx="8" cy="8" r="4.2" /><path d="M11 11l8.5 8.5" /><path d="M16 16l2.2-2.2" /><path d="M18.2 18.2l2.2-2.2" /></>),
+    home: svg(<><path d="M4 11l8-7 8 7" /><path d="M6 9.6V20h12V9.6" /></>),
+    phone: svg(<><path d="M7 4l2.8.8 1 3.6-2 1.3a10.5 10.5 0 005 5l1.3-2 3.6 1V18a2 2 0 01-2.2 2A15 15 0 015 6.2 2 2 0 017 4z" /></>),
+    chat: svg(<><path d="M4 6h16v9.5H10.5L6 20v-4.5H4z" /><path d="M8 10.5h8M8 13h5" /></>),
+    people: svg(<><circle cx="9" cy="9" r="2.8" /><path d="M3.8 19a5.2 5.2 0 0110.4 0" /><circle cx="16.6" cy="10" r="2.2" /><path d="M15.6 19a5 5 0 016.6-4.4" /></>),
+    doc: svg(<><path d="M6 3h8l4 4v14H6z" /><path d="M14 3v4h4" /><path d="M9 12.5h6M9 16h4" /></>),
+    medal: svg(<><circle cx="12" cy="14.5" r="4.8" /><path d="M9.2 10L7 3h4l1 2.6L13 3h4l-2.2 7" /><path d="M12 12.6l.85 1.7 1.9.3-1.37 1.32.32 1.88L12 16.9l-1.7.9.32-1.88L9.25 14.6l1.9-.3z" strokeWidth="1" /></>),
+    star: svg(<><path d="M12 3.6l2.6 5.3 5.8.9-4.2 4.1 1 5.8L12 17l-5.2 2.7 1-5.8-4.2-4.1 5.8-.9z" /></>),
+    shield: svg(<><path d="M12 3l7 2.8V11c0 4.2-3 7.4-7 8.6-4-1.2-7-4.4-7-8.6V5.8z" /><path d="M9 11.6l2 2 4-4" /></>),
+    heart: svg(<><path d="M12 20S4 15.2 4 9.4A3.8 3.8 0 0112 7.2 3.8 3.8 0 0120 9.4C20 15.2 12 20 12 20z" /></>),
+    sparkle: svg(<><path d="M12 4l1.7 4.6L18 10l-4.3 1.4L12 16l-1.7-4.6L6 10l4.3-1.4z" /><path d="M18.6 4.6l.5 1.5 1.5.5-1.5.5-.5 1.5-.5-1.5-1.5-.5 1.5-.5z" strokeWidth="1.1" /></>),
+  };
+
+  // ordered rules — first/strongest match wins (case-insensitive)
+  const RULES = [
+    { icon: "camera", kw: ["photo", "photograph", "video", "film", "shoot", "twilight", "imagery", "drone", "media", "picture"] },
+    { icon: "target", kw: ["digital ad", "targeted", "retarget", "paid", "ppc", "ad funnel", "campaign", " ads", "online ad"] },
+    { icon: "broadcast", kw: ["syndicat", "portal", "mls", "feature", "placement", "feed", "distribut", "broadcast", "listing site"] },
+    { icon: "megaphone", kw: ["social", "promote", "advertis", "awareness", "buzz", "exposure", "reach"] },
+    { icon: "chart", kw: ["sold", "closed", "transaction", "track record", "results", "data", "trend", "analy", "statistic", "sale-to-list", "days on market"] },
+    { icon: "tag", kw: ["price", "pricing", "comp", "valuation", "apprais", "cma", "list price", "number"] },
+    { icon: "key", kw: ["open house", "showing", "tour", "walkthrough", "walk the home", "visit", "access", "door"] },
+    { icon: "home", kw: ["stage", "staging", "prep", "declutter", "curb", "property", "home", "house", "remodel"] },
+    { icon: "phone", kw: ["call", "phone", "responsive", "available", "text", "reach out", "answer"] },
+    { icon: "chat", kw: ["communicat", "update", "message", "chat", "inform", "transparen", "question", "guidance"] },
+    { icon: "people", kw: ["buyer", "network", "team", "client", "people", "relationship", "database", "connection", "referral"] },
+    { icon: "doc", kw: ["negotiat", "offer", "contract", "paperwork", "document", "terms", "deal", "escrow", "closing", "close"] },
+    { icon: "medal", kw: ["award", "recogni", "rank", "#1", "number one", "honor", "top producer", "best in"] },
+    { icon: "star", kw: ["experience", "expert", "year", "decade", "proven", "seasoned", "veteran", "best", "reputation"] },
+    { icon: "shield", kw: ["trust", "guarantee", "protect", "honest", "integrity", "commit", "promise", "backed", "no pressure"] },
+    { icon: "heart", kw: ["hands-on", "personal", "dedicat", "attentive", "care", "boutique", "small", "one-on-one", "start to finish", "yourself"] },
+  ];
+
+  function pickIcon(title, body) {
+    const t = (title || "").toLowerCase();
+    const b = (body || "").toLowerCase();
+    for (const r of RULES) if (r.kw.some((k) => t.includes(k))) return r.icon;       // title first
+    for (const r of RULES) if (r.kw.some((k) => b.includes(k))) return r.icon;       // body as tiebreaker
+    return "sparkle";                                                                // neutral universal fallback
+  }
+
+  function Icon({ name }) {
+    return GLYPHS[name] || GLYPHS.sparkle;
+  }
+
+  window.pickIcon = pickIcon;
+  window.Icon = Icon;
+})();
+
+</script>
+<script type="text/babel" data-presets="react">
+// sections.jsx — Studio SEP seller page (Round 3 · the elevation round).
+// Dark/light band rhythm, dimensional cards, us-vs-market stat, dark reviews
+// band, slim-mobile comp thumbnails, inline-highlighted figures.
+
+const D = window.SEP_DATA;
+
+// inline-highlight numeric figures in prose (Beacon "245 sales" pattern)
+function hl(text) {
+  return String(text).split(/(\d[\d,.]*%?)/g).map((p, i) =>
+    /\d/.test(p) ? <span className="emph" key={i}>{p}</span> : p);
+}
+
+// simple, allowed geometric marks replaced by the auto-assigned icon library
+// (icons.jsx provides window.Icon + window.pickIcon).
+
+function Stars({ n = 5, className = "" }) {
+  return <span className={"stars " + className} aria-hidden="true">{"★★★★★".slice(0, n)}</span>;
+}
+
+/* ---------- HERO ---------- */
+function Hero({ heroPhoto }) {
+  const h = D.hero;
+  return (
+    <section className="hero" data-screen-label="Hero">
+      <div className="hero__photo">
+        {h.family && (
+          <div className="hero__pers">
+            <span>For the {h.family} Family</span>
+            <span className="dot"></span>
+          </div>
+        )}
+        <div className="hero__empty"><span>{heroPhoto ? "Drop cover photo" : "Cover photo · optional"}</span></div>
+        {heroPhoto && (
+          <image-slot id="hero-cover" class="hero__slot" shape="rect" fit="cover"
+            placeholder="Drop cover photo"></image-slot>
+        )}
+      </div>
+      <div className="hero__band">
+        <div className="hero__eyebrow">— A Recommendation · {h.city}</div>
+        <h1 className="hero__addr">{h.address}</h1>
+        <div className="hero__loc">{h.cityStateZip}</div>
+      </div>
+    </section>
+  );
+}
+
+/* ---------- RECOMMENDED PRICE — overlapping panel ---------- */
+function Price({ priceState }) {
+  const p = D.price;
+  return (
+    <section className="price" data-screen-label="Recommended price">
+      <div className="price__card" data-reveal>
+        <div className="price__accentbar"></div>
+        <div className="price__meta">
+          <div className="price__label">Recommended List</div>
+          <p className="price__sub">Based on <b>{p.compCount} recent sales</b> nearby.</p>
+        </div>
+        {priceState === "range" ? (
+          <div className="price__range">
+            <div className="price__rangerow">
+              <div className="price__leg">
+                <span className="cap">Low</span>
+                <span className="val"><span className="cur">$</span>{p.range.low.replace("$", "")}</span>
+              </div>
+              <div className="price__dash">–</div>
+              <div className="price__leg">
+                <span className="cap">High</span>
+                <span className="val"><span className="cur">$</span>{p.range.high.replace("$", "")}</span>
+              </div>
+            </div>
+            <div className="price__bar"><i></i></div>
+          </div>
+        ) : (
+          <div className="price__single">
+            <span className="cur">$</span>{p.single.replace("$", "")}
+          </div>
+        )}
+      </div>
+    </section>
+  );
+}
+
+/* ---------- 01 · NOTE FROM AGENT ---------- */
+function Note() {
+  const n = D.note;
+  if (!n.present) return null;
+  return (
+    <section className="section note z-offwhite" data-screen-label="Note from agent">
+      <div className="note__grid">
+        <div className="note__copy" data-reveal>
+          <div className="eyebrow"><span className="num">01</span> · A Short Note From Your Agent</div>
+          <h2 className="head">Two <em>minutes</em>, on your home.</h2>
+          <p className="lede">{n.body}</p>
+        </div>
+        <div className="video" data-reveal>
+          <div className="video__play"></div>
+          <div className="video__cap">{n.videoCaption}</div>
+        </div>
+      </div>
+    </section>
+  );
+}
+
+/* ---------- 02 · WHY THIS PRICE — comps (slim mobile thumb) ---------- */
+function WhyPrice({ compsMode }) {
+  const w = D.whyPrice;
+  if (!w.present) return null;
+  const showPhotos = compsMode !== "text";
+  return (
+    <section className="section whyprice" data-screen-label="Why this price">
+      <div data-reveal>
+        <div className="eyebrow"><span className="num">02</span> · Why This Price <span className="rule"></span></div>
+        <h2 className="head">A confident, <em>defensible</em> number.</h2>
+      </div>
+      <div className="why__lead">
+        <div className="why__numblock" data-reveal>
+          <span className="why__num">{w.compCount}</span>
+          <span className="why__numtext">recent sales nearby anchor this number.</span>
+        </div>
+        {w.agentNote && <p className="why__agentnote" data-reveal>{w.agentNote}</p>}
+      </div>
+      <div className="comps">
+        {w.comps.map((c, i) => {
+          const withPhoto = showPhotos && c.hasPhoto;
+          return (
+            <div className={"comp-card" + (withPhoto ? " has-photo" : "")} key={c.idx}
+              data-reveal style={{ transitionDelay: (i * 70) + "ms" }}>
+              {withPhoto && (
+                <div className="comp-card__photo">
+                  <image-slot id={"comp-" + c.idx} shape="rect" fit="cover"
+                    placeholder="Comp photo"></image-slot>
+                </div>
+              )}
+              <div className="comp-card__body">
+                <div className="comp-card__info">
+                  <span className="comp-card__idx">{c.idx}</span>
+                  <div className="comp-card__addr">{c.address}</div>
+                  <div className="comp-card__meta">Tacoma, WA · {c.meta}</div>
+                </div>
+                <div className="comp-card__price">
+                  <b>{c.price}</b>
+                  <span>Sold</span>
+                </div>
+              </div>
+            </div>
+          );
+        })}
+      </div>
+      <div className="comp__src" data-reveal>Source · Public Record</div>
+    </section>
+  );
+}
+
+/* ---------- WHY WORK WITH US — elevated cards ---------- */
+function Reasons() {
+  const r = D.reasons;
+  if (!r.present || !r.items.length) return null;
+  return (
+    <section className="section reasons z-offwhite" data-screen-label="Why work with us">
+      <div data-reveal>
+        <div className="eyebrow">Why Work With Us <span className="rule"></span></div>
+        <h2 className="head">A few reasons to <em>list with us</em>.</h2>
+      </div>
+      <div className="rcards" data-count={r.items.length}>
+        {r.items.map((it, i) => (
+          <div className="rcard" key={i} data-reveal style={{ transitionDelay: (i * 80) + "ms" }}>
+            <div className="card-mark"><Icon name={pickIcon(it.title, it.body)} /></div>
+            <div className="rcard__title">{hl(it.title)}</div>
+            <p className="rcard__body">{it.body}</p>
+          </div>
+        ))}
+      </div>
+    </section>
+  );
+}
+
+/* ---------- BY THE NUMBERS — dark band, us-vs-market ---------- */
+function ByNumbers() {
+  const b = D.byNumbers;
+  if (!b.present) return null;
+  const floor = 94, top = 100;
+  const pos = (v) => ((v - floor) / (top - floor)) * 100;
+  return (
+    <section className="section bynum z-ink" data-screen-label="By the numbers">
+      <div data-reveal>
+        <div className="eyebrow on-dark">By The Numbers <span className="rule"></span></div>
+      </div>
+      <div className="cmp" data-reveal style={{ "--fill": pos(b.value) / 100 }}>
+        <div className="cmp__label">{b.label}</div>
+        <div className="cmp__row">
+          <div className="cmp__col cmp__col--you">
+            <span className="cmp__k">This home</span>
+            <span className="cmp__v"><span className="spark">{b.value}</span><i>%</i></span>
+          </div>
+          <div className="cmp__vs">vs</div>
+          <div className="cmp__col cmp__col--mkt">
+            <span className="cmp__k">{b.marketLabel}</span>
+            <span className="cmp__v">{b.marketAvg}<i>%</i></span>
+          </div>
+        </div>
+        <div className="bynum__track">
+          <div className="bynum__fill"></div>
+          <div className="bynum__mktmark" style={{ left: pos(b.marketAvg) + "%" }}>
+            <span>{b.marketAvg} {b.marketLabel}</span>
+          </div>
+        </div>
+      </div>
+    </section>
+  );
+}
+
+/* ---------- HOW WE MARKET — elevated cards ---------- */
+function Marketing() {
+  const m = D.marketing;
+  if (!m.present || !m.items.length) return null;
+  return (
+    <section className="section mkt z-sand" data-screen-label="How we market">
+      <div data-reveal>
+        <div className="eyebrow">How We Market Your Home <span className="rule"></span></div>
+      </div>
+      <div className="mcards">
+        {m.items.map((it, i) => (
+          <div className="mcard" key={i} data-reveal style={{ transitionDelay: (i * 80) + "ms" }}>
+            <div className="card-mark"><Icon name={pickIcon(it.title, it.body)} /></div>
+            <div className="mcard__title">{it.title}</div>
+            <p className="mcard__body">{it.body}</p>
+          </div>
+        ))}
+      </div>
+    </section>
+  );
+}
+
+/* ---------- HOW WE WORK — horizontal stepper / mobile timeline ---------- */
+function HowWeWork() {
+  const w = D.howWeWork;
+  if (!w.present || !w.steps.length) return null;
+  return (
+    <section className="section work z-mist" data-screen-label="How we work">
+      <div data-reveal>
+        <div className="eyebrow">How We Work <span className="rule"></span></div>
+        <h2 className="head">From hello to <em>handed keys</em>.</h2>
+      </div>
+      <div className="flow" data-count={w.steps.length}>
+        {w.steps.map((s, i) => (
+          <div className="fstep" key={i} data-reveal style={{ transitionDelay: (i * 90) + "ms" }}>
+            <div className="fstep__badge">{i + 1}</div>
+            <div className="fstep__title">{s.title}</div>
+            <p className="fstep__body">{s.body}</p>
+          </div>
+        ))}
+      </div>
+    </section>
+  );
+}
+
+/* ---------- REVIEWS — dark band, pull-quote + bundled platform logos ---------- */
+// Wordmark stand-ins for the bundled official brand SVGs (swapped in at build,
+// respecting each platform's usage rules). Shown only for sources the agent has.
+function PlatformLogo({ brand, label }) {
+  return (
+    <a className={"plogo plogo--" + brand} href="#" onClick={(e) => e.preventDefault()} aria-label={label + " reviews"}>
+      <span className="plogo__name">{label}</span>
+    </a>
+  );
+}
+
+function Reviews({ reviewSource }) {
+  const r = D.reviews;
+  if (!r.present) return null;
+  // tweak: "both" | "zillow" | "none"  (build: real multi-select per source)
+  const keys = reviewSource === "none" ? []
+    : reviewSource === "zillow" ? ["zillow"]
+    : r.sources.map((s) => s.key);
+  const active = r.sources.filter((s) => keys.includes(s.key));
+  const total = active.reduce((n, s) => n + (s.count || 0), 0);
+  const rating = (r.rating != null ? r.rating : 5).toFixed(1);
+  const primary = active[0];
+  const hasQuotes = r.quotes && r.quotes.length;
+  return (
+    <section className="section reviews z-ink" data-screen-label="Reviews">
+      <div data-reveal>
+        <div className="eyebrow on-dark">In Their Words <span className="rule"></span></div>
+      </div>
+      <div className="reviews__layout">
+        <div data-reveal>
+          {hasQuotes && r.quotes.map((q, i) => (
+            <div key={i}>
+              <Stars />
+              <p className="review__q"><span className="mark">“</span>{q.body}<span className="mark">”</span></p>
+              <div className="review__attr">{q.attribution}</div>
+            </div>
+          ))}
+        </div>
+        <div className="rev-conf" data-reveal>
+          <div className="rev-conf__rating">
+            <span className="rev-conf__num">{rating}</span>
+            <Stars className="sm" />
+          </div>
+          {total > 0 && (
+            <div className="rev-conf__count"><span className="emph">{total}</span> verified reviews</div>
+          )}
+          {active.length > 0 && (
+            <div className="rev-logos">
+              {active.map((s) => <PlatformLogo key={s.key} brand={s.key} label={s.label} />)}
+            </div>
+          )}
+          <a className="zillow" href="#" onClick={(e) => e.preventDefault()}>
+            <span className="lead">Read {r.agentName}'s reviews{primary ? " on " + primary.label : ""}</span>
+            <span className="go">See All Reviews{primary ? " On " + primary.label : ""} →</span>
+          </a>
+        </div>
+      </div>
+    </section>
+  );
+}
+
+/* ---------- 05 · RECENT AREA SALES ---------- */
+function AreaSales() {
+  const a = D.areaSales;
+  if (!a.present) return null;
+  const pts = a.chart.points.filter((p) => p.v != null);
+  const W = 640, H = 250, padL = 48, padR = 16, padT = 28, padB = 34;
+  const rec = 687;
+  const ys = pts.map((p) => p.v);
+  const min = Math.min(...ys, rec) - 8, max = Math.max(...ys, rec) + 8;
+  const x = (i) => padL + (i / (pts.length - 1)) * (W - padL - padR);
+  const y = (v) => padT + (1 - (v - min) / (max - min)) * (H - padT - padB);
+  const line = pts.map((p, i) => `${x(i).toFixed(1)},${y(p.v).toFixed(1)}`).join(" ");
+  const areaPath = `M ${x(0)},${y(pts[0].v)} ` + pts.map((p, i) => `L ${x(i)},${y(p.v)}`).join(" ") +
+    ` L ${x(pts.length - 1)},${H - padB} L ${x(0)},${H - padB} Z`;
+  const ticks = [685, 670, 655];   // clean value ticks within domain
+  const lastI = pts.length - 1;
+  return (
+    <section className="section area z-paper" data-screen-label="Recent area sales">
+      <div data-reveal>
+        <div className="eyebrow"><span className="num">05</span> · Recent Area Sales <span className="rule"></span></div>
+        <h2 className="head">A neighborhood that <em>moves</em>.</h2>
+      </div>
+      <div className="area__stats">
+        {a.stats.map((s, i) => (
+          <div className="stat" key={i} data-reveal style={{ transitionDelay: (i * 70) + "ms" }}>
+            <div className="stat__val">{s.value}</div>
+            <div className="stat__label">{s.label}</div>
+            <div className="stat__sub">{s.sub}</div>
+          </div>
+        ))}
+      </div>
+      <div className="chart" data-reveal>
+        <div className="chart__head">
+          <div className="chart__cap">
+            <span className="k">{a.chart.recommendedLabel}</span>
+            <span className="v pill">{a.chart.recommendedValue}</span>
+          </div>
+          <div className="chart__cap r">
+            <span className="k">{a.chart.currentLabel}</span>
+            <span className="v">{a.chart.currentValue}</span>
+          </div>
+        </div>
+        <div className="chart__plot">
+          <svg viewBox={`0 0 ${W} ${H}`} role="img" aria-label="Median sale price, last 6 months">
+            {ticks.map((tv, i) => (
+              <g key={"t" + i}>
+                <line className="gridline" x1={padL} x2={W - padR} y1={y(tv)} y2={y(tv)} />
+                <text className="ylabel" x={padL - 10} y={y(tv) + 3} textAnchor="end">${tv}k</text>
+              </g>
+            ))}
+            <line className="dashline" x1={padL} x2={W - padR} y1={y(rec)} y2={y(rec)} />
+            <path className="area-fill" d={areaPath} />
+            <line className="dropline" x1={x(lastI)} x2={x(lastI)} y1={y(pts[lastI].v)} y2={H - padB} />
+            <polyline className="line" points={line} pathLength="200" style={{ "--len": 200 }} />
+            {pts.map((p, i) => (
+              <g key={i}>
+                {i === lastI && <circle className="halo" cx={x(i)} cy={y(p.v)} r="10" />}
+                <circle className={"dot" + (i === lastI ? " cur" : "")} cx={x(i)} cy={y(p.v)} r={i === lastI ? 6 : 3.6} />
+                <text className="xlabel" x={x(i)} y={H - 9} textAnchor="middle">{p.month}</text>
+              </g>
+            ))}
+          </svg>
+        </div>
+      </div>
+    </section>
+  );
+}
+
+/* ---------- 06 · YOUR AGENT (footer) ---------- */
+function AgentFooter({ heroPhoto }) {
+  const a = D.agent;
+  return (
+    <section className="section agent" data-screen-label="Your agent">
+      <div className="agent__top">
+        <div data-reveal>
+          <div className="eyebrow on-dark"><span className="num">06</span> · Your Agent</div>
+          <h2 className="agent__name">{a.name}.</h2>
+          <div className="agent__tag">{a.tagline}</div>
+        </div>
+        <div data-reveal>
+          <div className="agent__card">
+            <div className="agent__avatar">
+              {heroPhoto
+                ? <image-slot id="agent-headshot" shape="circle" placeholder="Headshot"></image-slot>
+                : a.monogram}
+            </div>
+            <div className="agent__who">
+              <div className="n">{a.name}</div>
+              <div className="r">{a.role}</div>
+            </div>
+          </div>
+        </div>
+      </div>
+
+      <div className="agent__bio" data-reveal>{a.bio}</div>
+
+      <div className="agent__meta" data-reveal>
+        <div className="agent__field"><div className="k">Phone</div><div className="v">{a.phone}</div></div>
+        <div className="agent__field"><div className="k">Email</div><div className="v">{a.email}</div></div>
+        <div className="agent__field"><div className="k">License</div><div className="v">{a.license}</div></div>
+        <div className="agent__field"><div className="k">Years Here</div><div className="v">{a.yearsHere}</div></div>
+      </div>
+
+      <div className="agent__cta" data-reveal>
+        <a className="btn btn--primary" href="#" onClick={(e) => e.preventDefault()}>
+          <span className="btn__lbl">Schedule a listing call</span> <span className="ar">→</span>
+        </a>
+        <a className="btn btn--ghost" href="#" onClick={(e) => e.preventDefault()}>
+          <span className="btn__lbl">Call Aaron directly</span> <span className="ar">☏</span>
+        </a>
+      </div>
+      <div className="agent__note">No pressure, reach out anytime.</div>
+
+      <div className="agent__foot">
+        <div className="agent__lower">
+          <div className="agent__brand">Studio <em>SEP</em></div>
+          <div className="agent__disc">{a.disclaimer}</div>
+        </div>
+      </div>
+    </section>
+  );
+}
+
+Object.assign(window, {
+  Hero, Price, Note, WhyPrice, Reasons, ByNumbers,
+  Marketing, HowWeWork, Reviews, AreaSales, AgentFooter,
+});
+
+</script>
+<script type="text/babel" data-presets="react">
+// app.jsx — composes the seller page, manages viewport + state Tweaks,
+// and drives the motion layer (scroll-reveal + earned draws).
+
+const { useState, useEffect } = React;
+
+const TWEAK_DEFAULTS = /*EDITMODE-BEGIN*/{
+  "priceState": "single",
+  "heroPhoto": "photo",
+  "density": "full",
+  "compsMode": "photos",
+  "reviewSource": "both",
+  "accent": "#06647D",
+  "typePair": "newsreader"
+}/*EDITMODE-END*/;
+
+const SPARSE_HIDDEN = new Set(["whyPrice", "reasons", "byNumbers", "marketing", "howWeWork", "areaSales"]);
+
+function SellerPage({ t }) {
+  const sparse = t.density === "sparse";
+  const show = (key) => !(sparse && SPARSE_HIDDEN.has(key));
+  return (
+    <div className={"sep pair-" + t.typePair} style={{ "--teal-700": t.accent }}>
+      <Hero heroPhoto={t.heroPhoto === "photo"} />
+      <Price priceState={t.priceState} />
+      {D.note.present && <Note />}
+      {show("whyPrice") && <WhyPrice compsMode={t.compsMode} />}
+      {show("reasons") && <Reasons />}
+      {show("byNumbers") && <ByNumbers />}
+      {show("marketing") && <Marketing />}
+      {show("howWeWork") && <HowWeWork />}
+      <Reviews reviewSource={t.reviewSource} />
+      {show("areaSales") && <AreaSales />}
+      <AgentFooter heroPhoto={t.heroPhoto === "photo"} />
+    </div>
+  );
+}
+
+function App() {
+  const [t, setTweak] = useTweaks(TWEAK_DEFAULTS);
+  const [view, setView] = useState(() => localStorage.getItem("sep_view") || "mobile");
+  const setVp = (v) => { setView(v); localStorage.setItem("sep_view", v); };
+
+  const key = [t.priceState, t.heroPhoto, t.density, t.compsMode, t.reviewSource, t.typePair, view].join("|");
+
+  return (
+    <div className="stage">
+      <div className="topbar">
+        <span className="brandtag">Studio SEP · Seller Page</span>
+        <div className="seg">
+          <button className={view === "mobile" ? "on" : ""} onClick={() => setVp("mobile")}>Mobile</button>
+          <button className={view === "desktop" ? "on" : ""} onClick={() => setVp("desktop")}>Desktop</button>
+        </div>
+        <span className="hint">Tweaks ▸ states &amp; palette</span>
+      </div>
+
+      <div className="frame-wrap">
+        <div className={"frame " + view}>
+          <SellerPage key={key} t={t} />
+        </div>
+      </div>
+
+      <TweaksPanel>
+        <TweakSection label="Page states" />
+        <TweakRadio label="Price" value={t.priceState}
+          options={["single", "range"]}
+          onChange={(v) => setTweak("priceState", v)} />
+        <TweakRadio label="Comp photos" value={t.compsMode}
+          options={["photos", "text"]}
+          onChange={(v) => setTweak("compsMode", v)} />
+        <TweakRadio label="Review source" value={t.reviewSource}
+          options={["both", "zillow", "none"]}
+          onChange={(v) => setTweak("reviewSource", v)} />
+        <TweakRadio label="Cover photo" value={t.heroPhoto}
+          options={["photo", "empty"]}
+          onChange={(v) => setTweak("heroPhoto", v)} />
+        <TweakRadio label="Content" value={t.density}
+          options={["full", "sparse"]}
+          onChange={(v) => setTweak("density", v)} />
+
+        <TweakSection label="Palette" />
+        <TweakColor label="Signature teal" value={t.accent}
+          options={["#06647D", "#0A5A8A", "#14706E", "#27414E"]}
+          onChange={(v) => setTweak("accent", v)} />
+
+        <TweakSection label="Type pairing" />
+        <TweakRadio label="Display" value={t.typePair}
+          options={["newsreader", "spectral"]}
+          onChange={(v) => setTweak("typePair", v)} />
+      </TweaksPanel>
+    </div>
+  );
+}
+
+ReactDOM.createRoot(document.getElementById("root")).render(<App />);
+
+</script>
+</body>
+</html>
