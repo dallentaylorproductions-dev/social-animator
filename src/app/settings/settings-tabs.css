@@ -48,11 +48,18 @@
 .sep-settings-head--profile {
   max-width: 42rem;
   padding: 24px 24px 0;
+  /* M-2: in installed standalone the iOS status bar painted over the
+     "← STUDIO" back link (the only way out of Settings without an iOS
+     back-swipe). Push the head below it; the .sep-settings-shell gradient
+     fills behind the status bar. max() keeps the 24px in a normal browser. */
+  padding-top: max(24px, env(safe-area-inset-top, 0px));
 }
 /* Match the Brand-kit .page column: 1060px + 28px side padding. */
 .sep-settings-head--brand {
   max-width: 1060px;
   padding: 24px 28px 0;
+  /* M-2: same status-bar clearance as the Profile head (covers the Brand tab). */
+  padding-top: max(24px, env(safe-area-inset-top, 0px));
 }
 
 /* "← Studio" back link — same look as the original Profile breadcrumb

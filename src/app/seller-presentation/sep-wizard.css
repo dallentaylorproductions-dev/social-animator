@@ -1221,6 +1221,14 @@
 @media (max-width: 640px) {
   .sep-wizard {
     padding: 26px 16px 80px;
+    /* M-2: the shorthand above resets padding-top to a flat 26px, which on a
+       phone wiped out the base rule's safe-area inset (M-1) — so in installed
+       standalone the top nav (← Dashboard / + Start) sat back under the iOS
+       status bar. Re-apply the inset here (this query matches every notched
+       phone). max() keeps the 26px/16px box in a normal browser (insets = 0). */
+    padding-top: max(26px, env(safe-area-inset-top, 0px));
+    padding-left: max(16px, env(safe-area-inset-left, 0px));
+    padding-right: max(16px, env(safe-area-inset-right, 0px));
   }
   .sep-wizard .sep-title {
     font-size: 26px;

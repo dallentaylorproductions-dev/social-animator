@@ -184,6 +184,19 @@ test.describe("Wizard live preview — mobile", () => {
     // so a touch-drag scrolls the page inside the frame, not the body behind.
     expect(await read(screen, "overflow-y")).toBe("auto");
 
+    // M-2: the real scroll fix is a BOUNDED scroll body. The overlay → surface
+    // → phone → screen flex chain now passes a definite height down (M-1's
+    // flex/min-height were inert while .sep-preview-surface was an unbounded,
+    // non-flex wrapper), so the screen is shorter than its content and has a
+    // genuine overflow region. Before M-2 it grew to its content height and
+    // never scrolled on iOS. Inset-independent → verifies in CI.
+    const { client, scroll } = await screen.evaluate((el) => ({
+      client: el.clientHeight,
+      scroll: el.scrollHeight,
+    }));
+    expect(client).toBeGreaterThan(0);
+    expect(scroll).toBeGreaterThan(client);
+
     // M-1 B3: background body scroll is locked while the overlay is open
     // (position:fixed lock) so the page behind can't scroll instead.
     expect(

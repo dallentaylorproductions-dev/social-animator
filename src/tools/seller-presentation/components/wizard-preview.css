@@ -209,6 +209,25 @@
   display: flex;
   flex-direction: column;
 }
+/* M-2: the overlay's only child is PreviewSurface's root (.sep-preview-surface).
+   M-1 put `flex: 1 1 auto; min-height: 0` on the phone + screen, but those were
+   inert: their actual parent — this surface — was neither stretched to fill the
+   overlay nor a flex container, so the bounded-height chain broke here and the
+   screen grew to its content (never overflowed → never scrolled on iOS). Make
+   the surface the full-height flex column the inner rules already assume. The
+   overlay's height is definite (position:fixed + inset:0), so this passes a real
+   bounded height down to the screen, which is what iOS needs to scroll. */
+.sep-preview-overlay .sep-preview-surface {
+  flex: 1 1 auto;
+  min-height: 0;
+  display: flex;
+  flex-direction: column;
+}
+/* keep the header at its natural height so all remaining space goes to the
+   scroll body (default flex-shrink could otherwise squeeze it) */
+.sep-preview-overlay .sep-preview-head {
+  flex: 0 0 auto;
+}
 .sep-preview-overlay .sep-preview-phone {
   flex: 1 1 auto;
   min-height: 0;
@@ -223,6 +242,9 @@
      contain stops the touch-drag from chaining to the (locked) page behind. */
   min-height: 0;
   overscroll-behavior: contain;
+  /* M-2: tell iOS this container owns vertical pans, so a touch-drag scrolls it
+     rather than being eaten by the gesture system / the body-scroll lock. */
+  touch-action: pan-y;
   border-radius: 20px;
 }
 @media (min-width: 1200px) {
