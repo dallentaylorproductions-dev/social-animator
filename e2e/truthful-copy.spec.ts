@@ -4,17 +4,13 @@ import path from 'node:path';
 import { defaultWhyUs } from '../src/lib/whyus';
 
 /**
- * B0a — truthful-copy gate.
+ * Truthful-copy gate.
  *
- * The product promise is honesty: the "Draft from your reviews" helper drafts
- * FROM reviews the agent already entered — it does not scrape, fetch, or write
+ * The product promise is honesty: the tool does not scrape, fetch, or write
  * "in your voice," and there is no "AI magic." This spec greps the user-facing
  * Settings + Seller-Presentation TSX for marketing-hype phrases that would
  * over-claim, and fails if any appear. New copy must stay on the right side of
  * this line.
- *
- * Allowed framing (intentionally NOT forbidden): "Draft from your reviews",
- * "Suggested bio", "Edit".
  *
  * Pure-Node test — no browser. Honesty doesn't ride on rendering.
  */

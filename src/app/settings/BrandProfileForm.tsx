@@ -11,7 +11,7 @@ import type { Review } from "@/tools/seller-presentation/engine/types";
 import { PhoneInput } from "@/components/inputs";
 import { HeadshotField } from "./HeadshotField";
 import { defaultWhyUs } from "@/lib/whyus";
-import { WhyUsSection, DraftFromReviews } from "./WhyUsSection";
+import { WhyUsSection } from "./WhyUsSection";
 
 /**
  * Soft cap on the curated reviews list. Six rows is enough to cover the
@@ -264,15 +264,6 @@ export function BrandProfileForm() {
           />
         </Field>
 
-        {/* B0a — "Draft from your reviews" AI helper. Operates only on the
-            reviews already entered below (plus any pasted); never fetches a
-            URL. Suggestions are editable and applied by the agent into the
-            bio / tagline / reviews-headline fields. */}
-        <DraftFromReviews
-          reviews={s.agentReviews ?? []}
-          onApply={(field, value) => update(field, value || undefined)}
-        />
-
         <Field label="Years of experience">
           <TextInput
             value={s.agentYearsInArea ?? ""}
@@ -333,10 +324,7 @@ export function BrandProfileForm() {
       />
 
       <p className="text-[11px] text-neutral-600 leading-relaxed pt-4 border-t border-neutral-900">
-        Saved automatically. Stored in your browser only. The one exception:
-        when you tap &ldquo;Draft from your reviews,&rdquo; the reviews you
-        send are processed to suggest a draft and returned for you to edit —
-        they&apos;re not stored on our servers.
+        Saved automatically. Stored in your browser only.
       </p>
     </div>
   );
