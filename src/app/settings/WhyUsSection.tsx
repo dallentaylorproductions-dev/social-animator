@@ -1,8 +1,7 @@
 "use client";
 
-import { useEffect, useState } from "react";
+import { useState } from "react";
 import { NumberInput, PercentInput } from "@/components/inputs";
-import type { Review } from "@/tools/seller-presentation/engine/types";
 import {
   type WhyUs,
   type MarketingPoint,
@@ -11,10 +10,9 @@ import {
   WHYUS_CAPS,
   WHYUS_CAP_NUDGE,
 } from "@/lib/whyus";
-import type { ReviewDraftSuggestions } from "@/lib/ai/review-draft-mapper";
 
 /**
- * B0a — "Why us" capture UI + the "Draft from your reviews" AI helper.
+ * B0a — "Why us" capture UI.
  *
  * Data-IN only (B0b renders these on the seller page). Matches the existing
  * BrandProfileForm visual language exactly — this is not a redesign. The
@@ -24,217 +22,6 @@ import type { ReviewDraftSuggestions } from "@/lib/ai/review-draft-mapper";
 
 const INPUT_CLASS =
   "w-full bg-neutral-900 border border-neutral-800 rounded-md px-3 py-2 text-base lg:text-sm focus:outline-none focus:border-mint";
-
-// ---------------------------------------------------------------------------
-// Draft from your reviews
-// ---------------------------------------------------------------------------
-
-type DraftTarget = "agentBioShort" | "agentTagline" | "reviewsHeadline";
-
-/**
- * The button + panel that turns the agent's own reviews into editable bio /
- * tagline / reviews-headline suggestions. Operates ONLY on the reviews already
- * entered (passed in) plus an optional paste-in — never fetches a URL. The
- * agent edits then applies each suggestion to its field; nothing auto-writes.
- */
-export function DraftFromReviews({
-  reviews,
-  onApply,
-}: {
-  reviews: Review[];
-  onApply: (field: DraftTarget, value: string) => void;
-}) {
-  const [pasted, setPasted] = useState("");
-  const [loading, setLoading] = useState(false);
-  const [error, setError] = useState<string | null>(null);
-  const [draft, setDraft] = useState<ReviewDraftSuggestions | null>(null);
-  // B0b — kill-switch gate (parity with ImportCompsButton). `null` while the
-  // flag resolves; the affordance stays hidden until the server confirms
-  // REVIEW_DRAFT_ENABLED === 'true', so a disabled feature never flashes a
-  // button that 503s. Manual entry of bio/tagline/headline is unaffected.
-  const [enabled, setEnabled] = useState<boolean | null>(null);
-
-  useEffect(() => {
-    let cancelled = false;
-    fetch("/api/entitlements/me", { credentials: "same-origin" })
-      .then((r) => (r.ok ? r.json() : null))
-      .then((data) => {
-        if (cancelled || !data || !data.ok) return;
-        setEnabled(!!data.features?.reviewDraftEnabled);
-      })
-      .catch(() => {
-        // Network failure → stays hidden; the agent still writes these fields
-        // by hand in the form above.
-      });
-    return () => {
-      cancelled = true;
-    };
-  }, []);
-
-  const hasSource = reviews.some((r) => r.body.trim()) || pasted.trim().length > 0;
-
-  const runDraft = async () => {
-    setLoading(true);
-    setError(null);
-    try {
-      const res = await fetch("/api/draft-from-reviews", {
-        method: "POST",
-        headers: { "content-type": "application/json" },
-        body: JSON.stringify({ reviews, pastedReviews: pasted }),
-      });
-      const data = (await res.json()) as
-        | { ok: true; suggestions: ReviewDraftSuggestions }
-        | { ok: false; message: string };
-      if (!data.ok) {
-        setError(data.message);
-        return;
-      }
-      setDraft(data.suggestions);
-    } catch {
-      setError("Couldn't draft just now. You can write these yourself or try again.");
-    } finally {
-      setLoading(false);
-    }
-  };
-
-  // Hidden until the kill switch confirms the feature is on (or still loading).
-  if (enabled !== true) return null;
-
-  return (
-    <div
-      className="space-y-3 rounded border border-neutral-800 bg-neutral-900/40 p-3"
-      data-testid="draft-from-reviews"
-    >
-      <div className="flex items-center justify-between gap-3">
-        <span className="text-[10px] uppercase tracking-[0.15em] text-neutral-500">
-          Draft from your reviews
-        </span>
-        <button
-          type="button"
-          onClick={runDraft}
-          disabled={loading || !hasSource}
-          data-testid="draft-from-reviews-run"
-          className="rounded border border-neutral-700 px-3 py-1.5 text-xs text-text-primary hover:bg-neutral-800 disabled:opacity-40 disabled:hover:bg-transparent"
-        >
-          {loading ? "Drafting…" : "Draft from your reviews"}
-        </button>
-      </div>
-      <p className="text-[11px] text-neutral-600 leading-relaxed">
-        Uses the reviews you&apos;ve entered to suggest a bio, tagline, and
-        reviews headline. You edit anything before it&apos;s applied.
-      </p>
-
-      <details className="text-xs text-neutral-500">
-        <summary className="cursor-pointer hover:text-neutral-300">
-          Paste more reviews (optional)
-        </summary>
-        <textarea
-          value={pasted}
-          onChange={(e) => setPasted(e.target.value)}
-          placeholder="Paste a few more reviews here if you have only a couple entered above."
-          rows={4}
-          data-testid="draft-from-reviews-paste"
-          className={`${INPUT_CLASS} mt-2 resize-y`}
-        />
-      </details>
-
-      {error && (
-        <p
-          className="text-[11px] text-amber-400/90 leading-relaxed"
-          data-testid="draft-from-reviews-error"
-        >
-          {error}
-        </p>
-      )}
-
-      {draft && (
-        <div className="space-y-3 pt-1" data-testid="draft-from-reviews-results">
-          <Suggestion
-            label="Suggested bio"
-            initial={draft.bio}
-            multiline
-            testId="suggested-bio"
-            onApply={(v) => onApply("agentBioShort", v)}
-          />
-          <Suggestion
-            label="Suggested tagline"
-            initial={draft.tagline}
-            testId="suggested-tagline"
-            onApply={(v) => onApply("agentTagline", v)}
-          />
-          <Suggestion
-            label="Suggested reviews headline"
-            initial={draft.reviewsHeadline}
-            testId="suggested-reviews-headline"
-            onApply={(v) => onApply("reviewsHeadline", v)}
-          />
-        </div>
-      )}
-    </div>
-  );
-}
-
-/** One editable suggestion card with an Apply button. */
-function Suggestion({
-  label,
-  initial,
-  multiline,
-  testId,
-  onApply,
-}: {
-  label: string;
-  initial: string;
-  multiline?: boolean;
-  testId: string;
-  onApply: (value: string) => void;
-}) {
-  const [value, setValue] = useState(initial);
-  const [applied, setApplied] = useState(false);
-
-  return (
-    <div className="space-y-1.5" data-testid={testId}>
-      <div className="flex items-center justify-between">
-        <span className="text-[10px] uppercase tracking-[0.15em] text-neutral-500">
-          {label}
-        </span>
-        <button
-          type="button"
-          onClick={() => {
-            onApply(value);
-            setApplied(true);
-          }}
-          data-testid={`${testId}-apply`}
-          className="text-xs text-mint hover:underline"
-        >
-          {applied ? "Applied ✓" : "Apply"}
-        </button>
-      </div>
-      {multiline ? (
-        <textarea
-          value={value}
-          onChange={(e) => {
-            setValue(e.target.value);
-            setApplied(false);
-          }}
-          rows={3}
-          data-testid={`${testId}-input`}
-          className={`${INPUT_CLASS} resize-y`}
-        />
-      ) : (
-        <input
-          type="text"
-          value={value}
-          onChange={(e) => {
-            setValue(e.target.value);
-            setApplied(false);
-          }}
-          data-testid={`${testId}-input`}
-          className={INPUT_CLASS}
-        />
-      )}
-    </div>
-  );
-}
 
 // ---------------------------------------------------------------------------
 // Why us

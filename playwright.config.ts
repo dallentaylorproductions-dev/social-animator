@@ -63,11 +63,6 @@ export default defineConfig({
       // toggling the env at runtime (it sends a header the route also
       // accepts as a flag override — see comp-import.feature-flag.spec.ts).
       COMP_IMPORT_ENABLED: 'true',
-      // B0b: enable the draft-from-reviews feature flag for the full suite.
-      // The flag-OFF spec sends the `X-Review-Draft-Test-Disable` header the
-      // route also honors (non-prod), so the kill-switch 503 is asserted
-      // without toggling the env at runtime.
-      REVIEW_DRAFT_ENABLED: 'true',
     },
   },
 });
