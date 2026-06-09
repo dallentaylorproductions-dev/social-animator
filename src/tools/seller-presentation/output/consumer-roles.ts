@@ -183,35 +183,22 @@ export function deriveConsumerRoles(
  * the signature (secondary retired in PR #29).
  */
 export function consumerRoleVars(roles: ConsumerRoles): Record<string, string> {
+  // D1-PORT — the ported prototype CSS (flagship.css) defines EVERY token literally
+  // (the locked neutrals/text/line/depth). Only the brand-tracked tokens are
+  // inlined here so the cohesive teal ramp re-hues per agent: `--teal-700` seeds
+  // the whole ramp (the CSS `--teal-900/500/200/100` color-mix expressions derive
+  // from it), `--mint` is the brand's bright light-tip, and `--on-signature` keeps
+  // the CTA/badge label legible (the prototype's hardcoded #eafcff would fail a
+  // pale signature). `--signature*` are kept for the brand-kit live-preview bridge
+  // and any shared consumer that still reads them.
   return {
+    "--teal-700": roles.signature,
+    "--accent": roles.signature,
+    "--mint": roles.mint,
+    "--on-signature": roles.onSignature,
+    // retained aliases for the live-preview bridge / shared readers
     "--signature": roles.signature,
     "--signature-deep": roles.signatureDeep,
     "--signature-link": roles.signatureLink,
-    "--tint-12": roles.tint12,
-    "--tint-9": roles.tint9,
-    "--tint-6": roles.tint6,
-    "--line-30": roles.line30,
-    "--on-signature": roles.onSignature,
-    "--decorative": roles.signature,
-    "--mint": roles.mint,
-    "--white": roles.white,
-    "--offwhite": roles.offwhite,
-    "--paper": roles.paper,
-    "--sand": roles.sand,
-    "--mist": roles.mist,
-    "--ink": roles.ink,
-    "--ink-soft": roles.inkSoft,
-    "--ink-faint": roles.inkFaint,
-    "--on-dark": roles.onDark,
-    "--on-dark-soft": roles.onDarkSoft,
-    "--on-dark-mute": roles.onDarkMute,
-    "--dark-band": roles.darkBand,
-    "--dark-band-2": roles.darkBand2,
-    "--dark-band-3": roles.darkBand3,
-    // F4 §D — the display-seat gate as a CSS flag (always emitted as "1"/"0"
-    // so a live bridge push reliably overwrites the prior value). The scoped
-    // `@container style(--display-seat: 1)` block in flagship.css is the ONLY
-    // consumer; "0" matches nothing → byte-identical render.
-    "--display-seat": roles.needsDisplaySeat ? "1" : "0",
   };
 }

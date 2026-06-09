@@ -1,234 +1,91 @@
-import type { ReactElement, SVGProps } from "react";
+import type { ReactElement } from "react";
 
 /**
- * D1 · Auto-icon system — the flagship (v2) meaningful-icon library + the
- * deterministic keyword→icon map shared by BOTH the why-work-with-us cards and
- * the how-we-market feature cards.
- *
- * STYLE (Build-Handoff §7): one editorial line set — `viewBox 0 0 24 24`,
- * `stroke: currentColor`, `stroke-width 1.6`, round caps/joins, NO fill. The
- * mark's color is set by the caller (`--signature`); the icon just inherits
- * `currentColor`.
- *
- * ASSIGNMENT is a DETERMINISTIC keyword map (NOT AI — instant, predictable):
- * `RULES` is an ordered, case-insensitive list; `pickIcon` matches the item
- * TITLE first, then the body as a tiebreaker, first/strongest rule wins, and an
- * unmatched item falls through to `sparkle` (a universal mark — never a
- * placeholder shape). One map serves how-we-market AND why-work-with-us.
+ * D1-PORT · Auto-icon system — ported VERBATIM from the locked prototype's
+ * inline `icons.jsx` block (docs/design/seller-page-v2/seller-page-standalone.html):
+ * the GLYPHS line-icon library + the deterministic keyword→icon `RULES`/`pickIcon`
+ * map. One consistent line style (1.6 stroke, round joins, currentColor). Shared by
+ * "How we market" and "Why work with us" cards. NO AI — ordered keyword rules,
+ * title first then body as a tiebreaker, first/strongest match wins, neutral
+ * `sparkle` fallback (never a placeholder shape).
  */
 
 export type IconName =
-  | "camera"
-  | "target"
-  | "broadcast"
-  | "megaphone"
-  | "chart"
-  | "tag"
-  | "key"
-  | "home"
-  | "phone"
-  | "chat"
-  | "people"
-  | "doc"
-  | "medal"
-  | "star"
-  | "shield"
-  | "heart"
-  | "sparkle";
+  | "camera" | "target" | "broadcast" | "megaphone" | "chart" | "tag" | "key"
+  | "home" | "phone" | "chat" | "people" | "doc" | "medal" | "star" | "shield"
+  | "heart" | "sparkle";
 
-type IconNode = (props: SVGProps<SVGSVGElement>) => ReactElement;
+const P = {
+  fill: "none" as const,
+  stroke: "currentColor",
+  strokeWidth: 1.6,
+  strokeLinecap: "round" as const,
+  strokeLinejoin: "round" as const,
+};
+const svg = (children: ReactElement): ReactElement => (
+  <svg viewBox="0 0 24 24" width="100%" height="100%" {...P}>
+    {children}
+  </svg>
+);
 
-/** Shared svg wrapper — locks the editorial line-set attributes in one place. */
-function Svg({ children, ...props }: SVGProps<SVGSVGElement>) {
-  return (
-    <svg
-      viewBox="0 0 24 24"
-      fill="none"
-      stroke="currentColor"
-      strokeWidth={1.6}
-      strokeLinecap="round"
-      strokeLinejoin="round"
-      aria-hidden="true"
-      {...props}
-    >
-      {children}
-    </svg>
-  );
-}
-
-/** The icon set (Build-Handoff §7 themes). */
-export const ICONS: Record<IconName, IconNode> = {
-  camera: (p) => (
-    <Svg {...p}>
-      <path d="M3 8.5A1.5 1.5 0 0 1 4.5 7h2l1.2-1.8A1 1 0 0 1 8.5 4.7h7a1 1 0 0 1 .8.5L17.5 7h2A1.5 1.5 0 0 1 21 8.5v9A1.5 1.5 0 0 1 19.5 19h-15A1.5 1.5 0 0 1 3 17.5z" />
-      <circle cx="12" cy="13" r="3.3" />
-    </Svg>
-  ),
-  target: (p) => (
-    <Svg {...p}>
-      <circle cx="12" cy="12" r="8.2" />
-      <circle cx="12" cy="12" r="4.4" />
-      <circle cx="12" cy="12" r="0.9" />
-    </Svg>
-  ),
-  broadcast: (p) => (
-    <Svg {...p}>
-      <circle cx="12" cy="12" r="2.2" />
-      <path d="M7.4 7.4a6.5 6.5 0 0 0 0 9.2M16.6 16.6a6.5 6.5 0 0 0 0-9.2M4.6 4.6a10.4 10.4 0 0 0 0 14.8M19.4 19.4a10.4 10.4 0 0 0 0-14.8" />
-    </Svg>
-  ),
-  megaphone: (p) => (
-    <Svg {...p}>
-      <path d="M4 10v4a1 1 0 0 0 1 1h2l9 4V5L7 9H5a1 1 0 0 0-1 1Z" />
-      <path d="M7 15v3.5a1.5 1.5 0 0 0 3 0V16M19 9.5a3 3 0 0 1 0 5" />
-    </Svg>
-  ),
-  chart: (p) => (
-    <Svg {...p}>
-      <path d="M4 4v16h16" />
-      <path d="M7.5 14.5 11 11l2.5 2.5L19 8" />
-    </Svg>
-  ),
-  tag: (p) => (
-    <Svg {...p}>
-      <path d="M4 11.5V5a1 1 0 0 1 1-1h6.5a1 1 0 0 1 .7.3l7.2 7.2a1 1 0 0 1 0 1.4l-6.7 6.7a1 1 0 0 1-1.4 0L4.3 12.2a1 1 0 0 1-.3-.7Z" />
-      <circle cx="8.2" cy="8.2" r="1.2" />
-    </Svg>
-  ),
-  key: (p) => (
-    <Svg {...p}>
-      <circle cx="7.5" cy="8" r="3.6" />
-      <path d="m10 10.5 8 8M15.5 16l1.7-1.7M18 18.5l1.7-1.7" />
-    </Svg>
-  ),
-  home: (p) => (
-    <Svg {...p}>
-      <path d="M4 11 12 4l8 7" />
-      <path d="M6 9.5V19a1 1 0 0 0 1 1h10a1 1 0 0 0 1-1V9.5" />
-      <path d="M10 20v-5h4v5" />
-    </Svg>
-  ),
-  phone: (p) => (
-    <Svg {...p}>
-      <path d="M5 4h3l1.5 4.5L7.5 10a10 10 0 0 0 4.5 4.5l1.5-2L18 18v2a1 1 0 0 1-1 1A14 14 0 0 1 4 5a1 1 0 0 1 1-1Z" />
-    </Svg>
-  ),
-  chat: (p) => (
-    <Svg {...p}>
-      <path d="M5 5h14a1 1 0 0 1 1 1v9a1 1 0 0 1-1 1H9l-4 3.5V6a1 1 0 0 1 1-1Z" />
-      <path d="M8.5 9.5h7M8.5 12.5h4" />
-    </Svg>
-  ),
-  people: (p) => (
-    <Svg {...p}>
-      <circle cx="9" cy="8.5" r="3" />
-      <path d="M3.5 19a5.5 5.5 0 0 1 11 0" />
-      <path d="M15.5 6.2a3 3 0 0 1 0 5.6M16.5 14.2a5.5 5.5 0 0 1 4 4.8" />
-    </Svg>
-  ),
-  doc: (p) => (
-    <Svg {...p}>
-      <path d="M6 3h7l5 5v12a1 1 0 0 1-1 1H6a1 1 0 0 1-1-1V4a1 1 0 0 1 1-1Z" />
-      <path d="M13 3v5h5M8.5 13h7M8.5 16.5h7" />
-    </Svg>
-  ),
-  medal: (p) => (
-    <Svg {...p}>
-      <circle cx="12" cy="14" r="5" />
-      <path d="M9 9.2 7 3h4l1.4 3.4M15 9.2 17 3h-4l-1 2.4M12 12l.9 1.8 2 .3-1.45 1.4.35 2L12 16.5 10.2 17.5l.35-2L9.1 14.1l2-.3Z" />
-    </Svg>
-  ),
-  star: (p) => (
-    <Svg {...p}>
-      <path d="M12 4l2.3 5 5.2.5-3.9 3.5 1.2 5.1L12 20.8 7.2 23.2l1.2-5.1L4.5 9.5l5.2-.5Z" transform="scale(0.9) translate(1.3 -1)" />
-    </Svg>
-  ),
-  shield: (p) => (
-    <Svg {...p}>
-      <path d="M12 3.5 19 6v6c0 4.2-2.9 7.2-7 8.5-4.1-1.3-7-4.3-7-8.5V6Z" />
-      <path d="m9 12 2 2 4-4" />
-    </Svg>
-  ),
-  heart: (p) => (
-    <Svg {...p}>
-      <path d="M12 19.5C6.5 16 4 12.6 4 9.4A3.9 3.9 0 0 1 12 7a3.9 3.9 0 0 1 8 2.4c0 3.2-2.5 6.6-8 10.1Z" />
-    </Svg>
-  ),
-  sparkle: (p) => (
-    <Svg {...p}>
-      <path d="M12 4c.6 3.7 2.3 5.4 6 6-3.7.6-5.4 2.3-6 6-.6-3.7-2.3-5.4-6-6 3.7-.6 5.4-2.3 6-6Z" />
-      <path d="M18.5 4.5c.2 1.1.7 1.6 1.8 1.8-1.1.2-1.6.7-1.8 1.8-.2-1.1-.7-1.6-1.8-1.8 1.1-.2 1.6-.7 1.8-1.8Z" />
-    </Svg>
-  ),
+export const GLYPHS: Record<IconName, ReactElement> = {
+  camera: svg(<><path d="M4 8h2.5L8 6h8l1.5 2H20a1 1 0 011 1v9a1 1 0 01-1 1H4a1 1 0 01-1-1V9a1 1 0 011-1z" /><circle cx="12" cy="13" r="3.2" /></>),
+  target: svg(<><circle cx="12" cy="12" r="8.5" /><circle cx="12" cy="12" r="4.4" /><circle cx="12" cy="12" r="0.9" fill="currentColor" stroke="none" /></>),
+  broadcast: svg(<><circle cx="12" cy="12" r="1.6" fill="currentColor" stroke="none" /><path d="M8.6 8.6a5 5 0 000 6.8" /><path d="M15.4 8.6a5 5 0 010 6.8" /><path d="M6.2 6.2a8.4 8.4 0 000 11.6" /><path d="M17.8 6.2a8.4 8.4 0 010 11.6" /></>),
+  megaphone: svg(<><path d="M4 10v4h3l8 4V6L7 10H4z" /><path d="M17 9.2a4 4 0 010 5.6" /></>),
+  chart: svg(<><path d="M4 4v16h16" /><path d="M8 15l3-4 3 2 4-6" /></>),
+  tag: svg(<><path d="M4 4h7l9 9-7 7-9-9V4z" /><circle cx="8.2" cy="8.2" r="1.4" /></>),
+  key: svg(<><circle cx="8" cy="8" r="4.2" /><path d="M11 11l8.5 8.5" /><path d="M16 16l2.2-2.2" /><path d="M18.2 18.2l2.2-2.2" /></>),
+  home: svg(<><path d="M4 11l8-7 8 7" /><path d="M6 9.6V20h12V9.6" /></>),
+  phone: svg(<><path d="M7 4l2.8.8 1 3.6-2 1.3a10.5 10.5 0 005 5l1.3-2 3.6 1V18a2 2 0 01-2.2 2A15 15 0 015 6.2 2 2 0 017 4z" /></>),
+  chat: svg(<><path d="M4 6h16v9.5H10.5L6 20v-4.5H4z" /><path d="M8 10.5h8M8 13h5" /></>),
+  people: svg(<><circle cx="9" cy="9" r="2.8" /><path d="M3.8 19a5.2 5.2 0 0110.4 0" /><circle cx="16.6" cy="10" r="2.2" /><path d="M15.6 19a5 5 0 016.6-4.4" /></>),
+  doc: svg(<><path d="M6 3h8l4 4v14H6z" /><path d="M14 3v4h4" /><path d="M9 12.5h6M9 16h4" /></>),
+  medal: svg(<><circle cx="12" cy="14.5" r="4.8" /><path d="M9.2 10L7 3h4l1 2.6L13 3h4l-2.2 7" /><path d="M12 12.6l.85 1.7 1.9.3-1.37 1.32.32 1.88L12 16.9l-1.7.9.32-1.88L9.25 14.6l1.9-.3z" strokeWidth="1" /></>),
+  star: svg(<><path d="M12 3.6l2.6 5.3 5.8.9-4.2 4.1 1 5.8L12 17l-5.2 2.7 1-5.8-4.2-4.1 5.8-.9z" /></>),
+  shield: svg(<><path d="M12 3l7 2.8V11c0 4.2-3 7.4-7 8.6-4-1.2-7-4.4-7-8.6V5.8z" /><path d="M9 11.6l2 2 4-4" /></>),
+  heart: svg(<><path d="M12 20S4 15.2 4 9.4A3.8 3.8 0 0112 7.2 3.8 3.8 0 0120 9.4C20 15.2 12 20 12 20z" /></>),
+  sparkle: svg(<><path d="M12 4l1.7 4.6L18 10l-4.3 1.4L12 16l-1.7-4.6L6 10l4.3-1.4z" /><path d="M18.6 4.6l.5 1.5 1.5.5-1.5.5-.5 1.5-.5-1.5-1.5-.5 1.5-.5z" strokeWidth="1.1" /></>),
 };
 
-/**
- * Ordered keyword rules. Earlier rules win, so distinctive real-estate themes
- * sit above the catch-all communication/experience/care ones. Keywords are
- * matched as case-insensitive substrings, so stems ("negotiat", "stag") cover
- * inflections.
- */
-export const RULES: ReadonlyArray<{ icon: IconName; keywords: readonly string[] }> = [
-  { icon: "camera", keywords: ["photo", "video", "photograph", "film", "shoot", "twilight", "drone", "imagery", "visual", "matterport", "3d tour"] },
-  { icon: "target", keywords: ["targeted", "digital ad", "paid ad", "ad funnel", "ads", "ppc", "retarget", "audience", "campaign", "google", "boosted"] },
-  { icon: "broadcast", keywords: ["syndicat", "portal", "zillow", "redfin", "realtor.com", "mls", "featured placement", "distribut", "syndication", "listing site"] },
-  { icon: "megaphone", keywords: ["social", "instagram", "facebook", "promot", "announce", "buzz", "exposure", "reach", "marketing"] },
-  { icon: "tag", keywords: ["pricing", "price", "comp", "valuation", "cma", "list price", "apprais", "value"] },
-  { icon: "key", keywords: ["open house", "showing", "tour", "lockbox", "access", "walkthrough", "private showing", "buyer visit"] },
-  { icon: "home", keywords: ["stag", "prep", "declutter", "repair", "curb", "ready to list", "make-ready", "improvement", "renovat"] },
-  { icon: "chart", keywords: ["data", "track record", "sold", "results", "analytics", "statistic", "performance", "numbers", "average", "days on market", "sale-to-list", "sale to list"] },
-  { icon: "doc", keywords: ["negotiat", "offer", "contract", "closing", "paperwork", "terms", "escrow", "sign", "inspection", "appraisal"] },
-  { icon: "people", keywords: ["buyer", "network", "sphere", "connection", "relationship", "community", "agents", "referral", "database"] },
-  { icon: "medal", keywords: ["award", "top ", "#1", "ranked", "recognition", "achievement", "best", "producer", "winning"] },
-  { icon: "shield", keywords: ["guarantee", "protect", "trust", "security", "commitment", "promise", "no-risk", "no risk", "easy exit", "cancel anytime"] },
-  { icon: "key", keywords: ["sell", "list with", "handed keys", "close"] },
-  { icon: "heart", keywords: ["hands-on", "hands on", "personal", "care", "dedicat", "boutique", "attention", "family", "local", "passion", "directly", "never handed"] },
-  { icon: "star", keywords: ["experience", "years", "expert", "seasoned", "veteran", "rated", "trusted", "review", "decade"] },
-  { icon: "phone", keywords: ["call", "phone", "available", "response time", "reach me"] },
-  { icon: "chat", keywords: ["communicat", "update", "text", "message", "responsive", "in touch", "informed"] },
+// ordered rules — first/strongest match wins (case-insensitive)
+export const RULES: ReadonlyArray<{ icon: IconName; kw: readonly string[] }> = [
+  { icon: "camera", kw: ["photo", "photograph", "video", "film", "shoot", "twilight", "imagery", "drone", "media", "picture"] },
+  { icon: "target", kw: ["digital ad", "targeted", "retarget", "paid", "ppc", "ad funnel", "campaign", " ads", "online ad"] },
+  { icon: "broadcast", kw: ["syndicat", "portal", "mls", "feature", "placement", "feed", "distribut", "broadcast", "listing site"] },
+  { icon: "megaphone", kw: ["social", "promote", "advertis", "awareness", "buzz", "exposure", "reach"] },
+  { icon: "chart", kw: ["sold", "closed", "transaction", "track record", "results", "data", "trend", "analy", "statistic", "sale-to-list", "days on market"] },
+  { icon: "tag", kw: ["price", "pricing", "comp", "valuation", "apprais", "cma", "list price", "number"] },
+  { icon: "key", kw: ["open house", "showing", "tour", "walkthrough", "walk the home", "visit", "access", "door"] },
+  { icon: "home", kw: ["stage", "staging", "prep", "declutter", "curb", "property", "home", "house", "remodel"] },
+  { icon: "phone", kw: ["call", "phone", "responsive", "available", "text", "reach out", "answer"] },
+  { icon: "chat", kw: ["communicat", "update", "message", "chat", "inform", "transparen", "question", "guidance"] },
+  { icon: "people", kw: ["buyer", "network", "team", "client", "people", "relationship", "database", "connection", "referral"] },
+  { icon: "doc", kw: ["negotiat", "offer", "contract", "paperwork", "document", "terms", "deal", "escrow", "closing", "close"] },
+  { icon: "medal", kw: ["award", "recogni", "rank", "#1", "number one", "honor", "top producer", "best in"] },
+  { icon: "star", kw: ["experience", "expert", "year", "decade", "proven", "seasoned", "veteran", "best", "reputation"] },
+  { icon: "shield", kw: ["trust", "guarantee", "protect", "honest", "integrity", "commit", "promise", "backed", "no pressure"] },
+  { icon: "heart", kw: ["hands-on", "personal", "dedicat", "attentive", "care", "boutique", "small", "one-on-one", "start to finish", "yourself"] },
 ];
 
-function matchIn(haystack: string): IconName | null {
-  for (const rule of RULES) {
-    for (const kw of rule.keywords) {
-      if (haystack.includes(kw)) return rule.icon;
-    }
-  }
-  return null;
+export function pickIcon(title?: string, body?: string): IconName {
+  const t = (title || "").toLowerCase();
+  const b = (body || "").toLowerCase();
+  for (const r of RULES) if (r.kw.some((k) => t.includes(k))) return r.icon; // title first
+  for (const r of RULES) if (r.kw.some((k) => b.includes(k))) return r.icon; // body as tiebreaker
+  return "sparkle"; // neutral universal fallback
 }
 
-/**
- * Resolve the icon for an item: TITLE first, BODY as tiebreaker, sparkle
- * fallback. Deterministic and pure — the same (title, body) always maps to the
- * same icon, so the render is stable and snapshot-safe.
- */
-export function pickIcon(title: string, body?: string): IconName {
-  const t = (title ?? "").toLowerCase();
-  const fromTitle = matchIn(t);
-  if (fromTitle) return fromTitle;
-  if (body) {
-    const fromBody = matchIn(body.toLowerCase());
-    if (fromBody) return fromBody;
-  }
-  return "sparkle";
-}
-
-/**
- * Render the resolved icon. `name` is optional — when omitted the icon is
- * picked from (title, body). The caller wraps this in the tinted square mark.
- */
+/** Render the resolved icon glyph; picks from (title, body) unless `name` is given. */
 export function AutoIcon({
   title,
   body,
   name,
-  className,
 }: {
   title?: string;
   body?: string;
   name?: IconName;
-  className?: string;
 }) {
-  const resolved = name ?? pickIcon(title ?? "", body);
-  const Node = ICONS[resolved];
-  return <Node className={className} data-icon={resolved} />;
+  const resolved = name ?? pickIcon(title, body);
+  return <span data-icon={resolved} style={{ display: "contents" }}>{GLYPHS[resolved]}</span>;
 }

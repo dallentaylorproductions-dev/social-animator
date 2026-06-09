@@ -1,1877 +1,335 @@
 /* ============================================================================
-   STUDIO SEP — Flagship (v2) consumer page · F2
-   Converged editorial template. Recreated from docs/design/flagship/
-   (flagship_template.html + TOKEN_MAP.md); the prototype HTML/CSS is NOT
-   shipped — this is the production port.
+   STUDIO SEP — Flagship (v2) consumer page · D1-PORT
+   LITERAL PORT of the locked Round-3 prototype
+   (docs/design/seller-page-v2/seller-page-standalone.html). Every visual value
+   (type scale, spacing, radii, elevation, the price scale, the 4 dark beats,
+   comp/stepper/chart geometry, warm/cool bands) is lifted from that file's
+   <style> block — NOT re-derived. Selectors are scoped under `.fs-page` so the
+   generic prototype class names cannot leak into v1/wizard/dashboard; this file
+   ships in FlagshipPage's own code-split chunk and never loads on a v1 page.
 
-   SCOPING: every selector is prefixed with `.fs-page` so the design's generic
-   class names (and the reused chart's `.chart` / `.line-stroke` / …) cannot
-   leak into v1, the wizard, the dashboard, or settings. v1's stylesheet stays
-   byte-identical; this file ships in FlagshipPage's own code-split chunk and
-   never loads on a v1 page.
-
-   COLOR: the ONLY brand input is --signature; FlagshipPage inlines the engine's
-   resolved role hexes (signature family + tints + line + on-signature) AND the
-   layout-locked neutrals (paper / ink / ink-soft / ink-faint / on-dark /
-   dark-band(s)) as custom properties on `.fs-page`. Body text is always --ink;
-   the only brand-colored text run is the link (--signature-link).
+   COLOR: the prototype's `--teal-700` + `--mint` are the only brand-tracked
+   tokens — FlagshipPage inlines them (brand-derived signature + mint light-tip)
+   so the cohesive teal ramp re-hues per agent; the derived `--teal-900/500/200/
+   100` color-mix expressions follow automatically. All neutrals/text/line/depth
+   tokens are the locked literals below. The CTA/badge label uses the engine's
+   `--on-signature` (not the prototype's hardcoded #eafcff) so a pale signature
+   keeps AA contrast.
    ============================================================================ */
 
-.fs-page {
-  /* ---- type tokens (self-hosted next/font families) ---- */
-  --fs-serif: var(--font-newsreader), Georgia, "Times New Roman", serif;
-  --fs-sans: var(--font-hanken), system-ui, -apple-system, "Segoe UI", sans-serif;
-  --fs-mono: var(--font-jetbrains-mono), ui-monospace, "SF Mono", Menlo, monospace;
-
-  /* ---- layout tokens (responsive via cqi inside .fs-frame) ---- */
-  --fs-maxw: 680px;
-  --fs-gutter: clamp(20px, 6cqi, 40px);
-  --fs-ease: cubic-bezier(0.22, 0.61, 0.36, 1);
-
-  /* ---- dimension tokens (Build-Handoff §4) ---- */
-  --r-sm: 10px;
-  --r-md: 16px;
-  --r-lg: 22px;
-  --r-xl: 30px;
-  --line-2: rgba(20, 36, 40, 0.22);
-  --lift-1: 0 1px 2px rgba(16, 28, 30, 0.05), 0 10px 26px -16px rgba(16, 28, 30, 0.28);
-  --lift-2: 0 2px 4px rgba(16, 28, 30, 0.06), 0 22px 50px -24px rgba(16, 28, 30, 0.4);
-  --lift-dark: 0 30px 60px -30px rgba(0, 0, 0, 0.6);
-
-  background: color-mix(in oklch, var(--ink) 6%, var(--paper));
-  color: var(--ink);
-  min-height: 100vh;
-  font-family: var(--fs-sans);
-  font-size: 16px;
-  line-height: 1.55;
-  -webkit-font-smoothing: antialiased;
-  text-rendering: optimizeLegibility;
-}
-.fs-page,
-.fs-page * {
-  box-sizing: border-box;
-  margin: 0;
-  padding: 0;
-}
-.fs-page img {
-  display: block;
-  max-width: 100%;
-}
-.fs-page a {
-  color: inherit;
+/* ---- page shell: outer gutter + the page column (the prototype's `.sep`
+   container is mapped onto `.fs-frame`). ---- */
+.fs-page { background: color-mix(in oklab, var(--ink) 4%, var(--paper)); min-height: 100vh; margin: 0; }
+.fs-page img { display: block; max-width: 100%; }
+.fs-page a { color: inherit; }
+.fs-page .fs-frame { width: 100%; max-width: 1180px; margin: 0 auto; overflow: hidden; }
+@media (min-width: 600px) {
+  .fs-page { padding: 36px 16px; }
+  .fs-page .fs-frame { border-radius: 18px; box-shadow: 0 40px 90px -38px rgba(12,21,24,.5); }
 }
 
-/* ---- frame: the page column + the container-query context --------------- */
-.fs-frame {
-  container-type: inline-size;
-  width: 100%;
-  max-width: 460px;
-  margin: 0 auto;
-  background: var(--paper);
-  overflow: hidden;
-}
-@media (min-width: 540px) {
-  .fs-page {
-    padding: 40px 0;
-  }
-  .fs-frame {
-    border-radius: 22px;
-    box-shadow: 0 40px 90px -38px rgba(20, 14, 8, 0.45);
-  }
-}
-@media (min-width: 1024px) {
-  .fs-frame {
-    max-width: 1120px;
-  }
-}
+.fs-page {--white:    #FCFAF4;
+  --offwhite: #F8F3E8;
+  --paper:    #F1EADC;
+  --sand:     #ECE1CC;
+  --mist:     #E3ECEC;
 
-/* ---- shared primitives -------------------------------------------------- */
-.fs-page .fs-wrap {
-  max-width: var(--fs-maxw);
-  margin: 0 auto;
-  padding-inline: var(--fs-gutter);
-}
-.fs-page .fs-block {
-  padding-block: clamp(46px, 12cqi, 84px);
-  position: relative;
-}
-.fs-page .fs-headline {
-  font-family: var(--fs-serif);
-  font-weight: 500;
-  line-height: 1.04;
-  font-size: clamp(30px, 7.6cqi, 46px);
-  letter-spacing: -0.012em;
-  color: var(--ink);
-  margin-top: 18px;
-  text-wrap: pretty;
-}
-.fs-page .fs-headline em {
-  font-style: italic;
-  font-weight: 400;
-}
-.fs-page .fs-lead {
-  color: var(--ink-soft);
-  max-width: 46ch;
-  margin-top: 14px;
-  font-size: clamp(15px, 4cqi, 17px);
-  line-height: 1.5;
-}
+  
+  --ink:      #0C1518;
+  --ink-2:    #14242B;
+  --ink-3:    #21383F;
 
-/* ---- eyebrow (index · label · signature dot · hairline) ----------------- */
-.fs-page .fs-eyebrow {
-  display: flex;
-  align-items: center;
-  gap: 10px;
-  font-family: var(--fs-mono);
-  font-size: 11px;
-  letter-spacing: 0.16em;
-  text-transform: uppercase;
-  color: var(--ink-soft);
-}
-.fs-page .fs-eyebrow__idx {
-  color: var(--decorative);
-  font-weight: 500;
-}
-.fs-page .fs-eyebrow__sep {
-  color: var(--ink-faint);
-}
-.fs-page .fs-eyebrow__dot {
-  width: 6px;
-  height: 6px;
-  border-radius: 50%;
-  background: var(--signature);
-  flex: none;
-}
-.fs-page .fs-eyebrow__rule {
-  flex: 1;
-  height: 1px;
-  background: var(--line-30);
-  min-width: 18px;
-}
-.fs-page .fs-eyebrow--on-dark {
-  color: color-mix(in srgb, var(--on-dark) 72%, transparent);
-}
-.fs-page .fs-eyebrow--on-dark .fs-eyebrow__rule {
-  background: rgba(255, 255, 255, 0.14);
-}
+  
+  --teal-700: #06647D;
+  --teal-900: color-mix(in oklab, var(--teal-700), #021216 55%);
+  --teal-500: color-mix(in oklab, var(--teal-700), #ffffff 24%);
+  --teal-200: color-mix(in oklab, var(--teal-700) 24%, var(--paper));
+  --teal-100: color-mix(in oklab, var(--teal-700) 12%, var(--paper));
+  --mint:     #4EF2D9;
+  --accent:   var(--teal-700);
 
-/* ============================== 1 · HERO ================================= */
-.fs-page .fs-hero {
-  background: var(--dark-band);
-}
-.fs-page .fs-hero__photo {
-  position: relative;
-  aspect-ratio: 4 / 3.5;
-  background-color: #2f2a24;
-  background-size: cover;
-  background-position: center 42%;
-  background-repeat: no-repeat;
-}
-.fs-page .fs-hero__photo--monogram {
-  background-image: linear-gradient(160deg, #6f7886, #454b57);
-}
-.fs-page .fs-hero__topline {
-  position: absolute;
-  top: 14px;
-  left: 0;
-  right: 0;
-  text-align: center;
-  z-index: 2;
-  font-family: var(--fs-mono);
-  font-size: 10px;
-  letter-spacing: 0.2em;
-  text-transform: uppercase;
-  color: rgba(255, 255, 255, 0.72);
-  text-shadow: 0 1px 10px rgba(0, 0, 0, 0.5);
-}
-.fs-page .fs-hero__band {
-  background: var(--dark-band);
-  color: var(--on-dark);
-  margin-top: -1px;
-  padding: 22px var(--fs-gutter) 30px;
-}
-.fs-page .fs-hero__band .fs-wrap {
-  padding-inline: 0;
-}
-.fs-page .fs-hero__forline {
-  display: flex;
-  align-items: center;
-  gap: 9px;
-  font-family: var(--fs-mono);
-  font-size: 11px;
-  letter-spacing: 0.14em;
-  text-transform: uppercase;
-  color: var(--on-dark);
-}
-.fs-page .fs-hero__dot {
-  width: 6px;
-  height: 6px;
-  border-radius: 50%;
-  /* The hero personalization dot is one of the two rare --mint moments. */
-  background: var(--mint);
-  flex: none;
-}
-.fs-page .fs-hero__sub {
-  display: flex;
-  align-items: center;
-  gap: 10px;
-  margin-top: 14px;
-  font-family: var(--fs-mono);
-  font-size: 10.5px;
-  letter-spacing: 0.14em;
-  text-transform: uppercase;
-  color: color-mix(in srgb, var(--on-dark) 60%, transparent);
-}
-.fs-page .fs-hero__rule {
-  width: 26px;
-  height: 1px;
-  background: rgba(255, 255, 255, 0.22);
-}
-.fs-page .fs-hero__addr {
-  font-family: var(--fs-serif);
-  font-weight: 500;
-  font-size: clamp(34px, 9cqi, 52px);
-  line-height: 1.02;
-  letter-spacing: -0.015em;
-  margin-top: 8px;
-  color: var(--on-dark);
-  text-wrap: balance;
-}
-.fs-page .fs-hero__meta {
-  margin-top: 16px;
-  padding-top: 14px;
-  border-top: 1px solid rgba(255, 255, 255, 0.13);
-  font-family: var(--fs-mono);
-  font-size: 11px;
-  letter-spacing: 0.12em;
-  text-transform: uppercase;
-  color: color-mix(in srgb, var(--on-dark) 55%, transparent);
-}
+  
+  --t-ink:      #1B2A2E;
+  --t-body:     #2C3C40;
+  --t-soft:     #4C5D61;
+  --t-mute:     #74858A;
+  --t-pap:      #EFE9DC;
+  --t-pap-soft: #B4C0C1;
+  --t-pap-mute: #7C8D90;
 
-/* ============================== 2 · PRICE =============================== */
-.fs-page .fs-price {
-  background: var(--paper);
-  padding-top: 0;
-}
-/* The white price panel pulls UP onto the dark hero band (overlap depth) with a
-   teal accent rule on its left edge — the hero typographic moment. */
-.fs-page .fs-price__panel {
-  position: relative;
-  z-index: 2;
-  margin-top: clamp(-120px, -15cqi, -58px);
-  background: var(--white);
-  border: 1px solid var(--line-2, rgba(20, 36, 40, 0.22));
-  border-left: 3px solid var(--signature);
-  border-radius: var(--r-lg, 22px);
-  padding: clamp(28px, 7cqi, 60px);
-  box-shadow: var(--lift-2);
-}
-/* meta row — RECOMMENDED LIST label + the "Based on N…" subline above the
-   number (spec §6 / mock). Wraps the subline below the label on narrow frames. */
-.fs-page .fs-price__meta {
-  display: flex;
-  flex-wrap: wrap;
-  align-items: baseline;
-  gap: 10px 22px;
-  margin-bottom: clamp(16px, 3cqi, 26px);
-}
-.fs-page .fs-price__meta .fs-eyebrow {
-  flex: 1 1 auto;
-  min-width: 0;
-}
-.fs-page .fs-price__big {
-  font-family: var(--fs-serif);
-  font-weight: 500;
-  color: var(--signature);
-  /* contained at all widths — a 7-figure value never clips/escapes the card
-     (verified at 360px). The cqi tracks the frame so the number scales down on
-     narrow frames; the desktop hero scale is restored in the wide-frame block. */
-  font-size: clamp(40px, 13cqi, 96px);
-  line-height: 0.9;
-  letter-spacing: -0.03em;
-  font-variant-numeric: lining-nums tabular-nums;
-  display: flex;
-  align-items: flex-start;
-  max-width: 100%;
-  min-width: 0;
-}
-.fs-page .fs-price__cur {
-  font-size: 0.42em;
-  line-height: 1;
-  margin-top: 0.12em;
-  margin-right: 0.06em;
-  color: var(--signature);
-  font-weight: 500;
-}
-.fs-page .fs-price__big .sep {
-  color: color-mix(in srgb, var(--signature) 62%, var(--ink-faint));
-}
-/* UX-2a — a low–high range carries two full "$X" amounts + a dash, so it
-   needs a smaller, wrap-tolerant size than the single-number moment. The
-   extra `.fs-price` ancestor lifts specificity above the base/wide
-   `.fs-price__big` font-size rules so the range size always wins. */
-.fs-page .fs-price .fs-price__big--range {
-  /* both legs stay at DISPLAY scale (never caption-sized); wrap-tolerant so a
-     long low–high pair stacks on narrow frames instead of clipping. */
-  font-size: clamp(44px, 11cqi, 104px);
-  flex-wrap: wrap;
-  align-items: baseline;
-  gap: 0.14em;
-  line-height: 1;
-}
-.fs-page .fs-price__range-dash {
-  color: color-mix(in srgb, var(--signature) 62%, var(--ink-faint));
-}
-.fs-page .fs-price__note {
-  color: var(--ink-soft);
-  font-size: clamp(14px, 3.6cqi, 16px);
-  max-width: 34ch;
-  text-align: right;
-  margin-left: auto;
-}
-.fs-page .fs-price__note-b {
-  color: var(--signature-deep);
-  font-weight: 600;
-}
+  
+  --line:     rgba(20,36,40,.13);
+  --line-2:   rgba(20,36,40,.22);
+  --line-pap: rgba(239,233,220,.16);
 
-/* ============================== 3 · AGENT NOTE ========================== */
-.fs-page .fs-note {
-  background: var(--offwhite);
-}
-.fs-page .fs-note__video {
-  margin-top: 30px;
-  border-radius: 14px;
-  overflow: hidden;
-  position: relative;
-  aspect-ratio: 9 / 12;
-  max-width: 380px;
-  background: var(--dark-band-2);
-  box-shadow: 0 24px 50px -28px rgba(0, 0, 0, 0.5);
-}
-.fs-page .fs-note__player {
-  display: block;
-  width: 100%;
-  height: 100%;
-  object-fit: cover;
-  background: var(--dark-band-2);
-}
-.fs-page .fs-note__video[data-no-poster="true"] {
-  background: linear-gradient(160deg, var(--tint-6), var(--dark-band-2));
-}
-.fs-page .fs-note__player:fullscreen {
-  object-fit: contain;
-  background: #000;
-}
-.fs-page .fs-note__player:-webkit-full-screen {
-  object-fit: contain;
-  background: #000;
-}
-.fs-page .fs-note__cap {
-  position: absolute;
-  left: 0;
-  right: 0;
-  bottom: 0;
-  padding: 16px 18px;
-  background: linear-gradient(transparent, rgba(0, 0, 0, 0.55));
-  font-family: var(--fs-serif);
-  font-style: italic;
-  font-size: 18px;
-  color: #fff;
-  pointer-events: none;
-}
+  
+  --f-display: "Newsreader", Georgia, serif;
+  --f-body:    "Hanken Grotesk", system-ui, sans-serif;
+  --f-mono:    "IBM Plex Mono", ui-monospace, monospace;
 
-/* ============================== 4 · WHY THIS PRICE ====================== */
-.fs-page .fs-why {
-  background: var(--paper);
-}
-.fs-page .fs-count {
-  margin-top: 32px;
-}
-.fs-page .fs-count--beside {
-  display: flex;
-  align-items: baseline;
-  gap: clamp(15px, 3.6cqi, 22px);
-}
-.fs-page .fs-count__digit {
-  font-family: var(--fs-serif);
-  font-weight: 500;
-  color: var(--signature);
-  font-variant-numeric: tabular-nums;
-  line-height: 0.74;
-  letter-spacing: -0.035em;
-  font-size: clamp(54px, 15.5cqi, 76px);
-  flex: none;
-}
-.fs-page .fs-count__say {
-  font-family: var(--fs-serif);
-  font-size: clamp(20px, 5.2cqi, 25px);
-  line-height: 1.18;
-  color: var(--ink);
-  max-width: 15ch;
-  text-wrap: balance;
-}
-.fs-page .fs-count__msg {
-  margin-top: 20px;
-  color: var(--ink);
-  font-family: var(--fs-serif);
-  font-style: italic;
-  font-size: clamp(16px, 4.4cqi, 19px);
-  line-height: 1.45;
-  max-width: 40ch;
-  border-left: 2px solid var(--line-30);
-  padding-left: 16px;
-}
-/* ---- comp cards: white, lift-1, with a PHOTO SLOT that flexes -----------
-   text-only → a padded card (the D1 default — projectComp doesn't set photoUrl
-   yet); with a photo → mobile = row (slim 116px strip + body), desktop = column
-   (16:10 photo on top + body). A text-only card sits cleanly beside a photo card
-   (grid align-items:start). */
-.fs-page .fs-comps {
-  margin-top: 30px;
-  display: grid;
-  grid-template-columns: 1fr;
-  gap: clamp(12px, 2.6cqi, 22px);
-  align-items: start;
-}
-.fs-page .fs-comp {
-  background: var(--white);
-  border: 1px solid var(--line);
-  border-radius: var(--r-md);
-  box-shadow: var(--lift-1);
-  overflow: hidden;
-  transition: transform 0.18s var(--fs-ease), box-shadow 0.18s var(--fs-ease);
-}
-.fs-page .fs-comp:hover {
-  transform: translateY(-2px);
-  box-shadow: var(--lift-2);
-}
-.fs-page .fs-comp__photo {
-  background-color: var(--tint-6);
-  background-size: cover;
-  background-position: center;
-  background-repeat: no-repeat;
-}
-/* with photo on mobile: the card is a row, photo a slim strip filling height */
-.fs-page .fs-comp--photo {
-  display: grid;
-  grid-template-columns: 116px 1fr;
-}
-.fs-page .fs-comp--photo .fs-comp__photo {
-  align-self: stretch;
-}
-.fs-page .fs-comp__body {
-  display: grid;
-  grid-template-columns: 28px 1fr auto;
-  gap: 14px;
-  align-items: start;
-  padding: 18px 18px;
-}
-.fs-page .fs-comp__no {
-  font-family: var(--fs-mono);
-  font-size: 11px;
-  color: var(--ink-faint);
-  letter-spacing: 0.1em;
-  padding-top: 4px;
-}
-.fs-page .fs-comp__addr {
-  font-family: var(--fs-serif);
-  font-size: clamp(18px, 4cqi, 23px);
-  font-weight: 500;
-  color: var(--ink);
-  line-height: 1.1;
-}
-.fs-page .fs-comp__sub {
-  font-family: var(--fs-mono);
-  font-size: 11px;
-  letter-spacing: 0.04em;
-  color: var(--ink-soft);
-  margin-top: 6px;
-  text-transform: uppercase;
-}
-.fs-page .fs-comp__price {
-  font-family: var(--fs-serif);
-  font-size: 21px;
-  font-weight: 500;
-  color: var(--signature-deep);
-  font-variant-numeric: tabular-nums;
-  text-align: right;
-  white-space: nowrap;
-}
-.fs-page .fs-comp__tag {
-  display: block;
-  font-family: var(--fs-mono);
-  font-size: 9.5px;
-  letter-spacing: 0.14em;
-  text-transform: uppercase;
-  color: var(--ink-faint);
-  margin-top: 5px;
-  text-align: right;
-}
-.fs-page .fs-comps__src {
-  font-family: var(--fs-mono);
-  font-size: 10.5px;
-  letter-spacing: 0.12em;
-  text-transform: uppercase;
-  color: var(--ink-faint);
-  margin-top: 18px;
-}
+  
+  --s-1:4px; --s-2:8px; --s-3:12px; --s-4:16px; --s-5:24px;
+  --s-6:32px; --s-7:48px; --s-8:64px; --s-9:96px; --s-10:128px;
 
-/* ============================== 5 · PITCH POINTS ======================== */
-.fs-page .fs-pitch {
-  background: var(--offwhite);
-}
-.fs-page .fs-pitch__list {
-  margin-top: 30px;
-  counter-reset: fsp;
-}
-.fs-page .fs-pitch__item {
-  display: grid;
-  grid-template-columns: auto 1fr;
-  gap: 20px;
-  align-items: baseline;
-  padding: 22px 0;
-  border-top: 1px solid var(--line-30);
-}
-.fs-page .fs-pitch__item:last-child {
-  border-bottom: 1px solid var(--line-30);
-}
-.fs-page .fs-pitch__item::before {
-  counter-increment: fsp;
-  content: counter(fsp, decimal-leading-zero);
-  font-family: var(--fs-serif);
-  font-style: italic;
-  font-size: 24px;
-  color: var(--decorative);
-  line-height: 1;
-}
-.fs-page .fs-pitch__h {
-  font-family: var(--fs-serif);
-  font-size: 21px;
-  font-weight: 500;
-  color: var(--ink);
-}
-.fs-page .fs-pitch__p {
-  color: var(--ink-soft);
-  margin-top: 5px;
-  font-size: 15px;
-  max-width: 42ch;
-}
+  
+  --r-sm:10px; --r-md:16px; --r-lg:22px; --r-xl:30px;
+  --lift-1: 0 1px 2px rgba(16,28,30,.05), 0 10px 26px -16px rgba(16,28,30,.28);
+  --lift-2: 0 2px 4px rgba(16,28,30,.06), 0 22px 50px -24px rgba(16,28,30,.40);
+  --lift-dark: 0 30px 60px -30px rgba(0,0,0,.6);
 
-/* ============================== 6 · REVIEWS (DARK beat) ================
-   One of the 4 dark beats. Left: stars + large pull-quotes. Right: a confidence
-   card (--ink-2) with 5.0 + stars + a platform LOGO SLOT (D4 swaps real SVGs) +
-   the see-all link. Quote marks = --decorative; stars = --signature. */
-.fs-page .fs-reviews {
-  background: var(--dark-band);
-  color: var(--on-dark);
-}
-.fs-page .fs-reviews__layout {
-  margin-top: clamp(26px, 6cqi, 42px);
-  display: grid;
-  grid-template-columns: 1fr;
-  gap: clamp(28px, 6cqi, 44px);
-}
-.fs-page .fs-reviews__list {
-  margin-top: 0;
-}
-.fs-page .fs-quote {
-  margin-top: 30px;
-}
-.fs-page .fs-quote:first-child {
-  margin-top: 0;
-}
-.fs-page .fs-stars {
-  display: inline-flex;
-  gap: 3px;
-}
-.fs-page .fs-star {
-  width: 18px;
-  height: 18px;
-  fill: var(--signature);
-}
-/* on the dark beat the signature can be deep — lift the stars to --mint so the
-   rating always reads bright (the rare highlight is apt for the 5.0 mark). */
-.fs-page .fs-reviews .fs-star {
-  fill: var(--mint);
-}
-.fs-page .fs-quote__stars {
-  margin-bottom: 16px;
-}
-.fs-page .fs-quote__body {
-  font-family: var(--fs-serif);
-  font-weight: 400;
-  font-size: clamp(22px, 6cqi, 32px);
-  line-height: 1.32;
-  color: var(--on-dark);
-  letter-spacing: -0.01em;
-  text-wrap: pretty;
-}
-.fs-page .fs-quote__mark {
-  color: var(--mint);
-  font-style: italic;
-}
-.fs-page .fs-quote__by {
-  display: flex;
-  align-items: center;
-  gap: 10px;
-  margin-top: 24px;
-  font-family: var(--fs-mono);
-  font-size: 11px;
-  letter-spacing: 0.12em;
-  text-transform: uppercase;
-  color: var(--on-dark-soft);
-}
-.fs-page .fs-quote__rule {
-  width: 26px;
-  height: 1px;
-  background: var(--mint);
-  flex: none;
-}
-
-/* ---- confidence card (--ink-2 lifted dark panel) ---------------------- */
-.fs-page .fs-conf {
-  align-self: start;
-  background: var(--dark-band-2);
-  border: 1px solid rgba(255, 255, 255, 0.08);
-  border-radius: var(--r-lg);
-  padding: clamp(24px, 5cqi, 32px);
-  box-shadow: var(--lift-dark);
-}
-.fs-page .fs-conf__rating {
-  font-family: var(--fs-serif);
-  font-weight: 500;
-  font-size: clamp(44px, 12cqi, 64px);
-  line-height: 1;
-  color: var(--on-dark);
-  letter-spacing: -0.02em;
-}
-.fs-page .fs-conf__stars {
-  margin-top: 10px;
-}
-.fs-page .fs-conf__logos {
-  display: flex;
-  flex-wrap: wrap;
-  gap: 16px;
-  margin-top: 20px;
-  padding-top: 18px;
-  border-top: 1px solid rgba(255, 255, 255, 0.1);
-}
-/* D4 swaps the official brand SVGs in; D1 ships a wordmark stand-in. */
-.fs-page .fs-conf__logo {
-  font-family: var(--fs-serif);
-  font-size: 17px;
-  font-weight: 500;
-  color: var(--on-dark-soft);
-  letter-spacing: -0.01em;
-}
-.fs-page .fs-conf__link {
-  display: inline-flex;
-  align-items: center;
-  gap: 8px;
-  margin-top: 20px;
-  color: var(--on-dark);
-  font-family: var(--fs-sans);
-  font-size: 14px;
-  font-weight: 500;
-  text-decoration: none;
-  border-bottom: 1px solid rgba(255, 255, 255, 0.3);
-  padding-bottom: 2px;
-  transition: border-color 0.15s;
-}
-.fs-page .fs-conf__link:hover {
-  border-bottom-color: var(--on-dark);
-}
-.fs-page .fs-conf__arr {
-  display: inline-block;
-  transition: transform 0.2s var(--fs-ease);
-}
-.fs-page .fs-conf__link:hover .fs-conf__arr {
-  transform: translateX(3px);
-}
-
-/* ---- outlink-only compact card (dark) --------------------------------- */
-.fs-page .fs-reviews--outlink .fs-reviews__card {
-  margin-top: 18px;
-  display: flex;
-  flex-direction: column;
-  gap: 10px;
-  padding: 24px 26px;
-  border: 1px solid rgba(255, 255, 255, 0.12);
-  border-radius: var(--r-md);
-  background: var(--dark-band-2);
-  text-decoration: none;
-  max-width: 40ch;
-  transition: border-color 0.18s var(--fs-ease);
-}
-.fs-page .fs-reviews--outlink .fs-reviews__card:hover {
-  border-color: var(--mint);
-}
-.fs-page .fs-reviews__card-copy {
-  font-family: var(--fs-serif);
-  font-size: 20px;
-  line-height: 1.3;
-  color: var(--on-dark);
-}
-.fs-page .fs-reviews__card-meta {
-  font-family: var(--fs-mono);
-  font-size: 10px;
-  letter-spacing: 0.16em;
-  text-transform: uppercase;
-  color: var(--on-dark-soft);
-}
-
-/* ============================== 7 · AREA STATS ========================= */
-.fs-page .fs-area {
-  background: var(--paper);
-}
-.fs-page .fs-stats {
-  margin-top: 30px;
-  border: 1px solid var(--line-30);
-  border-radius: 14px;
-  overflow: hidden;
-  background: var(--white);
-  display: grid;
-  grid-template-columns: 1fr 1fr;
-}
-.fs-page .fs-stat {
-  padding: 22px 20px;
-  border-right: 1px solid var(--line-30);
-  border-bottom: 1px solid var(--line-30);
-}
-.fs-page .fs-stat:nth-child(2n) {
-  border-right: 0;
-}
-.fs-page .fs-stat:nth-last-child(-n + 2) {
-  border-bottom: 0;
-}
-.fs-page .fs-stat__k {
-  font-family: var(--fs-mono);
-  font-size: 9.5px;
-  letter-spacing: 0.13em;
-  text-transform: uppercase;
-  color: var(--ink-soft);
-}
-.fs-page .fs-stat__v {
-  font-family: var(--fs-serif);
-  font-weight: 500;
-  font-size: clamp(30px, 9cqi, 42px);
-  line-height: 1;
-  color: var(--signature);
-  margin-top: 12px;
-  font-variant-numeric: tabular-nums;
-  letter-spacing: -0.02em;
-}
-.fs-page .fs-stat__sub {
-  font-family: var(--fs-mono);
-  font-size: 10px;
-  letter-spacing: 0.04em;
-  color: var(--ink-faint);
-  margin-top: 6px;
-}
-/* pending state — calm, never looks broken */
-.fs-page .fs-area__pending {
-  margin-top: 30px;
-  border: 1px solid var(--line-30);
-  border-radius: 14px;
-  background: var(--tint-6);
-  padding: clamp(34px, 9cqi, 52px) clamp(22px, 6cqi, 40px);
-}
-.fs-page .fs-area__pk {
-  display: flex;
-  align-items: center;
-  gap: 10px;
-  font-family: var(--fs-mono);
-  font-size: 10.5px;
-  letter-spacing: 0.14em;
-  text-transform: uppercase;
-  color: var(--ink-soft);
-}
-.fs-page .fs-area__shimmer {
-  position: relative;
-  width: 34px;
-  height: 1px;
-  background: var(--line-30);
-  overflow: hidden;
-}
-.fs-page .fs-area__shimmer::after {
-  content: "";
-  position: absolute;
-  inset: 0;
-  width: 50%;
-  background: linear-gradient(90deg, transparent, var(--signature), transparent);
-  animation: fsSlide 2.4s var(--fs-ease) infinite;
-}
-@keyframes fsSlide {
-  0% {
-    transform: translateX(-100%);
-  }
-  100% {
-    transform: translateX(220%);
-  }
-}
-.fs-page .fs-area__pending p {
-  font-family: var(--fs-serif);
-  font-size: clamp(20px, 5.4cqi, 26px);
-  line-height: 1.34;
-  color: var(--ink);
-  margin-top: 18px;
-  text-wrap: pretty;
-  max-width: 26ch;
-}
-
-/* ---- FROZEN production chart — TOKEN_MAP §7 SKIN ONLY --------------------
-   The AreaChart component (geometry/scales/labels/draw-on) is reused verbatim
-   from presentation-page.tsx. Here we restyle ONLY its colors / type / chrome
-   against its existing class names; no geometry rule is touched. */
-.fs-page .chart-wrap {
-  margin-top: 18px;
-  border: 1px solid var(--line-30);
-  border-radius: 16px;
-  background: var(--white);
-  padding: 24px 22px 18px;
-}
-.fs-page .chart-head {
-  display: flex;
-  flex-direction: column;
-  gap: 4px;
-  margin-bottom: 6px;
-}
-.fs-page .chart-head .l {
-  font-family: var(--fs-mono);
-  font-size: 11px;
-  letter-spacing: 0.16em;
-  text-transform: uppercase;
-  color: var(--ink-faint);
-  line-height: 1.5;
-}
-.fs-page .chart-head .l strong {
-  display: block;
-  color: var(--ink-soft);
-  font-weight: 500;
-  font-size: 12px;
-  letter-spacing: 0.18em;
-}
-.fs-page .chart {
-  width: 100%;
-  display: block;
-  overflow: visible;
-  margin-top: 10px;
-  font-family: var(--fs-mono);
-}
-.fs-page .chart .gridline {
-  stroke: var(--line-30);
-  stroke-width: 1;
-}
-.fs-page .chart .baseline {
-  stroke: var(--line-30);
-  stroke-width: 1;
-}
-.fs-page .chart .y-label,
-.fs-page .chart .x-label {
-  font-size: 10px;
-  letter-spacing: 0.06em;
-  text-transform: uppercase;
-  fill: var(--ink-faint);
-}
-.fs-page .chart .area-fill {
-  fill: var(--signature);
-  fill-opacity: 0.08;
-}
-.fs-page .chart .line-stroke {
-  fill: none;
-  stroke: var(--signature);
-  stroke-width: 2.5;
-  stroke-linecap: round;
-  stroke-linejoin: round;
-}
-.fs-page .chart .point {
-  fill: var(--paper);
-  stroke: var(--signature);
-  stroke-width: 2;
-}
-.fs-page .chart .point-current-ring {
-  fill: var(--paper);
-  stroke: none;
-}
-.fs-page .chart .point-current {
-  fill: var(--signature);
-  stroke: var(--paper);
-  stroke-width: 2;
-}
-.fs-page .chart .point-current-pulse {
-  fill: var(--signature);
-  opacity: 0.15;
-  transform-origin: center;
-  transform-box: fill-box;
-  animation: sepSonar 2.6s cubic-bezier(0, 0, 0.2, 1) infinite;
-}
-.fs-page .chart .point-current-pulse.delay {
-  animation-delay: 1.3s;
-}
-.fs-page .chart .rec-line {
-  stroke: var(--signature-deep);
-  stroke-width: 1.5;
-  stroke-dasharray: 5 5;
-}
-.fs-page .chart .rec-tag-bg {
-  fill: var(--tint-12);
-}
-.fs-page .chart .rec-tag-text {
-  font-family: var(--fs-mono);
-  font-size: 8.5px;
-  font-weight: 500;
-  letter-spacing: 0.12em;
-  text-transform: uppercase;
-  fill: var(--signature-deep);
-}
-.fs-page .chart .rec-tag-num {
-  font-family: var(--fs-serif);
-  font-size: 17px;
-  font-weight: 500;
-  fill: var(--signature-deep);
-}
-.fs-page .chart .callout-sub {
-  font-family: var(--fs-mono);
-  font-size: 9px;
-  letter-spacing: 0.08em;
-  text-transform: uppercase;
-  fill: var(--ink-faint);
-}
-.fs-page .chart .callout-text {
-  font-family: var(--fs-serif);
-  font-size: 22px;
-  font-weight: 600;
-  fill: var(--signature);
-  letter-spacing: -0.02em;
-}
-
-/* ============================== 8 · AGENT BAND ========================== */
-.fs-page .fs-agent {
-  background: var(--dark-band);
-  color: var(--on-dark);
-}
-.fs-page .fs-agent__name {
-  font-family: var(--fs-serif);
-  font-weight: 500;
-  font-size: clamp(40px, 12cqi, 64px);
-  /* D1 collision fix — line-height ≥ 1 + a clear top margin so the large name
-     never overlaps the "06 · YOUR AGENT" eyebrow above it (the round-5 export
-     bug); the tagline below gets its own clear margin. block display keeps the
-     three stacked, never floated/overlapping, at any width. */
-  line-height: 1.04;
-  letter-spacing: -0.02em;
-  display: block;
-  margin-top: clamp(24px, 4cqi, 34px);
-  color: var(--on-dark);
-}
-/* B0b — optional agent tagline on the dark band: quiet serif italic in the
-   fixed cream register (never accent — legibility on dark stays layout-locked). */
-.fs-page .fs-agent__tagline {
-  font-family: var(--fs-serif);
-  font-style: italic;
-  font-size: clamp(18px, 4.6cqi, 22px);
-  line-height: 1.4;
-  display: block;
-  margin-top: 16px;
-  max-width: 38ch;
-  color: color-mix(in srgb, var(--on-dark) 82%, transparent);
-  text-wrap: pretty;
-}
-.fs-page .fs-agent__card {
-  display: flex;
-  align-items: center;
-  gap: 16px;
-  margin-top: 28px;
-  padding: 16px;
-  background: var(--dark-band-2);
-  border: 1px solid rgba(255, 255, 255, 0.08);
-  border-radius: 14px;
-}
-.fs-page .fs-agent__avatar {
-  width: 62px;
-  height: 62px;
-  /* UX-2b-followup — a full circle (was an 11px rounded square) so the
-     published avatar matches the circular crop editor + Settings preview:
-     true WYSIWYG. The 62×62 box makes 50% a perfect circle; the inner clip
-     inherits this radius, so the focal/scale photo crop is circular too. */
-  border-radius: 50%;
-  flex: none;
-  background: linear-gradient(160deg, #5a6470, #3a4049);
-  background-size: cover;
-  background-position: center;
-  display: grid;
-  place-items: center;
-  border: 1px solid rgba(255, 255, 255, 0.1);
-  position: relative;
-}
-.fs-page .fs-agent__avatar::before {
-  content: attr(data-monogram);
-  font-family: var(--fs-serif);
-  font-size: 22px;
-  color: rgba(255, 255, 255, 0.82);
-  letter-spacing: -0.02em;
-}
-.fs-page .fs-agent__avatar--photo::before {
-  content: "";
-}
-/* UX-2b — repositionable headshot. The agent's focal point + zoom are a pure
-   DISPLAY transform (no re-crop). The byte-identical default avatar above
-   keeps carrying the photo as its own centered `cover` background; this --adj
-   variant ONLY renders when the agent moved the focal point or zoomed in. The
-   photo rides an inner clip layer so a zoom magnifies WITHOUT spilling past the
-   frame, while the avatar itself stays `overflow: visible` so the signature
-   status dot (::after, -3px outset) is never clipped. */
-.fs-page .fs-agent__avatar--adj {
-  background-image: none;
-}
-.fs-page .fs-agent__avatar-clip {
-  position: absolute;
-  inset: 0;
-  overflow: hidden;
-  border-radius: inherit;
-}
-.fs-page .fs-agent__avatar-img {
-  position: absolute;
-  inset: 0;
-  background-size: cover;
-  background-repeat: no-repeat;
-}
-.fs-page .fs-agent__avatar::after {
-  content: "";
-  position: absolute;
-  inset: auto -3px -3px auto;
-  width: 16px;
-  height: 16px;
-  border-radius: 50%;
-  background: var(--signature);
-  border: 2px solid var(--dark-band-2);
-}
-.fs-page .fs-agent__cardname {
-  font-family: var(--fs-serif);
-  font-size: 21px;
-  font-weight: 500;
-  color: var(--on-dark);
-}
-.fs-page .fs-agent__role {
-  font-family: var(--fs-mono);
-  font-size: 11px;
-  letter-spacing: 0.06em;
-  color: color-mix(in srgb, var(--on-dark) 60%, transparent);
-  margin-top: 4px;
-  text-transform: uppercase;
-}
-.fs-page .fs-agent__bio {
-  font-family: var(--fs-serif);
-  font-style: italic;
-  font-size: clamp(20px, 5.5cqi, 26px);
-  line-height: 1.35;
-  color: var(--on-dark);
-  margin-top: 30px;
-  text-wrap: pretty;
-}
-.fs-page .fs-agent__contact {
-  display: grid;
-  grid-template-columns: 1fr 1fr;
-  gap: 1px;
-  margin-top: 30px;
-  background: rgba(255, 255, 255, 0.08);
-  border: 1px solid rgba(255, 255, 255, 0.08);
-  border-radius: 12px;
-  overflow: hidden;
-}
-.fs-page .fs-agent__field {
-  background: var(--dark-band);
-  padding: 16px 18px;
-}
-.fs-page .fs-agent__fk {
-  font-family: var(--fs-mono);
-  font-size: 9.5px;
-  letter-spacing: 0.14em;
-  text-transform: uppercase;
-  color: color-mix(in srgb, var(--on-dark) 45%, transparent);
-}
-.fs-page .fs-agent__fv {
-  font-family: var(--fs-sans);
-  font-size: 15px;
-  color: var(--on-dark);
-  margin-top: 7px;
-  font-weight: 500;
-  word-break: break-word;
-}
-.fs-page .fs-agent__cta {
-  margin-top: 30px;
-  display: flex;
-  flex-direction: column;
-  gap: 14px;
-}
-/* PRIMARY — fill --signature, label --on-signature (terracotta → dark) */
-.fs-page .fs-btn-primary {
-  display: flex;
-  align-items: center;
-  justify-content: space-between;
-  gap: 14px;
-  background: var(--signature);
-  color: var(--on-signature);
-  padding: 16px 16px 16px 24px;
-  border-radius: 40px;
-  font-family: var(--fs-sans);
-  font-size: 16px;
-  font-weight: 600;
-  text-decoration: none;
-  transition: transform 0.18s var(--fs-ease), box-shadow 0.18s var(--fs-ease);
-}
-.fs-page .fs-btn-primary:hover {
-  transform: translateY(-1px);
-  box-shadow: 0 14px 30px -12px rgba(0, 0, 0, 0.6);
-}
-.fs-page .fs-btn-primary .fs-btn__ic {
-  width: 36px;
-  height: 36px;
-  border-radius: 50%;
-  background: color-mix(in srgb, var(--on-signature) 16%, transparent);
-  display: grid;
-  place-items: center;
-  flex: none;
-}
-.fs-page .fs-btn-primary .fs-btn__ic svg {
-  stroke: var(--on-signature);
-}
-.fs-page .fs-btn-reassure {
-  text-align: center;
-  font-family: var(--fs-serif);
-  font-style: italic;
-  font-size: 15px;
-  color: color-mix(in srgb, var(--on-dark) 55%, transparent);
-}
-/* GHOST — on the dark band, so border + label = --on-dark (NOT on-signature) */
-.fs-page .fs-btn-ghost {
-  display: flex;
-  align-items: center;
-  justify-content: space-between;
-  gap: 14px;
-  background: transparent;
-  color: var(--on-dark);
-  padding: 15px 20px 15px 24px;
-  border-radius: 40px;
-  border: 1px solid rgba(241, 235, 224, 0.34);
-  font-family: var(--fs-sans);
-  font-size: 16px;
-  font-weight: 500;
-  text-decoration: none;
-  transition: border-color 0.18s, background 0.18s;
-}
-.fs-page .fs-btn-ghost:hover {
-  border-color: var(--on-dark);
-  background: rgba(255, 255, 255, 0.04);
-}
-.fs-page .fs-btn-ghost .fs-btn__ic svg {
-  stroke: var(--on-dark);
-}
-
-/* ============================== 9 · FOOTER ============================= */
-.fs-page .fs-foot {
-  background: var(--dark-band);
-  color: color-mix(in srgb, var(--on-dark) 40%, transparent);
-  padding-top: 10px;
-}
-.fs-page .fs-foot__inner {
-  border-top: 1px solid rgba(255, 255, 255, 0.09);
-  padding-top: 30px;
-  padding-bottom: 40px;
-}
-.fs-page .fs-foot__word {
-  font-family: var(--fs-serif);
-  font-size: 20px;
-  font-weight: 500;
-  color: var(--on-dark);
-  letter-spacing: -0.01em;
-  margin-bottom: 20px;
-}
-.fs-page .fs-foot__word em {
-  font-style: italic;
-  font-weight: 600;
-  color: var(--signature);
-}
-.fs-page .fs-foot__disc {
-  font-family: var(--fs-mono);
-  font-size: 10.5px;
-  line-height: 1.7;
-  letter-spacing: 0.02em;
-  color: color-mix(in srgb, var(--on-dark) 38%, transparent);
-  max-width: 60ch;
-}
-
-/* =================== §D · PALE-SIGNATURE DISPLAY SEAT ==================
-   When the engine reports the agent's RAW signature can't reach 3:1 as a big
-   display number on paper, `deriveConsumerRoles` sets the ONE gate
-   (`needsDisplaySeat` → `--display-seat: 1`, pushed on the shared role path so
-   the live preview inherits this with no extra wiring). The big informational
-   numbers — price figure, count digit, stat values — then sit on a `--tint-12`
-   chip and deepen to `--signature-deep` (the engine's purpose-built ≥4.5:1
-   numerals-on-tint-12 role), so a washed-out signature stays legible without
-   any engine math change. A style query (not a class) keeps this in CSS and
-   live-updatable; normal signatures emit `--display-seat: 0` → no match → the
-   render is byte-identical. Browsers without style-query support fall back to
-   the un-seated number on its band (still the clamped, AA-large signature). */
-@container style(--display-seat: 1) {
-  /* The SMALLER numbers — count digit + stat values — sit on a --tint-12 chip
-     and deepen to --signature-deep so a washed-out signature stays legible at
-     body scale. The big PRICE figure is NOT chipped: the seat behind it read as
-     a lingering artifact, and at display scale (AA-large 3:1) the deepened
-     signature is already legible without a background. So price deepens only. */
-  .fs-page .fs-count__digit,
-  .fs-page .fs-stat__v {
-    color: var(--signature-deep);
-    background: var(--tint-12);
-    border-radius: 0.16em;
-    padding: 0.06em 0.22em;
-  }
-  /* price: deepen the figure (and its $ / separators) to keep it legible —
-     NO background chip, so the layout is otherwise the un-seated price. */
-  .fs-page .fs-price__big,
-  .fs-page .fs-price__cur,
-  .fs-page .fs-price__big .sep {
-    color: var(--signature-deep);
-  }
-  .fs-page .fs-stat__v {
-    display: inline-block;
-  }
-}
-/* NOTE — the §by-the-numbers comparison + big stats live on the DARK beat where
-   the home figure is the fixed --mint and the big numbers are cream, so they
-   never depend on the agent's (possibly pale) signature and need no seat. */
-
-/* ===================== AUTO-ICON MARK (shared) ========================
-   The tinted rounded-square mark behind every auto-assigned line-icon. Shared
-   by why-work-with-us (48px) and how-we-market (58px). Icon color = --signature,
-   mark wash = the pale signature tint (--tint-12); the icon inherits currentColor. */
-.fs-page .fs-iconmark {
-  display: grid;
-  place-items: center;
-  border-radius: var(--r-md);
-  background: var(--tint-12);
-  color: var(--signature);
-  flex: none;
-}
-.fs-page .fs-iconmark svg {
-  display: block;
-}
-.fs-page .fs-iconmark--sm {
-  width: 48px;
-  height: 48px;
-}
-.fs-page .fs-iconmark--sm svg {
-  width: 24px;
-  height: 24px;
-}
-.fs-page .fs-iconmark--lg {
-  width: 58px;
-  height: 58px;
-}
-.fs-page .fs-iconmark--lg svg {
-  width: 30px;
-  height: 30px;
-}
-/* one emphasized figure per card (the .emph craft) */
-.fs-page .emph {
-  color: var(--signature-deep);
-  font-style: normal;
-}
-
-/* ===================== WHY WORK WITH US (cream cards) ==================
-   Elevated WHITE cards on the cream band; each carries an auto-assigned line
-   icon + the differentiator copy (one figure emphasized). */
-.fs-page .fs-whyus {
-  background: var(--offwhite);
-}
-.fs-page .fs-whyus__cards {
-  margin-top: clamp(26px, 6cqi, 40px);
-  display: grid;
-  grid-template-columns: 1fr;
-  gap: clamp(14px, 3cqi, 22px);
-}
-.fs-page .fs-whyus__card {
-  background: var(--white);
-  border: 1px solid var(--line);
-  border-radius: var(--r-lg);
-  padding: clamp(22px, 4.5cqi, 30px);
-  box-shadow: var(--lift-1);
-  transition: transform 0.18s var(--fs-ease), box-shadow 0.18s var(--fs-ease);
-}
-.fs-page .fs-whyus__card:hover {
-  transform: translateY(-3px);
-  box-shadow: var(--lift-2);
-}
-.fs-page .fs-whyus__card-text {
-  font-family: var(--fs-serif);
-  font-size: clamp(19px, 4.4cqi, 24px);
-  line-height: 1.18;
-  color: var(--ink);
-  margin-top: 18px;
-  text-wrap: pretty;
-}
-
-/* ===================== BY THE NUMBERS (DARK beat) =====================
-   One of the 4 dark beats. The us-vs-market comparison: "This home" in the rare
-   --mint at display scale, market muted; a track fills signature→mint to the
-   home magnitude with a tick at the market magnitude. */
-.fs-page .fs-bynum {
-  background: var(--dark-band);
-  color: var(--on-dark);
-}
-.fs-page .fs-bynum .fs-eyebrow {
-  margin-bottom: clamp(26px, 6cqi, 42px);
-}
-.fs-page .fs-bynum__bars {
-  display: grid;
-  gap: clamp(34px, 7cqi, 52px);
-}
-.fs-page .fs-bynum__bar-label {
-  font-family: var(--fs-mono);
-  font-size: 11px;
-  letter-spacing: 0.18em;
-  text-transform: uppercase;
-  color: var(--on-dark-mute);
-}
-.fs-page .fs-bynum__bar-vals {
-  display: flex;
-  align-items: flex-end;
-  gap: clamp(24px, 6cqi, 48px);
-  margin-top: 16px;
-}
-.fs-page .fs-bynum__col {
-  display: flex;
-  flex-direction: column;
-}
-/* labels CLEAR the numbers at every width (≥16px gap, spec §6) */
-.fs-page .fs-bynum__caption {
-  order: 2;
-  margin-top: 16px;
-  font-family: var(--fs-mono);
-  font-size: 10px;
-  letter-spacing: 0.16em;
-  text-transform: uppercase;
-  color: var(--on-dark-mute);
-}
-.fs-page .fs-bynum__home {
-  order: 1;
-  font-family: var(--fs-serif);
-  font-weight: 500;
-  /* the rare --mint moment */
-  color: var(--mint);
-  font-size: clamp(64px, 18cqi, 128px);
-  line-height: 0.92;
-  letter-spacing: -0.02em;
-  font-variant-numeric: lining-nums tabular-nums;
-}
-.fs-page .fs-bynum__col--market {
-  padding-bottom: 6px;
-}
-.fs-page .fs-bynum__mkt {
-  order: 1;
-  font-family: var(--fs-serif);
-  font-weight: 500;
-  color: var(--on-dark-mute);
-  font-size: clamp(40px, 10cqi, 80px);
-  line-height: 0.92;
-  letter-spacing: -0.02em;
-  font-variant-numeric: lining-nums tabular-nums;
-}
-.fs-page .fs-bynum__track {
-  position: relative;
-  margin-top: 22px;
-  height: 8px;
-  border-radius: 99px;
-  background: rgba(255, 255, 255, 0.1);
-  overflow: hidden;
-}
-.fs-page .fs-bynum__fill {
-  height: 100%;
-  border-radius: 99px;
-  background: linear-gradient(90deg, var(--signature), var(--mint));
-}
-.fs-page .fs-bynum__tick {
-  position: absolute;
-  top: -3px;
-  bottom: -3px;
-  left: var(--tick, 0%);
-  width: 2px;
-  background: var(--on-dark);
-  opacity: 0.55;
-}
-/* big stats (no market comparison) — calm cream figures on the dark beat */
-.fs-page .fs-bynum__big {
-  margin-top: clamp(34px, 7cqi, 52px);
-  display: grid;
-  grid-template-columns: 1fr 1fr;
-  gap: 1px;
-  background: rgba(255, 255, 255, 0.08);
-  border: 1px solid rgba(255, 255, 255, 0.08);
-  border-radius: var(--r-md);
-  overflow: hidden;
-}
-.fs-page .fs-bynum__bigstat {
-  background: var(--dark-band-2);
-  padding: 22px 20px;
-}
-.fs-page .fs-bynum__bignum {
-  font-family: var(--fs-serif);
-  font-weight: 500;
-  font-size: clamp(30px, 9cqi, 44px);
-  line-height: 1;
-  color: var(--on-dark);
-  font-variant-numeric: lining-nums tabular-nums;
-  letter-spacing: -0.02em;
-  display: flex;
-  align-items: baseline;
-  gap: 6px;
-  flex-wrap: wrap;
-}
-.fs-page .fs-bynum__bigunit {
-  font-family: var(--fs-mono);
-  font-size: 11px;
-  letter-spacing: 0.08em;
-  text-transform: uppercase;
-  color: var(--on-dark-mute);
-}
-.fs-page .fs-bynum__biglabel {
-  font-family: var(--fs-mono);
-  font-size: 9.5px;
-  letter-spacing: 0.13em;
-  text-transform: uppercase;
-  color: var(--on-dark-soft);
-  margin-top: 12px;
-}
-
-/* ===================== HOW WE MARKET (WARM tint band) =================
-   --sand background, prominent 58px icon marks, bolder serif titles, more
-   whitespace — distinct from the cream why-us cards + the cool how-we-work band. */
-.fs-page .fs-mkt {
-  background: var(--sand);
-}
-.fs-page .fs-mkt__grid {
-  margin-top: clamp(26px, 6cqi, 40px);
-  display: grid;
-  grid-template-columns: 1fr;
-  gap: clamp(14px, 3cqi, 22px);
-}
-.fs-page .fs-mkt__card {
-  background: var(--white);
-  border: 1px solid var(--line);
-  border-radius: var(--r-lg);
-  padding: clamp(26px, 5cqi, 40px);
-  box-shadow: var(--lift-1);
-  transition: transform 0.18s var(--fs-ease), box-shadow 0.18s var(--fs-ease);
-}
-.fs-page .fs-mkt__card:hover {
-  transform: translateY(-3px);
-  box-shadow: var(--lift-2);
-}
-.fs-page .fs-mkt__title {
-  font-family: var(--fs-serif);
-  font-weight: 500;
-  font-size: clamp(22px, 5cqi, 30px);
-  line-height: 1.1;
-  color: var(--ink);
-  margin-top: 22px;
-  text-wrap: pretty;
-}
-.fs-page .fs-mkt__detail {
-  color: var(--ink-soft);
-  margin-top: 10px;
-  font-size: clamp(15px, 3.6cqi, 17px);
-  line-height: 1.55;
-  max-width: 42ch;
-}
-
-/* ===================== HOW WE WORK (COOL tint stepper) ================
-   --mist band. Mobile = vertical timeline (badge-left on a connecting line);
-   desktop = horizontal stepper (equal-width cards, numbered badges centered on
-   a connecting hairline). */
-.fs-page .fs-work {
-  background: var(--mist);
-}
-.fs-page .fs-stepper {
-  margin-top: clamp(28px, 6cqi, 44px);
-  list-style: none;
-  counter-reset: none;
-}
-.fs-page .fs-step {
-  position: relative;
-  padding: 0 0 28px 44px;
-}
-.fs-page .fs-step:last-child {
-  padding-bottom: 0;
-}
-.fs-page .fs-step__badge {
-  position: absolute;
-  left: 0;
-  top: 0;
-  width: 30px;
-  height: 30px;
-  border-radius: 50%;
-  background: var(--signature);
-  color: var(--on-signature);
-  font-family: var(--fs-mono);
-  font-size: 12px;
-  font-weight: 500;
-  display: flex;
-  align-items: center;
-  justify-content: center;
-  z-index: 1;
-}
-.fs-page .fs-step::after {
-  content: "";
-  position: absolute;
-  left: 14.5px;
-  top: 34px;
-  bottom: 6px;
-  width: 1px;
-  background: var(--line-2);
-}
-.fs-page .fs-step:last-child::after {
-  display: none;
-}
-.fs-page .fs-step__h {
-  font-family: var(--fs-serif);
-  font-weight: 500;
-  font-size: clamp(19px, 4.4cqi, 23px);
-  line-height: 1.2;
-  color: var(--ink);
-  padding-top: 3px;
-}
-.fs-page .fs-step__p {
-  color: var(--ink-soft);
-  margin-top: 6px;
-  font-size: clamp(14px, 3.4cqi, 16px);
-  line-height: 1.5;
-  max-width: 40ch;
-}
-
-/* ===================== OUR GUARANTEE (quiet paper) ==================== */
-.fs-page .fs-guarantee {
-  background: var(--paper);
-}
-.fs-page .fs-guarantee__k {
-  font-family: var(--fs-mono);
-  font-size: 10.5px;
-  letter-spacing: 0.16em;
-  text-transform: uppercase;
-  color: var(--ink-faint);
-}
-.fs-page .fs-guarantee__p {
-  font-family: var(--fs-serif);
-  font-style: italic;
-  font-size: clamp(20px, 5.2cqi, 28px);
-  line-height: 1.36;
-  color: var(--ink);
-  margin-top: 16px;
-  max-width: 30ch;
-  text-wrap: pretty;
-}
-
-/* ---- wide frame: cards go multi-up; stepper goes horizontal ----------- */
-@container (min-width: 820px) {
-  .fs-page .fs-whyus__cards {
-    grid-template-columns: repeat(3, 1fr);
-  }
-  .fs-page .fs-mkt__grid {
-    grid-template-columns: repeat(3, 1fr);
-  }
-  .fs-page .fs-bynum__bars {
-    max-width: 820px;
-  }
-  /* horizontal stepper — equal-width cards, badges on a connecting hairline */
-  .fs-page .fs-stepper {
-    display: flex;
-    gap: 16px;
-  }
-  .fs-page .fs-step {
-    flex: 1;
-    padding: 46px 0 0;
-    text-align: left;
-  }
-  .fs-page .fs-step__badge {
-    left: 0;
-    top: 0;
-  }
-  .fs-page .fs-step::after {
-    left: 30px;
-    right: -16px;
-    top: 14.5px;
-    bottom: auto;
-    width: auto;
-    height: 1px;
-  }
-  .fs-page .fs-step:last-child::after {
-    display: none;
-  }
-}
-
-/* ============================== MOTION ================================= */
-.fs-page .reveal {
-  opacity: 0;
-  transform: translateY(14px);
-  transition: opacity 0.7s var(--fs-ease), transform 0.7s var(--fs-ease);
-  will-change: opacity, transform;
-}
-.fs-page .reveal.in {
-  opacity: 1;
-  transform: none;
-}
-/* chart draw-on — same behavior as v1 (path pathLength=600), reused via the
-   shared motion driver adding `.in` to `.chart`. */
-.fs-page .chart .area-fill {
-  opacity: 0;
-  transition: opacity 0.52s var(--fs-ease) 0.12s;
-}
-.fs-page .chart .line-stroke {
-  stroke-dasharray: 600;
-  stroke-dashoffset: 600;
-  transition: stroke-dashoffset 1.1s var(--fs-ease) 0.08s;
-}
-.fs-page .chart .point {
-  opacity: 0;
-  transform: scale(0.5);
-  transform-origin: center;
-  transition: opacity 0.24s var(--fs-ease) 0.9s, transform 0.32s var(--fs-ease) 0.9s;
-}
-.fs-page .chart.in .area-fill {
-  opacity: 0.08;
-}
-.fs-page .chart.in .line-stroke {
-  stroke-dashoffset: 0;
-}
-.fs-page .chart.in .point {
-  opacity: 1;
-  transform: scale(1);
-}
-/* By-the-numbers comparison fills draw on once when their row reveals — same
-   shared driver as the chart (the row is a `.reveal`, the fill grows from 0 to
-   its inline --w target). Motivated motion only; no loop. */
-.fs-page .fs-bynum__fill {
-  width: 0;
-  transition: width 0.9s var(--fs-ease) 0.1s;
-}
-.fs-page .reveal.in .fs-bynum__fill {
-  width: var(--w, 0);
-}
-
-/* ============================== WIDE-FRAME (container query) ============
-   Driven by ACTUAL frame width, not the viewport — one page reshapes to any
-   width per the design model. */
-@container (min-width: 820px) {
-  .fs-page .fs-wrap {
-    --fs-maxw: 1060px;
-  }
-  /* Desktop hero — side by side: 1.15fr photo / .85fr dark band (spec §6 / mock),
-     not the mobile photo-on-top stack. */
-  .fs-page .fs-hero {
-    display: grid;
-    grid-template-columns: 1.15fr 0.85fr;
-    align-items: stretch;
-    min-height: 480px;
-  }
-  .fs-page .fs-hero__photo {
-    aspect-ratio: auto;
-    height: 100%;
-  }
-  .fs-page .fs-hero__band {
-    margin-top: 0;
-    display: flex;
-    flex-direction: column;
-    justify-content: center;
-    padding: clamp(40px, 5cqi, 72px);
-  }
-  /* desktop hero scale, capped at the spec's 144px max */
-  .fs-page .fs-price__big {
-    font-size: clamp(96px, 12cqi, 144px);
-  }
-  /* UX-2a — range scales up at wide frames but stays below the single figure so
-     both amounts fit on one line (display scale, never caption-sized). */
-  .fs-page .fs-price .fs-price__big--range {
-    font-size: clamp(60px, 7cqi, 104px);
-  }
-  /* §01 note text optically centered against the video, nudged above center;
-     relational so a long note grows the column and degrades toward top. */
-  .fs-page .fs-note__inner {
-    display: grid;
-    grid-template-columns: 1fr 360px;
-    gap: 54px;
-    align-items: center;
-  }
-  .fs-page .fs-note__text {
-    margin-bottom: clamp(0px, 3.2cqi, 28px);
-  }
-  .fs-page .fs-note__video {
-    margin-top: 0;
-  }
-  /* comps as a two-up card grid */
-  .fs-page .fs-comps {
-    grid-template-columns: 1fr 1fr;
-    column-gap: 22px;
-  }
-  /* a photo card flips to a column: 16:10 photo on top, body below */
-  .fs-page .fs-comp--photo {
-    grid-template-columns: 1fr;
-  }
-  .fs-page .fs-comp--photo .fs-comp__photo {
-    aspect-ratio: 16 / 10;
-    width: 100%;
-  }
-  /* reviews: pull-quotes beside the confidence card */
-  .fs-page .fs-reviews__layout {
-    grid-template-columns: 1fr 320px;
-    align-items: start;
-  }
-  .fs-page .fs-count--beside .fs-count__digit {
-    font-size: 96px;
-  }
-  .fs-page .fs-stats {
-    grid-template-columns: repeat(4, 1fr);
-  }
-  .fs-page .fs-stat {
-    border-bottom: 0;
-  }
-  .fs-page .fs-stat:nth-child(2n) {
-    border-right: 1px solid var(--line-30);
-  }
-  .fs-page .fs-stat:last-child {
-    border-right: 0;
-  }
-  .fs-page .fs-agent__contact {
-    grid-template-columns: repeat(4, 1fr);
-  }
-  .fs-page .fs-agent__cta {
-    flex-direction: row;
-    align-items: center;
-    flex-wrap: wrap;
-  }
-  .fs-page .fs-agent__cta .fs-btn-primary {
-    flex: 1;
-    min-width: 260px;
-  }
-  .fs-page .fs-agent__cta .fs-btn-ghost {
-    flex: 1;
-    min-width: 240px;
-  }
-  .fs-page .fs-btn-reassure {
-    order: 3;
-    flex-basis: 100%;
-    text-align: left;
-    margin-top: 4px;
-  }
-}
-
-/* ============================== REDUCED MOTION + PRINT =================
-   Single source of truth: end-states forced, animations nulled. `beforeprint`
-   completeness is handled in CSS too — print forces every reveal/chart end
-   state so a saved PDF is never mid-animation. */
+  
+  --ease: cubic-bezier(.2,.6,.2,1);
+  --dur: .7s; }
+.fs-page.pair-spectral {--f-display: "Spectral", Georgia, serif; }
+.fs-page * {box-sizing: border-box; }
+.fs-page .fs-frame {container-type: inline-size; container-name: page; background: var(--paper); color: var(--t-body); font-family: var(--f-body); -webkit-font-smoothing: antialiased; font-size: 17px; line-height: 1.6; }
+.fs-page .eyebrow {font-family: var(--f-mono); font-size: 11.5px; letter-spacing: .2em; text-transform: uppercase; color: var(--t-mute); font-weight: 500; display: flex; align-items: center; gap: 10px; }
+.fs-page .eyebrow .num {color: var(--t-soft); }
+.fs-page .eyebrow.on-dark {color: var(--t-pap-mute); }
+.fs-page .eyebrow .rule {flex: 1; height: 1px; background: var(--line); }
+.fs-page .eyebrow.on-dark .rule {background: var(--line-pap); }
+.fs-page h2.head {font-family: var(--f-display); font-weight: 400; font-size: clamp(33px, 6.6cqi, 54px); line-height: 1.05; letter-spacing: -.015em; color: var(--t-ink); margin: var(--s-5) 0 0; text-wrap: balance; }
+.fs-page h2.head em {font-style: italic; }
+.fs-page .on-dark h2.head, .fs-page h2.head.on-dark, .fs-page .z-ink h2.head {color: var(--t-pap); }
+.fs-page .body-lg {font-size: clamp(16.5px, 2.1cqi, 18.5px); line-height: 1.62; color: var(--t-body); }
+.fs-page .lede {font-family: var(--f-display); font-weight: 400; font-size: clamp(20px, 2.9cqi, 26px); line-height: 1.4; color: var(--t-ink); letter-spacing: -.005em; text-wrap: pretty; }
+.fs-page .emph {color: var(--teal-700); }
+.fs-page .body-lg .emph {font-weight: 600; }
+.fs-page .section {padding: clamp(46px, 9cqi, 104px) clamp(22px, 6cqi, 84px); position: relative; }
+.fs-page .z-white {background: var(--white); }
+.fs-page .z-offwhite {background: var(--offwhite); }
+.fs-page .z-paper {background: var(--paper); }
+.fs-page .z-sand {background: var(--sand); }
+.fs-page .z-mist {background: var(--mist); }
+.fs-page .z-ink {background: var(--ink); color: var(--t-pap); }
+.fs-page .hero {background: var(--ink); color: var(--t-pap); padding-bottom: clamp(70px, 9cqi, 96px); }
+.fs-page .hero__photo {position: relative; width: 100%; aspect-ratio: 4 / 3; background: var(--ink-2); overflow: hidden; }
+.fs-page .hero__photo image-slot {width: 100%; height: 100%; display: block; }
+.fs-page .hero__slot {position: absolute; inset: 0; z-index: 1; }
+.fs-page .hero__pers {position: absolute; top: 16px; left: 0; right: 0; z-index: 2; text-align: center; font-family: var(--f-mono); font-size: 10.5px; letter-spacing: .22em; text-transform: uppercase; color: var(--t-pap-soft); display: flex; align-items: center; justify-content: center; gap: 9px; }
+.fs-page .hero__pers .dot {width: 4px; height: 4px; border-radius: 50%; background: var(--mint); }
+.fs-page .hero__band {padding: clamp(28px,6cqi,48px) clamp(22px,6cqi,84px) 0; }
+.fs-page .hero__eyebrow {font-family: var(--f-mono); font-size: 11px; letter-spacing: .2em; text-transform: uppercase; color: var(--t-pap-mute); margin-bottom: 18px; }
+.fs-page .hero__addr {font-family: var(--f-display); font-weight: 400; font-size: clamp(38px, 8.6cqi, 80px); line-height: 1.0; letter-spacing: -.02em; margin: 0; color: var(--t-pap); }
+.fs-page .hero__loc {font-family: var(--f-mono); font-size: 12px; letter-spacing: .14em; text-transform: uppercase; color: var(--t-pap-mute); margin-top: 16px; }
+.fs-page .hero__empty {position: absolute; inset: 0; display: flex; align-items: center; justify-content: center; background: repeating-linear-gradient(135deg, #16262d 0 2px, transparent 2px 11px), linear-gradient(160deg, #16272e, #0e1a1f); }
+.fs-page .hero__empty span {font-family: var(--f-mono); font-size: 11px; letter-spacing: .22em; text-transform: uppercase; color: #5e767c; }
+.fs-page .price {background: var(--paper); padding-top: 0; padding-bottom: clamp(40px,7cqi,84px); }
+.fs-page .price__card {position: relative; z-index: 3; margin-top: clamp(-58px, -7cqi, -88px); background: var(--white); border: 1px solid var(--line-2); border-radius: var(--r-lg); box-shadow: var(--lift-2); padding: clamp(28px,5.5cqi,56px); }
+.fs-page .price__accentbar {position: absolute; left: 0; top: 22px; bottom: 22px; width: 4px; border-radius: 0 4px 4px 0; background: linear-gradient(var(--teal-700), var(--teal-500)); }
+.fs-page .price__meta {display: flex; justify-content: space-between; align-items: baseline; gap: 16px 28px; flex-wrap: wrap; }
+.fs-page .price__label {font-family: var(--f-mono); font-size: 11.5px; letter-spacing: .24em; text-transform: uppercase; color: var(--teal-700); font-weight: 500; white-space: nowrap; }
+.fs-page .price__sub {font-size: 15.5px; color: var(--t-soft); margin: 0; max-width: 32ch; }
+.fs-page .price__sub b {color: var(--teal-900); font-weight: 600; }
+.fs-page .price__single {font-family: var(--f-display); font-weight: 400; font-size: clamp(60px, 18cqi, 144px); line-height: .9; letter-spacing: -.03em; color: var(--teal-900); margin: 20px 0 0; font-variant-numeric: lining-nums tabular-nums; }
+.fs-page .price__single .cur {font-size: .5em; vertical-align: .34em; color: var(--teal-500); }
+.fs-page .price__range {margin-top: 20px; }
+.fs-page .price__rangerow {display: flex; flex-direction: column; align-items: flex-start; gap: 12px; }
+.fs-page .price__leg {display: flex; flex-direction: column; gap: 4px; }
+.fs-page .price__leg .cap {font-family: var(--f-mono); font-size: 10.5px; letter-spacing: .2em; text-transform: uppercase; color: var(--teal-700); }
+.fs-page .price__leg .val {font-family: var(--f-display); font-weight: 400; font-size: clamp(46px, 13cqi, 104px); line-height: .88; letter-spacing: -.03em; color: var(--teal-900); font-variant-numeric: lining-nums tabular-nums; }
+.fs-page .price__leg .val .cur {font-size: .48em; vertical-align: .36em; color: var(--teal-500); }
+.fs-page .price__dash {display: none; font-family: var(--f-display); color: var(--teal-500); font-size: clamp(28px,8cqi,60px); line-height: 1; padding-bottom: .12em; }
+.fs-page .price__bar {margin-top: 22px; height: 6px; border-radius: 99px; background: var(--teal-100); position: relative; overflow: hidden; }
+@keyframes barGrow { from { transform: scaleX(0); } to { transform: scaleX(1); } }
+.fs-page .price__bar i {position: absolute; inset: 0; border-radius: 99px; background: linear-gradient(90deg, var(--teal-500), var(--teal-700)); transform-origin: left; transform: scaleX(1); animation: barGrow 1.1s var(--ease) .25s both; }
+.fs-page .note {background: var(--offwhite); }
+.fs-page .note__grid {display: grid; gap: clamp(28px,5cqi,56px); align-items: center; }
+.fs-page .note__copy .lede {margin-top: 20px; max-width: 26ch; }
+.fs-page .note__copy .body-lg {margin-top: 16px; max-width: 42ch; }
+.fs-page .video {position: relative; aspect-ratio: 4 / 5; border-radius: var(--r-lg); overflow: hidden; background: linear-gradient(165deg, var(--teal-200), var(--mist)); border: 1px solid var(--line); box-shadow: var(--lift-1); }
+.fs-page .video::before {content: ""; position: absolute; inset: 0; background: repeating-linear-gradient(135deg, rgba(5,56,69,.04) 0 2px, transparent 2px 12px); }
+.fs-page .video__play {position: absolute; top: 50%; left: 50%; transform: translate(-50%,-50%); width: 66px; height: 66px; border-radius: 50%; background: var(--white); display: flex; align-items: center; justify-content: center; box-shadow: 0 10px 30px rgba(5,56,69,.25); }
+.fs-page .video__play::after {content: ""; border-left: 16px solid var(--teal-700); border-top: 10px solid transparent; border-bottom: 10px solid transparent; margin-left: 4px; }
+.fs-page .video__cap {position: absolute; left: 20px; bottom: 18px; font-family: var(--f-display); font-style: italic; font-size: 15px; color: var(--teal-900); }
+.fs-page .whyprice {background: var(--paper); }
+.fs-page .why__lead {display: grid; gap: clamp(20px,4cqi,40px); align-items: end; margin-top: clamp(26px,4cqi,40px); }
+.fs-page .why__numblock {display: flex; gap: 18px; align-items: flex-start; }
+.fs-page .why__num {font-family: var(--f-display); font-weight: 400; font-size: clamp(58px, 13cqi, 108px); line-height: .8; color: var(--teal-900); letter-spacing: -.03em; }
+.fs-page .why__numtext {font-size: clamp(16.5px,2.2cqi,19px); line-height: 1.32; color: var(--t-ink); max-width: 16ch; align-self: center; }
+.fs-page .why__agentnote {font-family: var(--f-display); font-style: italic; font-size: clamp(16px,2.2cqi,19px); color: var(--t-soft); line-height: 1.5; max-width: 44ch; }
+.fs-page .comps {margin-top: clamp(30px,5cqi,52px); display: grid; gap: 12px; }
+.fs-page .comp-card {background: var(--white); border: 1px solid var(--line); border-radius: var(--r-md); box-shadow: var(--lift-1); overflow: hidden; display: flex; flex-direction: row; align-items: stretch; transition: transform .25s var(--ease), box-shadow .25s var(--ease); }
+.fs-page .comp-card:hover {transform: translateY(-3px); box-shadow: var(--lift-2); }
+.fs-page .comp-card__photo {position: relative; flex: none; width: 116px; align-self: stretch; min-height: 96px; background: var(--mist); }
+.fs-page .comp-card__photo image-slot {position: absolute; inset: 0; width: 100%; height: 100%; display: block; }
+.fs-page .comp-card__body {flex: 1; min-width: 0; padding: clamp(15px,2.4cqi,18px) clamp(16px,2.6cqi,20px); display: flex; align-items: center; justify-content: space-between; gap: 14px; }
+.fs-page .comp-card__info {min-width: 0; }
+.fs-page .comp-card__idx {font-family: var(--f-mono); font-size: 10.5px; letter-spacing: .14em; color: var(--t-mute); display: block; margin-bottom: 5px; }
+.fs-page .comp-card__addr {font-family: var(--f-display); font-size: clamp(18px,2.6cqi,22px); color: var(--t-ink); line-height: 1.1; }
+.fs-page .comp-card__meta {font-family: var(--f-mono); font-size: 10px; letter-spacing: .07em; color: var(--t-mute); text-transform: uppercase; margin-top: 6px; }
+.fs-page .comp-card__price {text-align: right; flex: none; }
+.fs-page .comp-card__price b {font-family: var(--f-display); font-size: clamp(18px,2.6cqi,23px); color: var(--t-ink); font-weight: 400; display: block; font-variant-numeric: lining-nums tabular-nums; }
+.fs-page .comp-card__price span {font-family: var(--f-mono); font-size: 9.5px; letter-spacing: .18em; color: var(--t-mute); text-transform: uppercase; }
+.fs-page .comp__src {font-family: var(--f-mono); font-size: 10.5px; letter-spacing: .18em; text-transform: uppercase; color: var(--t-mute); margin-top: 20px; }
+.fs-page .reasons {background: var(--offwhite); }
+.fs-page .rcards {margin-top: clamp(28px,5cqi,48px); display: grid; gap: 14px; }
+.fs-page .rcard {background: var(--white); border: 1px solid var(--line); border-radius: var(--r-md); box-shadow: var(--lift-1); padding: clamp(22px,3cqi,30px); transition: transform .25s var(--ease), box-shadow .25s var(--ease); }
+.fs-page .rcard:hover {transform: translateY(-3px); box-shadow: var(--lift-2); }
+.fs-page .rcard__idx {font-family: var(--f-mono); font-size: 12px; letter-spacing: .12em; color: var(--teal-700); }
+.fs-page .rcard__title {font-family: var(--f-display); font-size: clamp(21px,2.8cqi,26px); color: var(--t-ink); margin-top: 16px; line-height: 1.12; }
+.fs-page .rcard__body {font-size: 16px; color: var(--t-body); margin-top: 10px; line-height: 1.55; max-width: 46ch; }
+.fs-page .bynum {background: var(--ink); color: var(--t-pap); }
+.fs-page .cmp {margin-top: clamp(22px,3.5cqi,34px); }
+.fs-page .cmp__label {font-family: var(--f-mono); font-size: 11.5px; letter-spacing: .22em; text-transform: uppercase; color: var(--t-pap-soft); }
+.fs-page .cmp__row {display: flex; align-items: flex-end; gap: clamp(20px,5cqi,56px); margin-top: 22px; flex-wrap: wrap; }
+.fs-page .card-mark {width: 48px; height: 48px; border-radius: 13px; background: var(--teal-100); border: 1px solid color-mix(in oklab, var(--teal-700) 18%, transparent); display: flex; align-items: center; justify-content: center; color: var(--teal-700); flex: none; }
+.fs-page .card-mark svg {width: 24px; height: 24px; display: block; }
+.fs-page .cmp__col {display: flex; flex-direction: column; gap: 16px; }
+.fs-page .cmp__k {font-family: var(--f-mono); font-size: 10.5px; letter-spacing: .16em; text-transform: uppercase; }
+.fs-page .cmp__col--you .cmp__k {color: var(--teal-500); }
+.fs-page .cmp__col--mkt .cmp__k {color: var(--t-pap-mute); }
+.fs-page .cmp__v {font-family: var(--f-display); line-height: .92; letter-spacing: -.02em; display: flex; align-items: baseline; }
+.fs-page .cmp__v i {font-style: normal; font-size: .4em; margin-left: .04em; }
+.fs-page .cmp__col--you .cmp__v {font-size: clamp(64px,15cqi,128px); color: var(--t-pap); }
+.fs-page .cmp__col--you .cmp__v i {color: var(--t-pap-soft); }
+.fs-page .cmp__col--you .spark {color: var(--mint); }
+.fs-page .cmp__col--mkt .cmp__v {font-size: clamp(40px,9cqi,80px); color: var(--t-pap-mute); }
+.fs-page .cmp__col--mkt .cmp__v i {color: var(--t-pap-mute); }
+.fs-page .cmp__vs {font-family: var(--f-display); font-style: italic; color: var(--t-pap-mute); font-size: clamp(18px,3cqi,28px); padding-bottom: .5em; }
+.fs-page .bynum__track {margin-top: clamp(30px,5cqi,46px); height: 12px; border-radius: 99px; background: rgba(255,255,255,.08); position: relative; }
+@keyframes fillGrow { from { transform: scaleX(0); } to { transform: scaleX(var(--fill, .983)); } }
+.fs-page .bynum__fill {position: absolute; inset: 0; border-radius: 99px; background: linear-gradient(90deg, var(--teal-500), var(--mint)); transform-origin: left; transform: scaleX(var(--fill, .983)); animation: fillGrow 1.3s var(--ease) .3s both; }
+.fs-page .bynum__mktmark {position: absolute; top: -7px; bottom: -7px; width: 2px; background: var(--t-pap-soft); }
+.fs-page .bynum__mktmark span {position: absolute; top: -22px; left: 50%; transform: translateX(-50%); white-space: nowrap; font-family: var(--f-mono); font-size: 9.5px; letter-spacing: .1em; color: var(--t-pap-mute); text-transform: uppercase; }
+.fs-page .mkt {background: var(--sand); }
+.fs-page .mcards {margin-top: clamp(28px,5cqi,48px); display: grid; gap: 14px; }
+.fs-page .mcard {background: var(--white); border: 1px solid var(--line); border-radius: var(--r-lg); box-shadow: var(--lift-1); padding: clamp(26px,3.6cqi,40px); transition: transform .25s var(--ease), box-shadow .25s var(--ease); }
+.fs-page .mcard:hover {transform: translateY(-3px); box-shadow: var(--lift-2); }
+.fs-page .mcard .card-mark {width: 58px; height: 58px; border-radius: 17px; }
+.fs-page .mcard .card-mark svg {width: 30px; height: 30px; }
+.fs-page .mcard__title {font-family: var(--f-display); font-size: clamp(22px,3.1cqi,30px); color: var(--t-ink); margin-top: 22px; line-height: 1.08; }
+.fs-page .mcard__body {font-size: 16.5px; color: var(--t-body); margin-top: 12px; line-height: 1.55; max-width: 42ch; }
+.fs-page .work {background: var(--mist); }
+.fs-page .flow {margin-top: clamp(28px,5cqi,48px); display: grid; gap: 14px; position: relative; }
+.fs-page .flow::before {content: ""; position: absolute; left: 33px; top: 26px; bottom: 26px; width: 2px; background: var(--line-2); z-index: 0; }
+.fs-page .fstep {position: relative; z-index: 1; background: var(--white); border: 1px solid var(--line); border-radius: var(--r-md); box-shadow: var(--lift-1); padding: clamp(18px,2.6cqi,22px) clamp(18px,2.6cqi,22px) clamp(18px,2.6cqi,22px) 66px; transition: transform .25s var(--ease), box-shadow .25s var(--ease); }
+.fs-page .fstep:hover {transform: translateY(-2px); box-shadow: var(--lift-2); }
+.fs-page .fstep__badge {position: absolute; left: 16px; top: clamp(18px,2.6cqi,22px); width: 34px; height: 34px; border-radius: 50%; background: var(--teal-700); color: var(--on-signature, #eafcff); font-family: var(--f-mono); font-size: 13px; display: flex; align-items: center; justify-content: center; }
+.fs-page .fstep__title {font-family: var(--f-display); font-size: clamp(19px,2.6cqi,23px); color: var(--t-ink); line-height: 1.12; }
+.fs-page .fstep__body {font-size: 15.5px; color: var(--t-body); margin-top: 6px; line-height: 1.5; }
+.fs-page .reviews {background: var(--ink); color: var(--t-pap); }
+.fs-page .reviews__layout {margin-top: clamp(24px,4cqi,40px); display: grid; gap: clamp(28px,5cqi,48px); align-items: center; }
+.fs-page .stars {color: var(--teal-500); letter-spacing: 4px; font-size: 17px; }
+.fs-page .stars.sm {font-size: 13px; letter-spacing: 2px; }
+.fs-page .review__q {font-family: var(--f-display); font-size: clamp(24px,3.8cqi,38px); line-height: 1.3; color: var(--t-pap); letter-spacing: -.012em; margin: 16px 0 0; max-width: 22ch; text-wrap: pretty; }
+.fs-page .review__q .mark {color: var(--teal-500); }
+.fs-page .review__attr {font-family: var(--f-mono); font-size: 11px; letter-spacing: .16em; text-transform: uppercase; color: var(--t-pap-mute); margin-top: 22px; }
+.fs-page .rev-conf {background: var(--ink-2); border: 1px solid var(--line-pap); border-radius: var(--r-lg); padding: clamp(24px,3.5cqi,32px); }
+.fs-page .rev-logos {display: flex; flex-wrap: wrap; align-items: center; gap: 12px 22px; margin-top: 20px; }
+.fs-page .plogo {display: inline-flex; align-items: center; gap: 9px; text-decoration: none; color: var(--t-pap); }
+.fs-page .plogo + .plogo {padding-left: 22px; border-left: 1px solid var(--line-pap); }
+.fs-page .plogo__name {font-family: var(--f-body); font-weight: 600; font-size: clamp(18px,2.3cqi,21px); letter-spacing: -.01em; }
+.fs-page .plogo:hover .plogo__name {color: var(--mint); }
+.fs-page .rev-conf__rating {display: flex; align-items: center; gap: 12px; }
+.fs-page .rev-conf__num {font-family: var(--f-display); font-size: clamp(40px,7cqi,58px); color: var(--t-pap); line-height: 1; }
+.fs-page .rev-conf__count {font-family: var(--f-mono); font-size: 12px; letter-spacing: .08em; text-transform: uppercase; color: var(--t-pap-soft); margin-top: 14px; }
+.fs-page .rev-conf__count .emph {color: var(--mint); font-weight: 600; }
+.fs-page .rev-conf .zillow {margin-top: 22px; display: flex; flex-direction: column; gap: 8px; background: var(--ink-3); border: 1px solid var(--line-pap); border-radius: var(--r-md); box-shadow: none; padding: 20px 22px; text-decoration: none; transition: transform .25s var(--ease); }
+.fs-page .rev-conf .zillow:hover {transform: translateY(-2px); }
+.fs-page .rev-conf .zillow .lead {font-family: var(--f-display); font-size: clamp(17px,2.2cqi,20px); color: var(--t-pap); }
+.fs-page .rev-conf .zillow .go {font-family: var(--f-mono); font-size: 10.5px; letter-spacing: .18em; text-transform: uppercase; color: var(--teal-500); display: flex; align-items: center; gap: 8px; }
+.fs-page .area {background: var(--paper); }
+.fs-page .area__stats {margin-top: clamp(28px,5cqi,48px); display: grid; gap: clamp(12px,1.6cqi,16px); }
+.fs-page .stat {background: var(--white); border: 1px solid var(--line); border-radius: var(--r-md); box-shadow: var(--lift-1); padding: clamp(20px,3cqi,28px) clamp(18px,3cqi,24px); }
+.fs-page .stat__val {font-family: var(--f-display); font-size: clamp(36px,6.4cqi,56px); color: var(--t-ink); line-height: .92; font-variant-numeric: lining-nums tabular-nums; }
+.fs-page .stat__label {font-family: var(--f-mono); font-size: 10px; letter-spacing: .16em; text-transform: uppercase; color: var(--t-mute); margin-top: 14px; }
+.fs-page .stat__sub {font-family: var(--f-mono); font-size: 10px; letter-spacing: .08em; text-transform: uppercase; color: var(--t-mute); margin-top: 7px; }
+.fs-page .chart {margin-top: clamp(16px,2.4cqi,24px); background: var(--white); border: 1px solid var(--line); border-radius: var(--r-lg); box-shadow: var(--lift-1); padding: clamp(22px,4cqi,34px); }
+.fs-page .chart__head {display: flex; justify-content: space-between; gap: 12px; }
+.fs-page .chart__cap {display: flex; flex-direction: column; }
+.fs-page .chart__cap.r {text-align: right; align-items: flex-end; }
+.fs-page .chart__cap .k {font-family: var(--f-mono); font-size: 9.5px; letter-spacing: .14em; text-transform: uppercase; color: var(--t-mute); }
+.fs-page .chart__cap .v {font-family: var(--f-display); font-size: clamp(20px,3.4cqi,30px); color: var(--teal-900); margin-top: 4px; }
+.fs-page .chart__cap .v.pill {background: var(--teal-100); border-radius: 6px; padding: 1px 8px; align-self: flex-start; }
+.fs-page .chart__plot {margin-top: 22px; position: relative; }
+.fs-page .chart svg {width: 100%; height: auto; display: block; overflow: visible; }
+.fs-page .chart .gridline {stroke: var(--line); stroke-width: 1; }
+.fs-page .chart .ylabel {font-family: var(--f-mono); font-size: 9px; letter-spacing: .03em; fill: var(--t-mute); }
+.fs-page .chart .dropline {stroke: var(--teal-500); stroke-width: 1.4; stroke-dasharray: 3 4; opacity: .5; }
+.fs-page .chart .halo {fill: none; stroke: var(--teal-700); stroke-opacity: .22; stroke-width: 2; }
+.fs-page .chart .xlabel {font-family: var(--f-mono); font-size: 9px; letter-spacing: .12em; fill: var(--t-mute); text-transform: uppercase; }
+.fs-page .chart .area-fill {fill: rgba(6,100,125,.07); }
+@keyframes drawLine { from { stroke-dashoffset: var(--len,200); } to { stroke-dashoffset: 0; } }
+.fs-page .chart .line {fill: none; stroke: var(--teal-700); stroke-width: 2.5; stroke-linecap: round; stroke-linejoin: round; stroke-dasharray: var(--len,200); stroke-dashoffset: 0; animation: drawLine 1.6s var(--ease) .3s both; }
+.fs-page .chart .dot {fill: var(--white); stroke: var(--teal-700); stroke-width: 2; }
+.fs-page .chart .dot.cur {fill: var(--teal-700); }
+.fs-page .chart .dashline {stroke: var(--teal-500); stroke-width: 1.5; stroke-dasharray: 4 4; }
+.fs-page .agent {background: var(--ink); color: var(--t-pap); }
+.fs-page .agent__name {font-family: var(--f-display); font-size: clamp(38px,8cqi,72px); letter-spacing: -.02em; color: var(--t-pap); margin: var(--s-4) 0 0; line-height: 1; }
+.fs-page .agent__tag {font-family: var(--f-display); font-style: italic; font-size: clamp(16px,2.4cqi,21px); color: var(--teal-500); margin-top: 12px; }
+.fs-page .agent__card {margin-top: clamp(28px,4cqi,40px); display: flex; align-items: center; gap: 16px; background: var(--ink-2); border: 1px solid var(--line-pap); border-radius: var(--r-md); padding: 16px 18px; }
+.fs-page .agent__avatar {width: 52px; height: 52px; border-radius: 50%; background: var(--ink-3); display: flex; align-items: center; justify-content: center; font-family: var(--f-display); font-size: 19px; color: var(--t-pap); overflow: hidden; flex: none; }
+.fs-page .agent__avatar image-slot {width: 100%; height: 100%; }
+.fs-page .agent__who .n {font-family: var(--f-display); font-size: 19px; color: var(--t-pap); }
+.fs-page .agent__who .r {font-family: var(--f-mono); font-size: 10px; letter-spacing: .14em; text-transform: uppercase; color: var(--t-pap-mute); margin-top: 4px; }
+.fs-page .agent__bio {font-family: var(--f-display); font-style: italic; font-size: clamp(16px,2.3cqi,21px); color: var(--t-pap-soft); margin-top: clamp(22px,3cqi,30px); }
+.fs-page .agent__meta {margin-top: clamp(22px,3cqi,30px); display: grid; gap: 1px; background: var(--line-pap); border-radius: var(--r-md); overflow: hidden; }
+.fs-page .agent__field {background: var(--ink); padding: 16px 18px; }
+.fs-page .agent__field .k {font-family: var(--f-mono); font-size: 9.5px; letter-spacing: .16em; text-transform: uppercase; color: var(--t-pap-mute); }
+.fs-page .agent__field .v {font-size: 15px; color: var(--t-pap); margin-top: 6px; word-break: break-word; }
+.fs-page .agent__cta {margin-top: clamp(24px,3cqi,34px); display: grid; gap: 12px; }
+.fs-page .btn {font-family: var(--f-body); font-size: 15px; border-radius: 999px; padding: 16px 22px; display: flex; align-items: center; justify-content: space-between; gap: 12px; cursor: pointer; border: 1px solid transparent; text-decoration: none; transition: transform .12s var(--ease); }
+.fs-page .btn:active {transform: scale(.985); }
+.fs-page .btn__lbl {flex: 1; }
+.fs-page .btn--primary {background: var(--teal-700); color: var(--on-signature, #eafcff); border-color: var(--teal-700); }
+.fs-page .btn--ghost {background: transparent; color: var(--t-pap); border-color: var(--line-pap); }
+.fs-page .btn .ar {font-family: var(--f-mono); }
+.fs-page .agent__note {font-family: var(--f-mono); font-size: 10.5px; letter-spacing: .08em; text-transform: uppercase; color: var(--t-pap-mute); margin-top: 14px; }
+.fs-page .agent__foot {margin-top: clamp(34px,5cqi,56px); padding-top: clamp(22px,3cqi,30px); border-top: 1px solid var(--line-pap); }
+.fs-page .agent__brand {font-family: var(--f-display); font-size: 22px; color: var(--t-pap); }
+.fs-page .agent__brand em {font-style: italic; color: var(--teal-500); }
+.fs-page .agent__disc {font-family: var(--f-mono); font-size: 10px; letter-spacing: .06em; line-height: 1.8; color: var(--t-pap-mute); text-transform: uppercase; margin-top: 16px; max-width: 60ch; }
 @media (prefers-reduced-motion: reduce) {
-  .fs-page .reveal,
-  .fs-page .chart .line-stroke,
-  .fs-page .chart .area-fill,
-  .fs-page .chart .point {
-    opacity: 1 !important;
-    transform: none !important;
-    transition: none !important;
-    stroke-dashoffset: 0 !important;
-  }
-  .fs-page .chart .area-fill {
-    opacity: 0.08 !important;
-  }
-  .fs-page .chart .point-current-pulse,
-  .fs-page .fs-area__shimmer::after {
-    animation: none !important;
-  }
-  /* land every comparison bar at its target width instantly. */
-  .fs-page .fs-bynum__fill {
-    width: var(--w, 0) !important;
-    transition: none !important;
-  }
+.fs-page .price__bar i, .fs-page .bynum__fill, .fs-page .chart .line {animation: none !important; }
+}
+@container page (min-width: 720px) {
+.fs-page .fs-frame {font-size: 18px; }
+.fs-page .hero {display: grid; grid-template-columns: 1.15fr .85fr; align-items: stretch; padding-bottom: 0; }
+.fs-page .hero__photo {aspect-ratio: auto; min-height: 560px; }
+.fs-page .hero__band {display: flex; flex-direction: column; justify-content: flex-end; padding-bottom: clamp(80px,9cqi,110px); }
+.fs-page .price {padding-left: clamp(40px,6cqi,84px); padding-right: clamp(40px,6cqi,84px); }
+.fs-page .price__card {margin-top: clamp(-92px,-9cqi,-120px); padding: clamp(40px,5cqi,60px); }
+.fs-page .price__rangerow {flex-direction: row; align-items: flex-end; gap: 44px; }
+.fs-page .price__dash {display: block; }
+.fs-page .note__grid {grid-template-columns: 1fr .72fr; }
+.fs-page .video {aspect-ratio: 3 / 4; }
+.fs-page .why__lead {grid-template-columns: 1fr 1fr; }
+.fs-page .comps {grid-template-columns: 1fr 1fr; gap: clamp(16px,2cqi,22px); align-items: start; }
+.fs-page .comp-card {flex-direction: column; align-items: stretch; }
+.fs-page .comp-card__photo {width: 100%; aspect-ratio: 16 / 10; align-self: auto; min-height: 0; }
+.fs-page .comp-card__body {padding: clamp(16px,2.6cqi,22px); }
+.fs-page .rcards {grid-template-columns: repeat(auto-fit, minmax(220px, 1fr)); gap: 18px; }
+.fs-page .mcards {grid-template-columns: repeat(auto-fit, minmax(220px, 1fr)); gap: 18px; }
+.fs-page .flow {grid-auto-flow: column; grid-auto-columns: 1fr; gap: 16px; }
+.fs-page .flow::before {left: 9%; right: 9%; top: 38px; bottom: auto; width: auto; height: 2px; }
+.fs-page .fstep {text-align: center; padding: 64px 18px 26px; }
+.fs-page .fstep__badge {left: 50%; transform: translateX(-50%); top: 20px; }
+.fs-page .fstep__body {max-width: 26ch; margin-left: auto; margin-right: auto; }
+.fs-page .reviews__layout {grid-template-columns: 1.25fr .75fr; align-items: center; }
+.fs-page .area__stats {grid-template-columns: repeat(4, 1fr); }
+.fs-page .agent__top {display: grid; grid-template-columns: 1fr 1fr; gap: 40px; align-items: end; }
+.fs-page .agent__meta {grid-template-columns: repeat(4, 1fr); }
+.fs-page .agent__cta {grid-template-columns: 1fr 1fr; }
+.fs-page .agent__lower {display: grid; grid-template-columns: 1fr 1fr; gap: 40px; align-items: start; }
+}
+
+/* ============================== MOTION (D1 — static end-state) ============
+   The shared PresentationPageMotion driver adds `.in` to `.reveal`/`.chart`
+   and runs the price count-up; ported markup keeps those hooks. Entrance
+   choreography proper is D2 — here a section just fades/rises once on enter,
+   and reduced-motion / print land every element at its final state. */
+.fs-page .reveal { opacity: 0; transform: translateY(16px); transition: opacity .7s var(--ease), transform .7s var(--ease); will-change: opacity, transform; }
+.fs-page .reveal.in { opacity: 1; transform: none; }
+@media (prefers-reduced-motion: reduce) {
+  .fs-page .reveal { opacity: 1 !important; transform: none !important; transition: none !important; }
 }
 @media print {
-  /* Print the brand surfaces — the dark hero/agent/footer bands and the tint
-     panels ARE the design; without exact color-adjust their cream-on-dark text
-     would print as invisible cream on white. `print-color-adjust` inherits, so
-     declaring it on the root covers the whole subtree. */
-  .fs-page {
-    -webkit-print-color-adjust: exact;
-    print-color-adjust: exact;
-    background: var(--paper);
-    padding: 0 !important;
-  }
-  .fs-page .fs-frame {
-    max-width: none;
-    border-radius: 0 !important;
-    box-shadow: none !important;
-    overflow: visible;
-  }
-
-  /* `beforeprint` end-state contract — there is NO JS print handler; motion is
-     CSS transitions off an IntersectionObserver, so a section that never
-     scrolled into view would print mid-reveal. These rules ARE the contract:
-     force every flagship reveal/chart to its final state so a saved PDF is
-     always complete. Mirrors the reduced-motion block above. */
-  .fs-page .reveal,
-  .fs-page .chart .line-stroke,
-  .fs-page .chart .area-fill,
-  .fs-page .chart .point {
-    opacity: 1 !important;
-    transform: none !important;
-    /* null the transition so the end-state is SNAPPED, not animated toward —
-       otherwise the PDF captures the reveal/draw-on mid-flight. */
-    transition: none !important;
-    stroke-dashoffset: 0 !important;
-  }
-  .fs-page .chart .area-fill {
-    opacity: 0.08 !important;
-  }
-  .fs-page .chart .point-current-pulse,
-  .fs-page .fs-area__shimmer::after {
-    animation: none !important;
-  }
-  /* bars must print at full width even if their section never scrolled into
-     view (so `.reveal.in` was never added). Snap to the inline --w. */
-  .fs-page .fs-bynum__fill {
-    width: var(--w, 0) !important;
-    transition: none !important;
-  }
-
-  /* Page-break rhythm: never split a self-contained unit (a comp row, a stat
-     cell, a pitch item, a quote, the agent card, the chart) across a page
-     fold. Major sections break between rather than through where the printer
-     can — these are hints, so an over-tall section still flows. */
-  .fs-page .fs-comp,
-  .fs-page .fs-stat,
-  .fs-page .fs-pitch__item,
-  .fs-page .fs-quote,
-  .fs-page .fs-agent__card,
-  .fs-page .chart-wrap,
-  .fs-page .fs-note__video,
-  .fs-page .fs-comp,
-  .fs-page .fs-whyus__card,
-  .fs-page .fs-bynum__bar,
-  .fs-page .fs-bynum__bigstat,
-  .fs-page .fs-mkt__card,
-  .fs-page .fs-step {
-    break-inside: avoid;
-  }
-  .fs-page .fs-price,
-  .fs-page .fs-why,
-  .fs-page .fs-pitch,
-  .fs-page .fs-whyus,
-  .fs-page .fs-bynum,
-  .fs-page .fs-mkt,
-  .fs-page .fs-work,
-  .fs-page .fs-guarantee,
-  .fs-page .fs-reviews,
-  .fs-page .fs-area,
-  .fs-page .fs-agent {
-    break-before: auto;
-  }
-  .fs-page .fs-headline,
-  .fs-page .fs-eyebrow {
-    break-after: avoid;
-  }
+  .fs-page { -webkit-print-color-adjust: exact; print-color-adjust: exact; background: var(--paper); padding: 0 !important; }
+  .fs-page .fs-frame { max-width: none; border-radius: 0 !important; box-shadow: none !important; overflow: visible; }
+  .fs-page .reveal { opacity: 1 !important; transform: none !important; transition: none !important; }
+  .fs-page .price__bar i, .fs-page .bynum__fill, .fs-page .chart .line { animation: none !important; }
+  .fs-page .comp-card, .fs-page .rcard, .fs-page .mcard, .fs-page .fstep, .fs-page .stat, .fs-page .chart, .fs-page .agent__card, .fs-page .video, .fs-page .cmp { break-inside: avoid; }
+  .fs-page .price, .fs-page .note, .fs-page .whyprice, .fs-page .reasons, .fs-page .bynum, .fs-page .mkt, .fs-page .work, .fs-page .reviews, .fs-page .area, .fs-page .agent { break-before: auto; }
+  .fs-page h2.head, .fs-page .eyebrow { break-after: avoid; }
 }
