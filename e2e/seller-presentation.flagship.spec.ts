@@ -137,9 +137,11 @@ test.describe("Flagship — optional-slot matrix (minimal reads complete)", () =
     // Optional slots absent:
     await expect(page.getByTestId("fs-note-video")).toHaveCount(0);
     await expect(page.getByTestId("fs-reviews")).toHaveCount(0);
-    // D1-CONSOLIDATE — no standalone pitch grid any more; with no whyUs AND no
-    // pitch cards, the whole "why list with us" chapter flexes out.
-    await expect(page.getByTestId("fs-whyus")).toHaveCount(0);
+    // D1-CLEANUP — with no whyUs AND no pitch cards, the whole "why list with
+    // us" chapter (selling points, by-the-numbers, how-we-market, how-we-work)
+    // flexes out.
+    await expect(page.getByTestId("fs-whyus-selling")).toHaveCount(0);
+    await expect(page.getByTestId("fs-whyus-stats")).toHaveCount(0);
     // LS-1 — with no area-snapshot data the WHOLE §05 section flexes out (no
     // heading, no pending card, no placeholder). A "market snapshot on the way"
     // promise must never reach a real seller's published page.

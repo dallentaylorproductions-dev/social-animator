@@ -13,6 +13,7 @@ export function AgentBand({
   eyebrowIndex = "06",
   showCtas = true,
   showFoot = true,
+  showGuarantee = false,
 }: {
   payload: PublicPayload;
   showWordmark?: boolean;
@@ -22,6 +23,13 @@ export function AgentBand({
   showCtas?: boolean;
   /** B0c — suppress the folded foot (the standalone page renders its own Footer). */
   showFoot?: boolean;
+  /**
+   * D1-CLEANUP — render the agent's guarantee as a quiet line by the CTAs. The
+   * v2 SELLER page sets this (the guarantee moved here off the removed why-us
+   * differentiators wall); the prelisting page leaves it false (its why-us
+   * variant still folds the guarantee into the differentiators section).
+   */
+  showGuarantee?: boolean;
 }) {
   const a = payload.agent;
   if (!a.name?.trim()) return null;
@@ -101,6 +109,15 @@ export function AgentBand({
             <div className="agent__note">No pressure, reach out anytime.</div>
           )
         ))}
+      {/* D1-CLEANUP — the agent's guarantee, relocated here from the removed
+          "Why work with us" section (seller page only; see showGuarantee). One
+          quiet, understated reassurance line by the CTAs; flexes out cleanly
+          when no guarantee is set. */}
+      {showGuarantee && payload.whyUs?.guarantee?.trim() && (
+        <div className="agent__guarantee" data-testid="fs-agent-guarantee">
+          {payload.whyUs.guarantee}
+        </div>
+      )}
 
       {showFoot && (
         <div className="agent__foot" data-testid="fs-foot">

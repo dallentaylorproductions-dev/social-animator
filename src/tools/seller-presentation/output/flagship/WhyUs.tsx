@@ -5,32 +5,43 @@ import type {
 import { AutoIcon, iconSection, matchIcon, type IconName } from "./icons";
 
 /**
- * B0b / D1-PORT / D1-CONSOLIDATE · The agent-constant "why list with us"
- * chapter, ported to the locked prototype's banded beats — collapsed to the
- * TWO card sections the prototype actually has (no standalone pitch grid, no
- * standalone guarantee band):
- *   1. Why work with us  — cream band, elevated WHITE cards w/ auto-icons (.rcard);
- *                          guarantee folded in as the closing line.
- *   2. By the numbers    — DARK beat, ONE big us-vs-market headline (.cmp) + a
- *                          compact supporting row (.bynum / .cmp).
- *   3. How we market     — WARM sand band, prominent auto-icon cards (.mcard).
- *   4. How we work       — COOL mist band, horizontal stepper / mobile timeline (.flow).
+ * B0b / D1-PORT / D1-CONSOLIDATE / D1-CLEANUP · The agent-constant "why list
+ * with us" chapter, shared by the v2 SELLER page (FlagshipPage) and the
+ * standalone PRE-LISTING pitch page (PrelistingPage). Two variants:
  *
- * D1-CONSOLIDATE routing: the per-listing PITCH cards (formerly their own
- * "A quiet, thorough way to sell" grid, which overlapped these two) are routed
- * into the two card sections by their auto-icon THEME — marketing-themed pitch
- * cards join "How we market", service/relationship-themed ones join "Why work
- * with us". A pitch card that duplicates a dedicated card (same icon via the
- * same keyword — e.g. both "photograph" → camera) is dropped in favor of the
- * dedicated card, so no point renders in both sections. Deterministic — no AI,
- * no invented copy.
+ *   variant="constant" (DEFAULT — prelisting): the full why-us pitch. Sections:
+ *     1. Why work with us  — cream band, the agent's differentiators (.rcard)
+ *                            with the guarantee folded in as the closing line.
+ *     2. By the numbers    — DARK beat, us-vs-market headline + supporting row.
+ *     3. How we market     — WARM sand band, auto-icon cards (.mcard).
+ *     4. How we work       — COOL mist band, stepper / timeline (.flow).
+ *     Per-listing PITCH cards route into §1/§3 by auto-icon THEME (D1-CONSOLIDATE).
+ *
+ *   variant="seller" (D1-CLEANUP — the v2 seller page): the redundant "Why work
+ *     with us" differentiators wall is DROPPED (it read as a near-twin of "How
+ *     we market"; the "why choose me" story is already carried by By-the-numbers,
+ *     Reviews, and the Agent block). In its place, the agent's NON-marketing
+ *     pitch cards — the authored selling points about THIS home — get their own
+ *     "Selling points" section (reusing the .reasons / .rcard treatment, locked
+ *     v1 copy), so removing the wall never silently drops authored content.
+ *     Marketing-themed pitch cards still join "How we market" (capped at 4). The
+ *     guarantee moves to the Agent block. `whyUs.differentiators` and
+ *     `whyUs.guarantee` stay in the payload (serializer untouched).
+ *
+ * De-dup is deterministic (no AI, no invented copy): a pitch card duplicates a
+ * dedicated card when they share an icon AND the keyword that triggered it; in
+ * the seller variant a selling point that merely restates a How-we-work STEP
+ * (e.g. "Negotiation handled in person" vs the "Negotiate and close" step) is
+ * the same point twice and drops.
  *
  * LOCKED SPLIT: "By the numbers" carries the agent's track record across PAST
  * listings (this home hasn't sold), so the comparison reads "My listings" vs
  * "Market" — never "this home". The neighborhood metrics live only in §05.
  */
 
-const MAX_CARDS = 6; // soft cap per card section so the grids don't balloon
+const SERVICE_MAX = 6; // soft cap on the differentiators / selling-points grid
+const MARKET_MAX_DEFAULT = 6; // "How we market" cap on the prelisting pitch page
+const MARKET_MAX_SELLER = 4; // tighter cap on the seller page (visual balance)
 
 type SectionCard = {
   title: string;
@@ -40,17 +51,30 @@ type SectionCard = {
   testid: string;
 };
 
-export function WhyUs({ payload }: { payload: PublicPayload }) {
+export function WhyUs({
+  payload,
+  variant = "constant",
+}: {
+  payload: PublicPayload;
+  /**
+   * "constant" = the agent-constant why-us pitch (prelisting): differentiators
+   * wall + guarantee, pitch routed by theme into both card sections.
+   * "seller" = D1-CLEANUP: differentiators dropped; non-marketing pitch becomes
+   * its own "Selling points" section; marketing capped at 4; guarantee moves to
+   * the Agent block.
+   */
+  variant?: "constant" | "seller";
+}) {
+  const seller = variant === "seller";
   const whyUs = payload.whyUs;
-  // The pitch cards ride on the seller page even when the agent configured no
-  // "Why us" package; build a minimal shell so routed pitch cards still render.
   const differentiators = whyUs?.differentiators ?? [];
   const marketingApproach = whyUs?.marketingApproach ?? [];
   const howWeWork = whyUs?.howWeWork ?? [];
+  // The guarantee renders here (constant) or in the Agent block (seller).
   const guarantee = whyUs?.guarantee;
   const stats = whyUs?.performanceStats ?? [];
 
-  // ----- Route the pitch cards into the two destination sections by theme.
+  // ----- Route the per-listing pitch cards by their auto-icon theme.
   const pitch = payload.pitchPublicCards.map((c, i) => {
     const m = matchIcon(c.title, c.support);
     return {
@@ -63,14 +87,30 @@ export function WhyUs({ payload }: { payload: PublicPayload }) {
     };
   });
 
-  // Dedicated cards first (they always render in their home section), then the
-  // routed pitch cards for that section — de-duped against the dedicated set,
-  // then capped. A pitch card duplicates a dedicated card when they share an
-  // icon AND the keyword that triggered it (same point, said twice).
-  const diffCards: SectionCard[] = differentiators.map((d, i) => {
-    const m = matchIcon(d);
-    return { title: d, icon: m.icon, kw: m.kw, testid: `fs-whyus-diff-${i}` };
-  });
+  // A pitch card duplicates a dedicated card when they share an icon AND the
+  // keyword that triggered it (same point, said twice).
+  const dupeAgainst =
+    (dedicated: ReadonlyArray<{ icon: IconName; kw: string | null }>) =>
+    (p: { icon: IconName; kw: string | null }) =>
+      p.kw !== null &&
+      dedicated.some((d) => d.icon === p.icon && d.kw === p.kw);
+
+  const routePitch = (
+    target: "service" | "marketing",
+    skip: (p: { icon: IconName; kw: string | null }) => boolean,
+  ): SectionCard[] =>
+    pitch
+      .filter((p) => p.section === target && !skip(p))
+      .map<SectionCard>((p) => ({
+        title: p.title,
+        body: p.body,
+        icon: p.icon,
+        kw: p.kw,
+        testid: `fs-whyus-pitch-${p.idx}`,
+      }));
+
+  // Dedicated marketing items first, then routed marketing pitch cards (de-duped
+  // against the dedicated set), then capped — 4 on the seller page, 6 elsewhere.
   const mktCards: SectionCard[] = marketingApproach.map((m, i) => {
     const mi = matchIcon(m.title, m.detail);
     return {
@@ -81,30 +121,28 @@ export function WhyUs({ payload }: { payload: PublicPayload }) {
       testid: `fs-whyus-mkt-${i}`,
     };
   });
+  const marketCards = [
+    ...mktCards,
+    ...routePitch("marketing", dupeAgainst(mktCards)),
+  ].slice(0, seller ? MARKET_MAX_SELLER : MARKET_MAX_DEFAULT);
 
-  const routePitch = (target: "service" | "marketing", dedicated: SectionCard[]) => {
-    const dupe = (p: { icon: IconName; kw: string | null }) =>
-      p.kw !== null &&
-      dedicated.some((d) => d.icon === p.icon && d.kw === p.kw);
-    return pitch
-      .filter((p) => p.section === target && !dupe(p))
-      .map<SectionCard>((p) => ({
-        title: p.title,
-        body: p.body,
-        icon: p.icon,
-        kw: p.kw,
-        testid: `fs-whyus-pitch-${p.idx}`,
-      }));
-  };
-
-  const serviceCards = [...diffCards, ...routePitch("service", diffCards)].slice(
-    0,
-    MAX_CARDS,
-  );
-  const marketCards = [...mktCards, ...routePitch("marketing", mktCards)].slice(
-    0,
-    MAX_CARDS,
-  );
+  // The first cream card section differs by variant:
+  //   constant → the differentiators wall + service-themed pitch (de-duped vs
+  //              the differentiators), guarantee folded in.
+  //   seller   → the authored selling points = non-marketing pitch, de-duped
+  //              against the How-we-work steps (a selling point that restates a
+  //              process step is redundant).
+  const diffCards: SectionCard[] = differentiators.map((d, i) => {
+    const m = matchIcon(d);
+    return { title: d, icon: m.icon, kw: m.kw, testid: `fs-whyus-diff-${i}` };
+  });
+  const stepMatches = howWeWork.map((s) => matchIcon(s.step, s.detail));
+  const serviceCards: SectionCard[] = seller
+    ? routePitch("service", dupeAgainst(stepMatches)).slice(0, SERVICE_MAX)
+    : [...diffCards, ...routePitch("service", dupeAgainst(diffCards))].slice(
+        0,
+        SERVICE_MAX,
+      );
 
   // Partition the track-record stats: comparison bars (a market value present)
   // vs single numbers. The headline is the first PERCENTAGE comparison (the
@@ -129,49 +167,76 @@ export function WhyUs({ payload }: { payload: PublicPayload }) {
   if (!present.service && !present.stats && !present.market && !present.work) {
     return null;
   }
+  // The `fs-whyus` chapter anchor rides the first present section — but only in
+  // the constant variant (the seller variant gives each section its own testid
+  // so removing the differentiators wall can't clobber `fs-whyus-stats`).
   const firstKey = (
     ["service", "stats", "market", "work"] as const
   ).find((k) => present[k]);
   const tid = (k: typeof firstKey) =>
-    k === firstKey ? { "data-testid": "fs-whyus" } : {};
+    !seller && k === firstKey ? { "data-testid": "fs-whyus" } : {};
 
   return (
     <>
-      {present.service && (
-        <section
-          className="section reasons z-offwhite"
-          data-testid="fs-whyus-diffs"
-          {...tid("service")}
-        >
-          <div className="reveal">
-            <div className="eyebrow">
-              Why Work With Us <span className="rule" aria-hidden="true" />
-            </div>
-            <h2 className="head">
-              A few reasons to <em>list with us</em>.
-            </h2>
-          </div>
-          <div className="rcards" data-count={serviceCards.length}>
-            {serviceCards.map((c) => (
-              <div className="rcard reveal" key={c.testid} data-testid={c.testid}>
-                <div className="card-mark">
-                  <AutoIcon name={c.icon} />
-                </div>
-                <div className="rcard__title">{hl(c.title)}</div>
-                {c.body && <p className="rcard__body">{c.body}</p>}
+      {present.service &&
+        (seller ? (
+          <section className="section reasons z-offwhite" data-testid="fs-whyus-selling">
+            <div className="reveal">
+              <div className="eyebrow">
+                What I&apos;ll Do For You{" "}
+                <span className="rule" aria-hidden="true" />
               </div>
-            ))}
-          </div>
-          {guarantee && (
-            <p
-              className="reasons__guarantee reveal"
-              data-testid="fs-whyus-guarantee"
-            >
-              {guarantee}
-            </p>
-          )}
-        </section>
-      )}
+              <h2 className="head">
+                A quiet, <em>thorough</em> way to sell.
+              </h2>
+            </div>
+            <div className="rcards" data-count={serviceCards.length}>
+              {serviceCards.map((c) => (
+                <div className="rcard reveal" key={c.testid} data-testid={c.testid}>
+                  <div className="card-mark">
+                    <AutoIcon name={c.icon} />
+                  </div>
+                  <div className="rcard__title">{hl(c.title)}</div>
+                  {c.body && <p className="rcard__body">{c.body}</p>}
+                </div>
+              ))}
+            </div>
+          </section>
+        ) : (
+          <section
+            className="section reasons z-offwhite"
+            data-testid="fs-whyus-diffs"
+            {...tid("service")}
+          >
+            <div className="reveal">
+              <div className="eyebrow">
+                Why Work With Us <span className="rule" aria-hidden="true" />
+              </div>
+              <h2 className="head">
+                A few reasons to <em>list with us</em>.
+              </h2>
+            </div>
+            <div className="rcards" data-count={serviceCards.length}>
+              {serviceCards.map((c) => (
+                <div className="rcard reveal" key={c.testid} data-testid={c.testid}>
+                  <div className="card-mark">
+                    <AutoIcon name={c.icon} />
+                  </div>
+                  <div className="rcard__title">{hl(c.title)}</div>
+                  {c.body && <p className="rcard__body">{c.body}</p>}
+                </div>
+              ))}
+            </div>
+            {guarantee && (
+              <p
+                className="reasons__guarantee reveal"
+                data-testid="fs-whyus-guarantee"
+              >
+                {guarantee}
+              </p>
+            )}
+          </section>
+        ))}
 
       {present.stats && headline && (
         <section

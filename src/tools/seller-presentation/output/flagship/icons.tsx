@@ -53,7 +53,10 @@ export const RULES: ReadonlyArray<{ icon: IconName; kw: readonly string[] }> = [
   { icon: "camera", kw: ["photo", "photograph", "video", "film", "shoot", "twilight", "imagery", "drone", "media", "picture"] },
   { icon: "target", kw: ["digital ad", "targeted", "retarget", "paid", "ppc", "ad funnel", "campaign", " ads", "online ad"] },
   { icon: "broadcast", kw: ["syndicat", "portal", "mls", "feature", "placement", "feed", "distribut", "broadcast", "listing site"] },
-  { icon: "megaphone", kw: ["social", "promote", "advertis", "awareness", "buzz", "exposure", "reach"] },
+  // "launch" sits on this MARKETING rule (and ahead of `tag`) so "A launch built
+  // around the first weekend." gets a megaphone — not the price-tag its body word
+  // "compress" would otherwise trip via the `tag` rule's "comp" keyword.
+  { icon: "megaphone", kw: ["launch", "social", "promote", "advertis", "awareness", "buzz", "exposure", "reach"] },
   { icon: "chart", kw: ["sold", "closed", "transaction", "track record", "results", "data", "trend", "analy", "statistic", "sale-to-list", "days on market"] },
   { icon: "tag", kw: ["price", "pricing", "comp", "valuation", "apprais", "cma", "list price", "number"] },
   { icon: "key", kw: ["open house", "showing", "tour", "walkthrough", "walk the home", "visit", "access", "door"] },

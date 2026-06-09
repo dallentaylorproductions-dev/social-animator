@@ -29,12 +29,14 @@ test.describe("Why-us — per-block render (full fixture)", () => {
   test("the section + every populated sub-block renders", async ({ page }) => {
     await page.goto(FLAGSHIP_FULL);
 
-    await expect(page.getByTestId("fs-whyus")).toBeVisible();
-
-    // Differentiators (3 in the fixture).
-    for (const i of [0, 1, 2]) {
-      await expect(page.getByTestId(`fs-whyus-diff-${i}`)).toBeVisible();
-    }
+    // Selling points — D1-CLEANUP restored a dedicated home for the agent's
+    // non-marketing pitch cards (the old differentiators wall is gone). Reuses
+    // the locked v1 heading copy.
+    const selling = page.getByTestId("fs-whyus-selling");
+    await expect(selling).toBeVisible();
+    await expect(selling).toContainText("A quiet, thorough way to sell");
+    // The fixture's "A Friday-evening update…" point lands here (chat icon).
+    await expect(page.getByTestId("fs-whyus-pitch-2")).toBeVisible();
 
     // Performance: two comparison bars (sale-to-list, days-on-market) + two
     // single big stats (views, homes sold).
@@ -44,7 +46,7 @@ test.describe("Why-us — per-block render (full fixture)", () => {
     await expect(page.getByTestId("fs-whyus-bigstat-0")).toBeVisible();
     await expect(page.getByTestId("fs-whyus-bigstat-1")).toBeVisible();
 
-    // Marketing approach (3 rows).
+    // Marketing approach (3 dedicated rows; the 4th slot is the routed launch card).
     for (const i of [0, 1, 2]) {
       await expect(page.getByTestId(`fs-whyus-mkt-${i}`)).toBeVisible();
     }
@@ -54,12 +56,11 @@ test.describe("Why-us — per-block render (full fixture)", () => {
       await expect(page.getByTestId(`fs-whyus-step-${i}`)).toBeVisible();
     }
 
-    // Guarantee — D1-CONSOLIDATE folds it in as the closing LINE of "Why work
-    // with us" (no standalone band), but it still renders. The service section
-    // is the first present block, so its container testid resolves to "fs-whyus".
-    await expect(page.getByTestId("fs-whyus-guarantee")).toBeVisible();
+    // Guarantee — D1-CLEANUP relocated it from the removed differentiators wall
+    // into the AGENT block; it no longer renders inside the why-us chapter.
+    await expect(page.getByTestId("fs-whyus-guarantee")).toHaveCount(0);
     await expect(
-      page.getByTestId("fs-whyus").getByTestId("fs-whyus-guarantee"),
+      page.getByTestId("fs-agent").getByTestId("fs-agent-guarantee"),
     ).toBeVisible();
   });
 
@@ -68,9 +69,10 @@ test.describe("Why-us — per-block render (full fixture)", () => {
   }) => {
     await page.goto(FLAGSHIP_FULL);
 
-    // Body copy (a differentiator) is ink — legibility never rides the accent.
+    // Body copy (a selling-point card title) is ink — legibility never rides
+    // the accent.
     const diffText = page
-      .getByTestId("fs-whyus-diff-0")
+      .getByTestId("fs-whyus-pitch-2")
       .locator(".rcard__title");
     expect(await read(diffText, "color")).toBe(INK);
 
@@ -151,21 +153,23 @@ test.describe("By the numbers — agent track record framing (D1-CONSOLIDATE)", 
   });
 });
 
-test.describe("Pitch routing — collapse into the two card sections (D1-CONSOLIDATE)", () => {
-  test("pitch cards route into the dedicated sections by auto-icon theme; the photography duplicate drops", async ({
+test.describe("Pitch routing — split by auto-icon theme (D1-CLEANUP)", () => {
+  test("marketing-themed pitch cards land in How-we-market, the rest in Selling points; the photography duplicate drops", async ({
     page,
   }) => {
     await page.goto(FLAGSHIP_FULL);
 
-    const why = page.getByTestId("fs-whyus"); // service section (first present)
+    const selling = page.getByTestId("fs-whyus-selling");
     const mkt = page.getByTestId("fs-whyus-mkt-sec");
 
-    // Both destination sections receive routed pitch cards (service-themed icons
-    // → "Why work with us"; marketing-themed icons → "How we market your home").
-    const inWhy = why.locator('[data-testid^="fs-whyus-pitch-"]');
-    const inMkt = mkt.locator('[data-testid^="fs-whyus-pitch-"]');
-    await expect(inWhy.first()).toBeVisible();
-    await expect(inMkt.first()).toBeVisible();
+    // Marketing-themed pitch cards (e.g. the launch card) join "How we market";
+    // non-marketing ones (the home's selling points) join "Selling points".
+    await expect(
+      selling.locator('[data-testid^="fs-whyus-pitch-"]').first(),
+    ).toBeVisible();
+    await expect(
+      mkt.locator('[data-testid^="fs-whyus-pitch-"]').first(),
+    ).toBeVisible();
 
     // The "A photographer the magazines use." pitch card resolves to the SAME
     // camera icon via the SAME keyword ("photo") as the dedicated marketing
@@ -174,26 +178,31 @@ test.describe("Pitch routing — collapse into the two card sections (D1-CONSOLI
     await expect(page.locator("body")).not.toContainText(
       "A photographer the magazines use",
     );
+
+    // "Negotiation handled in person." restates the "Negotiate and close"
+    // How-we-work step (same doc icon via "negotiat") → the same point twice, so
+    // it drops too.
+    await expect(page.getByTestId("fs-whyus-pitch-3")).toHaveCount(0);
+    await expect(page.locator("body")).not.toContainText(
+      "Negotiation handled in person",
+    );
   });
 
-  test("no standalone pitch grid; each routed pitch point renders once, never in both sections", async ({
+  test("each surviving pitch point renders once, never in both sections", async ({
     page,
   }) => {
     await page.goto(FLAGSHIP_FULL);
 
-    // The old standalone pitch section ("A quiet, thorough way to sell") is gone.
+    // The legacy v1-style standalone pitch grid (its own testid) is still absent.
     await expect(page.getByTestId("fs-pitch")).toHaveCount(0);
-    await expect(page.locator("body")).not.toContainText(
-      "A quiet, thorough way to sell",
-    );
 
     // Every routed pitch card sits in EXACTLY one section — a card routes by its
-    // single icon, so the same point can never appear in both grids.
+    // single icon theme, so the same point can never appear in both grids.
     const total = await page
       .locator('[data-testid^="fs-whyus-pitch-"]')
       .count();
-    const inWhy = await page
-      .getByTestId("fs-whyus")
+    const inSelling = await page
+      .getByTestId("fs-whyus-selling")
       .locator('[data-testid^="fs-whyus-pitch-"]')
       .count();
     const inMkt = await page
@@ -201,7 +210,17 @@ test.describe("Pitch routing — collapse into the two card sections (D1-CONSOLI
       .locator('[data-testid^="fs-whyus-pitch-"]')
       .count();
     expect(total).toBeGreaterThan(0);
-    expect(inWhy + inMkt).toBe(total); // no card double-rendered across sections
+    expect(inSelling + inMkt).toBe(total); // no card double-rendered across sections
+  });
+
+  test("How-we-market is capped at 4 cards (visual balance)", async ({
+    page,
+  }) => {
+    await page.goto(FLAGSHIP_FULL);
+    const cards = page
+      .getByTestId("fs-whyus-mkt-sec")
+      .locator(".mcard");
+    expect(await cards.count()).toBeLessThanOrEqual(4);
   });
 });
 
@@ -215,9 +234,10 @@ test.describe("Why-us — flex (empty whyUs)", () => {
     await expect(
       page.getByTestId("seller-presentation-flagship"),
     ).toBeVisible();
-    // No why-us section, and no orphaned sub-block headers.
-    await expect(page.getByTestId("fs-whyus")).toHaveCount(0);
+    // No why-us chapter, and no orphaned sub-block headers.
+    await expect(page.getByTestId("fs-whyus-selling")).toHaveCount(0);
     await expect(page.getByTestId("fs-whyus-stats")).toHaveCount(0);
+    await expect(page.getByTestId("fs-whyus-mkt-sec")).toHaveCount(0);
     await expect(page.getByTestId("fs-agent-tagline")).toHaveCount(0);
     // The page still reads complete — closing sections present.
     await expect(page.getByTestId("fs-agent")).toBeVisible();
@@ -237,8 +257,9 @@ test.describe("Why-us — v1 cohort byte-safety", () => {
       page.getByTestId("seller-presentation-flagship"),
     ).toHaveCount(0);
 
-    // The why-us section is flagship-only — never present on v1.
-    await expect(page.getByTestId("fs-whyus")).toHaveCount(0);
+    // The why-us chapter is flagship-only — never present on v1.
+    await expect(page.getByTestId("fs-whyus-stats")).toHaveCount(0);
+    await expect(page.getByTestId("fs-whyus-selling")).toHaveCount(0);
 
     // And none of the why-us copy leaks into the v1 DOM (v1 ignores the
     // whyUs / agentTagline / reviewsHeadline payload fields entirely).

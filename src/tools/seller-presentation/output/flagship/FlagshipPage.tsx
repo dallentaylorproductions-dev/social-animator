@@ -59,12 +59,12 @@ export function FlagshipPage({ handout }: { handout: HandoutRecord }) {
         <Price payload={payload} />
         <AgentNote payload={payload} />
         <WhyPrice payload={payload} />
-        {/* D1-CONSOLIDATE — the agent-constant "why list with us" chapter. The
-            per-listing pitch cards (formerly their own overlapping grid) are now
-            routed INTO WhyUs's two card sections by auto-icon theme, so there is
-            no standalone pitch section. Flexes out entirely when neither a why-us
-            package nor any pitch card is present. */}
-        <WhyUs payload={payload} />
+        {/* D1-CLEANUP — the "why list with us" chapter in its SELLER variant: the
+            redundant differentiators wall is dropped; the agent's non-marketing
+            pitch cards become a "Selling points" section; marketing-themed pitch
+            joins "How we market" (cap 4); the guarantee moves to the Agent block.
+            Flexes out entirely when nothing renderable is present. */}
+        <WhyUs payload={payload} variant="seller" />
         <Reviews payload={payload} />
         <AreaStats payload={payload} />
         {/* AgentBand now folds in the prototype's agent__foot (wordmark +
@@ -74,6 +74,7 @@ export function FlagshipPage({ handout }: { handout: HandoutRecord }) {
         <AgentBand
           payload={payload}
           showWordmark={payload.suppressWordmark !== true}
+          showGuarantee
         />
       </div>
       <PresentationPageMotion />

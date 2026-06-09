@@ -37,6 +37,15 @@ test.describe("D1 — auto-icon keyword map (deterministic, pure)", () => {
     expect(pickIcon("Open house every weekend")).toBe("key");
     expect(pickIcon("We stage every home")).toBe("home");
     expect(pickIcon("Negotiate and close")).toBe("doc");
+    // D1-CLEANUP §5 — "launch" is a marketing keyword (ahead of `tag`), so a
+    // launch card is a megaphone, not the price-tag its body word "compress"
+    // would trip via the `tag` rule's "comp".
+    expect(
+      pickIcon(
+        "A launch built around the first weekend.",
+        "Pre-market push designed to compress the offer window.",
+      ),
+    ).toBe("megaphone");
     // Unmatched copy falls through to the universal mark (never a placeholder).
     expect(pickIcon("Something entirely unrelated")).toBe("sparkle");
   });
@@ -122,22 +131,19 @@ test.describe("D1 — four dark beats, evenly spaced, none adjacent", () => {
   });
 });
 
-test.describe("D1 — auto-icons on why-us + how-we-market cards", () => {
-  test("each card renders an auto-assigned line icon", async ({ page }) => {
+test.describe("D1 — auto-icons on selling-points + how-we-market cards", () => {
+  test("each card renders an auto-assigned line icon; the launch card is not a price tag", async ({
+    page,
+  }) => {
     await page.goto(FLAGSHIP);
 
-    // Why-work-with-us: the 3 dedicated differentiator cards each resolve an
-    // icon. (D1-CONSOLIDATE also routes theme-matched pitch cards into this
-    // section under their own fs-whyus-pitch-* testids — checked separately.)
-    for (const i of [0, 1, 2]) {
-      await expect(
-        page.getByTestId(`fs-whyus-diff-${i}`).locator("[data-icon]"),
-      ).toHaveCount(1);
-    }
-    // The photography differentiator resolves to the camera icon.
+    // D1-CLEANUP — the "Why work with us" differentiators wall is gone. The
+    // agent's non-marketing pitch cards now render in "Selling points"; each
+    // resolves an icon. (The fixture's "A Friday-evening update…" point lands
+    // here under its routed testid fs-whyus-pitch-2.)
     await expect(
-      page.getByTestId("fs-whyus-diff-1").locator("[data-icon]"),
-    ).toHaveAttribute("data-icon", "camera");
+      page.getByTestId("fs-whyus-pitch-2").locator("[data-icon]"),
+    ).toHaveCount(1);
 
     // How-we-market: the 3 dedicated feature cards each resolve an icon.
     for (const i of [0, 1, 2]) {
@@ -148,6 +154,17 @@ test.describe("D1 — auto-icons on why-us + how-we-market cards", () => {
     await expect(
       page.getByTestId("fs-whyus-mkt-1").locator("[data-icon]"),
     ).toHaveAttribute("data-icon", "target");
+
+    // D1-CLEANUP §5 — the routed "A launch built around the first weekend." card
+    // (in How-we-market) gets a MARKETING glyph (megaphone), never the price-tag
+    // its body word "compress" would otherwise trip via the `tag` rule.
+    const launch = page.getByTestId("fs-whyus-pitch-1");
+    await expect(launch).toContainText("launch built around the first weekend");
+    const launchIcon = await launch
+      .locator("[data-icon]")
+      .getAttribute("data-icon");
+    expect(launchIcon).not.toBe("tag");
+    expect(launchIcon).toBe("megaphone");
   });
 
   test("the by-the-numbers home figure is the rare --mint (not ink, not market)", async ({

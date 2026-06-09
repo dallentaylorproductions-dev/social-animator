@@ -296,6 +296,7 @@
 .fs-page .btn--ghost {background: transparent; color: var(--t-pap); border-color: var(--line-pap); }
 .fs-page .btn .ar {font-family: var(--f-mono); }
 .fs-page .agent__note {font-family: var(--f-mono); font-size: 10.5px; letter-spacing: .08em; text-transform: uppercase; color: var(--t-pap-mute); margin-top: 14px; }
+.fs-page .agent__guarantee {font-family: var(--f-display); font-style: italic; font-size: clamp(14px,1.9cqi,17px); line-height: 1.5; color: var(--t-pap-soft); margin-top: 14px; max-width: 46ch; }
 .fs-page .agent__foot {margin-top: clamp(34px,5cqi,56px); padding-top: clamp(22px,3cqi,30px); border-top: 1px solid var(--line-pap); }
 .fs-page .agent__brand {font-family: var(--f-display); font-size: 22px; color: var(--t-pap); }
 .fs-page .agent__brand em {font-style: italic; color: var(--teal-500); }
