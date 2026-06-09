@@ -851,8 +851,8 @@ function AreaStatsEditor({ draft, setDraft }: StepEditorialProps) {
           neighborhood chart on the published page. */}
       <AreaChartHint />
 
-      {/* FR-2 — auto-fill provenance. When the comp set yields a snapshot,
-          tell the agent it's pre-filled + publishes automatically. */}
+      {/* FR-2 — derive provenance. When the comp set yields a snapshot,
+          tell the agent it's prefilled from their comps and publishes. */}
       {hasDerived && (
         <div
           className="from-comps area-derived-note"
