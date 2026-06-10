@@ -4,6 +4,7 @@ import {
   useCallback,
   useEffect,
   useMemo,
+  useRef,
   useState,
   useSyncExternalStore,
 } from "react";
@@ -24,6 +25,7 @@ import type {
 } from "../engine/types";
 import { effectivePosterUrl } from "../engine/types";
 import { deriveAreaStatsFromComps } from "@/lib/seller-presentation/area-stats-from-comps";
+import { useSPEntitlement } from "./SPEntitlementContext";
 
 /**
  * A7d.11 — the upload session key used by the walk-through video
@@ -840,6 +842,92 @@ function AreaStatsEditor({ draft, setDraft }: StepEditorialProps) {
     !!derived.monthlySeries && derived.monthlySeries.length > 0 &&
     manualSeries.length === 0;
 
+  // ---- P2-CHART — RentCast market price-trend (flag-gated, OFF by default) ----
+  // When AREA_CHART_RENTCAST_ENABLED is on AND the property has a valid zip,
+  // resolve a real month-by-month median SALE-PRICE series at AUTHORING time
+  // and write it into the draft so it BAKES into the published payload (the
+  // consumer page never calls RentCast). Manual entry still wins — typing any
+  // month overrides the auto series and drops the "Auto from market data" chip.
+  // Flag off / loading / no-data / error → exact pre-P2 behavior (this whole
+  // block no-ops, the comp-derived + manual paths below are untouched).
+  const { areaChartRentcastEnabled } = useSPEntitlement();
+  const zip = (draft.propertyZip ?? "").trim();
+  const zipValid = /^\d{5}$/.test(zip);
+  const [marketTrend, setMarketTrend] = useState<{
+    status: "idle" | "loading" | "loaded" | "empty" | "error";
+    zip: string | null;
+  }>({ status: "idle", zip: null });
+  // The series we last auto-loaded from market data. The chip shows only while
+  // the draft series is byte-identical to it — any manual edit diverges it, so
+  // the chip turns off reactively without a ref/flag dance.
+  const [marketSeries, setMarketSeries] = useState<AreaStatsMonthly[] | null>(
+    null,
+  );
+  const lastFetchedZipRef = useRef<string | null>(null);
+
+  useEffect(() => {
+    // Flag OFF or still resolving (null) → never touch RentCast.
+    if (areaChartRentcastEnabled !== true) return;
+    if (!zipValid) return;
+    // Debounce + change-guard: only fetch when the zip is present and changed,
+    // so editing other Step-1 fields can't fan out repeated calls.
+    if (lastFetchedZipRef.current === zip) return;
+
+    let cancelled = false;
+    const timer = setTimeout(() => {
+      lastFetchedZipRef.current = zip;
+      setMarketTrend({ status: "loading", zip });
+      fetch(
+        `/api/seller-presentation/area-trend?zip=${encodeURIComponent(zip)}`,
+        { credentials: "same-origin" },
+      )
+        .then((r) => (r.status === 200 ? r.json() : null))
+        .then((data) => {
+          if (cancelled) return;
+          if (
+            data &&
+            data.ok &&
+            Array.isArray(data.series) &&
+            data.series.length >= 2
+          ) {
+            const series: AreaStatsMonthly[] = data.series;
+            // Re-sync the month-input editor so the loaded prices SHOW in the
+            // fields (not just the preview), then write the series into the
+            // draft via the functional updater (avoids clobbering a sibling
+            // field the agent may have edited during the debounce window).
+            setEditor(deriveMonthlyEditorState(series));
+            setMarketSeries(series);
+            setDraft((prev) => ({
+              ...prev,
+              areaStats: { ...(prev.areaStats ?? {}), monthlySeries: series },
+            }));
+            setMarketTrend({ status: "loaded", zip });
+          } else if (data && data.code === "no-data") {
+            setMarketTrend({ status: "empty", zip });
+          } else {
+            // feature-disabled (race), 401, network/JSON error, <2 points.
+            setMarketTrend({ status: "error", zip });
+          }
+        })
+        .catch(() => {
+          if (!cancelled) setMarketTrend({ status: "error", zip });
+        });
+    }, 600);
+
+    return () => {
+      cancelled = true;
+      clearTimeout(timer);
+    };
+    // `update`/`setDraft` are stable; re-run only when the flag or zip changes.
+    // eslint-disable-next-line react-hooks/exhaustive-deps
+  }, [areaChartRentcastEnabled, zip, zipValid]);
+
+  // Chip shows only while the draft series is still exactly the auto-loaded one.
+  const seriesIsMarketAuto =
+    marketTrend.status === "loaded" &&
+    !!marketSeries &&
+    JSON.stringify(stats.monthlySeries ?? null) === JSON.stringify(marketSeries);
+
   return (
     <>
       {/* Discovery framing — make the chart payoff unmistakable so the
@@ -910,7 +998,7 @@ function AreaStatsEditor({ draft, setDraft }: StepEditorialProps) {
           months of history you have, then fill in the prices you know.
         </p>
 
-        {showDerivedMonthly && (
+        {showDerivedMonthly && !seriesIsMarketAuto && (
           <p
             className="area-derived-monthly"
             data-testid="step-editorial-area-derived-monthly"
@@ -920,6 +1008,34 @@ function AreaStatsEditor({ draft, setDraft }: StepEditorialProps) {
             {derived.monthlySeries![0].month} to{" "}
             {derived.monthlySeries![derived.monthlySeries!.length - 1].month})
             charts automatically. Fill the months below to override.
+          </p>
+        )}
+
+        {/* P2-CHART — auto-from-market chip (reuses the P1-#6 "Auto from …"
+            chip pattern). Shows only while the series is still the loaded
+            market data; typing any month diverges it and drops the chip. */}
+        {seriesIsMarketAuto && (
+          <p
+            className="area-derived-monthly"
+            data-testid="step-editorial-area-market-auto"
+          >
+            <span className="from-comps-chip">Auto from market data</span>{" "}
+            Median sale price for ZIP <strong>{marketTrend.zip}</strong> across{" "}
+            <strong>{marketSeries!.length}</strong> months (RentCast). Type any
+            month to override.
+          </p>
+        )}
+
+        {/* P2-CHART — quiet fallback note when a load was attempted and yielded
+            no usable trend. Never blocks the step; manual entry stays below. */}
+        {(marketTrend.status === "empty" || marketTrend.status === "error") && (
+          <p
+            className="area-market-note"
+            data-testid="step-editorial-area-market-note"
+          >
+            {marketTrend.status === "empty"
+              ? "No market trend available for this ZIP yet — fill the months below by hand."
+              : "Couldn't load the market trend — fill the months below by hand."}
           </p>
         )}
 

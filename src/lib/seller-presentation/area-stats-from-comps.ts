@@ -66,8 +66,10 @@ function median(nums: number[]): number {
 
 /** "$685,432" → 685000 rounded to nearest thousand, locale-formatted.
  *  Matches StepStrategy's `fmtAboutThousands` so the §05 median reads the
- *  same as the Step-3 "from your comps" line. */
-function formatAboutThousands(n: number): string {
+ *  same as the Step-3 "from your comps" line.
+ *  Exported so the RentCast normalizer formats market-sourced prices the
+ *  same way comp-derived ones are (`rentcast-area-trend.ts`). */
+export function formatAboutThousands(n: number): string {
   return "$" + (Math.round(n / 1000) * 1000).toLocaleString("en-US");
 }
 
@@ -131,8 +133,10 @@ function parseSoldDate(
 }
 
 /** "2026-05" → "May '26"; falls back to the input if unparseable. Kept in
- *  lock-step with StepEditorial.formatMonthLabel. */
-function formatMonthLabel(ym: string): string {
+ *  lock-step with StepEditorial.formatMonthLabel.
+ *  Exported so the RentCast normalizer emits the same "May '26" label form
+ *  as comp-derived / manual series (`rentcast-area-trend.ts`). */
+export function formatMonthLabel(ym: string): string {
   const match = /^(\d{4})-(\d{2})$/.exec(ym);
   if (!match) return ym;
   const monthIdx = Number.parseInt(match[2], 10) - 1;

@@ -64,6 +64,11 @@ export async function GET(req: Request) {
     // locks). Server still enforces; the flag is the kill switch.
     features: {
       compImportEnabled: process.env.COMP_IMPORT_ENABLED === "true",
+      // P2-CHART — the §05 RentCast market-trend auto-fill. OFF by default;
+      // when false the wizard never attempts the fetch and the area-snapshot
+      // step behaves exactly as pre-P2 (manual/comp-derived series).
+      areaChartRentcastEnabled:
+        process.env.AREA_CHART_RENTCAST_ENABLED === "true",
     },
   });
 }

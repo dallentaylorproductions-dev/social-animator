@@ -1,0 +1,90 @@
+{
+  "_fixtureNote": "Representative RentCast GET /v1/markets?zipCode=98406&dataType=Sale&historyRange=12 response, built to the documented market-data schema (saleData.history keyed by YYYY-MM, each entry carries medianPrice + date). Captured-shape stand-in: a live call needs the Rent_Cast_API key, which is server-only (Vercel), not available in CI/local — the real-API validation is the Preview smoke. Values are illustrative Tacoma medians, not a live snapshot.",
+  "id": "98406",
+  "zipCode": "98406",
+  "saleData": {
+    "lastUpdatedDate": "2026-05-31T00:00:00.000Z",
+    "averagePrice": 648900,
+    "medianPrice": 642000,
+    "minPrice": 410000,
+    "maxPrice": 1250000,
+    "averagePricePerSquareFoot": 372,
+    "medianPricePerSquareFoot": 358,
+    "totalListings": 214,
+    "newListings": 61,
+    "history": {
+      "2025-06": {
+        "date": "2025-06-01T00:00:00.000Z",
+        "averagePrice": 611200,
+        "medianPrice": 605000,
+        "totalListings": 188
+      },
+      "2025-07": {
+        "date": "2025-07-01T00:00:00.000Z",
+        "averagePrice": 618400,
+        "medianPrice": 612000,
+        "totalListings": 196
+      },
+      "2025-08": {
+        "date": "2025-08-01T00:00:00.000Z",
+        "averagePrice": 615900,
+        "medianPrice": 608000,
+        "totalListings": 201
+      },
+      "2025-09": {
+        "date": "2025-09-01T00:00:00.000Z",
+        "averagePrice": 627300,
+        "medianPrice": 621000,
+        "totalListings": 207
+      },
+      "2025-10": {
+        "date": "2025-10-01T00:00:00.000Z",
+        "averagePrice": 633100,
+        "medianPrice": 628000,
+        "totalListings": 199
+      },
+      "2025-11": {
+        "date": "2025-11-01T00:00:00.000Z",
+        "averagePrice": 630800,
+        "medianPrice": 625000,
+        "totalListings": 182
+      },
+      "2025-12": {
+        "date": "2025-12-01T00:00:00.000Z",
+        "averagePrice": 636400,
+        "medianPrice": 631000,
+        "totalListings": 174
+      },
+      "2026-01": {
+        "date": "2026-01-01T00:00:00.000Z",
+        "averagePrice": 639900,
+        "medianPrice": 634000,
+        "totalListings": 169
+      },
+      "2026-02": {
+        "date": "2026-02-01T00:00:00.000Z",
+        "averagePrice": 642700,
+        "medianPrice": 637000,
+        "totalListings": 178
+      },
+      "2026-03": {
+        "date": "2026-03-01T00:00:00.000Z",
+        "averagePrice": 645100,
+        "medianPrice": 639000,
+        "totalListings": 193
+      },
+      "2026-04": {
+        "date": "2026-04-01T00:00:00.000Z",
+        "averagePrice": 647800,
+        "medianPrice": 640000,
+        "totalListings": 205
+      },
+      "2026-05": {
+        "date": "2026-05-01T00:00:00.000Z",
+        "averagePrice": 648900,
+        "medianPrice": 642000,
+        "totalListings": 214
+      }
+    }
+  }
+}

@@ -26,11 +26,14 @@ import { test, expect } from '@playwright/test';
  * this spec catches it before publish.
  */
 
+import { readFile } from 'node:fs/promises';
+import path from 'node:path';
 import { clampDraft } from '../src/tools/seller-presentation/engine/types';
 import {
   toPublicPayload,
   clampPublicPayload,
 } from '../src/tools/seller-presentation/output/public-payload';
+import { normalizeRentCastSaleSeries } from '../src/lib/seller-presentation/rentcast-area-trend';
 
 const REAL_MONTHLY_SERIES = [
   { month: "Jun '25", medianPrice: '605000' },
@@ -113,6 +116,48 @@ test.describe('Seller Presentation — neighborhood chart from a real publish', 
     expect(readBack.areaStats?.monthlySeries).toHaveLength(12);
     expect(readBack.areaStats?.monthlySeries?.[0].month).toBe("Jun '25");
     expect(readBack.areaStats?.monthlySeries?.[11].medianPrice).toBe('642000');
+  });
+
+  test('a RentCast-sourced monthlySeries survives clampDraft → toPublicPayload → clampPublicPayload', async () => {
+    // P2-CHART — the OTHER source of monthlySeries: a real RentCast market
+    // trend, resolved at authoring time and written into the draft. Prove the
+    // normalized, multi-point series (NOT a straight line) survives the exact
+    // pure publish chain the route runs, with the "$X,000" market format the
+    // normalizer emits intact end-to-end.
+    const fixturePath = path.resolve(
+      __dirname,
+      'fixtures/rentcast/markets-98406-sale.json',
+    );
+    const fixture = JSON.parse(await readFile(fixturePath, 'utf8'));
+    const rentcastSeries = normalizeRentCastSaleSeries(fixture);
+    expect(rentcastSeries).toHaveLength(12);
+
+    const draft = {
+      ...REAL_WIZARD_DRAFT,
+      areaStats: {
+        ...REAL_WIZARD_DRAFT.areaStats,
+        monthlySeries: rentcastSeries,
+      },
+    };
+
+    const clamped = clampDraft(draft);
+    expect(clamped.areaStats?.monthlySeries).toHaveLength(12);
+    expect(clamped.areaStats?.monthlySeries?.[0]).toEqual({
+      month: "Jun '25",
+      medianPrice: '$605,000',
+    });
+
+    const payload = toPublicPayload(clamped, {});
+    expect(payload.areaStats?.monthlySeries).toHaveLength(12);
+
+    const readBack = clampPublicPayload(JSON.parse(JSON.stringify(payload)));
+    const survived = readBack.areaStats?.monthlySeries;
+    expect(survived).toHaveLength(12);
+    expect(survived?.[0]).toEqual({ month: "Jun '25", medianPrice: '$605,000' });
+    expect(survived?.[11]).toEqual({ month: "May '26", medianPrice: '$642,000' });
+    // Real trend, not a lazy straight line — the values genuinely vary.
+    const distinct = new Set(survived?.map((m) => m.medianPrice));
+    expect(distinct.size).toBeGreaterThan(1);
   });
 
   test('the rendered page shows the chart SVG with the series data', async ({

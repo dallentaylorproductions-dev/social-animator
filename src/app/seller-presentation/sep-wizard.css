@@ -1466,6 +1466,14 @@
   color: var(--text);
   font-weight: 700;
 }
+/* P2-CHART — quiet "couldn't load market trend, enter manually" note. Calm,
+   muted, non-alarming: a load was attempted and we fell back, not an error. */
+.sep-wizard .area-market-note {
+  margin-top: 8px;
+  font-size: 13px;
+  color: var(--muted);
+  line-height: 1.5;
+}
 
 /* pricing approach — "arrives chosen" + reveal */
 .sep-wizard .approach-chosen {
