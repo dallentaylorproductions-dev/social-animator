@@ -12,7 +12,6 @@ export function AgentNote({ payload }: { payload: PublicPayload }) {
   const v = payload.video;
   const hasVideo = !!v?.videoUrl;
   const poster = v ? effectivePosterUrl(v) : undefined;
-  const caption = v?.title?.trim() || "Let's walk through your plan.";
 
   return (
     <section className="section note z-offwhite" data-testid="fs-note">
@@ -51,10 +50,18 @@ export function AgentNote({ payload }: { payload: PublicPayload }) {
                 inset: 0,
                 width: "100%",
                 height: "100%",
-                objectFit: "cover",
+                // P2-VIDEO (a)+(b): `contain` (was `cover`) shows the full
+                // frame so the agent's head is never cropped, and because
+                // native `controls` take this <video> ELEMENT fullscreen,
+                // `contain` also carries into fullscreen — the video renders
+                // at its native aspect with no zoom/blowout. A neutral mist
+                // fill sits behind any letterbox bars (calm card treatment,
+                // not the brand-glow gradient, not pure black) and doubles as
+                // a non-black surface on posterless mobile.
+                objectFit: "contain",
+                background: "var(--mist)",
               }}
             />
-            <div className="video__cap">{caption}</div>
           </div>
         )}
       </div>

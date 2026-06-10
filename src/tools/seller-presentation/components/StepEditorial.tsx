@@ -447,17 +447,12 @@ function VideoEditor({ draft, setDraft }: StepEditorialProps) {
         testIdPrefix="step-editorial-video"
         helpText="Up to 90 seconds, 250 MB. MP4, MOV, or WebM."
       />
-      <label className="field-block">
-        <span className="field-label">Title</span>
-        <input
-          type="text"
-          className="input"
-          value={v.title ?? ""}
-          onChange={(e) => setVideo({ title: e.target.value || undefined })}
-          placeholder="A walk-through of your plan, recorded yesterday."
-          data-testid="step-editorial-video-title"
-        />
-      </label>
+      {/* P2-VIDEO (c): the video title input was removed — it rendered in the
+          brand color (low contrast over the video) and the player UI covered
+          it anyway. Decision (Dallen + Cowork, Option 2): drop it entirely, no
+          replacement label. The `title` field stays on the model (dormant)
+          because the v1 VideoBlock still reads it for already-published v1
+          pages; we just stop collecting and rendering it. */}
       <div className="sec5-grid">
         <label className="field-block">
           <span className="field-label">Runtime</span>

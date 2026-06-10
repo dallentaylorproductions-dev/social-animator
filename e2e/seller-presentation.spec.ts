@@ -1568,10 +1568,14 @@ test.describe('Seller Presentation — A7d editorial extras', () => {
     const previewSrc = await videoPreview.getAttribute('src');
     expect(previewSrc).toMatch(/^blob:/);
 
-    await page
-      .getByTestId('step-editorial-video-title')
-      .fill('A walk-through of your plan.');
-    // Runtime is auto-filled from the (stubbed) 14-second duration —
+    // P2-VIDEO (c): the video title input is gone from the editorial step.
+    await expect(
+      page.getByTestId('step-editorial-video-title'),
+    ).toHaveCount(0);
+
+    // P2-VIDEO (c): the video title input was removed from the wizard; no
+    // title is collected anymore. Runtime is auto-filled from the (stubbed)
+    // 14-second duration —
     // "0:14". The test asserts the format below in the localStorage
     // wait. The field stays editable as a fallback per the brief.
     await page
@@ -1645,7 +1649,8 @@ test.describe('Seller Presentation — A7d editorial extras', () => {
           return (
             parsed.currentStep === 'review' &&
             d.video?.videoUrl === url &&
-            d.video?.title === 'A walk-through of your plan.' &&
+            // P2-VIDEO (c): title is no longer collected by the wizard.
+            d.video?.title === undefined &&
             // Runtime is auto-filled from the stubbed 14-second
             // duration → "0:14" via the new formatter.
             d.video?.runtime === '0:14' &&

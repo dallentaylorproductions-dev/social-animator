@@ -122,6 +122,31 @@ test.describe("Flagship — count digit + n-aware grammar", () => {
   });
 });
 
+test.describe("Flagship — P2-VIDEO display (contain, no caption/title)", () => {
+  test("the in-page §01 video uses object-fit: contain (full frame, head never cropped) — NOT cover", async ({
+    page,
+  }) => {
+    await page.goto(FLAGSHIP);
+    const player = page.locator('[data-testid="fs-note-video"] .video__player');
+    await expect(player).toBeVisible();
+    // (a) The whole agent is visible: `contain` letterboxes inside the
+    // fixed 4/5 frame instead of cropping to fill. `cover` is the bug.
+    expect(await read(player, "object-fit")).toBe("contain");
+    // No CSS transform on the element that takes native fullscreen — a
+    // transformed/`cover` wrapper going fullscreen is the (b) blowout.
+    expect(await read(player, "transform")).toMatch(/none|matrix\(1, 0, 0, 1, 0, 0\)/);
+  });
+
+  test("no video caption/title is rendered over the player (P2-VIDEO c)", async ({
+    page,
+  }) => {
+    await page.goto(FLAGSHIP);
+    await expect(page.getByTestId("fs-note-video")).toBeVisible();
+    // The brand-colored caption band was removed entirely — no replacement.
+    await expect(page.locator(".fs-page .video__cap")).toHaveCount(0);
+  });
+});
+
 test.describe("Flagship — optional-slot matrix (minimal reads complete)", () => {
   test("video / reviews / why-us / area flex out; wordmark present", async ({
     page,

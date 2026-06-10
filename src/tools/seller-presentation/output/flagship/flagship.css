@@ -145,7 +145,6 @@
 .fs-page .video::before {content: ""; position: absolute; inset: 0; background: repeating-linear-gradient(135deg, rgba(5,56,69,.04) 0 2px, transparent 2px 12px); }
 .fs-page .video__play {position: absolute; top: 50%; left: 50%; transform: translate(-50%,-50%); width: 66px; height: 66px; border-radius: 50%; background: var(--white); display: flex; align-items: center; justify-content: center; box-shadow: 0 10px 30px rgba(5,56,69,.25); }
 .fs-page .video__play::after {content: ""; border-left: 16px solid var(--teal-700); border-top: 10px solid transparent; border-bottom: 10px solid transparent; margin-left: 4px; }
-.fs-page .video__cap {position: absolute; left: 20px; bottom: 18px; font-family: var(--f-display); font-style: italic; font-size: 15px; color: var(--teal-900); }
 .fs-page .whyprice {background: var(--paper); }
 .fs-page .why__lead {display: grid; gap: clamp(20px,4cqi,40px); align-items: end; margin-top: clamp(26px,4cqi,40px); }
 .fs-page .why__numblock {display: flex; gap: 18px; align-items: flex-start; }

@@ -81,6 +81,13 @@ export interface PresentationVideo {
    */
   autoPosterUrl?: string;
   videoUrl?: string;
+  /**
+   * @deprecated P2-VIDEO (c) — no longer collected (the wizard input was
+   * removed) nor rendered on the flagship (v2) page. Kept DORMANT on the
+   * model because the v1 `VideoBlock` still reads it for already-published
+   * v1 pages (eyebrow copy, meta line, aria-label) and must render those
+   * byte-identically. Do not re-introduce a v2 input/render for it.
+   */
   title?: string;
   /** Free-text duration ("2:14" or "2 min"). */
   runtime?: string;
