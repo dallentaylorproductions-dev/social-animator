@@ -53,6 +53,10 @@ interface SPEntitlement {
   suppressUpgradeUi: boolean;
   /** Feature-flag state for comp-import. `null` while loading; `false` hides the affordance entirely. */
   compImportEnabled: boolean | null;
+  /** P2-CHART feature-flag state for the §05 RentCast market-trend auto-fill.
+   *  `null` while loading; `false` ⇒ the wizard never fetches RentCast and the
+   *  area step behaves exactly as pre-P2 (manual/comp-derived series). */
+  areaChartRentcastEnabled: boolean | null;
 }
 
 const Ctx = createContext<SPEntitlement>({
@@ -62,6 +66,7 @@ const Ctx = createContext<SPEntitlement>({
   themeAccessLabel: '',
   suppressUpgradeUi: false,
   compImportEnabled: null,
+  areaChartRentcastEnabled: null,
 });
 
 export function useSPEntitlement(): SPEntitlement {
@@ -76,6 +81,7 @@ export function SPEntitlementProvider({ children }: { children: ReactNode }) {
     themeAccessLabel: '',
     suppressUpgradeUi: false,
     compImportEnabled: null,
+    areaChartRentcastEnabled: null,
   });
 
   useEffect(() => {
@@ -100,6 +106,7 @@ export function SPEntitlementProvider({ children }: { children: ReactNode }) {
           themeAccessLabel: data.themeAccess?.label ?? '',
           suppressUpgradeUi: !!data.suppressUpgradeUi,
           compImportEnabled: !!data.features?.compImportEnabled,
+          areaChartRentcastEnabled: !!data.features?.areaChartRentcastEnabled,
         });
       })
       .catch(() => {
