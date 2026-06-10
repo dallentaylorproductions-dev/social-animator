@@ -6,6 +6,7 @@ import { brandToPublishInputs } from "./preview/preview-payload";
 import { spStrategyDisplayLabel } from "../content/strategy-display-labels";
 import {
   validateForExport,
+  REQUIRED_INPUT_LABELS,
   type SellerPresentationDraft,
 } from "../engine/types";
 import {
@@ -70,21 +71,21 @@ type PublishState =
 
 type ExportState = "idle" | "downloading" | "done" | { error: string };
 
+// Maps a missing-required key to the wizard step that collects it. The
+// human LABEL comes from the shared REQUIRED_INPUT_LABELS so this hint and
+// the publish route's named-rejection message always agree.
 function fieldToStep(field: string): { stepId: StepId; label: string } {
+  const label = REQUIRED_INPUT_LABELS[field] ?? field;
   switch (field) {
     case "propertyAddress":
-      return { stepId: "property", label: "property address" };
+      return { stepId: "property", label };
     case "recommendedPrice":
-      return { stepId: "strategy", label: "recommended price" };
+      return { stepId: "strategy", label };
     case "comps":
-      return { stepId: "comps", label: "at least one comp" };
     case "comps[0]":
-      return {
-        stepId: "comps",
-        label: "Comp 1 address + sold price",
-      };
+      return { stepId: "comps", label };
     default:
-      return { stepId: "property", label: field };
+      return { stepId: "property", label };
   }
 }
 
