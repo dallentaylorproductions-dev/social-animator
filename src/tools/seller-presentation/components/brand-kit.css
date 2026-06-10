@@ -648,6 +648,33 @@
   background: var(--v2-mint);
   box-shadow: 0 0 8px var(--v2-mint);
 }
+/* P1-#2A — honest "this is example content" label above the embedded
+   preview. Restrained: a small mint tag + a muted one-liner, centered to the
+   phone, so the demo by-the-numbers band can't be read as the agent's own. */
+.bk-scope .preview__example {
+  display: flex;
+  flex-wrap: wrap;
+  align-items: baseline;
+  justify-content: center;
+  gap: 8px;
+  max-width: 320px;
+  margin: -8px auto 16px;
+  font-family: var(--sans);
+  font-size: 12px;
+  line-height: 1.5;
+  color: var(--ui-text-2);
+  text-align: center;
+}
+.bk-scope .preview__example-tag {
+  font-family: var(--mono);
+  font-size: 10px;
+  letter-spacing: 0.16em;
+  text-transform: uppercase;
+  color: var(--v2-mint);
+  border: 1px solid var(--ui-line-2);
+  border-radius: 999px;
+  padding: 2px 9px;
+}
 .bk-scope .phone {
   width: 384px;
   margin: 0 auto;
