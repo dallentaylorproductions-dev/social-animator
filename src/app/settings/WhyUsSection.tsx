@@ -54,10 +54,12 @@ export function WhyUsSection({
         aria-expanded={open}
         className="flex w-full items-center justify-between text-left"
       >
-        <span className="text-xs uppercase tracking-[0.18em] text-neutral-500">
+        <span className="text-xs uppercase tracking-[0.18em] text-neutral-400">
           Why us
         </span>
-        <span className="text-neutral-600 text-sm">{open ? "−" : "+"}</span>
+        <span aria-hidden className="text-base leading-none text-neutral-400">
+          {open ? "▾" : "▸"}
+        </span>
       </button>
       <p className="-mt-2 text-[11px] text-neutral-600 leading-relaxed">
         Your pre-listing pitch, set once, shown on every seller page. Edit the
@@ -357,10 +359,71 @@ function TitleDetailGroup({
 }
 
 /**
- * The quantified-comparison rows. Arrives PRE-LABELED so the agent only types
- * numbers. The label is editable (for custom rows) but the canonical rows lead
- * with their label set. `unit === "%"` → PercentInput (decimals), else
- * NumberInput (comma-grouped integers) — never a raw input.
+ * One stat value cell. Defined at MODULE scope on purpose: when this lived
+ * inside PerformanceStatsGroup's body it was a fresh component identity on every
+ * render, so each keystroke (onChange → parent re-render) remounted the input
+ * and dropped focus after a single digit (P0). Hoisted out, its identity is
+ * stable, so the field keeps focus while the agent types. `unit === "%"` routes
+ * to PercentInput (decimals + "%"), anything else to NumberInput (comma-grouped
+ * integers) — never a raw input. Both format on blur, not per keystroke.
+ */
+function StatValueInput({
+  value,
+  unit,
+  onValue,
+  testId,
+  placeholder,
+}: {
+  value: string;
+  unit?: string;
+  onValue: (v: string) => void;
+  testId: string;
+  placeholder: string;
+}) {
+  return unit === "%" ? (
+    <PercentInput
+      value={value}
+      onChange={onValue}
+      placeholder={placeholder}
+      aria-label={testId}
+    />
+  ) : (
+    <NumberInput
+      value={value}
+      onChange={onValue}
+      placeholder={placeholder}
+      aria-label={testId}
+    />
+  );
+}
+
+/**
+ * A usable EXAMPLE value for a stat's own number field — a real-looking figure
+ * the agent can pattern-match against, not a format description. Keyed off the
+ * canonical unit/label so each pre-labeled row shows what "good" looks like.
+ */
+function statExample(stat: PerformanceStat): string {
+  const label = stat.label.toLowerCase();
+  if (stat.unit === "%") return "99%";
+  if (stat.unit === "days" || label.includes("day")) return "14";
+  if (stat.unit === "views" || label.includes("view")) return "1,240";
+  if (label.includes("sold")) return "32";
+  if (label.includes("review")) return "120";
+  return "1,240";
+}
+
+/** A light market-average example: only the percentage rows get a number; the
+ *  rest leave the optional column visibly empty. */
+function marketExample(stat: PerformanceStat): string {
+  return stat.unit === "%" ? "96%" : "—";
+}
+
+/**
+ * The quantified-comparison rows ("Your results, by the numbers"). Arrives
+ * PRE-LABELED so the agent only types numbers; the label stays editable for
+ * custom rows. Presented as a prominent, collapsible card (the agent's moment
+ * to flex their proof) with a filled/unfilled indicator. Default OPEN so it
+ * reads as an invitation, not a tucked-away advanced setting.
  */
 function PerformanceStatsGroup({
   stats,
@@ -371,96 +434,120 @@ function PerformanceStatsGroup({
   cap: number;
   onChange: (items: PerformanceStat[]) => void;
 }) {
+  const [open, setOpen] = useState(true);
   const atCap = stats.length >= cap;
+  const filled = stats.filter((s) => s.yourValue.trim()).length;
   const patch = (idx: number, patchObj: Partial<PerformanceStat>) =>
     onChange(stats.map((s, j) => (j === idx ? { ...s, ...patchObj } : s)));
 
-  const ValueInput = ({
-    value,
-    unit,
-    onValue,
-    testId,
-    placeholder,
-  }: {
-    value: string;
-    unit?: string;
-    onValue: (v: string) => void;
-    testId: string;
-    placeholder: string;
-  }) =>
-    unit === "%" ? (
-      <PercentInput value={value} onChange={onValue} placeholder={placeholder} aria-label={testId} />
-    ) : (
-      <NumberInput value={value} onChange={onValue} placeholder={placeholder} aria-label={testId} />
-    );
-
   return (
-    <div className="space-y-3">
-      <GroupHeading
-        heading="Your results, by the numbers"
-        help="Pre-labeled: just fill in the numbers. They power the By the numbers band on your presentation, which shows once you fill them in. Leave any row blank to hide it."
-      />
-      {stats.map((stat, idx) => (
-        <div
-          key={idx}
-          className="space-y-2 rounded border border-neutral-800 bg-neutral-900/40 p-3"
-          data-testid={`whyus-stat-row-${idx}`}
-        >
-          <div className="flex items-center justify-between gap-2">
-            <input
-              type="text"
-              value={stat.label}
-              onChange={(e) => patch(idx, { label: e.target.value })}
-              placeholder="Stat label"
-              data-testid={`whyus-stat-label-${idx}`}
-              className={`${INPUT_CLASS} flex-1`}
-            />
-            <RowControls
-              idx={idx}
-              count={stats.length}
-              onMove={(f, t) => onChange(moveItem(stats, f, t))}
-              onRemove={(i) => onChange(stats.filter((_, j) => j !== i))}
-              testPrefix="whyus-stat"
-            />
-          </div>
-          <div className="grid grid-cols-2 gap-2">
-            <div>
-              <label className="block text-[9px] uppercase tracking-wider text-neutral-600 mb-1">
-                You{stat.unit ? ` (${stat.unit})` : ""}
-              </label>
-              <ValueInput
-                value={stat.yourValue}
-                unit={stat.unit}
-                onValue={(v) => patch(idx, { yourValue: v })}
-                testId={`whyus-stat-your-${idx}`}
-                placeholder={stat.unit === "%" ? "98.2%" : "1,240"}
-              />
-            </div>
-            <div>
-              <label className="block text-[9px] uppercase tracking-wider text-neutral-600 mb-1">
-                Market avg (optional)
-              </label>
-              <ValueInput
-                value={stat.marketValue ?? ""}
-                unit={stat.unit}
-                onValue={(v) => patch(idx, { marketValue: v || undefined })}
-                testId={`whyus-stat-market-${idx}`}
-                placeholder={stat.unit === "%" ? "96.0%" : "—"}
-              />
-            </div>
-          </div>
+    <div
+      className="space-y-3 rounded-lg border border-neutral-800 bg-neutral-900/50 p-4"
+      data-testid="whyus-stats-group"
+    >
+      <button
+        type="button"
+        onClick={() => setOpen((v) => !v)}
+        data-testid="whyus-stats-toggle"
+        aria-expanded={open}
+        className="flex w-full items-start justify-between gap-3 text-left"
+      >
+        <div className="space-y-1">
+          <h4 className="text-sm font-semibold text-text-primary">
+            Your results, by the numbers
+          </h4>
+          <p className="text-[11px] text-neutral-500 leading-relaxed">
+            This is your track record. It is what earns you the listing.
+          </p>
         </div>
-      ))}
-      <CapNudge atCap={atCap} />
-      {!atCap && (
-        <button
-          type="button"
-          onClick={() => onChange([...stats, { label: "", yourValue: "" }])}
-          data-testid="whyus-stat-add"
-          className="rounded border border-neutral-700 px-3 py-1.5 text-xs text-text-primary hover:bg-neutral-800"
-        >
-          + Add a stat
-        </button>
+        <div className="flex shrink-0 items-center gap-2">
+          <span
+            className={`rounded-full border px-2 py-0.5 text-[10px] ${
+              filled > 0
+                ? "border-mint/40 text-mint"
+                : "border-neutral-700 text-neutral-500"
+            }`}
+            data-testid="whyus-stats-filled"
+          >
+            {filled > 0 ? `${filled} filled` : "Not started"}
+          </span>
+          <span aria-hidden className="text-base leading-none text-neutral-400">
+            {open ? "▾" : "▸"}
+          </span>
+        </div>
+      </button>
+
+      {open && (
+        <div className="space-y-3 pt-1" data-testid="whyus-stats-body">
+          <p className="text-[11px] text-neutral-600 leading-relaxed">
+            Fill in the numbers you are proud of. Each row shows on your
+            presentation once it has a number, next to the market average if you
+            add one. Leave any row blank to hide it. Two or three strong numbers
+            land harder than a full wall.
+          </p>
+          {stats.map((stat, idx) => (
+            <div
+              key={idx}
+              className="space-y-2 rounded border border-neutral-800 bg-neutral-900/40 p-3"
+              data-testid={`whyus-stat-row-${idx}`}
+            >
+              <div className="flex items-center justify-between gap-2">
+                <input
+                  type="text"
+                  value={stat.label}
+                  onChange={(e) => patch(idx, { label: e.target.value })}
+                  placeholder="What does this number measure?"
+                  data-testid={`whyus-stat-label-${idx}`}
+                  className={`${INPUT_CLASS} flex-1`}
+                />
+                <RowControls
+                  idx={idx}
+                  count={stats.length}
+                  onMove={(f, t) => onChange(moveItem(stats, f, t))}
+                  onRemove={(i) => onChange(stats.filter((_, j) => j !== i))}
+                  testPrefix="whyus-stat"
+                />
+              </div>
+              <div className="grid grid-cols-2 gap-2">
+                <div>
+                  <label className="block text-[9px] uppercase tracking-wider text-neutral-600 mb-1">
+                    Your number
+                  </label>
+                  <StatValueInput
+                    value={stat.yourValue}
+                    unit={stat.unit}
+                    onValue={(v) => patch(idx, { yourValue: v })}
+                    testId={`whyus-stat-your-${idx}`}
+                    placeholder={statExample(stat)}
+                  />
+                </div>
+                <div>
+                  <label className="block text-[9px] uppercase tracking-wider text-neutral-600 mb-1">
+                    Market average (optional)
+                  </label>
+                  <StatValueInput
+                    value={stat.marketValue ?? ""}
+                    unit={stat.unit}
+                    onValue={(v) => patch(idx, { marketValue: v || undefined })}
+                    testId={`whyus-stat-market-${idx}`}
+                    placeholder={marketExample(stat)}
+                  />
+                </div>
+              </div>
+            </div>
+          ))}
+          <CapNudge atCap={atCap} />
+          {!atCap && (
+            <button
+              type="button"
+              onClick={() => onChange([...stats, { label: "", yourValue: "" }])}
+              data-testid="whyus-stat-add"
+              className="rounded border border-neutral-700 px-3 py-1.5 text-xs text-text-primary hover:bg-neutral-800"
+            >
+              + Add a stat
+            </button>
+          )}
+        </div>
       )}
     </div>
   );
