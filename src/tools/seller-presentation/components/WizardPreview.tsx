@@ -90,7 +90,19 @@ const FIELD_ANCHOR_RULES: Array<{
       `fs-whyus-pitch-${el.dataset.testid!.replace("step-pitch-card-", "")}`,
   },
   { match: '[data-testid^="step-pitch"]', anchor: () => "fs-whyus-selling" },
-  // price / rationale / confidence → the price block
+  // the "Why this price" note → the rendered note paragraph in §02 (WhyPrice,
+  // `fs-count-msg`), NOT the recommended-price block. `priceRationale`
+  // publishes into §02, so editing it must reveal THAT element; the generic
+  // step-strategy rule below would park the preview at the list price
+  // (`fs-price`, top of §03) and hide the very text being typed. Ordered
+  // before the generic rule so it wins (first match). Best-effort: the anchor
+  // only exists once the note has text, so the first keystrokes simply don't
+  // scroll until the live render mounts it — then every input event lands it.
+  {
+    match: '[data-testid="step-strategy-rationale"]',
+    anchor: () => "fs-count-msg",
+  },
+  // price / confidence / approach → the price block
   { match: '[data-testid^="step-strategy"]', anchor: () => "fs-price" },
   // the walkthrough video → the agent-note band; area stats → the area band
   { match: '[data-testid^="step-editorial-video"]', anchor: () => "fs-note" },
