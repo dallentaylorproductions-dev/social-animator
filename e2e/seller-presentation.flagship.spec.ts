@@ -1,4 +1,6 @@
 import { test, expect, type Page } from "@playwright/test";
+import { readFileSync } from "node:fs";
+import { resolve } from "node:path";
 
 /**
  * Flagship (v2) consumer page — render + role + reachability gate. Driven via
@@ -122,28 +124,80 @@ test.describe("Flagship — count digit + n-aware grammar", () => {
   });
 });
 
-test.describe("Flagship — P2-VIDEO display (contain, no caption/title)", () => {
-  test("the in-page §01 video uses object-fit: contain (full frame, head never cropped) — NOT cover", async ({
+test.describe("Flagship — P2-VIDEO-2 inlay framing (cover + focal point)", () => {
+  test("the in-page §01 video FILLS the frame: object-fit: cover (NOT contain — no letterbox)", async ({
     page,
   }) => {
     await page.goto(FLAGSHIP);
     const player = page.locator('[data-testid="fs-note-video"] .video__player');
     await expect(player).toBeVisible();
-    // (a) The whole agent is visible: `contain` letterboxes inside the
-    // fixed 4/5 frame instead of cropping to fill. `cover` is the bug.
-    expect(await read(player, "object-fit")).toBe("contain");
-    // No CSS transform on the element that takes native fullscreen — a
-    // transformed/`cover` wrapper going fullscreen is the (b) blowout.
-    expect(await read(player, "transform")).toMatch(/none|matrix\(1, 0, 0, 1, 0, 0\)/);
+    // P2-VIDEO-2: Dallen reverted the prior contain/letterbox — the inlay
+    // fills its fixed-aspect frame again, framed (not auto-cropped) by the
+    // agent's focal point so the head isn't chopped.
+    expect(await read(player, "object-fit")).toBe("cover");
   });
 
-  test("no video caption/title is rendered over the player (P2-VIDEO c)", async ({
+  test("the inlay applies the agent focal point (object-position) — default 50%/30% when unframed", async ({
+    page,
+  }) => {
+    await page.goto(FLAGSHIP);
+    const player = page.locator('[data-testid="fs-note-video"] .video__player');
+    await expect(player).toBeVisible();
+    // The full fixture carries no framing → DEFAULT_VIDEO_FRAMING (focalX 50,
+    // focalY 30, zoom 1): upper-center bias so faces aren't cut.
+    expect(await read(player, "object-position")).toBe("50% 30%");
+    // zoom 1 → scale(1) → identity matrix (or "none").
+    expect(await read(player, "transform")).toMatch(
+      /none|matrix\(1, 0, 0, 1, 0, 0\)/,
+    );
+  });
+
+  test("no video caption/title is rendered over the player (P2-VIDEO c, still removed)", async ({
     page,
   }) => {
     await page.goto(FLAGSHIP);
     await expect(page.getByTestId("fs-note-video")).toBeVisible();
-    // The brand-colored caption band was removed entirely — no replacement.
+    // The brand-colored caption band stays removed — no replacement.
     await expect(page.locator(".fs-page .video__cap")).toHaveCount(0);
+  });
+});
+
+test.describe("Flagship — P2-VIDEO-2 fullscreen ignores framing (native full video)", () => {
+  // Source-file assertion (mirrors the v1 a7d12 approach): the framing is set
+  // inline on the player, so the CSS must carry a :fullscreen override that
+  // RESETS it — when the buyer takes the native control, that same <video>
+  // goes fullscreen and must show the full uploaded video, not the inlay crop.
+  const CSS = readFileSync(
+    resolve(
+      process.cwd(),
+      "src/tools/seller-presentation/output/flagship/flagship.css",
+    ),
+    "utf8",
+  );
+
+  test(":fullscreen rule resets object-fit→contain, object-position→center, transform→none", () => {
+    const rule = CSS.match(
+      /\.fs-page\s+\.video__player:fullscreen\s*\{[\s\S]*?\}/,
+    );
+    expect(rule, ":fullscreen rule for .video__player not found").toBeTruthy();
+    expect(rule![0]).toMatch(/object-fit:\s*contain\s*!important/);
+    expect(rule![0]).toMatch(/object-position:\s*center\s*!important/);
+    expect(rule![0]).toMatch(/transform:\s*none\s*!important/);
+  });
+
+  test(":-webkit-full-screen alias lives in a SEPARATE rule (selector-list-discard safety)", () => {
+    const rule = CSS.match(
+      /\.fs-page\s+\.video__player:-webkit-full-screen\s*\{[\s\S]*?\}/,
+    );
+    expect(
+      rule,
+      ":-webkit-full-screen rule for .video__player not found",
+    ).toBeTruthy();
+    expect(rule![0]).toMatch(/object-fit:\s*contain\s*!important/);
+    // Belt-and-braces: the WebKit pseudo must NOT share a comma-list with the
+    // standard :fullscreen pseudo (a UA that knows only one drops the rule).
+    expect(CSS).not.toMatch(/:fullscreen\s*,\s*[^{]*:-webkit-full-screen/);
+    expect(CSS).not.toMatch(/:-webkit-full-screen\s*,\s*[^{]*:fullscreen/);
   });
 });
 

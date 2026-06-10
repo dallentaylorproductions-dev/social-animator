@@ -145,6 +145,16 @@
 .fs-page .video::before {content: ""; position: absolute; inset: 0; background: repeating-linear-gradient(135deg, rgba(5,56,69,.04) 0 2px, transparent 2px 12px); }
 .fs-page .video__play {position: absolute; top: 50%; left: 50%; transform: translate(-50%,-50%); width: 66px; height: 66px; border-radius: 50%; background: var(--white); display: flex; align-items: center; justify-content: center; box-shadow: 0 10px 30px rgba(5,56,69,.25); }
 .fs-page .video__play::after {content: ""; border-left: 16px solid var(--teal-700); border-top: 10px solid transparent; border-bottom: 10px solid transparent; margin-left: 4px; }
+/* P2-VIDEO-2 — the inlay fills the frame with cover + agent framing (object-fit/
+   object-position/transform set inline on .video__player). When the buyer takes
+   the native fullscreen control, that SAME <video> element goes fullscreen — so
+   reset the framing here to show the full uploaded video at its native aspect
+   (no zoom/blowout, no inlay crop). `!important` overrides the inline framing;
+   `width/height:100%` lets the fullscreen viewport drive the box, not the inline
+   inset. The WebKit alias is a SEPARATE rule: a comma-list with an unknown
+   pseudo gets the whole rule discarded by the UA. */
+.fs-page .video__player:fullscreen {object-fit: contain !important; object-position: center !important; transform: none !important; width: 100% !important; height: 100% !important; background: #000 !important; }
+.fs-page .video__player:-webkit-full-screen {object-fit: contain !important; object-position: center !important; transform: none !important; width: 100% !important; height: 100% !important; background: #000 !important; }
 .fs-page .whyprice {background: var(--paper); }
 .fs-page .why__lead {display: grid; gap: clamp(20px,4cqi,40px); align-items: end; margin-top: clamp(26px,4cqi,40px); }
 .fs-page .why__numblock {display: flex; gap: 18px; align-items: flex-start; }

@@ -1573,6 +1573,19 @@ test.describe('Seller Presentation — A7d editorial extras', () => {
       page.getByTestId('step-editorial-video-title'),
     ).toHaveCount(0);
 
+    // P2-VIDEO-2: the Instagram-style inlay framing control appears once a
+    // video exists (drag-to-reposition surface + zoom + reset).
+    await expect(
+      page.getByTestId('step-editorial-video-framing'),
+    ).toBeVisible();
+    await expect(
+      page.getByTestId('step-editorial-video-framing-frame'),
+    ).toBeVisible();
+    // Unframed by default → "Reset framing" is disabled until the agent moves it.
+    await expect(
+      page.getByTestId('step-editorial-video-framing-reset'),
+    ).toBeDisabled();
+
     // P2-VIDEO (c): the video title input was removed from the wizard; no
     // title is collected anymore. Runtime is auto-filled from the (stubbed)
     // 14-second duration —

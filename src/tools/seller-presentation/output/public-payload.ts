@@ -31,7 +31,9 @@ import type {
   Review,
   ReviewsOutlink,
   SellerPresentationDraft,
+  VideoFraming,
 } from "../engine/types";
+import { clampVideoFraming } from "../engine/types";
 import { PUBLISH_TEMPLATE_VERSION } from "../config/template-version";
 import { isPriceRangeActive } from "../engine/price-range";
 import {
@@ -56,6 +58,7 @@ export type {
   PresentationVideo,
   Review,
   ReviewsOutlink,
+  VideoFraming,
 };
 
 /**
@@ -389,6 +392,10 @@ function projectPresentationVideo(
     title: v.title,
     runtime: v.runtime,
     recordedOn: v.recordedOn,
+    // P2-VIDEO-2 — re-clamp the numeric framing at the write boundary
+    // (object-position 0–100, scale 1–3) so a tampered draft can't inject
+    // an out-of-range crop into the published page.
+    framing: clampVideoFraming(v.framing),
   };
 }
 
@@ -1019,6 +1026,7 @@ function clampPresentationVideo(raw: unknown): PresentationVideo | undefined {
     title: typeof r.title === "string" ? r.title : undefined,
     runtime: typeof r.runtime === "string" ? r.runtime : undefined,
     recordedOn: typeof r.recordedOn === "string" ? r.recordedOn : undefined,
+    framing: clampVideoFraming(r.framing),
   };
   return Object.values(video).some((v) => v !== undefined) ? video : undefined;
 }

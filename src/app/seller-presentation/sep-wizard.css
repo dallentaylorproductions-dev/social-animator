@@ -2040,6 +2040,100 @@
   gap: 16px;
 }
 
+/* P2-VIDEO-2 — Instagram-style inlay framing control. The frame mirrors the
+   default consumer inlay aspect (4/5); the media inside uses the renderer's
+   exact cover + object-position + scale recipe (set inline) so it's WYSIWYG. */
+.sep-wizard .video-framing {
+  display: flex;
+  flex-direction: column;
+  gap: 10px;
+}
+.sep-wizard .video-framing__frame {
+  position: relative;
+  width: 100%;
+  max-width: 240px;
+  aspect-ratio: 4 / 5;
+  overflow: hidden;
+  border-radius: 16px;
+  border: 1px solid var(--mint-line);
+  background: var(--panel-2);
+  cursor: grab;
+  /* keep a touch-drag from scrolling the page while reframing on mobile */
+  touch-action: none;
+  user-select: none;
+}
+.sep-wizard .video-framing__frame:active {
+  cursor: grabbing;
+}
+.sep-wizard .video-framing__media {
+  position: absolute;
+  inset: 0;
+  width: 100%;
+  height: 100%;
+  /* the frame owns the pointer drag; the media must not swallow it */
+  pointer-events: none;
+}
+/* subtle rule-of-thirds guides to help the agent center a face */
+.sep-wizard .video-framing__grid {
+  position: absolute;
+  inset: 0;
+  pointer-events: none;
+  background-image:
+    linear-gradient(to right, rgba(255, 255, 255, 0.16) 1px, transparent 1px),
+    linear-gradient(to right, rgba(255, 255, 255, 0.16) 1px, transparent 1px),
+    linear-gradient(to bottom, rgba(255, 255, 255, 0.16) 1px, transparent 1px),
+    linear-gradient(to bottom, rgba(255, 255, 255, 0.16) 1px, transparent 1px);
+  background-position: 33.33% 0, 66.66% 0, 0 33.33%, 0 66.66%;
+  background-size: 1px 100%, 1px 100%, 100% 1px, 100% 1px;
+  background-repeat: no-repeat;
+  opacity: 0.5;
+}
+.sep-wizard .video-framing__controls {
+  display: flex;
+  align-items: center;
+  gap: 16px;
+  flex-wrap: wrap;
+}
+.sep-wizard .video-framing__zoom {
+  display: inline-flex;
+  align-items: center;
+  gap: 10px;
+  flex: 1;
+  min-width: 160px;
+}
+.sep-wizard .video-framing__zoom-label {
+  font-family: var(--mono);
+  font-size: 11px;
+  letter-spacing: 0.1em;
+  text-transform: uppercase;
+  color: var(--faint);
+}
+.sep-wizard .video-framing__zoom input[type="range"] {
+  flex: 1;
+  accent-color: var(--mint);
+  cursor: pointer;
+}
+.sep-wizard .video-framing__reset {
+  flex: none;
+  background: none;
+  border: none;
+  color: var(--faint);
+  font-family: var(--sans);
+  font-size: 13px;
+  font-weight: 500;
+  cursor: pointer;
+  padding: 4px 2px;
+  white-space: nowrap;
+  transition: color 0.16s;
+}
+.sep-wizard .video-framing__reset:hover:not(:disabled) {
+  color: var(--mint);
+}
+.sep-wizard .video-framing__reset:disabled {
+  opacity: 0.4;
+  cursor: default;
+}
+
 /* upload-lock overlay */
 .sep-wizard .sec5-lock {
   position: absolute;

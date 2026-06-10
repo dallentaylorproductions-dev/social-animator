@@ -9,6 +9,7 @@ import {
 } from "react";
 import { ImageUploadField } from "@/components/ImageUploadField";
 import { VideoUploadField } from "@/components/VideoUploadField";
+import { VideoFramingField } from "@/components/VideoFramingField";
 import { CurrencyInput } from "@/components/inputs/CurrencyInput";
 import { PercentInput } from "@/components/inputs/PercentInput";
 import {
@@ -421,6 +422,10 @@ function VideoEditor({ draft, setDraft }: StepEditorialProps) {
             videoUrl: url || undefined,
             autoPosterUrl: undefined,
             scrubPosterUrl: undefined,
+            // P2-VIDEO-2 — clear the inlay framing on Replace / Remove: the
+            // focal point belonged to the prior video and would misframe a
+            // new one. The next video starts from the unframed default.
+            framing: undefined,
           };
           if (
             durationSeconds !== undefined &&
@@ -447,6 +452,19 @@ function VideoEditor({ draft, setDraft }: StepEditorialProps) {
         testIdPrefix="step-editorial-video"
         helpText="Up to 90 seconds, 250 MB. MP4, MOV, or WebM."
       />
+      {/* P2-VIDEO-2 — Instagram-style inlay framing. Only meaningful once a
+          video exists; sits right under the uploader so framing reads as part
+          of "set up your video," and the thumbnail picker follows below. */}
+      {v.videoUrl ? (
+        <VideoFramingField
+          label="Inlay framing"
+          videoUrl={v.videoUrl}
+          posterUrl={effectivePosterUrl(draft.video)}
+          framing={v.framing}
+          onChange={(framing) => setVideo({ framing })}
+          testIdPrefix="step-editorial-video-framing"
+        />
+      ) : null}
       {/* P2-VIDEO (c): the video title input was removed — it rendered in the
           brand color (low contrast over the video) and the player UI covered
           it anyway. Decision (Dallen + Cowork, Option 2): drop it entirely, no
