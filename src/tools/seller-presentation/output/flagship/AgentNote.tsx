@@ -44,11 +44,18 @@ export function AgentNote({ payload }: { payload: PublicPayload }) {
           >
             <video
               className="video__player"
-              // P2-VIDEO-3 — `#t=0.1` so iOS Safari paints the first frame
-              // instead of black when no poster is set (desktop already
-              // paints frame 1). A set `poster` still wins; the fragment
-              // only affects the posterless paint + initial play position.
-              src={withFirstFrameHint(v!.videoUrl)}
+              // P2-VIDEO-3 — first-frame hint is POSTERLESS-ONLY. iOS Safari
+              // paints a posterless <video> black, so when no poster exists
+              // we append `#t=0.1` to seek+paint the first frame. But that
+              // seek also PAINTS the 0.1s frame OVER any `poster` (preload
+              // metadata + a media fragment advances readyState past
+              // HAVE_METADATA and replaces the poster) — which silently
+              // discarded the agent's "Use this frame" pick (the chosen
+              // poster reached the payload but never showed). So when a
+              // poster IS set (override > scrub-pick > auto first-frame, via
+              // effectivePosterUrl) we use the RAW url and let the poster
+              // image show on every device.
+              src={poster ? v!.videoUrl : withFirstFrameHint(v!.videoUrl)}
               {...(poster ? { poster } : {})}
               controls
               playsInline

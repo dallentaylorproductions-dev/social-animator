@@ -1,7 +1,10 @@
 import { test, expect } from "@playwright/test";
 import { readFileSync } from "node:fs";
 import { resolve } from "node:path";
-import { withFirstFrameHint } from "../src/tools/seller-presentation/engine/types";
+import {
+  withFirstFrameHint,
+  effectivePosterUrl,
+} from "../src/tools/seller-presentation/engine/types";
 
 /**
  * P2-VIDEO-3 — iOS first-frame paint (Dallen real-iPhone bug, 2026-06-10).
@@ -82,6 +85,124 @@ test.describe("P2-VIDEO-3 — wizard wiring", () => {
     expect(src).toMatch(/currentTime\s*=\s*0\.1/);
     // Guarded to the start so it never yanks an already-scrubbed video.
     expect(src).toMatch(/currentTime\s*<\s*0\.05/);
+  });
+});
+
+/**
+ * P2-VIDEO-3 follow-up (PR #57 review, Dallen 2026-06-10).
+ *
+ * Fix 1: "Use this frame" didn't reach the preview. The chosen poster DID
+ * land in state + payload (effectivePosterUrl precedence is correct), but
+ * the #57 `#t=0.1` fragment on the flagship player's src made the browser
+ * seek to 0.1s and PAINT that first frame OVER the poster — so the live
+ * preview / mobile Preview / published page showed the first frame instead
+ * of the agent's pick. Fix: posterless-ONLY fragment (raw url when a poster
+ * is set), so the chosen poster image shows everywhere.
+ */
+test.describe("P2-VIDEO-3 (fix) — manual pick beats the first-frame paint", () => {
+  test("effectivePosterUrl precedence: override > scrub > auto > none", () => {
+    const base = { videoUrl: "https://x/v.mp4" };
+    expect(effectivePosterUrl({ ...base, autoPosterUrl: "a" })).toBe("a");
+    // A scrub pick beats the auto first-frame default.
+    expect(
+      effectivePosterUrl({ ...base, autoPosterUrl: "a", scrubPosterUrl: "s" }),
+    ).toBe("s");
+    // A manual override beats both.
+    expect(
+      effectivePosterUrl({
+        ...base,
+        autoPosterUrl: "a",
+        scrubPosterUrl: "s",
+        posterUrl: "o",
+      }),
+    ).toBe("o");
+    expect(effectivePosterUrl(base)).toBeUndefined();
+  });
+
+  test("flagship player shows the SCRUB-picked poster — raw src, NO #t=0.1 overpaint", async ({
+    page,
+  }) => {
+    await page.goto(
+      "/seller-presentation-preview?fixture=poster-scrub-over-auto&template=flagship",
+    );
+    const player = page.locator('[data-testid="fs-note-video"] .video__player');
+    await expect(player).toBeVisible();
+    const src = await player.getAttribute("src");
+    const poster = await player.getAttribute("poster");
+    // The chosen frame is the poster…
+    expect(poster).toBe("https://blob.example.com/scrub-picked-frame.jpg");
+    // …and the src is the RAW video URL — no fragment, so the 0.1s frame
+    // can't paint over and discard the pick.
+    expect(src).toBe("https://example.com/walkthrough.mp4");
+    expect(src!.includes("#t=")).toBe(false);
+  });
+
+  test("flagship player keeps the #t=0.1 hint ONLY when there's no poster", async ({
+    page,
+  }) => {
+    await page.goto(
+      "/seller-presentation-preview?fixture=poster-none&template=flagship",
+    );
+    const player = page.locator('[data-testid="fs-note-video"] .video__player');
+    await expect(player).toBeVisible();
+    const src = await player.getAttribute("src");
+    const poster = await player.getAttribute("poster");
+    expect(poster).toBeNull();
+    expect(src).toBe("https://example.com/walkthrough.mp4#t=0.1");
+  });
+
+  test("flagship player shows the manual-override poster (raw src)", async ({
+    page,
+  }) => {
+    await page.goto(
+      "/seller-presentation-preview?fixture=poster-override-wins&template=flagship",
+    );
+    const player = page.locator('[data-testid="fs-note-video"] .video__player');
+    await expect(player).toBeVisible();
+    expect(await player.getAttribute("poster")).toBe(
+      "https://blob.example.com/manual-override-thumbnail.jpg",
+    );
+    expect(await player.getAttribute("src")).toBe(
+      "https://example.com/walkthrough.mp4",
+    );
+  });
+
+  test("AgentNote source gates the fragment on the absence of a poster", () => {
+    const src = readFileSync(
+      resolve(
+        process.cwd(),
+        "src/tools/seller-presentation/output/flagship/AgentNote.tsx",
+      ),
+      "utf8",
+    );
+    // posterless-only: raw url when poster is set, hinted url otherwise.
+    expect(src).toMatch(
+      /src=\{poster\s*\?\s*v!\.videoUrl\s*:\s*withFirstFrameHint\(v!\.videoUrl\)\}/,
+    );
+  });
+});
+
+/**
+ * Fix 2: iOS Safari's central "start playback" button covered the agent's
+ * face in the authoring preview while they scrubbed "Pick a thumbnail".
+ */
+test.describe("P2-VIDEO-3 (fix) — play button doesn't cover the face while scrubbing", () => {
+  test("the authoring preview hides the iOS central play overlay (controls bar stays)", () => {
+    const field = readFileSync(
+      resolve(process.cwd(), "src/components/VideoUploadField.tsx"),
+      "utf8",
+    );
+    const css = readFileSync(
+      resolve(process.cwd(), "src/app/seller-presentation/sep-wizard.css"),
+      "utf8",
+    );
+    // The preview <video> carries the authoring-only hook class…
+    expect(field).toMatch(/sep-video-authoring-preview/);
+    // …and the CSS hides ONLY the central start-playback overlay button
+    // (the native controls bar — and its own play button — is untouched).
+    expect(css).toMatch(
+      /\.sep-video-authoring-preview::-webkit-media-controls-start-playback-button\s*\{[\s\S]*?display:\s*none/,
+    );
   });
 });
 

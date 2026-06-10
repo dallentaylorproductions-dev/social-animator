@@ -726,7 +726,14 @@ export function VideoUploadField({
               controls
               playsInline
               preload="metadata"
-              className="aspect-video w-full"
+              // P2-VIDEO-3 (Dallen real-iPhone 2026-06-10) — `sep-video-
+              // authoring-preview` lets sep-wizard.css hide iOS Safari's big
+              // CENTRAL "start playback" button, which sat over the agent's
+              // face while they scrubbed "Pick a thumbnail" — they couldn't
+              // see their expression to choose a frame. The native controls
+              // BAR (with its own play button) stays, so there's still a way
+              // to play. Authoring-only; the consumer player is untouched.
+              className="aspect-video w-full sep-video-authoring-preview"
               data-testid={tid("preview")}
               onLoadedMetadata={(e) => {
                 // Mirror the duration into state from the MAIN video
