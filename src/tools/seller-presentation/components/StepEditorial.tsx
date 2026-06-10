@@ -13,6 +13,7 @@ import { VideoUploadField } from "@/components/VideoUploadField";
 import { VideoFramingField } from "@/components/VideoFramingField";
 import { CurrencyInput } from "@/components/inputs/CurrencyInput";
 import { PercentInput } from "@/components/inputs/PercentInput";
+import { useBrandSettings } from "@/lib/brand";
 import {
   getVideoUploadSessionState,
   subscribeVideoUploadSession,
@@ -205,6 +206,8 @@ export function StepEditorial({ draft, setDraft }: StepEditorialProps) {
         </p>
       </div>
 
+      <ByTheNumbersPointer />
+
       {/* A7d.11 — step body wrapper. The lock overlay below sits
           absolutely over this container while the walk-through video
           upload is in flight, so the agent cannot edit OTHER fields
@@ -309,6 +312,45 @@ function UploadingLockOverlay({
           Hold tight. The rest of the step unlocks the moment this finishes.
         </p>
       </div>
+    </div>
+  );
+}
+
+/**
+ * P1-#5 — quiet discoverability pointer. The "By the numbers" band on the
+ * seller page is agent-CONSTANT: it's set once in Settings → Profile (the
+ * track record), not per-listing here. This pointer tells the agent where it
+ * comes from and whether it's ready, with a link across and a filled/unfilled
+ * indicator. Reads brand settings live so the indicator reflects saved state.
+ */
+function ByTheNumbersPointer() {
+  const { settings } = useBrandSettings();
+  const stats = settings.whyUs?.performanceStats ?? [];
+  const filled = stats.filter((s) => s.yourValue?.trim()).length;
+  const ready = filled > 0;
+  return (
+    <div className="sec5-pointer" data-testid="step-editorial-bynum-pointer">
+      <div className="sec5-pointer-text">
+        <span className="sec5-pointer-title">By the numbers band</span>
+        <p className="sec5-pointer-line">
+          The track-record band on your seller page is powered by your results
+          in Settings. Set it once, and it shows on every page.
+        </p>
+        <span
+          className={ready ? "sec5-pointer-chip ready" : "sec5-pointer-chip"}
+          data-testid="step-editorial-bynum-indicator"
+          data-filled={filled}
+        >
+          {ready ? `${filled} filled in` : "Not set up yet"}
+        </span>
+      </div>
+      <a
+        className="sec5-pointer-link"
+        href="/settings"
+        data-testid="step-editorial-bynum-link"
+      >
+        {ready ? "Edit in Profile" : "Add yours in Profile"}
+      </a>
     </div>
   );
 }
