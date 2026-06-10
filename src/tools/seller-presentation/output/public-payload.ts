@@ -304,6 +304,17 @@ export interface PublicPayload {
   agentTagline?: string;
   /** B0b — optional headline for the reviews block (overrides the default lead when set). */
   reviewsHeadline?: string;
+
+  /**
+   * PREVIEW-ONLY honest-sample marker. The wizard live preview keeps the
+   * By-the-numbers band visible even before the agent fills their track record
+   * (Dallen: "it looks good, keep it"), showing SAMPLE figures behind a
+   * "Sample" tag so they read as an example, never the agent's real data. Set
+   * ONLY by `draftPreviewPayload`; the publish path never writes it, so the
+   * published page is byte-identical (the tag never renders) and an empty
+   * track record still hides the band there.
+   */
+  whyUsStatsSample?: boolean;
 }
 
 /**
