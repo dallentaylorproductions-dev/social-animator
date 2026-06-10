@@ -3,6 +3,7 @@
 import { useRef } from "react";
 import {
   DEFAULT_VIDEO_FRAMING,
+  withFirstFrameHint,
   type VideoFraming,
 } from "@/tools/seller-presentation/engine/types";
 
@@ -136,7 +137,12 @@ export function VideoFramingField({
         <video
           className="video-framing__media"
           data-testid={tid("media")}
-          src={videoUrl}
+          // P2-VIDEO-3 — `#t=0.1` so iOS paints the first frame in the inlay
+          // immediately after upload instead of a black/gray box (the inlay
+          // has no controls + isn't played, so without this iOS never seeks
+          // and the frame never appears until a manual scrub). `videoUrl` is
+          // always the hosted Blob URL here.
+          src={withFirstFrameHint(videoUrl)}
           {...(posterUrl ? { poster: posterUrl } : {})}
           muted
           playsInline

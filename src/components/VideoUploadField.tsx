@@ -740,6 +740,26 @@ export function VideoUploadField({
                 if (Number.isFinite(v.duration) && v.duration > 0) {
                   setDuration(v.duration);
                 }
+                // P2-VIDEO-3 (Dallen real-iPhone 2026-06-10) — iOS Safari
+                // paints a posterless <video> BLACK until it's played or
+                // seeked, so the preview box showed black right after upload
+                // until the agent dragged the scrubber. Nudge to ~0.1s on
+                // first load so the first frame paints immediately (desktop
+                // already paints frame 1 — this is invisible there). This is
+                // a plain seek, NOT a canvas capture (capture hangs on iOS).
+                // The `#t=` URL trick isn't used here because this src can be
+                // a `blob:` objectURL, which doesn't reliably honor media
+                // fragments on iOS. Guarded to the very start so it never
+                // yanks a video the agent has already scrubbed, and wrapped
+                // because currentTime can throw if set before metadata.
+                if (v.currentTime < 0.05) {
+                  try {
+                    v.currentTime = 0.1;
+                  } catch {
+                    // ignore — a pre-metadata seek guard; the scrubber's
+                    // own seek path covers any later positioning.
+                  }
+                }
               }}
             />
           </div>

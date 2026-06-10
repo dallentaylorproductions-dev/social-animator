@@ -1,5 +1,9 @@
 import type { PublicPayload } from "../public-payload";
-import { effectivePosterUrl, effectiveFraming } from "../../engine/types";
+import {
+  effectivePosterUrl,
+  effectiveFraming,
+  withFirstFrameHint,
+} from "../../engine/types";
 
 /**
  * §01 · Note from your agent — cream band, ported from the prototype's `Note`
@@ -40,7 +44,11 @@ export function AgentNote({ payload }: { payload: PublicPayload }) {
           >
             <video
               className="video__player"
-              src={v!.videoUrl}
+              // P2-VIDEO-3 — `#t=0.1` so iOS Safari paints the first frame
+              // instead of black when no poster is set (desktop already
+              // paints frame 1). A set `poster` still wins; the fragment
+              // only affects the posterless paint + initial play position.
+              src={withFirstFrameHint(v!.videoUrl)}
               {...(poster ? { poster } : {})}
               controls
               playsInline
