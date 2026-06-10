@@ -10,7 +10,6 @@ import {
 import { ImageUploadField } from "@/components/ImageUploadField";
 import { VideoUploadField } from "@/components/VideoUploadField";
 import { CurrencyInput } from "@/components/inputs/CurrencyInput";
-import { NumberInput } from "@/components/inputs/NumberInput";
 import { PercentInput } from "@/components/inputs/PercentInput";
 import {
   getVideoUploadSessionState,
@@ -894,64 +893,14 @@ function AreaStatsEditor({ draft, setDraft }: StepEditorialProps) {
             aria-label="area-yoy"
           />
         </label>
-        <label className="field-block">
-          <span className="field-label">Days on market</span>
-          <NumberInput
-            className="input"
-            value={stats.daysOnMarket ?? ""}
-            onChange={(v) => update({ daysOnMarket: v || undefined })}
-            placeholder={derived.daysOnMarket ?? "14"}
-            aria-label="area-dom"
-          />
-          {renderDerivedFill(
-            "daysOnMarket",
-            stats.daysOnMarket,
-            "step-editorial-area-derived-daysOnMarket",
-          )}
-        </label>
-        <label className="field-block">
-          <span className="field-label">Area DOM comparison</span>
-          <input
-            type="text"
-            className="input"
-            value={stats.daysOnMarketZipAvg ?? ""}
-            onChange={(e) =>
-              update({ daysOnMarketZipAvg: e.target.value || undefined })
-            }
-            placeholder="vs Tremont avg 21"
-            data-testid="step-editorial-area-dom-comp"
-          />
-        </label>
-        <label className="field-block">
-          <span className="field-label">Closings in last 90 days</span>
-          <NumberInput
-            className="input"
-            value={stats.closings90d ?? ""}
-            onChange={(v) => update({ closings90d: v || undefined })}
-            placeholder={derived.closings90d ?? "38"}
-            aria-label="area-closings"
-          />
-          {renderDerivedFill(
-            "closings90d",
-            stats.closings90d,
-            "step-editorial-area-derived-closings90d",
-          )}
-        </label>
-        <label className="field-block">
-          <span className="field-label">List-to-sale ratio</span>
-          <PercentInput
-            className="input"
-            value={stats.listToSaleRatio ?? ""}
-            onChange={(v) => update({ listToSaleRatio: v || undefined })}
-            placeholder={derived.listToSaleRatio ?? "101%"}
-            aria-label="area-ratio"
-          />
-          {renderDerivedFill(
-            "listToSaleRatio",
-            stats.listToSaleRatio,
-            "step-editorial-area-derived-listToSaleRatio",
-          )}
-        </label>
+        {/* P1-#4 — Days on market, Area DOM comparison, Closings (90d), and
+            List-to-sale ratio inputs were removed: the §05 "Recent area sales"
+            band publishes ONLY the median, the YoY sub, and the monthly chart
+            (the LOCKED SPLIT in output/flagship/AreaStats.tsx — the others
+            duplicate the agent track-record stats in "By the numbers"). Those
+            inputs collected data the page never renders, so they were wasted
+            steps. The model fields + the comp-derivation (mergeAreaStats) are
+            untouched — anything already published stays byte-identical. */}
       </div>
 
       <div className="sec5-monthly" data-testid="step-editorial-area-monthly">

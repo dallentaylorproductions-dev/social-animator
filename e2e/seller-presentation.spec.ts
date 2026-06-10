@@ -1599,17 +1599,11 @@ test.describe('Seller Presentation — A7d editorial extras', () => {
     // YoY → PercentInput (signed). Type "+4.6"; "%" appended on blur.
     await page.getByLabel('area-yoy').fill('+4.6');
     await page.getByLabel('area-yoy').blur();
-    // DOM → NumberInput (numeric keypad + commas on blur).
-    await page.getByLabel('area-dom').fill('14');
-    // DOM comparison stays as text — short usable example placeholder.
-    await page
-      .getByTestId('step-editorial-area-dom-comp')
-      .fill('vs Tremont avg 21');
-    // Closings → NumberInput.
-    await page.getByLabel('area-closings').fill('38');
-    // List-to-sale ratio → PercentInput.
-    await page.getByLabel('area-ratio').fill('101');
-    await page.getByLabel('area-ratio').blur();
+    // P1-#4: the Days-on-market, Area-DOM-comparison, Closings (90d), and
+    // List-to-sale-ratio inputs were removed from the wizard (§05 publishes
+    // only median + YoY + the monthly chart). The model fields remain, but
+    // the agent no longer enters them here, so this round-trip drives only
+    // the surviving inputs.
     // Month chart input — A7d.4 redesign: native month picker for the
     // anchor + count stepper for how many months back, auto-generated
     // labels, one CurrencyInput per row. Agent only enters prices.
@@ -1722,21 +1716,14 @@ test.describe('Seller Presentation — A7d editorial extras', () => {
     const stats = d.areaStats as {
       medianSale?: string;
       medianSaleDeltaYoy?: string;
-      daysOnMarket?: string;
-      daysOnMarketZipAvg?: string;
-      closings90d?: string;
-      listToSaleRatio?: string;
       monthlySeries?: Array<{ month?: string; medianPrice?: string }>;
     };
-    // A7d.4: every Area-snapshot field now stores its post-format value
-    // (currency keypad → $-formatted, percent input → trailing %, number
-    // input → comma-grouped).
+    // A7d.4: the surviving Area-snapshot fields store their post-format value
+    // (currency keypad → $-formatted, percent input → trailing %). P1-#4
+    // removed the days-on-market / DOM-comparison / closings / list-to-sale
+    // inputs, so they're no longer entered or asserted here.
     expect(stats.medianSale).toBe('$642,000');
     expect(stats.medianSaleDeltaYoy).toBe('+4.6%');
-    expect(stats.daysOnMarket).toBe('14');
-    expect(stats.daysOnMarketZipAvg).toBe('vs Tremont avg 21');
-    expect(stats.closings90d).toBe('38');
-    expect(stats.listToSaleRatio).toBe('101%');
     expect(stats.monthlySeries?.[0]?.month).toBe("May '26");
     expect(stats.monthlySeries?.[0]?.medianPrice).toBe('$642,000');
 
