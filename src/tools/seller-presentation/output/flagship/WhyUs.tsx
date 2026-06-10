@@ -1,271 +1,470 @@
 import type {
   PerformanceStat,
   PublicPayload,
-  PublicWhyUs,
 } from "../public-payload";
-import { Eyebrow } from "./Eyebrow";
+import { AutoIcon, iconSection, matchIcon, type IconName } from "./icons";
 
 /**
- * B0b · Why us — the agent-constant "why list with us" chapter (paper-tinted
- * band). The FIRST piece of the Beacon-grade consumer page: the differentiation
- * the seller actually sees. Sourced from brand Settings, snapshotted into the
- * payload at publish (`payload.whyUs`), rendered ONLY on the flagship (v2)
- * template — v1 slugs never mount this.
+ * B0b / D1-PORT / D1-CONSOLIDATE / D1-CLEANUP · The agent-constant "why list
+ * with us" chapter, shared by the v2 SELLER page (FlagshipPage) and the
+ * standalone PRE-LISTING pitch page (PrelistingPage). Two variants:
  *
- * FLEX (sep-flex-in-out-optional-blocks): every sub-block hides cleanly when
- * its list is empty. The page reads complete with all of why-us, some, or none
- * — no empty headers, no "coming soon." The whole section is absent when the
- * clamp returned no renderable content (`payload.whyUs === undefined`).
+ *   variant="constant" (DEFAULT — prelisting): the full why-us pitch. Sections:
+ *     1. Why work with us  — cream band, the agent's differentiators (.rcard)
+ *                            with the guarantee folded in as the closing line.
+ *     2. By the numbers    — DARK beat, us-vs-market headline + supporting row.
+ *     3. How we market     — WARM sand band, auto-icon cards (.mcard).
+ *     4. How we work       — COOL mist band, stepper / timeline (.flow).
+ *     Per-listing PITCH cards route into §1/§3 by auto-icon THEME (D1-CONSOLIDATE).
  *
- * COLOR / LEGIBILITY (sep-template-image-text-legibility-rule): the substantive
- * numbers — the comparison bars + single big stats — carry the agent's
- * `--signature`; ALL reading text stays `--ink` / `--ink-soft`. The bars sit on
- * tinted tracks (real tonal range, calm ≠ flat); body legibility never depends
- * on the accent. Pale signatures fall through the shared `--display-seat` gate
- * (flagship.css §D), which deepens + chips the big numerals.
+ *   variant="seller" (D1-CLEANUP — the v2 seller page): the redundant "Why work
+ *     with us" differentiators wall is DROPPED (it read as a near-twin of "How
+ *     we market"; the "why choose me" story is already carried by By-the-numbers,
+ *     Reviews, and the Agent block). In its place, the agent's NON-marketing
+ *     pitch cards — the authored selling points about THIS home — get their own
+ *     "Selling points" section (reusing the .reasons / .rcard treatment, locked
+ *     v1 copy), so removing the wall never silently drops authored content.
+ *     Marketing-themed pitch cards still join "How we market" (capped at 4). The
+ *     guarantee moves to the Agent block. `whyUs.differentiators` and
+ *     `whyUs.guarantee` stay in the payload (serializer untouched).
  *
- * MOTION (sep-consumer-template-motion-direction): motivated only. Each row is a
- * `.reveal` the shared driver keys on; the comparison-bar FILLS draw on once
- * when their row reveals (CSS `.reveal.in .fs-bar__fill { width: var(--w) }`),
- * mirroring the chart's draw-on. No gratuitous movement; reduced-motion lands
- * every bar at full width instantly.
+ * De-dup is deterministic (no AI, no invented copy): a pitch card duplicates a
+ * dedicated card when they share an icon AND the keyword that triggered it; in
+ * the seller variant a selling point that merely restates a How-we-work STEP
+ * (e.g. "Negotiation handled in person" vs the "Negotiate and close" step) is
+ * the same point twice and drops.
+ *
+ * LOCKED SPLIT: "By the numbers" carries the agent's track record across PAST
+ * listings (this home hasn't sold), so the comparison reads "My listings" vs
+ * "Market" — never "this home". The neighborhood metrics live only in §05.
  */
-export function WhyUs({ payload }: { payload: PublicPayload }) {
-  const whyUs = payload.whyUs;
-  if (!whyUs) return null;
 
-  const { differentiators, marketingApproach, howWeWork, guarantee } = whyUs;
-  const { bars, bigStats } = splitStats(whyUs.performanceStats);
+const SERVICE_MAX = 6; // soft cap on the differentiators / selling-points grid
+const MARKET_MAX_DEFAULT = 6; // "How we market" cap on the prelisting pitch page
+const MARKET_MAX_SELLER = 4; // tighter cap on the seller page (visual balance)
+
+type SectionCard = {
+  title: string;
+  body?: string;
+  icon: IconName;
+  kw: string | null;
+  testid: string;
+};
+
+export function WhyUs({
+  payload,
+  variant = "constant",
+}: {
+  payload: PublicPayload;
+  /**
+   * "constant" = the agent-constant why-us pitch (prelisting): differentiators
+   * wall + guarantee, pitch routed by theme into both card sections.
+   * "seller" = D1-CLEANUP: differentiators dropped; non-marketing pitch becomes
+   * its own "Selling points" section; marketing capped at 4; guarantee moves to
+   * the Agent block.
+   */
+  variant?: "constant" | "seller";
+}) {
+  const seller = variant === "seller";
+  const whyUs = payload.whyUs;
+  const differentiators = whyUs?.differentiators ?? [];
+  const marketingApproach = whyUs?.marketingApproach ?? [];
+  const howWeWork = whyUs?.howWeWork ?? [];
+  // The guarantee renders here (constant) or in the Agent block (seller).
+  const guarantee = whyUs?.guarantee;
+  const stats = whyUs?.performanceStats ?? [];
+
+  // ----- Route the per-listing pitch cards by their auto-icon theme.
+  const pitch = payload.pitchPublicCards.map((c, i) => {
+    const m = matchIcon(c.title, c.support);
+    return {
+      title: c.title,
+      body: c.support || undefined,
+      icon: m.icon,
+      kw: m.kw,
+      section: iconSection(m.icon),
+      idx: i,
+    };
+  });
+
+  // A pitch card duplicates a dedicated card when they share an icon AND the
+  // keyword that triggered it (same point, said twice).
+  const dupeAgainst =
+    (dedicated: ReadonlyArray<{ icon: IconName; kw: string | null }>) =>
+    (p: { icon: IconName; kw: string | null }) =>
+      p.kw !== null &&
+      dedicated.some((d) => d.icon === p.icon && d.kw === p.kw);
+
+  const routePitch = (
+    target: "service" | "marketing",
+    skip: (p: { icon: IconName; kw: string | null }) => boolean,
+  ): SectionCard[] =>
+    pitch
+      .filter((p) => p.section === target && !skip(p))
+      .map<SectionCard>((p) => ({
+        title: p.title,
+        body: p.body,
+        icon: p.icon,
+        kw: p.kw,
+        testid: `fs-whyus-pitch-${p.idx}`,
+      }));
+
+  // Dedicated marketing items first, then routed marketing pitch cards (de-duped
+  // against the dedicated set), then capped — 4 on the seller page, 6 elsewhere.
+  const mktCards: SectionCard[] = marketingApproach.map((m, i) => {
+    const mi = matchIcon(m.title, m.detail);
+    return {
+      title: m.title,
+      body: m.detail || undefined,
+      icon: mi.icon,
+      kw: mi.kw,
+      testid: `fs-whyus-mkt-${i}`,
+    };
+  });
+  const marketCards = [
+    ...mktCards,
+    ...routePitch("marketing", dupeAgainst(mktCards)),
+  ].slice(0, seller ? MARKET_MAX_SELLER : MARKET_MAX_DEFAULT);
+
+  // The first cream card section differs by variant:
+  //   constant → the differentiators wall + service-themed pitch (de-duped vs
+  //              the differentiators), guarantee folded in.
+  //   seller   → the authored selling points = non-marketing pitch, de-duped
+  //              against the How-we-work steps (a selling point that restates a
+  //              process step is redundant).
+  const diffCards: SectionCard[] = differentiators.map((d, i) => {
+    const m = matchIcon(d);
+    return { title: d, icon: m.icon, kw: m.kw, testid: `fs-whyus-diff-${i}` };
+  });
+  const stepMatches = howWeWork.map((s) => matchIcon(s.step, s.detail));
+  const serviceCards: SectionCard[] = seller
+    ? routePitch("service", dupeAgainst(stepMatches)).slice(0, SERVICE_MAX)
+    : [...diffCards, ...routePitch("service", dupeAgainst(diffCards))].slice(
+        0,
+        SERVICE_MAX,
+      );
+
+  // Partition the track-record stats: comparison bars (a market value present)
+  // vs single numbers. The headline is the first PERCENTAGE comparison (the
+  // signature sale-to-list moment); everything else drops to the compact row.
+  const bars = stats.filter((s) => !!s.marketValue);
+  const bigStats = stats.filter((s) => !s.marketValue);
+  const headlineIdx = bars.findIndex((s) =>
+    /%/.test(s.yourValue + (s.unit ?? "")),
+  );
+  const headline =
+    headlineIdx >= 0 ? bars[headlineIdx] : bars[0] ?? bigStats[0];
+  const supportBars = bars.filter((s) => s !== headline);
+  const supportBig = bigStats.filter((s) => s !== headline);
+
+  const present = {
+    service: serviceCards.length > 0,
+    stats: stats.length > 0,
+    market: marketCards.length > 0,
+    work: howWeWork.length > 0,
+  };
+  // The whole chapter hides when nothing renderable survived (flex).
+  if (!present.service && !present.stats && !present.market && !present.work) {
+    return null;
+  }
+  // The `fs-whyus` chapter anchor rides the first present section — but only in
+  // the constant variant (the seller variant gives each section its own testid
+  // so removing the differentiators wall can't clobber `fs-whyus-stats`).
+  const firstKey = (
+    ["service", "stats", "market", "work"] as const
+  ).find((k) => present[k]);
+  const tid = (k: typeof firstKey) =>
+    !seller && k === firstKey ? { "data-testid": "fs-whyus" } : {};
 
   return (
-    <section className="fs-whyus fs-block" data-testid="fs-whyus">
-      <div className="fs-wrap">
-        {/* Label-only eyebrow (no index) — the same un-numbered grammar the hero
-            and price sections use, so inserting this chapter leaves every
-            numbered section's eyebrow untouched. */}
-        <Eyebrow label="Why work with us" />
-        <h2 className="fs-headline reveal">
-          A few reasons to <em>list with us</em>.
-        </h2>
-
-        {differentiators.length > 0 && (
-          <ul className="fs-whyus__diffs" data-testid="fs-whyus-diffs">
-            {differentiators.map((d, i) => (
-              <li
-                className="fs-whyus__diff reveal"
-                key={i}
-                data-testid={`fs-whyus-diff-${i}`}
-              >
-                <span className="fs-whyus__diff-mark" aria-hidden="true" />
-                <span className="fs-whyus__diff-text">{d}</span>
-              </li>
-            ))}
-          </ul>
-        )}
-
-        {(bars.length > 0 || bigStats.length > 0) && (
-          <div className="fs-whyus__group" data-testid="fs-whyus-stats">
-            <SubHead>By the numbers</SubHead>
-            {bars.length > 0 && (
-              <div className="fs-bars">
-                {bars.map((b, i) => (
-                  <CompareBar key={i} bar={b} index={i} />
-                ))}
+    <>
+      {present.service &&
+        (seller ? (
+          <section className="section reasons z-offwhite" data-testid="fs-whyus-selling">
+            <div className="reveal">
+              <div className="eyebrow">
+                What I&apos;ll Do For You{" "}
+                <span className="rule" aria-hidden="true" />
               </div>
-            )}
-            {bigStats.length > 0 && (
-              <div className="fs-whyus__bigstats">
-                {bigStats.map((s, i) => (
-                  <BigStat key={i} stat={s} index={i} />
-                ))}
-              </div>
-            )}
-          </div>
-        )}
-
-        {marketingApproach.length > 0 && (
-          <div className="fs-whyus__group" data-testid="fs-whyus-mkt">
-            <SubHead>How we market your home</SubHead>
-            <div className="fs-whyus__mkt-list">
-              {marketingApproach.map((m, i) => (
-                <div
-                  className="fs-whyus__mkt-row reveal"
-                  key={i}
-                  data-testid={`fs-whyus-mkt-${i}`}
-                >
-                  <div className="fs-whyus__mkt-title">{m.title}</div>
-                  {m.detail && (
-                    <p className="fs-whyus__mkt-detail">{m.detail}</p>
-                  )}
+              <h2 className="head">
+                A quiet, <em>thorough</em> way to sell.
+              </h2>
+            </div>
+            <div className="rcards" data-count={serviceCards.length}>
+              {serviceCards.map((c) => (
+                <div className="rcard reveal" key={c.testid} data-testid={c.testid}>
+                  <div className="card-mark">
+                    <AutoIcon name={c.icon} />
+                  </div>
+                  <div className="rcard__title">{hl(c.title)}</div>
+                  {c.body && <p className="rcard__body">{c.body}</p>}
                 </div>
               ))}
             </div>
-          </div>
-        )}
-
-        {howWeWork.length > 0 && (
-          <div className="fs-whyus__group" data-testid="fs-whyus-process">
-            <SubHead>How we work</SubHead>
-            <ol className="fs-whyus__steps">
-              {howWeWork.map((s, i) => (
-                <li
-                  className="fs-whyus__step reveal"
-                  key={i}
-                  data-testid={`fs-whyus-step-${i}`}
-                >
-                  <div className="fs-whyus__step-h">{s.step}</div>
-                  {s.detail && (
-                    <p className="fs-whyus__step-p">{s.detail}</p>
-                  )}
-                </li>
-              ))}
-            </ol>
-          </div>
-        )}
-
-        {guarantee && (
-          <div
-            className="fs-whyus__guarantee reveal"
-            data-testid="fs-whyus-guarantee"
+          </section>
+        ) : (
+          <section
+            className="section reasons z-offwhite"
+            data-testid="fs-whyus-diffs"
+            {...tid("service")}
           >
-            <div className="fs-whyus__guarantee-k">Our guarantee</div>
-            <p className="fs-whyus__guarantee-p">{guarantee}</p>
+            <div className="reveal">
+              <div className="eyebrow">
+                Why Work With Us <span className="rule" aria-hidden="true" />
+              </div>
+              <h2 className="head">
+                A few reasons to <em>list with us</em>.
+              </h2>
+            </div>
+            <div className="rcards" data-count={serviceCards.length}>
+              {serviceCards.map((c) => (
+                <div className="rcard reveal" key={c.testid} data-testid={c.testid}>
+                  <div className="card-mark">
+                    <AutoIcon name={c.icon} />
+                  </div>
+                  <div className="rcard__title">{hl(c.title)}</div>
+                  {c.body && <p className="rcard__body">{c.body}</p>}
+                </div>
+              ))}
+            </div>
+            {guarantee && (
+              <p
+                className="reasons__guarantee reveal"
+                data-testid="fs-whyus-guarantee"
+              >
+                {guarantee}
+              </p>
+            )}
+          </section>
+        ))}
+
+      {present.stats && headline && (
+        <section
+          className="section bynum z-ink"
+          data-testid="fs-whyus-stats"
+          {...tid("stats")}
+        >
+          <div className="reveal">
+            <div className="eyebrow on-dark">
+              By The Numbers <span className="rule" aria-hidden="true" />
+            </div>
           </div>
-        )}
-      </div>
-    </section>
+          <HeadlineStat stat={headline} testid="fs-whyus-bar-0" />
+          {(supportBars.length > 0 || supportBig.length > 0) && (
+            <div className="bynum__sub reveal">
+              {supportBars.map((s, i) => (
+                <SubStat
+                  key={`bar-${i}`}
+                  stat={s}
+                  testid={`fs-whyus-bar-${i + 1}`}
+                />
+              ))}
+              {supportBig.map((s, i) => (
+                <SubStat
+                  key={`big-${i}`}
+                  stat={s}
+                  testid={`fs-whyus-bigstat-${i}`}
+                />
+              ))}
+            </div>
+          )}
+        </section>
+      )}
+
+      {present.market && (
+        <section
+          className="section mkt z-sand"
+          data-testid="fs-whyus-mkt-sec"
+          {...tid("market")}
+        >
+          <div className="reveal">
+            <div className="eyebrow">
+              How We Market Your Home{" "}
+              <span className="rule" aria-hidden="true" />
+            </div>
+          </div>
+          <div className="mcards" data-count={marketCards.length}>
+            {marketCards.map((c) => (
+              <div className="mcard reveal" key={c.testid} data-testid={c.testid}>
+                <div className="card-mark">
+                  <AutoIcon name={c.icon} />
+                </div>
+                <div className="mcard__title">{c.title}</div>
+                {c.body && <p className="mcard__body">{c.body}</p>}
+              </div>
+            ))}
+          </div>
+        </section>
+      )}
+
+      {present.work && (
+        <section
+          className="section work z-mist"
+          data-testid="fs-whyus-process"
+          {...tid("work")}
+        >
+          <div className="reveal">
+            <div className="eyebrow">
+              How We Work <span className="rule" aria-hidden="true" />
+            </div>
+            <h2 className="head">
+              From hello to <em>handed keys</em>.
+            </h2>
+          </div>
+          <div className="flow" data-count={howWeWork.length}>
+            {howWeWork.map((s, i) => (
+              <div
+                className="fstep reveal"
+                key={i}
+                data-testid={`fs-whyus-step-${i}`}
+              >
+                <div className="fstep__badge">{i + 1}</div>
+                <div className="fstep__title">{s.step}</div>
+                {s.detail && <p className="fstep__body">{s.detail}</p>}
+              </div>
+            ))}
+          </div>
+        </section>
+      )}
+    </>
   );
 }
 
-/** A quiet mono sub-heading that opens each why-us sub-block. */
-function SubHead({ children }: { children: string }) {
-  return <div className="fs-whyus__subhead reveal">{children}</div>;
-}
-
-/** A single quantified comparison row — the Beacon "we do this differently" block. */
-interface BarModel {
+/**
+ * The signature headline stat — the prototype's big `.cmp` with the animated
+ * fill track. The agent figure is the rare --mint `.spark`; the market figure
+ * is muted. Labels read "My listings" / "Market" (track record, not this home).
+ */
+function HeadlineStat({
+  stat,
+  testid,
+}: {
   stat: PerformanceStat;
-  your: number;
-  market: number;
-}
+  testid: string;
+}) {
+  const you = splitVal(stat.yourValue, stat.unit);
+  const hasMkt = !!stat.marketValue;
+  const mkt = hasMkt ? splitVal(stat.marketValue!, stat.unit) : null;
 
-function CompareBar({ bar, index }: { bar: BarModel; index: number }) {
-  const { stat, your, market } = bar;
-  const max = Math.max(your, market) || 1;
-  // Floor a non-zero magnitude to a visible sliver so a small-but-real value
-  // never disappears; a true zero stays empty.
-  const width = (v: number) => (v <= 0 ? 0 : Math.max(4, (v / max) * 100));
-
-  return (
-    <div
-      className="fs-bar reveal"
-      data-testid={`fs-whyus-bar-${index}`}
-    >
-      <div className="fs-bar__label">{stat.label}</div>
-
-      <div className="fs-bar__row">
-        <div className="fs-bar__track">
-          <div
-            className="fs-bar__fill"
-            style={barStyle(width(your))}
-            data-testid={`fs-whyus-bar-${index}-you`}
-          />
-        </div>
-        <div className="fs-bar__val">{displayStat(stat.yourValue, stat.unit)}</div>
-      </div>
-
-      <div className="fs-bar__row fs-bar__row--market">
-        <div className="fs-bar__track">
-          <div
-            className="fs-bar__fill fs-bar__fill--market"
-            style={barStyle(width(market))}
-          />
-        </div>
-        <div className="fs-bar__mval">
-          {displayStat(stat.marketValue ?? "", stat.unit)}
-          <span className="fs-bar__mtag"> market avg</span>
-        </div>
-      </div>
-    </div>
-  );
-}
-
-/** A stat with no market comparison — rendered as a single big figure. */
-function BigStat({ stat, index }: { stat: PerformanceStat; index: number }) {
-  const suffix = wordUnit(stat.unit);
-  return (
-    <div
-      className="fs-whyus__bigstat reveal"
-      data-testid={`fs-whyus-bigstat-${index}`}
-    >
-      <div className="fs-whyus__bignum">
-        {stat.yourValue}
-        {suffix && <span className="fs-whyus__bigunit">{suffix}</span>}
-      </div>
-      <div className="fs-whyus__biglabel">{stat.label}</div>
-    </div>
-  );
-}
-
-/**
- * Inline CSS custom property the draw-on keys on. The fill is width:0 until its
- * `.reveal` row gets `.in`, then transitions to `--w`. Typed for the style
- * prop without leaking a non-standard key into the public CSSProperties.
- */
-function barStyle(pct: number): React.CSSProperties {
-  return { ["--w" as string]: `${pct}%` } as React.CSSProperties;
-}
-
-/** A word unit (days / views) shown as a quiet suffix; "%" rides inside the value already. */
-function wordUnit(unit?: string): string | undefined {
-  if (!unit) return undefined;
-  const u = unit.trim();
-  return u && u !== "%" ? u : undefined;
-}
-
-/**
- * Display a stat value verbatim (PercentInput already carries its own "%",
- * NumberInput stores the comma-grouped figure), appending a word unit when one
- * applies. Never re-formats the number — the agent typed exactly this.
- */
-function displayStat(value: string, unit?: string): string {
-  const suffix = wordUnit(unit);
-  return suffix ? `${value} ${suffix}` : value;
-}
-
-/**
- * Partition the stats into comparison bars (a market value present and both
- * sides parse to a number) vs single big stats (everything else). Keeps the
- * signature comparison block coherent and never tries to draw a bar it can't
- * measure.
- */
-function splitStats(stats: PublicWhyUs["performanceStats"]): {
-  bars: BarModel[];
-  bigStats: PerformanceStat[];
-} {
-  const bars: BarModel[] = [];
-  const bigStats: PerformanceStat[] = [];
-  for (const stat of stats) {
-    const your = parseStatNum(stat.yourValue);
-    const market = stat.marketValue ? parseStatNum(stat.marketValue) : null;
-    if (
-      stat.marketValue &&
-      your !== null &&
-      market !== null &&
-      (your > 0 || market > 0)
-    ) {
-      bars.push({ stat, your, market });
-    } else {
-      bigStats.push(stat);
+  // percentage track (higher-is-better) — floor a touch below the lower value.
+  let fill = 0.5;
+  let markPct = 50;
+  if (mkt) {
+    const yv = parseFloat(you.num.replace(/[^0-9.]/g, ""));
+    const mv = parseFloat(mkt.num.replace(/[^0-9.]/g, ""));
+    if (Number.isFinite(yv) && Number.isFinite(mv)) {
+      const lo = Math.min(yv, mv) - Math.max(2, Math.abs(yv - mv) * 1.5);
+      const hi = /%/.test(you.unit ?? "") ? 100 : Math.max(yv, mv) + 2;
+      const span = Math.max(hi - lo, 0.001);
+      fill = Math.min(1, Math.max(0.04, (yv - lo) / span));
+      markPct = Math.min(100, Math.max(0, ((mv - lo) / span) * 100));
     }
   }
-  return { bars, bigStats };
+
+  return (
+    <div
+      className="cmp reveal"
+      data-testid={testid}
+      style={{ "--fill": fill } as React.CSSProperties}
+    >
+      <div className="cmp__label">{stat.label}</div>
+      <div className="cmp__row">
+        <div className="cmp__col cmp__col--you">
+          <span className="cmp__k">My listings</span>
+          <span className="cmp__v">
+            <span className="spark">{you.num}</span>
+            {you.unit && <i>{you.unit}</i>}
+          </span>
+        </div>
+        {mkt && (
+          <>
+            <div className="cmp__vs">vs</div>
+            <div className="cmp__col cmp__col--mkt">
+              <span className="cmp__k">Market</span>
+              <span className="cmp__v">
+                {mkt.num}
+                {mkt.unit && <i>{mkt.unit}</i>}
+              </span>
+            </div>
+          </>
+        )}
+      </div>
+      {mkt && (
+        <div className="bynum__track">
+          <div
+            className="bynum__fill"
+            data-testid={`${testid}-you`}
+            style={{ "--fill": fill } as React.CSSProperties}
+          />
+          <div className="bynum__mktmark" style={{ left: `${markPct}%` }}>
+            <span>
+              {mkt.num}
+              {mkt.unit} market
+            </span>
+          </div>
+        </div>
+      )}
+    </div>
+  );
 }
 
-/** Parse the leading magnitude from a display value ("98.2%" → 98.2, "1,240" → 1240). */
-function parseStatNum(raw: string): number | null {
-  const cleaned = raw.replace(/[^0-9.]/g, "");
-  if (!cleaned) return null;
-  const n = Number.parseFloat(cleaned);
-  return Number.isFinite(n) ? n : null;
+/**
+ * A compact supporting stat beneath the headline. A comparison stat reads
+ * "My listings 14 days · Market 27 days"; a standalone stat is just its label +
+ * value (no fabricated market column, no "this home").
+ */
+function SubStat({
+  stat,
+  testid,
+}: {
+  stat: PerformanceStat;
+  testid: string;
+}) {
+  const you = splitVal(stat.yourValue, stat.unit);
+  const mkt = stat.marketValue ? splitVal(stat.marketValue, stat.unit) : null;
+  return (
+    <div className="substat reveal" data-testid={testid}>
+      <div className="substat__label">{stat.label}</div>
+      <div className="substat__v">
+        <span className="substat__you">
+          {mkt && <span className="substat__k">My listings</span>}
+          <span className="spark">{you.num}</span>
+          {you.unit && <i>{you.unit}</i>}
+        </span>
+        {mkt && (
+          <span className="substat__mkt">
+            <span className="substat__k">Market</span>
+            {mkt.num}
+            {mkt.unit && <i>{mkt.unit}</i>}
+          </span>
+        )}
+      </div>
+    </div>
+  );
+}
+
+/** Split "99.4%" → {num:"99.4", unit:"%"}; word unit from `stat.unit`. */
+function splitVal(
+  value: string,
+  unit?: string,
+): { num: string; unit?: string } {
+  const v = (value ?? "").trim();
+  if (v.endsWith("%")) return { num: v.slice(0, -1), unit: "%" };
+  const wu = unit && unit.trim() && unit.trim() !== "%" ? unit.trim() : undefined;
+  return { num: v, unit: wu };
+}
+
+/** Inline-highlight numeric figures in prose ("25 years" → emphasized 25). */
+function hl(text: string): React.ReactNode {
+  return String(text)
+    .split(/(\d[\d,.]*%?)/g)
+    .map((p, i) =>
+      /\d/.test(p) ? (
+        <span className="emph" key={i}>
+          {p}
+        </span>
+      ) : (
+        p
+      ),
+    );
 }

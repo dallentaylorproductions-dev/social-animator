@@ -39,26 +39,26 @@ test.describe("Flagship — print pass", () => {
   }) => {
     // A reveal deep in the page (never scrolled into view) must still be at its
     // final opacity under print — proving the CSS contract, not the observer.
-    const lateReveal = page.locator(".fs-page .fs-stat.reveal").first();
+    const lateReveal = page.locator(".fs-page .stat.reveal").first();
     expect(await read(lateReveal, "opacity")).toBe("1");
     expect(await read(lateReveal, "transform")).toBe("none");
   });
 
   test("chart prints at its end-state", async ({ page }) => {
-    const line = page.locator(".fs-page .chart .line-stroke").first();
+    const line = page.locator(".fs-page .chart .line").first();
     // The draw-on line is fully drawn (offset 0), not mid-stroke (600).
     expect(parseFloat(await read(line, "stroke-dashoffset"))).toBe(0);
     const area = page.locator(".fs-page .chart .area-fill").first();
-    expect(parseFloat(await read(area, "opacity"))).toBeCloseTo(0.08, 2);
-    const point = page.locator(".fs-page .chart .point").first();
+    expect(await read(area, "opacity")).toBe("1"); // alpha baked into the fill color
+    const point = page.locator(".fs-page .chart .dot").first();
     expect(await read(point, "opacity")).toBe("1");
   });
 
   test("self-contained units avoid page-fold splits", async ({ page }) => {
     for (const sel of [
-      ".fs-page .fs-comp",
-      ".fs-page .fs-stat",
-      ".fs-page .fs-pitch__item",
+      ".fs-page .comp-card",
+      ".fs-page .stat",
+      ".fs-page .rcard",
     ]) {
       const value = await read(page.locator(sel).first(), "break-inside");
       expect(value, sel).toBe("avoid");

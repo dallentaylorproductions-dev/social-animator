@@ -71,10 +71,15 @@ jobs:
         run: npm ci
 
       - name: Install Playwright browsers
-        # --with-deps installs the system libraries Chromium needs on Ubuntu
+        # Install BOTH browsers the suite actually uses: chromium (the
+        # default `chromium` project) and webkit (the `mobile-webkit`
+        # project — iPhone 14 emulation for the *.mobile.spec.ts phone
+        # regressions). Omitting webkit makes those specs fail at launch
+        # with "Executable doesn't exist at .../webkit-XXXX/pw_run.sh".
+        # --with-deps installs the system libraries each needs on Ubuntu
         # (libnss3, libatk-bridge2.0-0, etc.). Mac-local installs don't need
         # this; CI Linux does.
-        run: npx playwright install --with-deps chromium
+        run: npx playwright install --with-deps chromium webkit
 
       - name: Run Playwright tests
         run: npx playwright test

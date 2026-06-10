@@ -1,121 +1,122 @@
 import type { PublicPayload } from "../public-payload";
 import {
   detectReviewsSource,
-  reviewsCardCopy,
   seeAllReviewsCopy,
 } from "../presentation-page";
-import { Eyebrow } from "./Eyebrow";
+
+/** Five filled stars (the prototype's text-mark rating). */
+function Stars({ className = "" }: { className?: string }) {
+  return (
+    <span className={"stars " + className} aria-label="Five out of five stars" role="img">
+      ★★★★★
+    </span>
+  );
+}
 
 /**
- * §04 · Reviews — paper band, classic editorial pull-quotes. OPTIONAL with
- * the same three states v1 resolves from the payload:
- *  - ready      : typed reviews → pull-quotes + (optional) "see all" link.
- *  - outlink-only: no typed reviews but an outlink set → compact CTA card.
- *  - off        : neither → section omitted entirely (page reads complete).
- * Quote marks = --decorative; attribution rule = --signature; the only
- * brand-colored text run on the page is the link (--signature-link).
- *
- * B0c — `eyebrowIndex` (default "04") is an additive override; pass `""` to
- * drop the index on the un-numbered standalone page. Default keeps the seller
- * page byte-identical.
+ * §04 · Reviews — DARK beat, ported from the prototype's `Reviews` DOM
+ * (pull-quotes + a confidence card with rating, platform LOGO slot, and the
+ * see-all link). D1 visual defaults (real rating/count + official logos are D4):
+ * a clean 5.0, no invented review count, and a wordmark stand-in for the detected
+ * source. Flexes out entirely when there are neither quotes nor an outlink.
  */
 export function Reviews({
   payload,
-  eyebrowIndex = "04",
+  eyebrowIndex,
 }: {
   payload: PublicPayload;
   eyebrowIndex?: string;
 }) {
+  void eyebrowIndex;
   const reviews = payload.reviews ?? [];
   const outlink = payload.reviewsOutlink;
   if (reviews.length === 0 && !outlink) return null;
 
   const sourceName = outlink ? detectReviewsSource(outlink.url) : null;
   const seeAll = seeAllReviewsCopy(sourceName);
-
-  if (reviews.length === 0 && outlink) {
-    const agentFirst = (payload.agent?.name ?? "").trim().split(/\s+/)[0];
-    const cardCopy = reviewsCardCopy(agentFirst, sourceName);
-    return (
-      <section
-        className="fs-reviews fs-reviews--outlink fs-block"
-        data-testid="fs-reviews"
-        data-variant="outlink-only"
-      >
-        <div className="fs-wrap">
-          <Eyebrow index={eyebrowIndex} label="In their words" />
-          <a
-            className="fs-reviews__card reveal"
-            href={outlink.url}
-            target="_blank"
-            rel="noopener noreferrer"
-            data-testid="fs-reviews-outlink"
-          >
-            <span className="fs-reviews__card-copy">{cardCopy}</span>
-            <span className="fs-reviews__card-meta">{seeAll}</span>
-          </a>
-        </div>
-      </section>
-    );
-  }
+  const agentFirst = (payload.agent?.name ?? "").trim().split(/\s+/)[0] || "us";
+  const hasQuotes = reviews.length > 0;
+  const variant = hasQuotes ? undefined : "outlink-only";
 
   return (
-    <section className="fs-reviews fs-block" data-testid="fs-reviews">
-      <div className="fs-wrap">
-        <Eyebrow index={eyebrowIndex} label="In their words" />
-        {/* B0b — an agent-constant reviews headline overrides the default lead
-            when set; absent → the original copy renders byte-identical. */}
-        <h2 className="fs-headline reveal">
-          {payload.reviewsHeadline ? (
-            payload.reviewsHeadline
-          ) : (
-            <>
-              From families <em>like yours</em>.
-            </>
-          )}
-        </h2>
-        <div className="fs-reviews__list">
-          {reviews.map((r, i) => {
-            const attribution = [
-              r.attributionStreet ? `Sold on ${r.attributionStreet}` : null,
-              r.attributionYear,
-            ]
-              .filter(Boolean)
-              .join(", ");
-            return (
-              <figure className="fs-quote reveal" key={i}>
-                <blockquote className="fs-quote__body">
-                  <span className="fs-quote__mark" aria-hidden="true">
-                    &ldquo;
-                  </span>
-                  {r.body}
-                  <span className="fs-quote__mark" aria-hidden="true">
-                    &rdquo;
-                  </span>
-                </blockquote>
-                <figcaption className="fs-quote__by">
-                  <span className="fs-quote__rule" aria-hidden="true" />
-                  <span className="fs-quote__nm">{r.attributionName}</span>
-                  {attribution && <span> · {attribution}</span>}
-                </figcaption>
-              </figure>
-            );
-          })}
+    <section
+      className="section reviews z-ink"
+      data-testid="fs-reviews"
+      {...(variant ? { "data-variant": variant } : {})}
+    >
+      <div className="reveal">
+        <div className="eyebrow on-dark">
+          In Their Words <span className="rule" aria-hidden="true" />
         </div>
-        {outlink && (
-          <a
-            className="fs-brandlink reveal"
-            href={outlink.url}
-            target="_blank"
-            rel="noopener noreferrer"
-            data-testid="fs-reviews-outlink"
-          >
-            {seeAll}{" "}
-            <span className="fs-brandlink__arr" aria-hidden="true">
-              →
-            </span>
-          </a>
+        {/* B0b — an agent-constant reviews headline (preserved): surfaced as the
+            section head when set; absent → just the eyebrow, as the prototype. */}
+        {payload.reviewsHeadline && (
+          <h2 className="head">{payload.reviewsHeadline}</h2>
         )}
+      </div>
+      <div className="reviews__layout">
+        <div className="reveal">
+          {hasQuotes &&
+            reviews.map((r, i) => {
+              const attribution = [
+                r.attributionStreet ? `SOLD ON ${r.attributionStreet}` : null,
+                r.attributionYear,
+                r.attributionName,
+              ]
+                .filter(Boolean)
+                .join(" · ");
+              return (
+                <div key={i}>
+                  <Stars />
+                  <p className="review__q">
+                    <span className="mark" aria-hidden="true">
+                      &ldquo;
+                    </span>
+                    {r.body}
+                    <span className="mark" aria-hidden="true">
+                      &rdquo;
+                    </span>
+                  </p>
+                  <div className="review__attr">
+                    {attribution || r.attributionName}
+                  </div>
+                </div>
+              );
+            })}
+        </div>
+
+        <div className="rev-conf reveal" data-testid="fs-reviews-confidence">
+          <div className="rev-conf__rating">
+            <span className="rev-conf__num">5.0</span>
+            <Stars className="sm" />
+          </div>
+          {sourceName && (
+            <div
+              className="rev-logos"
+              data-testid="fs-reviews-logo-slot"
+              data-source={sourceName}
+            >
+              <span className="plogo">
+                <span className="plogo__name">{sourceName}</span>
+              </span>
+            </div>
+          )}
+          {outlink && (
+            <a
+              className="zillow"
+              href={outlink.url}
+              target="_blank"
+              rel="noopener noreferrer"
+              data-testid="fs-reviews-outlink"
+            >
+              <span className="lead">
+                Read {agentFirst}&apos;s reviews
+                {sourceName ? ` on ${sourceName}` : ""}
+              </span>
+              <span className="go">{seeAll} →</span>
+            </a>
+          )}
+        </div>
       </div>
     </section>
   );

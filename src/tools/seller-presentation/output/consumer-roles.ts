@@ -32,12 +32,37 @@ import { BrandEngine } from "@/lib/brand/color-engine";
  * cream). Kept here so the template imports one resolved set.
  */
 const LAYOUT = {
-  paper: "#F1EBE0", // --surface (locked page register)
-  ink: "#1A1612", // --ink (raw body ink)
-  onDark: "#FBF6EC", // cream text used on the solid dark bands
-  darkBand: "#1A1612", // agent / dark chapter band background
-  darkBand2: "#16110D", // deeper dark band (editorial register)
+  // ---- light surfaces (D1 locked palette · Build-Handoff §1) ----
+  white: "#FCFAF4", // lifted cards (price, comps, why-us, market, stepper, stats, chart)
+  offwhite: "#F8F3E8", // note zone · why-work-with-us cream
+  paper: "#F1EADC", // base page · price zone · comps zone · §05 area zone
+  sand: "#ECE1CC", // how-we-market WARM-tint band
+  mist: "#E3ECEC", // how-we-work COOL-tint band
+  // ---- text on light ----
+  ink: "#1B2A2E", // --t-ink (headings on light)
+  inkSoft: "#2C3C40", // --t-body (running body on light, near-ink high-contrast)
+  inkFaint: "#74858A", // --t-mute (tertiary / mono labels / captions on light)
+  // ---- dark beats (the 4 full-bleed dark beats) ----
+  darkBand: "#0C1518", // --ink (hero, by-the-numbers, reviews, agent)
+  darkBand2: "#14242B", // --ink-2 (lifted dark panel: agent card, reviews confidence card)
+  darkBand3: "#21383F", // --ink-3 (dark chip / avatar / secondary button fill)
+  // ---- text on dark ----
+  onDark: "#EFE9DC", // --t-pap (primary on dark)
+  onDarkSoft: "#B4C0C1", // --t-pap-soft (secondary on dark)
+  onDarkMute: "#7C8D90", // --t-pap-mute (tertiary / labels on dark)
 } as const;
+
+/**
+ * Near-black ink fed to the COLOR ENGINE for its ramp + on-signature contrast
+ * math ONLY. This is intentionally decoupled from the page's heading `--ink`
+ * (the teal-tinted `LAYOUT.ink` #1B2A2E): the engine uses `ink` as the dark
+ * candidate for `--on-signature` (the CTA label on the signature fill), and a
+ * lighter tinted ink would weaken a mid-warm signature's dark-label contrast
+ * below AA and wrongly flip it to cream. The signature ramp + tints are
+ * ink-independent, so this only affects the on-signature pick — keeping the
+ * contract (terracotta → dark label, blue/green → cream) intact.
+ */
+const ENGINE_INK = "#1A1612";
 
 /** The full resolved role set the flagship (v2) template consumes. */
 export interface ConsumerRoles {
@@ -51,16 +76,38 @@ export interface ConsumerRoles {
   tint6: string;
   line30: string;
   onSignature: string;
-  // ---- layout-locked neutrals ----
+  /**
+   * D1 — the RARE light-tip highlight (Build-Handoff §1 `--mint`). Reserved for
+   * the two earned light-on-dark moments: the §by-the-numbers 98.3 figure + the
+   * hero personalization dot. Derived as a high-lightness tip of the agent's
+   * signature (OKLCh, hue held) so a re-hued brand stays cohesive AND always
+   * pops bright on the dark beats — never the washed-out paper-mixed tint.
+   */
+  mint: string;
+  // ---- layout-locked neutrals (D1 locked palette) ----
+  /** Lifted-card surface (price/comp/why-us/market/stepper/stat/chart cards). */
+  white: string;
+  /** Cream zone — agent note + why-work-with-us. */
+  offwhite: string;
   paper: string;
+  /** Warm-tint band — how-we-market. */
+  sand: string;
+  /** Cool-tint band — how-we-work. */
+  mist: string;
   ink: string;
-  /** Softer body ink for secondary copy (production --ink-muted at defaults). */
+  /** Running body ink (near-ink, high-contrast) for readable sized-up copy. */
   inkSoft: string;
-  /** Faint ink for tertiary/label copy (production --ink-faint at defaults). */
+  /** Faint ink for tertiary/label/caption copy. */
   inkFaint: string;
   onDark: string;
+  /** Secondary text on the dark beats. */
+  onDarkSoft: string;
+  /** Tertiary / label text on the dark beats. */
+  onDarkMute: string;
   darkBand: string;
   darkBand2: string;
+  /** Dark chip / avatar / ghost-button fill on the dark beats. */
+  darkBand3: string;
   // ---- derived layout gate (F4 §D) ----
   /**
    * F4 — display-seat gate. True iff the agent's RAW signature can't itself
@@ -79,19 +126,20 @@ export function deriveConsumerRoles(
   accentHex: string | undefined,
 ): ConsumerRoles {
   // Drive the canonical engine with the agent's accent + the LOCKED layout
-  // surface/ink. Invalid/undefined accent falls through to the engine's
-  // default signature (F3: flagship blue #037290) internally.
+  // surface/ink. Invalid/undefined accent falls through to the engine's default
+  // signature (flagship blue #037290) — kept as-is so this redesign doesn't move
+  // the shared brand-system default; a set brand re-hues the whole signature ramp
+  // (the D1 locked teal-700 is the brand-kit pick, not a hard-coded page lock).
   const d = BrandEngine.derive(accentHex ?? "", {
     surface: LAYOUT.paper,
-    ink: LAYOUT.ink,
+    ink: ENGINE_INK,
   });
   const h = d.hexes;
 
-  // inkSoft / inkFaint are layout-locked: derived from the locked paper/ink
-  // via the engine's own OKLCh mix (reused math, not new), so they match the
-  // production --ink-muted (56%) / --ink-faint (38%) resolved values exactly.
-  const inkSoft = BrandEngine.mixOklch(LAYOUT.paper, LAYOUT.ink, 0.56);
-  const inkFaint = BrandEngine.mixOklch(LAYOUT.paper, LAYOUT.ink, 0.38);
+  // --mint — the bright light-tip of the signature (OKLCh lighten toward white,
+  // hue/chroma character held by the engine mix), so it always reads as a vivid
+  // highlight on the dark beats regardless of how deep the agent's accent is.
+  const mint = BrandEngine.mixOklch(h.signature, "#FFFFFF", 0.42);
 
   return {
     signature: h.signature,
@@ -102,13 +150,21 @@ export function deriveConsumerRoles(
     tint6: h["tint-6"],
     line30: h["line-30"],
     onSignature: h["on-signature"],
+    mint,
+    white: LAYOUT.white,
+    offwhite: LAYOUT.offwhite,
     paper: LAYOUT.paper,
+    sand: LAYOUT.sand,
+    mist: LAYOUT.mist,
     ink: LAYOUT.ink,
-    inkSoft,
-    inkFaint,
+    inkSoft: LAYOUT.inkSoft,
+    inkFaint: LAYOUT.inkFaint,
     onDark: LAYOUT.onDark,
+    onDarkSoft: LAYOUT.onDarkSoft,
+    onDarkMute: LAYOUT.onDarkMute,
     darkBand: LAYOUT.darkBand,
     darkBand2: LAYOUT.darkBand2,
+    darkBand3: LAYOUT.darkBand3,
     // F4 §D — the agent's RAW signature can't serve as a 3:1 display number on
     // paper. The engine reports this directly (no new color math): when the
     // unclamped signature-on-surface is < 3:1, the foreground clamp can only
@@ -127,27 +183,22 @@ export function deriveConsumerRoles(
  * the signature (secondary retired in PR #29).
  */
 export function consumerRoleVars(roles: ConsumerRoles): Record<string, string> {
+  // D1-PORT — the ported prototype CSS (flagship.css) defines EVERY token literally
+  // (the locked neutrals/text/line/depth). Only the brand-tracked tokens are
+  // inlined here so the cohesive teal ramp re-hues per agent: `--teal-700` seeds
+  // the whole ramp (the CSS `--teal-900/500/200/100` color-mix expressions derive
+  // from it), `--mint` is the brand's bright light-tip, and `--on-signature` keeps
+  // the CTA/badge label legible (the prototype's hardcoded #eafcff would fail a
+  // pale signature). `--signature*` are kept for the brand-kit live-preview bridge
+  // and any shared consumer that still reads them.
   return {
+    "--teal-700": roles.signature,
+    "--accent": roles.signature,
+    "--mint": roles.mint,
+    "--on-signature": roles.onSignature,
+    // retained aliases for the live-preview bridge / shared readers
     "--signature": roles.signature,
     "--signature-deep": roles.signatureDeep,
     "--signature-link": roles.signatureLink,
-    "--tint-12": roles.tint12,
-    "--tint-9": roles.tint9,
-    "--tint-6": roles.tint6,
-    "--line-30": roles.line30,
-    "--on-signature": roles.onSignature,
-    "--decorative": roles.signature,
-    "--paper": roles.paper,
-    "--ink": roles.ink,
-    "--ink-soft": roles.inkSoft,
-    "--ink-faint": roles.inkFaint,
-    "--on-dark": roles.onDark,
-    "--dark-band": roles.darkBand,
-    "--dark-band-2": roles.darkBand2,
-    // F4 §D — the display-seat gate as a CSS flag (always emitted as "1"/"0"
-    // so a live bridge push reliably overwrites the prior value). The scoped
-    // `@container style(--display-seat: 1)` block in flagship.css is the ONLY
-    // consumer; "0" matches nothing → byte-identical render.
-    "--display-seat": roles.needsDisplaySeat ? "1" : "0",
   };
 }

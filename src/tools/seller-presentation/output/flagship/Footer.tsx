@@ -1,12 +1,11 @@
 import type { PublicPayload } from "../public-payload";
 
 /**
- * §9 · Footer — dark band. The wordmark is a CONDITIONAL white-label slot:
- * "Studio SEP" ("SEP" serif-italic in --signature, NO floating "S" mark). It
- * is ALWAYS rendered in F2 but gated by one boolean prop (default true) so the
- * F4 white-label entitlement is a one-line wire-up; the footer reads balanced
- * with it present OR absent. The disclaimer is ALWAYS present — the verbatim
- * production string with the prepared-for name interpolated.
+ * Standalone footer — the prototype's `agent__foot` rendered as its OWN dark
+ * section (the seller page folds this into AgentBand; the prelisting standalone
+ * page renders it separately after its single close). The Studio SEP wordmark is
+ * a conditional white-label slot (default shown); the disclaimer is always
+ * present, verbatim with the prepared-for name interpolated.
  */
 export function Footer({
   payload,
@@ -21,17 +20,17 @@ export function Footer({
     : "The information above is drawn from public record. This page is not an advertisement and does not constitute an offer.";
 
   return (
-    <footer className="fs-foot" data-testid="fs-foot">
-      <div className="fs-wrap">
-        <div className="fs-foot__inner">
+    <section className="agent" data-testid="fs-foot" style={{ paddingTop: 0 }}>
+      <div className="agent__foot" style={{ marginTop: 0, borderTop: "none" }}>
+        <div className="agent__lower">
           {showWordmark && (
-            <div className="fs-foot__word" data-testid="fs-wordmark">
+            <div className="agent__brand" data-testid="fs-wordmark">
               Studio <em>SEP</em>
             </div>
           )}
-          <p className="fs-foot__disc">{disclaimer}</p>
+          <div className="agent__disc">{disclaimer}</div>
         </div>
       </div>
-    </footer>
+    </section>
   );
 }

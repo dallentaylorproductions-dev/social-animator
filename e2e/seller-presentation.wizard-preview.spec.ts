@@ -36,9 +36,17 @@ test.describe("Wizard live preview — desktop dock", () => {
 
     // The sample renders in the agent's brand color = the blue default, never
     // the v1 terracotta.
-    const color = await read(dock.locator(".fs-price__big").first(), "color");
-    expect(color).toBe(BLUE);
+    // The price figure is the deep-teal (--teal-900) mix of the brand signature —
+    // present + brand-derived (NOT the v1 terracotta). The blue brand token rides
+    // the root's --teal-700.
+    const color = await read(dock.locator(".price__single").first(), "color");
+    expect(color).toBeTruthy();
     expect(color).not.toBe(TERRACOTTA);
+    const rootTeal = await read(
+      dock.getByTestId("seller-presentation-flagship"),
+      "--teal-700",
+    );
+    expect(rootTeal.trim().toLowerCase()).toContain("037290");
   });
 
   test("typing an address swaps the panel to the agent's real draft", async ({
@@ -146,14 +154,16 @@ test.describe("Wizard live preview — field-level scroll-sync", () => {
     await page.getByLabel("recommended-price").focus();
     await expect.poll(() => anchorInView(screen, "fs-price")).toBe(true);
 
-    // Pitch → cards seed on entry; focusing point 0 reveals fs-pitch-0.
+    // Pitch → cards seed on entry; D1-CONSOLIDATE routes each pitch point into
+    // the why-list-with-us chapter (keeping its index), so point 0 reveals
+    // fs-whyus-pitch-0.
     await page.getByTestId("wizard-next").click();
     await expect(page.getByTestId("step-pitch")).toBeVisible();
     await expect(page.getByTestId("step-pitch-card-0")).toBeVisible();
-    await expect(screen.getByTestId("fs-pitch-0")).toBeAttached();
+    await expect(screen.getByTestId("fs-whyus-pitch-0")).toBeAttached();
     await scrollScreenTop(screen);
     await page.getByTestId("step-pitch-title-0").focus();
-    await expect.poll(() => anchorInView(screen, "fs-pitch-0")).toBe(true);
+    await expect.poll(() => anchorInView(screen, "fs-whyus-pitch-0")).toBe(true);
   });
 });
 

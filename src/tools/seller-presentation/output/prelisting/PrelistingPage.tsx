@@ -63,7 +63,7 @@ export function PrelistingPage({ record }: { record: HandoutRecord }) {
             (showCtas={false}) so the page has ONE decided close below; the
             section index is dropped (eyebrowIndex="") for a clean un-numbered
             standalone composition. */}
-        <AgentBand payload={view} eyebrowIndex="" showCtas={false} />
+        <AgentBand payload={view} eyebrowIndex="" showCtas={false} showFoot={false} />
         {/* The agent-constant "why list with us" case. */}
         <WhyUs payload={view} />
         {/* Curated reviews + outlink, agent-constant. */}

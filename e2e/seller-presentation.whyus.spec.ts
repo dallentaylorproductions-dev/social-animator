@@ -14,7 +14,7 @@ import { test, expect, type Page } from "@playwright/test";
  *   - v1 cohort — an unset/v1 payload never mounts the section or leaks the copy.
  */
 
-const INK = "rgb(26, 22, 18)"; // --ink #1a1612 (layout-locked, every signature)
+const INK = "rgb(27, 42, 46)"; // --ink #1B2A2E (D1 locked neutral, every signature)
 
 const FLAGSHIP_FULL =
   "/seller-presentation-preview?fixture=full&template=flagship";
@@ -29,12 +29,14 @@ test.describe("Why-us — per-block render (full fixture)", () => {
   test("the section + every populated sub-block renders", async ({ page }) => {
     await page.goto(FLAGSHIP_FULL);
 
-    await expect(page.getByTestId("fs-whyus")).toBeVisible();
-
-    // Differentiators (3 in the fixture).
-    for (const i of [0, 1, 2]) {
-      await expect(page.getByTestId(`fs-whyus-diff-${i}`)).toBeVisible();
-    }
+    // Selling points — D1-CLEANUP restored a dedicated home for the agent's
+    // non-marketing pitch cards (the old differentiators wall is gone). Reuses
+    // the locked v1 heading copy.
+    const selling = page.getByTestId("fs-whyus-selling");
+    await expect(selling).toBeVisible();
+    await expect(selling).toContainText("A quiet, thorough way to sell");
+    // The fixture's "A Friday-evening update…" point lands here (chat icon).
+    await expect(page.getByTestId("fs-whyus-pitch-2")).toBeVisible();
 
     // Performance: two comparison bars (sale-to-list, days-on-market) + two
     // single big stats (views, homes sold).
@@ -44,7 +46,7 @@ test.describe("Why-us — per-block render (full fixture)", () => {
     await expect(page.getByTestId("fs-whyus-bigstat-0")).toBeVisible();
     await expect(page.getByTestId("fs-whyus-bigstat-1")).toBeVisible();
 
-    // Marketing approach (3 rows).
+    // Marketing approach (3 dedicated rows; the 4th slot is the routed launch card).
     for (const i of [0, 1, 2]) {
       await expect(page.getByTestId(`fs-whyus-mkt-${i}`)).toBeVisible();
     }
@@ -54,8 +56,12 @@ test.describe("Why-us — per-block render (full fixture)", () => {
       await expect(page.getByTestId(`fs-whyus-step-${i}`)).toBeVisible();
     }
 
-    // Guarantee.
-    await expect(page.getByTestId("fs-whyus-guarantee")).toBeVisible();
+    // Guarantee — D1-CLEANUP relocated it from the removed differentiators wall
+    // into the AGENT block; it no longer renders inside the why-us chapter.
+    await expect(page.getByTestId("fs-whyus-guarantee")).toHaveCount(0);
+    await expect(
+      page.getByTestId("fs-agent").getByTestId("fs-agent-guarantee"),
+    ).toBeVisible();
   });
 
   test("reading text stays ink; the bar numeral carries the signature", async ({
@@ -63,16 +69,17 @@ test.describe("Why-us — per-block render (full fixture)", () => {
   }) => {
     await page.goto(FLAGSHIP_FULL);
 
-    // Body copy (a differentiator) is ink — legibility never rides the accent.
+    // Body copy (a selling-point card title) is ink — legibility never rides
+    // the accent.
     const diffText = page
-      .getByTestId("fs-whyus-diff-0")
-      .locator(".fs-whyus__diff-text");
+      .getByTestId("fs-whyus-pitch-2")
+      .locator(".rcard__title");
     expect(await read(diffText, "color")).toBe(INK);
 
     // The substantive bar value is NOT ink (it carries --signature, deepened on
     // pale-signature pages). Proving it differs from ink keeps the design intent
     // honest without hardcoding a specific signature hex.
-    const barVal = page.getByTestId("fs-whyus-bar-0").locator(".fs-bar__val");
+    const barVal = page.getByTestId("fs-whyus-bar-0").locator(".cmp__col--you .spark");
     expect(await read(barVal, "color")).not.toBe(INK);
   });
 
@@ -84,7 +91,7 @@ test.describe("Why-us — per-block render (full fixture)", () => {
     // regardless of whether the IntersectionObserver has fired yet.
     const fill = page.getByTestId("fs-whyus-bar-0-you");
     const style = (await fill.getAttribute("style")) ?? "";
-    expect(style).toContain("--w");
+    expect(style).toContain("--fill");
   });
 
   test("agent tagline + reviews headline surface (additive, near their blocks)", async ({
@@ -99,8 +106,121 @@ test.describe("Why-us — per-block render (full fixture)", () => {
 
     // The reviews headline overrides the default "From families like yours".
     await expect(
-      page.getByTestId("fs-reviews").locator(".fs-headline"),
+      page.getByTestId("fs-reviews").locator("h2.head"),
     ).toContainText("What sellers say");
+  });
+});
+
+test.describe("By the numbers — agent track record framing (D1-CONSOLIDATE)", () => {
+  test("reads 'My listings' vs 'Market' — never 'This home'", async ({
+    page,
+  }) => {
+    await page.goto(FLAGSHIP_FULL);
+    const stats = page.getByTestId("fs-whyus-stats");
+    await expect(stats).toBeVisible();
+
+    // The stats are the agent's record across PAST listings (this home hasn't
+    // sold), so no "this home" framing may remain anywhere on the page.
+    await expect(page.locator("body")).not.toContainText("This home");
+    await expect(stats).toContainText("My listings");
+    await expect(stats).toContainText("Market");
+  });
+
+  test("ONE big headline (sale-to-list, with the signature track) + a compact supporting row keeps all four figures", async ({
+    page,
+  }) => {
+    await page.goto(FLAGSHIP_FULL);
+
+    // Headline = the sale-to-list percentage, at the big .cmp scale, with the
+    // animated fill track (the one signature punch).
+    const headline = page.getByTestId("fs-whyus-bar-0");
+    await expect(headline).toBeVisible();
+    await expect(headline).toContainText("99.4");
+    await expect(headline.locator(".cmp__col--you .cmp__v")).toBeVisible();
+    await expect(page.getByTestId("fs-whyus-bar-0-you")).toBeVisible(); // track
+
+    // The remaining three figures move to the compact supporting row — smaller,
+    // but every value is kept.
+    const sub = page.locator(".fs-page .bynum__sub");
+    await expect(sub).toBeVisible();
+    await expect(page.getByTestId("fs-whyus-bar-1")).toContainText("14"); // days on market
+    await expect(page.getByTestId("fs-whyus-bigstat-0")).toContainText("1,240"); // views
+    await expect(page.getByTestId("fs-whyus-bigstat-1")).toContainText("32"); // homes sold
+    // The standalone stats carry NO fabricated market column.
+    await expect(page.getByTestId("fs-whyus-bigstat-0")).not.toContainText(
+      "Market",
+    );
+  });
+});
+
+test.describe("Pitch routing — split by auto-icon theme (D1-CLEANUP)", () => {
+  test("marketing-themed pitch cards land in How-we-market, the rest in Selling points; the photography duplicate drops", async ({
+    page,
+  }) => {
+    await page.goto(FLAGSHIP_FULL);
+
+    const selling = page.getByTestId("fs-whyus-selling");
+    const mkt = page.getByTestId("fs-whyus-mkt-sec");
+
+    // Marketing-themed pitch cards (e.g. the launch card) join "How we market";
+    // non-marketing ones (the home's selling points) join "Selling points".
+    await expect(
+      selling.locator('[data-testid^="fs-whyus-pitch-"]').first(),
+    ).toBeVisible();
+    await expect(
+      mkt.locator('[data-testid^="fs-whyus-pitch-"]').first(),
+    ).toBeVisible();
+
+    // The "A photographer the magazines use." pitch card resolves to the SAME
+    // camera icon via the SAME keyword ("photo") as the dedicated marketing
+    // photography card → it is the duplicate and is dropped, not rendered.
+    await expect(page.getByTestId("fs-whyus-pitch-0")).toHaveCount(0);
+    await expect(page.locator("body")).not.toContainText(
+      "A photographer the magazines use",
+    );
+
+    // "Negotiation handled in person." restates the "Negotiate and close"
+    // How-we-work step (same doc icon via "negotiat") → the same point twice, so
+    // it drops too.
+    await expect(page.getByTestId("fs-whyus-pitch-3")).toHaveCount(0);
+    await expect(page.locator("body")).not.toContainText(
+      "Negotiation handled in person",
+    );
+  });
+
+  test("each surviving pitch point renders once, never in both sections", async ({
+    page,
+  }) => {
+    await page.goto(FLAGSHIP_FULL);
+
+    // The legacy v1-style standalone pitch grid (its own testid) is still absent.
+    await expect(page.getByTestId("fs-pitch")).toHaveCount(0);
+
+    // Every routed pitch card sits in EXACTLY one section — a card routes by its
+    // single icon theme, so the same point can never appear in both grids.
+    const total = await page
+      .locator('[data-testid^="fs-whyus-pitch-"]')
+      .count();
+    const inSelling = await page
+      .getByTestId("fs-whyus-selling")
+      .locator('[data-testid^="fs-whyus-pitch-"]')
+      .count();
+    const inMkt = await page
+      .getByTestId("fs-whyus-mkt-sec")
+      .locator('[data-testid^="fs-whyus-pitch-"]')
+      .count();
+    expect(total).toBeGreaterThan(0);
+    expect(inSelling + inMkt).toBe(total); // no card double-rendered across sections
+  });
+
+  test("How-we-market is capped at 4 cards (visual balance)", async ({
+    page,
+  }) => {
+    await page.goto(FLAGSHIP_FULL);
+    const cards = page
+      .getByTestId("fs-whyus-mkt-sec")
+      .locator(".mcard");
+    expect(await cards.count()).toBeLessThanOrEqual(4);
   });
 });
 
@@ -114,9 +234,10 @@ test.describe("Why-us — flex (empty whyUs)", () => {
     await expect(
       page.getByTestId("seller-presentation-flagship"),
     ).toBeVisible();
-    // No why-us section, and no orphaned sub-block headers.
-    await expect(page.getByTestId("fs-whyus")).toHaveCount(0);
+    // No why-us chapter, and no orphaned sub-block headers.
+    await expect(page.getByTestId("fs-whyus-selling")).toHaveCount(0);
     await expect(page.getByTestId("fs-whyus-stats")).toHaveCount(0);
+    await expect(page.getByTestId("fs-whyus-mkt-sec")).toHaveCount(0);
     await expect(page.getByTestId("fs-agent-tagline")).toHaveCount(0);
     // The page still reads complete — closing sections present.
     await expect(page.getByTestId("fs-agent")).toBeVisible();
@@ -136,8 +257,9 @@ test.describe("Why-us — v1 cohort byte-safety", () => {
       page.getByTestId("seller-presentation-flagship"),
     ).toHaveCount(0);
 
-    // The why-us section is flagship-only — never present on v1.
-    await expect(page.getByTestId("fs-whyus")).toHaveCount(0);
+    // The why-us chapter is flagship-only — never present on v1.
+    await expect(page.getByTestId("fs-whyus-stats")).toHaveCount(0);
+    await expect(page.getByTestId("fs-whyus-selling")).toHaveCount(0);
 
     // And none of the why-us copy leaks into the v1 DOM (v1 ignores the
     // whyUs / agentTagline / reviewsHeadline payload fields entirely).

@@ -1,87 +1,112 @@
 import type { PublicComp, PublicPayload } from "../public-payload";
-import { Eyebrow } from "./Eyebrow";
 import { countSentence, hasCount } from "./copy";
 
 /**
- * §02 · Why this price — confident-tint band. The argument for the number:
- *  - count block: a big derived DIGIT beside an n-aware sentence ("B-side").
- *    The digit slot renders ONLY the numeral (`whyPrice.comps.length`, the
- *    already-filtered counted set) — never freeform text. Digit = --signature
- *    (a substantive display number); sentence = --ink.
- *  - optional agent message: the EXISTING seller-visible "why this price"
- *    field (`whyPrice.publicRationale`, captured by StepStrategy's "your
- *    seller reads this" zone and rendered publicly by v1). Bound here as an
- *    --ink italic lead below the count block — NO new persisted field, never
- *    the numeral treatment.
- *  - comps ledger: comp price = --signature-deep; rules = --line-30.
+ * §02 · Why this price (comps) — ported from the prototype's `WhyPrice` DOM.
+ * Big derived numeral + n-aware sentence, optional agent rationale, then the
+ * comp cards (slim 116px photo strip on mobile / 16:10 photo on top on desktop —
+ * the photo SLOT flexes out cleanly when absent; D1 ships text-only, D3 wires the
+ * real upload). `SOURCE · PUBLIC RECORD` preserved.
  */
 export function WhyPrice({ payload }: { payload: PublicPayload }) {
   const { whyPrice } = payload;
   const rationale = whyPrice.publicRationale?.trim();
   const comps = whyPrice.comps;
   const n = comps.length;
-
-  // Hide entirely when there is neither a message nor any comp to show.
   if (!rationale && n === 0) return null;
 
+  const city = payload.property.city?.trim();
+
   return (
-    <section className="fs-why fs-block tint-confident" data-testid="fs-why">
-      <div className="fs-wrap">
-        <Eyebrow index="02" label="Why this price" />
-        <h2 className="fs-headline reveal">
+    <section className="section whyprice" data-testid="fs-why">
+      <div className="reveal">
+        <div className="eyebrow">
+          <span className="num">02</span> · Why This Price{" "}
+          <span className="rule" aria-hidden="true" />
+        </div>
+        <h2 className="head">
           A confident, <em>defensible</em> number.
         </h2>
+      </div>
 
+      <div className="why__lead">
         {hasCount(n) && (
-          <div className="fs-count fs-count--beside reveal">
-            <span className="fs-count__digit" data-testid="fs-count-digit">
+          <div className="why__numblock reveal">
+            <span className="why__num" data-testid="fs-count-digit">
               {n}
             </span>
-            <p className="fs-count__say" data-testid="fs-count-say">
+            <span className="why__numtext" data-testid="fs-count-say">
               {countSentence(n)}
-            </p>
+            </span>
           </div>
         )}
-
         {rationale && (
-          <p className="fs-count__msg reveal" data-testid="fs-count-msg">
+          <p className="why__agentnote reveal" data-testid="fs-count-msg">
             {rationale}
           </p>
         )}
-
-        {n > 0 && (
-          <div className="fs-comps" data-testid="fs-comps">
-            {comps.map((c, i) => (
-              <CompRow key={i} comp={c} index={i} />
-            ))}
-          </div>
-        )}
-        {n > 0 && <div className="fs-comps__src">Source · Public record</div>}
       </div>
+
+      {n > 0 && (
+        <div className="comps" data-testid="fs-comps">
+          {comps.map((c, i) => (
+            <CompCard key={i} comp={c} index={i} city={city} />
+          ))}
+        </div>
+      )}
+      {n > 0 && (
+        <div className="comp__src reveal">Source · Public Record</div>
+      )}
     </section>
   );
 }
 
-function CompRow({ comp, index }: { comp: PublicComp; index: number }) {
-  const no = String(index + 1).padStart(2, "0");
-  const sub = [
-    comp.sqft ? `${comp.sqft} sqft` : null,
-    comp.yearBuilt !== undefined ? `Built ${comp.yearBuilt}` : null,
-    comp.soldDate ?? null,
+function CompCard({
+  comp,
+  index,
+  city,
+}: {
+  comp: PublicComp;
+  index: number;
+  city?: string;
+}) {
+  const idx = String(index + 1).padStart(2, "0");
+  const hasPhoto = !!comp.photoUrl;
+  const meta = [
+    city || null,
+    comp.sqft ? `${comp.sqft} SQFT` : null,
+    comp.yearBuilt !== undefined ? `BUILT ${comp.yearBuilt}` : null,
   ]
     .filter(Boolean)
     .join(" · ");
 
   return (
-    <div className="fs-comp reveal" data-testid={`fs-comp-${index}`}>
-      <div className="fs-comp__no">{no}</div>
-      <div>
-        <div className="fs-comp__addr">{comp.address || "—"}</div>
-        {sub && <div className="fs-comp__sub">{sub}</div>}
-      </div>
-      <div>
-        <div className="fs-comp__price">{comp.soldPrice || "—"}</div>
-        <span className="fs-comp__tag">Sold</span>
+    <div
+      className={`comp-card reveal${hasPhoto ? " has-photo" : ""}`}
+      data-testid={`fs-comp-${index}`}
+    >
+      {hasPhoto && (
+        <div
+          className="comp-card__photo"
+          data-testid={`fs-comp-${index}-photo`}
+          aria-hidden="true"
+          style={{
+            backgroundImage: `url("${comp.photoUrl!.replace(/"/g, '\\"')}")`,
+            backgroundSize: "cover",
+            backgroundPosition: "center",
+          }}
+        />
+      )}
+      <div className="comp-card__body">
+        <div className="comp-card__info">
+          <span className="comp-card__idx">{idx}</span>
+          <div className="comp-card__addr">{comp.address || "—"}</div>
+          {meta && <div className="comp-card__meta">{meta}</div>}
+        </div>
+        <div className="comp-card__price">
+          <b>{comp.soldPrice || "—"}</b>
+          <span>Sold</span>
+        </div>
       </div>
     </div>
   );

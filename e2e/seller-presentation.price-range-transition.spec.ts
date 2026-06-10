@@ -153,7 +153,7 @@ test.describe("UX-2a-followup — price single→range transition (no crash)", (
     // count-up node remounts — no removeChild crash either direction.
     await page.getByTestId("step-strategy-range-toggle").click();
     await expect(screen.getByTestId("fs-price-range")).toHaveCount(0);
-    await expect(screen.locator(".fs-price__big").first()).toBeVisible();
+    await expect(screen.locator(".price__single").first()).toBeVisible();
     await expect(screen.locator("[data-testid='fs-price']")).toContainText(
       "$650,000",
     );

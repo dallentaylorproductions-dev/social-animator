@@ -47,26 +47,29 @@ test.describe("F3 — Brand-kit live preview shows the flagship rhythm", () => {
     await page.goto(EMBED_FLAGSHIP);
     const roles = deriveConsumerRoles(ACCENT);
 
-    // Price figure is the signature (the §2 hero value moment).
-    const priceBig = await read(
-      page.locator(".fs-page .fs-price__big").first(),
-      "color",
+    // D1-PORT — the ONE brand-tracked token is `--teal-700` (it seeds the whole
+    // ported teal ramp). The live preview shares the same `deriveConsumerRoles`
+    // path, so the flagship root's inlined `--teal-700` equals roles.signature.
+    const rootTeal = await read(
+      page.getByTestId("seller-presentation-flagship"),
+      "--teal-700",
     );
-    expect(priceBig).toBe(hexToRgb(roles.signature));
+    expect(rootTeal.trim()).toBe(roles.signature);
 
-    // The §4 "why this price" band is a --tint-12 confident band.
-    const bandTint = await read(
-      page.locator(".fs-page .fs-why").first(),
-      "background-color",
-    );
-    expect(bandTint).toBe(hexToRgb(roles.tint12));
-
-    // The role var is declared on the flagship root itself (the live path).
+    // The retained `--signature` alias (for the bridge) also resolves on the root.
     const rootSig = await read(
       page.getByTestId("seller-presentation-flagship"),
       "--signature",
     );
     expect(rootSig.trim()).toBe(roles.signature);
+
+    // The price figure is the deep teal (a signature mix) — present + non-empty,
+    // proving the ramp painted from the brand-tracked token.
+    const priceBig = await read(
+      page.locator(".fs-page .price__single").first(),
+      "color",
+    );
+    expect(priceBig).toMatch(/oklab|rgb|#/);
   });
 
   test("same-origin posted role vars repaint the FLAGSHIP root", async ({

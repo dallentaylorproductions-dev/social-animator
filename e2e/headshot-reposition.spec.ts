@@ -152,7 +152,7 @@ test.describe("UX-2b headshot — agent band render", () => {
 
     await expect(page.getByTestId("fs-agent")).toBeVisible();
     // The repositioned variant renders.
-    await expect(page.locator(".fs-agent__avatar--adj")).toHaveCount(1);
+    await expect(page.locator(".agent__avatar--adj")).toHaveCount(1);
 
     const img = page.getByTestId("fs-agent-avatar-img");
     await expect(img).toHaveCount(1);
@@ -178,9 +178,9 @@ test.describe("UX-2b headshot — agent band render", () => {
     await expect(page.getByTestId("fs-agent")).toBeVisible();
     // Default path: the plain photo avatar, NO reposition variant, NO inner
     // clip/image layer.
-    await expect(page.locator(".fs-agent__avatar--adj")).toHaveCount(0);
+    await expect(page.locator(".agent__avatar--adj")).toHaveCount(0);
     await expect(page.getByTestId("fs-agent-avatar-img")).toHaveCount(0);
-    const avatar = page.locator(".fs-agent__avatar--photo");
+    const avatar = page.getByTestId("fs-agent-avatar");
     await expect(avatar).toHaveCount(1);
     const bg = await avatar.evaluate(
       (el) => getComputedStyle(el).backgroundImage,

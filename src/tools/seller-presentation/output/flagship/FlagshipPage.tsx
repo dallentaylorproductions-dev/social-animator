@@ -8,12 +8,10 @@ import { Hero } from "./Hero";
 import { Price } from "./Price";
 import { AgentNote } from "./AgentNote";
 import { WhyPrice } from "./WhyPrice";
-import { Pitch } from "./Pitch";
 import { WhyUs } from "./WhyUs";
 import { Reviews } from "./Reviews";
 import { AreaStats } from "./AreaStats";
 import { AgentBand } from "./AgentBand";
-import { Footer } from "./Footer";
 import "./flagship.css";
 
 /**
@@ -61,17 +59,23 @@ export function FlagshipPage({ handout }: { handout: HandoutRecord }) {
         <Price payload={payload} />
         <AgentNote payload={payload} />
         <WhyPrice payload={payload} />
-        <Pitch payload={payload} />
-        {/* B0b — the agent-constant "why list with us" chapter, framing the
-            seller's reasons-to-choose alongside the home-specific story. Flexes
-            out entirely when no why-us content was configured. */}
-        <WhyUs payload={payload} />
+        {/* D1-CLEANUP — the "why list with us" chapter in its SELLER variant: the
+            redundant differentiators wall is dropped; the agent's non-marketing
+            pitch cards become a "Selling points" section; marketing-themed pitch
+            joins "How we market" (cap 4); the guarantee moves to the Agent block.
+            Flexes out entirely when nothing renderable is present. */}
+        <WhyUs payload={payload} variant="seller" />
         <Reviews payload={payload} />
         <AreaStats payload={payload} />
-        <AgentBand payload={payload} />
-        {/* Wordmark is a conditional white-label slot (F4): suppressed when the
-            payload's white-label flag is set; the disclaimer always renders. */}
-        <Footer payload={payload} showWordmark={payload.suppressWordmark !== true} />
+        {/* AgentBand now folds in the prototype's agent__foot (wordmark +
+            disclaimer). Wordmark is a conditional white-label slot (F4):
+            suppressed when the payload's white-label flag is set; the disclaimer
+            always renders. */}
+        <AgentBand
+          payload={payload}
+          showWordmark={payload.suppressWordmark !== true}
+          showGuarantee
+        />
       </div>
       <PresentationPageMotion />
     </div>
