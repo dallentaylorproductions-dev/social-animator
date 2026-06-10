@@ -1034,8 +1034,8 @@ function AreaStatsEditor({ draft, setDraft }: StepEditorialProps) {
             data-testid="step-editorial-area-market-note"
           >
             {marketTrend.status === "empty"
-              ? "No market trend available for this ZIP yet — fill the months below by hand."
-              : "Couldn't load the market trend — fill the months below by hand."}
+              ? "No market trend available for this ZIP yet. Fill the months below by hand."
+              : "Couldn't load the market trend. Fill the months below by hand."}
           </p>
         )}
 

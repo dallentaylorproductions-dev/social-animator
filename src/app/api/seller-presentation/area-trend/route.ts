@@ -56,12 +56,12 @@ interface ApiErr {
 function fallbackMessage(code: string): string {
   switch (code) {
     case "no-data":
-      return "No market trend available for this ZIP yet — enter the monthly prices by hand.";
+      return "No market trend available for this ZIP yet. Enter the monthly prices by hand.";
     case "invalid-zip":
       return "Enter a valid 5-digit ZIP to load the market trend.";
     default:
-      // key-missing / error — never expose the cause; just point to manual entry.
-      return "Couldn't load the market trend — enter the monthly prices by hand.";
+      // key-missing / error: never expose the cause; just point to manual entry.
+      return "Couldn't load the market trend. Enter the monthly prices by hand.";
   }
 }
 
