@@ -13,6 +13,7 @@ import {
   startVideoUpload,
   subscribeVideoUploadSession,
 } from "@/lib/video-upload-session";
+import { isAllowedVideoContentType } from "@/lib/media-storage/video-content-types";
 
 /**
  * VideoUploadField — phone-camera-roll → hosted-URL uploader
@@ -154,12 +155,6 @@ export const VIDEO_MAX_DURATION_SECONDS = 90;
  * together if this needs to change.
  */
 export const VIDEO_MAX_BYTES = 250 * 1024 * 1024;
-
-const ALLOWED_MIME = new Set([
-  "video/mp4",
-  "video/quicktime",
-  "video/webm",
-]);
 
 /**
  * A7d.8.3 — how many filmstrip frames to pre-extract. 8 evenly-spaced
@@ -494,9 +489,9 @@ export function VideoUploadField({
       return;
     }
 
-    if (!ALLOWED_MIME.has(file.type)) {
+    if (!isAllowedVideoContentType(file.type)) {
       setError(
-        `Unsupported video format (${file.type}). Try MP4, MOV, or WebM.`,
+        `Unsupported video format (${file.type || "unknown"}). Try MP4, MOV, or WebM.`,
       );
       return;
     }

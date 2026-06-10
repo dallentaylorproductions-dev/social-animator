@@ -62,6 +62,28 @@ import { upload } from "@vercel/blob/client";
  * flow / page navigation if the parent chooses to tear it down).
  */
 
+/**
+ * A7d.13 — translate the @vercel/blob/client SDK's opaque token error
+ * into a clear, actionable message (Dallen 2026-06-10 iOS bug).
+ *
+ * The SDK throws the literal string "Failed to retrieve the client
+ * token" for ANY non-2xx from /api/upload-video — auth (401), cap
+ * (429), unconfigured (503), bad body (400) — and DISCARDS the route's
+ * JSON error body, so the precise reason can't reach the client through
+ * the SDK. The single most likely cause on a real device (page loads,
+ * upload fails) is an expired/absent session, so the rewritten message
+ * leads with that while naming the other possibilities. The exact
+ * server-side reason is in the Vercel runtime logs (see route.ts
+ * A7d.13 logging).
+ */
+export function friendlyUploadError(err: unknown): string {
+  const raw = err instanceof Error ? err.message : "Upload failed";
+  if (/failed to\s+retrieve the client token/i.test(raw)) {
+    return "Couldn't start the upload. Your session may have expired — refresh the page and sign in again, then retry. If it keeps failing, the file may be too large or an unsupported format.";
+  }
+  return raw;
+}
+
 export type VideoUploadStatus = "idle" | "uploading" | "completed" | "failed";
 
 export interface VideoUploadSessionState {
@@ -222,6 +244,17 @@ export async function startVideoUpload(
       handleUploadUrl: opts.handleUploadUrl,
       contentType: opts.contentType,
       multipart: opts.multipart,
+      // A7d.13 — thread the content type + size to the token route via
+      // clientPayload PURELY for server-side diagnostics. The SDK's
+      // token request otherwise carries NO content type, so without
+      // this the route can't log what the phone actually sent. The
+      // route ignores it for policy (the token's allowedContentTypes +
+      // Blob's PUT-time check remain the single enforcement point), so
+      // this is observe-only and changes no acceptance behavior.
+      clientPayload: JSON.stringify({
+        contentType: opts.contentType,
+        size: file.size,
+      }),
       abortSignal: session.abortController.signal,
       onUploadProgress: (e) => {
         if (
@@ -258,7 +291,7 @@ export async function startVideoUpload(
     if (current !== session) return;
     applyPatch(key, {
       status: "failed",
-      error: err instanceof Error ? err.message : "Upload failed",
+      error: friendlyUploadError(err),
     });
   }
 }

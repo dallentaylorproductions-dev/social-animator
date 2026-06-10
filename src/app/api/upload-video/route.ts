@@ -2,6 +2,7 @@ import { NextResponse } from "next/server";
 import { kv } from "@vercel/kv";
 import { auth } from "@/lib/auth";
 import { getMediaStorage } from "@/lib/media-storage";
+import { VIDEO_CONTENT_TYPES } from "@/lib/media-storage/video-content-types";
 import { loadAgentProfile } from "@/lib/entitlements/load-agent-profile";
 import { resolveEntitlements } from "@/lib/entitlements/resolver";
 import {
@@ -78,11 +79,16 @@ export const runtime = "nodejs";
  */
 export const MAX_VIDEO_BYTES = 250 * 1024 * 1024;
 
-const ALLOWED_TYPES = [
-  "video/mp4",
-  "video/quicktime",
-  "video/webm",
-] as const;
+/**
+ * Accepted video MIME types, baked into the issued client token's
+ * `allowedContentTypes` (Vercel Blob enforces it at PUT time). Imported
+ * from the shared module so the client field's pre-flight guard and
+ * this token can never drift. NOTE: the SDK does NOT send the content
+ * type during token generation, so this list is irrelevant to the
+ * "Failed to retrieve the client token" failure mode — see
+ * video-content-types.ts.
+ */
+const ALLOWED_TYPES = VIDEO_CONTENT_TYPES;
 
 /**
  * Folders the issued token is permitted to write into. Matches the
@@ -118,6 +124,70 @@ function readEventType(body: unknown): string {
     : "blob.generate-client-token";
 }
 
+/**
+ * A7d.13 — token-route diagnostics (Dallen 2026-06-10).
+ *
+ * The browser SDK collapses ANY non-2xx from this route (401 auth, 429
+ * cap, 400 bad-body, 503 unconfigured, or a handshake throw) into the
+ * single opaque client string "Failed to retrieve the client token."
+ * That made the real-iPhone failure undiagnosable: desktop uploads
+ * succeed, iPhone fails, same deployment — but the client never reveals
+ * WHICH gate rejected. These helpers log the real reason server-side so
+ * the next mobile attempt is readable in the Vercel runtime logs.
+ *
+ * The content type is logged from the SDK's `clientPayload` (the field
+ * now threads `{ contentType, size }` through it) — NOT from any
+ * token-time content-type check, because the SDK doesn't send the
+ * content type at token time. Cookie PRESENCE (never the value) is the
+ * key signal: a token request that arrives WITHOUT the Auth.js session
+ * cookie is the smoking gun for the iOS failure, since the wizard page
+ * itself loads fine on the phone.
+ */
+function requestDiag(req: Request): Record<string, unknown> {
+  const h = req.headers;
+  const cookie = h.get("cookie") ?? "";
+  return {
+    ua: (h.get("user-agent") ?? "").slice(0, 160),
+    origin: h.get("origin"),
+    referer: h.get("referer"),
+    hasCookie: cookie.length > 0,
+    // Auth.js v5 JWT session cookie, across the secure/non-secure +
+    // chunked variants. Absent → the route will 401 even though the
+    // user is "signed in" for page loads on the same host.
+    hasSessionCookie:
+      /(?:^|[;\s])(?:__Secure-|__Host-)?(?:authjs|next-auth)\.session-token(?:\.\d+)?=/.test(
+        cookie,
+      ),
+  };
+}
+
+/**
+ * Pull the diagnostic `{ contentType, size }` the field threads through
+ * the SDK's `clientPayload`. Defensive: clientPayload is a free-form
+ * string (or null) in the protocol, so anything unparseable yields an
+ * empty object rather than throwing inside the handshake path.
+ */
+function readClientDiag(
+  body: unknown,
+): { contentType?: string; size?: number } {
+  try {
+    const payload = (body as { payload?: { clientPayload?: unknown } })
+      ?.payload?.clientPayload;
+    if (typeof payload !== "string") return {};
+    const parsed = JSON.parse(payload) as {
+      contentType?: unknown;
+      size?: unknown;
+    };
+    return {
+      contentType:
+        typeof parsed.contentType === "string" ? parsed.contentType : undefined,
+      size: typeof parsed.size === "number" ? parsed.size : undefined,
+    };
+  } catch {
+    return {};
+  }
+}
+
 export async function POST(req: Request) {
   const e2e = isE2EBypassActive();
   const e2eAuthBypass = e2e && req.headers.get("x-e2e-bypass") === "1";
@@ -129,15 +199,38 @@ export async function POST(req: Request) {
   // Performed BEFORE body parsing so an unauthed request fails fast
   // and doesn't leak any signal about what the handshake expects.
   let email: string | null | undefined;
+  let authThrew = false;
   if (e2eAuthBypass) {
     email = "e2e@test";
   } else {
-    const session = await auth();
-    email = session?.user?.email;
+    try {
+      const session = await auth();
+      email = session?.user?.email;
+    } catch (err) {
+      // A7d.13 — a malformed/partial session cookie can make auth()
+      // THROW rather than return null. Previously that surfaced as a
+      // 500 (still opaque to the SDK); now we log it and fall through
+      // to the same clear 401 so the failure mode is one diagnosable
+      // path, not two.
+      authThrew = true;
+      console.error("[upload-video] auth() threw during token request:", err);
+    }
   }
   if (!email) {
+    // A7d.13 — THE prime diagnostic for the iOS bug. If this fires on a
+    // real-phone attempt, the token request arrived without a valid
+    // session (cookie missing/expired/threw) — NOT a content-type
+    // problem. `hasSessionCookie:false` in this line pins the cause.
+    console.warn("[upload-video] DENY 401 not-authenticated", {
+      authThrew,
+      ...requestDiag(req),
+    });
     return NextResponse.json(
-      { ok: false, error: "Not authenticated" },
+      {
+        ok: false,
+        error:
+          "You're not signed in (or your session expired). Refresh the page, sign in again, then retry the upload.",
+      },
       { status: 401, headers: { "Cache-Control": "no-store" } },
     );
   }
@@ -188,6 +281,12 @@ export async function POST(req: Request) {
       pipe.expire(capKey, VIDEO_UPLOAD_WINDOW_SECONDS);
       const [used] = (await pipe.exec()) as [number, number];
       if (used > cap) {
+        console.warn("[upload-video] DENY 429 cap-reached", {
+          email,
+          used,
+          cap,
+          ...requestDiag(req),
+        });
         return NextResponse.json(
           {
             ok: false,
@@ -226,6 +325,7 @@ export async function POST(req: Request) {
   // --- Storage configured? ---
   const storage = getMediaStorage();
   if (!storage.isConfigured() || e2eForceNoToken) {
+    console.warn("[upload-video] DENY 503 not-configured", requestDiag(req));
     return NextResponse.json(
       {
         ok: false,
@@ -237,6 +337,11 @@ export async function POST(req: Request) {
   }
 
   // --- Delegate handshake to the adapter ---
+  // A7d.13 — log the requested content type + size (threaded by the
+  // field through clientPayload) on EVERY token request, success or
+  // fail, so a real-phone attempt is fully readable in the runtime
+  // logs even when the SDK shows only its generic error.
+  const clientDiag = readClientDiag(body);
   try {
     const result = await storage.handleClientUploadRequest({
       request: req,
@@ -246,11 +351,29 @@ export async function POST(req: Request) {
       allowedContentTypes: ALLOWED_TYPES,
       maximumSizeInBytes: MAX_VIDEO_BYTES,
     });
+    if (eventType === "blob.generate-client-token") {
+      console.info("[upload-video] OK token issued", {
+        email,
+        ...clientDiag,
+        ...requestDiag(req),
+      });
+    }
     return NextResponse.json(result, {
       headers: { "Cache-Control": "no-store" },
     });
   } catch (err) {
+    // A7d.13 — the adapter's handleUpload() throws on a bad pathname/
+    // folder (and would throw on a content-type/size policy violation
+    // if the SDK ever sent those at token time). Log the REAL reason —
+    // this is what the SDK swallows into "Failed to retrieve the
+    // client token."
     const message = err instanceof Error ? err.message : "Handshake failed";
+    console.error("[upload-video] DENY 400 handshake-rejected", {
+      email,
+      reason: message,
+      ...clientDiag,
+      ...requestDiag(req),
+    });
     return NextResponse.json(
       { ok: false, error: message },
       { status: 400, headers: { "Cache-Control": "no-store" } },
