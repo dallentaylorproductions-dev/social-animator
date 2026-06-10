@@ -726,7 +726,14 @@ export function VideoUploadField({
               controls
               playsInline
               preload="metadata"
-              className="aspect-video w-full"
+              // P2-VIDEO-3 (Dallen real-iPhone 2026-06-10) — `sep-video-
+              // authoring-preview` lets sep-wizard.css hide iOS Safari's big
+              // CENTRAL "start playback" button, which sat over the agent's
+              // face while they scrubbed "Pick a thumbnail" — they couldn't
+              // see their expression to choose a frame. The native controls
+              // BAR (with its own play button) stays, so there's still a way
+              // to play. Authoring-only; the consumer player is untouched.
+              className="aspect-video w-full sep-video-authoring-preview"
               data-testid={tid("preview")}
               onLoadedMetadata={(e) => {
                 // Mirror the duration into state from the MAIN video
@@ -739,6 +746,26 @@ export function VideoUploadField({
                 const v = e.target as HTMLVideoElement;
                 if (Number.isFinite(v.duration) && v.duration > 0) {
                   setDuration(v.duration);
+                }
+                // P2-VIDEO-3 (Dallen real-iPhone 2026-06-10) — iOS Safari
+                // paints a posterless <video> BLACK until it's played or
+                // seeked, so the preview box showed black right after upload
+                // until the agent dragged the scrubber. Nudge to ~0.1s on
+                // first load so the first frame paints immediately (desktop
+                // already paints frame 1 — this is invisible there). This is
+                // a plain seek, NOT a canvas capture (capture hangs on iOS).
+                // The `#t=` URL trick isn't used here because this src can be
+                // a `blob:` objectURL, which doesn't reliably honor media
+                // fragments on iOS. Guarded to the very start so it never
+                // yanks a video the agent has already scrubbed, and wrapped
+                // because currentTime can throw if set before metadata.
+                if (v.currentTime < 0.05) {
+                  try {
+                    v.currentTime = 0.1;
+                  } catch {
+                    // ignore — a pre-metadata seek guard; the scrubber's
+                    // own seek path covers any later positioning.
+                  }
                 }
               }}
             />

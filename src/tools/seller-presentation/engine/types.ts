@@ -146,6 +146,34 @@ export function effectivePosterUrl(
 }
 
 /**
+ * P2-VIDEO-3 — iOS first-frame hint (Dallen real-iPhone bug, 2026-06-10).
+ *
+ * iOS Safari paints a posterless `<video>` BLACK until it's played or
+ * seeked — desktop browsers render frame 1 automatically. Appending the
+ * media fragment `#t=0.1` makes iOS seek to ~0.1s and PAINT that frame on
+ * load, with NO canvas capture (capture-from-`<video>` is unreliable /
+ * hangs on iOS — the very thing this avoids). Used on the inlay framing
+ * control + the flagship §01 inlay player, both of which take a HOSTED
+ * Blob URL.
+ *
+ * Notes:
+ *   - Hosted (https) URLs only. `blob:` object URLs don't reliably honor
+ *     media fragments on iOS, so the in-session wizard PREVIEW seeks
+ *     programmatically (`video.currentTime`) on `loadedmetadata` instead.
+ *   - Idempotent: a URL that already carries any `#fragment` is returned
+ *     unchanged (never stack two fragments). Blank/undefined passes
+ *     through so callers can spread it conditionally.
+ *   - When the buyer/agent presses play, playback simply starts ~0.1s in
+ *     — imperceptible, and a far better paint than a black box.
+ */
+export function withFirstFrameHint(
+  url: string | undefined,
+): string | undefined {
+  if (!url || url.includes("#")) return url;
+  return `${url}#t=0.1`;
+}
+
+/**
  * P2-VIDEO-2 — resolve the inlay framing with per-field defaults. Centralized
  * so the renderer (AgentNote), the wizard framing control, and any fixture
  * agree on the unframed fallback ({@link DEFAULT_VIDEO_FRAMING}). Always

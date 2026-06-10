@@ -2700,3 +2700,15 @@
     gap: 10px;
   }
 }
+
+/* P2-VIDEO-3 (Dallen real-iPhone 2026-06-10) — face visible while picking a
+   thumbnail. While the agent scrubs the "Pick a thumbnail" slider the upload
+   preview video is PAUSED, and iOS Safari paints a big central "start
+   playback" button over it — landing right on the agent's face so they can't
+   judge their expression. Hide ONLY that central overlay button on the
+   authoring preview; the native controls bar (and its play button) remains,
+   so there's still a way to play. Consumer/live-preview players are untouched
+   (this class is only on VideoUploadField's preview). */
+.sep-video-authoring-preview::-webkit-media-controls-start-playback-button {
+  display: none !important;
+}
