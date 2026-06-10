@@ -115,6 +115,10 @@ export function samplePayload(brand: BrandSettings): PublicPayload {
 export function draftPreviewPayload(
   draft: SellerPresentationDraft,
   brand: BrandSettings,
+  // COMP_PHOTOS — mirror the publish-time flag so the live preview shows comp
+  // photos exactly when the published page would. Defaults false so existing
+  // callers (and a flag-off session) render byte-identically to today.
+  compPhotos: boolean = false,
 ): PublicPayload {
   const { agentContact, brandReviews, brandColors, brandWhyUs } =
     brandToPublishInputs(brand);
@@ -128,6 +132,7 @@ export function draftPreviewPayload(
     // every preview render today.
     false,
     brandWhyUs,
+    compPhotos,
   );
 
   // Honest preview: the By-the-numbers band looks good, so Dallen wants it to

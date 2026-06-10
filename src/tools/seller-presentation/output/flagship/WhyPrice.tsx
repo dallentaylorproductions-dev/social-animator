@@ -1,4 +1,5 @@
 import type { PublicComp, PublicPayload } from "../public-payload";
+import { streetViewStaticUrl } from "@/lib/seller-presentation/street-view";
 import { countSentence, hasCount } from "./copy";
 
 /**
@@ -71,7 +72,19 @@ function CompCard({
   city?: string;
 }) {
   const idx = String(index + 1).padStart(2, "0");
-  const hasPhoto = !!comp.photoUrl;
+  // Manual upload (the agent's own image) takes precedence over Street View.
+  const manualPhoto = comp.photoUrl?.trim() || "";
+  // Street View only when there's no manual photo, coverage was resolved, and
+  // a browser key is configured (streetViewStaticUrl returns null otherwise).
+  // COMPLIANCE: this is a URL only — the browser fetches the image fresh from
+  // Google via the <img> below; we never request or store the bytes, and the
+  // baked-in Google attribution is preserved (the image is not cropped past
+  // its bottom-left watermark; see flagship.css `.comp-card__photo img`).
+  const streetViewUrl =
+    !manualPhoto && comp.hasStreetView === true
+      ? streetViewStaticUrl(comp.streetViewPanoId)
+      : null;
+  const hasPhoto = !!manualPhoto || !!streetViewUrl;
   const meta = [
     city || null,
     comp.sqft ? `${comp.sqft} SQFT` : null,
@@ -85,17 +98,37 @@ function CompCard({
       className={`comp-card reveal${hasPhoto ? " has-photo" : ""}`}
       data-testid={`fs-comp-${index}`}
     >
-      {hasPhoto && (
+      {manualPhoto && (
         <div
           className="comp-card__photo"
           data-testid={`fs-comp-${index}-photo`}
           aria-hidden="true"
           style={{
-            backgroundImage: `url("${comp.photoUrl!.replace(/"/g, '\\"')}")`,
+            backgroundImage: `url("${manualPhoto.replace(/"/g, '\\"')}")`,
             backgroundSize: "cover",
             backgroundPosition: "center",
           }}
         />
+      )}
+      {!manualPhoto && streetViewUrl && (
+        <div
+          className="comp-card__photo"
+          data-testid={`fs-comp-${index}-photo`}
+        >
+          {/* Fetched fresh from Google in the buyer's browser; never proxied
+              or stored. `loading="lazy"` + browser cache keep billing low.
+              No referrerPolicy override: the default sends our origin as the
+              Referer so Google's referrer-restricted key validates. */}
+          {/* eslint-disable-next-line @next/next/no-img-element */}
+          <img
+            src={streetViewUrl}
+            alt=""
+            aria-hidden="true"
+            loading="lazy"
+            decoding="async"
+            data-testid={`fs-comp-${index}-streetview`}
+          />
+        </div>
       )}
       <div className="comp-card__body">
         <div className="comp-card__info">

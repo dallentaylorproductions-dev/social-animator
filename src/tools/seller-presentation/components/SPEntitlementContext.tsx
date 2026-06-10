@@ -57,6 +57,11 @@ interface SPEntitlement {
    *  `null` while loading; `false` ⇒ the wizard never fetches RentCast and the
    *  area step behaves exactly as pre-P2 (manual/comp-derived series). */
   areaChartRentcastEnabled: boolean | null;
+  /** COMP_PHOTOS feature-flag state for per-comp Street View auto-photo +
+   *  manual upload. `null` while loading; `false` ⇒ the wizard never resolves
+   *  Street View coverage and never shows the per-comp upload (text-only comps,
+   *  exact current behavior). */
+  compPhotosEnabled: boolean | null;
 }
 
 const Ctx = createContext<SPEntitlement>({
@@ -67,6 +72,7 @@ const Ctx = createContext<SPEntitlement>({
   suppressUpgradeUi: false,
   compImportEnabled: null,
   areaChartRentcastEnabled: null,
+  compPhotosEnabled: null,
 });
 
 export function useSPEntitlement(): SPEntitlement {
@@ -82,6 +88,7 @@ export function SPEntitlementProvider({ children }: { children: ReactNode }) {
     suppressUpgradeUi: false,
     compImportEnabled: null,
     areaChartRentcastEnabled: null,
+    compPhotosEnabled: null,
   });
 
   useEffect(() => {
@@ -107,6 +114,7 @@ export function SPEntitlementProvider({ children }: { children: ReactNode }) {
           suppressUpgradeUi: !!data.suppressUpgradeUi,
           compImportEnabled: !!data.features?.compImportEnabled,
           areaChartRentcastEnabled: !!data.features?.areaChartRentcastEnabled,
+          compPhotosEnabled: !!data.features?.compPhotosEnabled,
         });
       })
       .catch(() => {

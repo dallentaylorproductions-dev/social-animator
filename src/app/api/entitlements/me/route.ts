@@ -69,6 +69,11 @@ export async function GET(req: Request) {
       // step behaves exactly as pre-P2 (manual/comp-derived series).
       areaChartRentcastEnabled:
         process.env.AREA_CHART_RENTCAST_ENABLED === "true",
+      // COMP_PHOTOS — per-comp Street View auto-photo + manual upload. OFF by
+      // default; when false the wizard never resolves Street View coverage,
+      // never shows the per-comp upload, and the serializer emits no photo
+      // keys (exact current behavior).
+      compPhotosEnabled: process.env.COMP_PHOTOS_ENABLED === "true",
     },
   });
 }

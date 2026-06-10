@@ -3,9 +3,12 @@
 import { useEffect, useRef, useState } from "react";
 import { CurrencyInput } from "@/components/inputs/CurrencyInput";
 import { NumberInput } from "@/components/inputs/NumberInput";
+import { ImageUploadField } from "@/components/ImageUploadField";
 import { computeCompMedian } from "@/lib/seller-presentation/median";
+import { resolveStreetViewMeta } from "@/lib/seller-presentation/street-view";
 import type { Comp, SellerPresentationDraft } from "../engine/types";
 import { useImportComps } from "../hooks/useImportComps";
+import { useSPEntitlement } from "./SPEntitlementContext";
 
 /**
  * Seller Presentation Step 2 — "Your comps" (Phase B2 redesign).
@@ -48,6 +51,13 @@ interface StepCompsProps {
 }
 
 const MAX_COMPS = 5;
+
+/**
+ * Debounce before resolving Street View coverage for an edited address. The
+ * metadata endpoint is free, but we only want one call once the agent stops
+ * typing, and only for the comps actually shown (capped at MAX_COMPS).
+ */
+const STREET_VIEW_RESOLVE_MS = 700;
 
 /* ---- value helpers ----------------------------------------------- */
 
@@ -262,6 +272,7 @@ interface CompCardProps {
   editing: boolean;
   currentYear: number | undefined;
   now: number | undefined;
+  compPhotos: boolean;
   onEdit: () => void;
   onClose: () => void;
   onToggleCounted: () => void;
@@ -275,6 +286,7 @@ function CompCard({
   editing,
   currentYear,
   now,
+  compPhotos,
   onEdit,
   onClose,
   onToggleCounted,
@@ -387,6 +399,7 @@ function CompCard({
           index={index}
           flagged={flagged}
           currentYear={currentYear}
+          compPhotos={compPhotos}
           onChange={onChange}
           onClose={onClose}
           onRemove={onRemove}
@@ -402,6 +415,7 @@ function CompEditor({
   index,
   flagged,
   currentYear,
+  compPhotos,
   onChange,
   onClose,
   onRemove,
@@ -410,6 +424,7 @@ function CompEditor({
   index: number;
   flagged: boolean;
   currentYear: number | undefined;
+  compPhotos: boolean;
   onChange: (patch: Partial<Comp>) => void;
   onClose: () => void;
   onRemove: () => void;
@@ -429,11 +444,49 @@ function CompEditor({
           type="text"
           className="input"
           value={comp.address}
-          onChange={(e) => onChange({ address: e.target.value })}
+          onChange={(e) =>
+            onChange(
+              // When the flag is on, editing the address invalidates any
+              // resolved Street View coverage so the effect re-resolves the
+              // new address (undefined => "not yet resolved").
+              compPhotos
+                ? {
+                    address: e.target.value,
+                    streetViewPanoId: undefined,
+                    hasStreetView: undefined,
+                  }
+                : { address: e.target.value },
+            )
+          }
           placeholder="1234 Elm Ave NE"
           data-testid={`step-comps-address-${index}`}
         />
       </label>
+
+      {compPhotos && (
+        <div className="comp-photo-field" data-testid={`step-comps-photo-${index}`}>
+          <ImageUploadField
+            label="Comp photo (optional)"
+            value={comp.photoUrl ?? ""}
+            onChange={(url) => onChange({ photoUrl: url || undefined })}
+            previewAspect="aspect-[16/10]"
+            folder="seller-presentation/comps"
+            testIdPrefix={`step-comps-photo-upload-${index}`}
+            disablePasteUrl
+            emptyTitle="Use your own photo"
+            emptySubtext={
+              comp.photoUrl
+                ? undefined
+                : comp.hasStreetView === true
+                  ? "A street photo for this address shows by default. Upload to use your own instead."
+                  : comp.hasStreetView === false
+                    ? "No street photo was found for this address. Upload one to show a photo."
+                    : "Upload a photo of this home from your camera roll."
+            }
+            helpText="Your photo replaces the default street photo on the seller page."
+          />
+        </div>
+      )}
 
       <div className="editor-grid">
         <label className="field">
@@ -786,6 +839,17 @@ export function StepComps({ draft, setDraft }: StepCompsProps) {
     setNow(d.getTime());
   }, []);
 
+  const { compPhotosEnabled } = useSPEntitlement();
+
+  // Latest-draft ref so the async Street View resolve below applies its writes
+  // against the current comps (not the stale closure from when it was queued).
+  // Updated in an effect (never during render) and read only inside the
+  // debounced timeout, which fires long after this effect has run.
+  const draftRef = useRef(draft);
+  useEffect(() => {
+    draftRef.current = draft;
+  }, [draft]);
+
   const imp = useImportComps({
     draft,
     setDraft,
@@ -808,6 +872,60 @@ export function StepComps({ draft, setDraft }: StepCompsProps) {
   useEffect(() => {
     if (manualMode && !hasComps && !adding) setAdding(true);
   }, [manualMode, hasComps, adding]);
+
+  // COMP_PHOTOS — resolve Street View coverage for the shown comps.
+  //
+  // Flag-gated, debounced, capped to the comps actually displayed (MAX_COMPS).
+  // Compliance: this hits only the FREE metadata endpoint client-side and
+  // persists ONLY the pano id + coverage flag onto the comp; no image bytes
+  // are ever requested or stored here. A comp with a manual photo, or one
+  // whose coverage is already resolved (`hasStreetView` set), is skipped — so
+  // this never loops and never re-bills. Any resolve failure (no key, CORS,
+  // no coverage) lands `hasStreetView: false`, which renders a clean
+  // text-only comp downstream.
+  useEffect(() => {
+    if (compPhotosEnabled !== true) return;
+    const pending = comps.filter(
+      (c) =>
+        !!c.address?.trim() && !c.photoUrl && c.hasStreetView === undefined,
+    );
+    if (pending.length === 0) return;
+
+    let cancelled = false;
+    const id = setTimeout(() => {
+      void (async () => {
+        const results = await Promise.all(
+          pending.map(async (c) => ({
+            address: c.address,
+            meta: await resolveStreetViewMeta(c.address),
+          })),
+        );
+        if (cancelled) return;
+        // Apply against the LATEST draft, matching by address among comps that
+        // are still unresolved, so a newer edit is never clobbered.
+        const cur = draftRef.current;
+        setDraft({
+          ...cur,
+          comps: cur.comps.map((c) => {
+            if (c.photoUrl || c.hasStreetView !== undefined || !c.address?.trim())
+              return c;
+            const hit = results.find((r) => r.address === c.address);
+            if (!hit) return c;
+            return {
+              ...c,
+              streetViewPanoId: hit.meta.panoId,
+              hasStreetView: hit.meta.hasStreetView,
+            };
+          }),
+        });
+      })();
+    }, STREET_VIEW_RESOLVE_MS);
+
+    return () => {
+      cancelled = true;
+      clearTimeout(id);
+    };
+  }, [comps, compPhotosEnabled, setDraft]);
 
   const updateComp = (index: number, patch: Partial<Comp>) => {
     setDraft({
@@ -994,6 +1112,7 @@ export function StepComps({ draft, setDraft }: StepCompsProps) {
               editing={editIndex === i}
               currentYear={currentYear}
               now={now}
+              compPhotos={compPhotosEnabled === true}
               onEdit={() => {
                 setEditIndex(i);
                 setAdding(false);

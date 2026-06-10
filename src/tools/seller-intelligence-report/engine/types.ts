@@ -67,6 +67,25 @@ export interface Comp {
    */
   source?: CompSource;
   fieldConfidence?: Partial<Record<CompFieldName, ConfidenceLevel>>;
+
+  /**
+   * COMP_PHOTOS (flag-gated, OFF by default) — per-comp home photo.
+   *
+   * `photoUrl` is an AGENT-uploaded image (camera roll -> Vercel Blob; the
+   * agent's own content, fine to store). It takes precedence over Street
+   * View at render.
+   *
+   * `streetViewPanoId` + `hasStreetView` are the ONLY Google data we
+   * persist — resolved at authoring time from the FREE Street View
+   * metadata endpoint. The pano id is explicitly EXEMPT from Google's
+   * caching restriction; the IMAGE itself is NEVER stored — it is fetched
+   * fresh client-side at view time. `hasStreetView === false` (resolved,
+   * no coverage) lays out as a clean text-only comp. All three are absent
+   * when the flag is off, so legacy/SIR drafts are unaffected.
+   */
+  photoUrl?: string;
+  streetViewPanoId?: string;
+  hasStreetView?: boolean;
 }
 
 export interface SellerIntelligenceReportDraft {
