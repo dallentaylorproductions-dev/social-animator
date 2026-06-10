@@ -398,7 +398,7 @@ function PerformanceStatsGroup({
     <div className="space-y-3">
       <GroupHeading
         heading="Your results, by the numbers"
-        help="Pre-labeled: just fill in the numbers. Leave any row blank to hide it."
+        help="Pre-labeled: just fill in the numbers. They power the By the numbers band on your presentation, which shows once you fill them in. Leave any row blank to hide it."
       />
       {stats.map((stat, idx) => (
         <div
