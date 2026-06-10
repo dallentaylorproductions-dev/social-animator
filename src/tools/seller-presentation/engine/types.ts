@@ -62,6 +62,37 @@ export interface PitchPoint {
  * follow-on. When `videoUrl` is set, the renderer (A7b) shows the
  * card; when unset, the section hides cleanly.
  */
+/**
+ * P2-VIDEO-2 — agent-chosen inlay framing (Instagram-style). The inlay
+ * FILLS its fixed-aspect frame with `object-fit: cover` (no letterbox);
+ * this record positions the cover within the frame so the agent's face is
+ * never auto-chopped. `focalX/Y` are object-position percentages (0–100);
+ * `zoom` is a `transform: scale()` factor (1 = fill, can only zoom IN).
+ * Aspect-independent on purpose: the same focal point drives both the 4/5
+ * (default) and the 3/4 (≥720px container) inlay frames AND the live
+ * wizard preview — one source of truth. NOT applied in fullscreen, where
+ * the buyer sees the full native uploaded video uncropped.
+ */
+export interface VideoFraming {
+  /** Horizontal object-position, 0–100 (%). */
+  focalX: number;
+  /** Vertical object-position, 0–100 (%). */
+  focalY: number;
+  /** transform: scale() factor, 1.0–3.0 (floor 1 = can't zoom out past fill). */
+  zoom: number;
+}
+
+/**
+ * Unframed default — upper-center bias (focalY 30) so faces aren't cut when
+ * the agent never opens the framing control, and so already-published videos
+ * with no `framing` fill sensibly without an obvious head-chop.
+ */
+export const DEFAULT_VIDEO_FRAMING: VideoFraming = {
+  focalX: 50,
+  focalY: 30,
+  zoom: 1,
+};
+
 export interface PresentationVideo {
   /**
    * Manual upload override (A7d.3 camera-roll "Video thumbnail" field).
@@ -81,11 +112,24 @@ export interface PresentationVideo {
    */
   autoPosterUrl?: string;
   videoUrl?: string;
+  /**
+   * @deprecated P2-VIDEO (c) — no longer collected (the wizard input was
+   * removed) nor rendered on the flagship (v2) page. Kept DORMANT on the
+   * model because the v1 `VideoBlock` still reads it for already-published
+   * v1 pages (eyebrow copy, meta line, aria-label) and must render those
+   * byte-identically. Do not re-introduce a v2 input/render for it.
+   */
   title?: string;
   /** Free-text duration ("2:14" or "2 min"). */
   runtime?: string;
   /** ISO 8601 date or free-text ("April 2026"). */
   recordedOn?: string;
+  /**
+   * P2-VIDEO-2 — agent-chosen inlay crop framing. Absent on legacy/published
+   * videos; the renderer fills the unset case via {@link DEFAULT_VIDEO_FRAMING}
+   * through {@link effectiveFraming}.
+   */
+  framing?: VideoFraming;
 }
 
 /**
@@ -99,6 +143,23 @@ export function effectivePosterUrl(
 ): string | undefined {
   if (!video) return undefined;
   return video.posterUrl || video.scrubPosterUrl || video.autoPosterUrl;
+}
+
+/**
+ * P2-VIDEO-2 — resolve the inlay framing with per-field defaults. Centralized
+ * so the renderer (AgentNote), the wizard framing control, and any fixture
+ * agree on the unframed fallback ({@link DEFAULT_VIDEO_FRAMING}). Always
+ * returns a complete, clamped framing so callers never branch on `undefined`.
+ */
+export function effectiveFraming(
+  video: PresentationVideo | undefined,
+): VideoFraming {
+  const f = video?.framing;
+  return {
+    focalX: clampFramingNumber(f?.focalX, 0, 100) ?? DEFAULT_VIDEO_FRAMING.focalX,
+    focalY: clampFramingNumber(f?.focalY, 0, 100) ?? DEFAULT_VIDEO_FRAMING.focalY,
+    zoom: clampFramingNumber(f?.zoom, 1, 3) ?? DEFAULT_VIDEO_FRAMING.zoom,
+  };
 }
 
 /** A single review surfaced in the reviews section. Manual/curated only — no scrape. */
@@ -249,6 +310,42 @@ function clampString(v: unknown): string | undefined {
   return typeof v === "string" && v.length > 0 ? v : undefined;
 }
 
+/**
+ * P2-VIDEO-2 — clamp a finite number into [min, max], else `undefined`.
+ * Non-numbers, NaN, and ±Infinity all reject so a hand-tampered draft can't
+ * inject a bad object-position/scale at the serializer boundary.
+ */
+function clampFramingNumber(
+  v: unknown,
+  min: number,
+  max: number,
+): number | undefined {
+  if (typeof v !== "number" || !Number.isFinite(v)) return undefined;
+  return Math.min(max, Math.max(min, v));
+}
+
+/**
+ * P2-VIDEO-2 — clamp the inlay framing field-by-field. Returns `undefined`
+ * when NO sub-field is present (so the draft stays tidy and the renderer
+ * falls back to {@link DEFAULT_VIDEO_FRAMING}); when at least one is present,
+ * fills the missing siblings from the default so the stored record is whole.
+ */
+export function clampVideoFraming(raw: unknown): VideoFraming | undefined {
+  if (!raw || typeof raw !== "object") return undefined;
+  const r = raw as Record<string, unknown>;
+  const focalX = clampFramingNumber(r.focalX, 0, 100);
+  const focalY = clampFramingNumber(r.focalY, 0, 100);
+  const zoom = clampFramingNumber(r.zoom, 1, 3);
+  if (focalX === undefined && focalY === undefined && zoom === undefined) {
+    return undefined;
+  }
+  return {
+    focalX: focalX ?? DEFAULT_VIDEO_FRAMING.focalX,
+    focalY: focalY ?? DEFAULT_VIDEO_FRAMING.focalY,
+    zoom: zoom ?? DEFAULT_VIDEO_FRAMING.zoom,
+  };
+}
+
 function clampStringArray(v: unknown, max: number): string[] {
   if (!Array.isArray(v)) return [];
   return v.filter((s): s is string => typeof s === "string").slice(0, max);
@@ -286,6 +383,7 @@ function clampPresentationVideo(raw: unknown): PresentationVideo | undefined {
     title: clampString(r.title),
     runtime: clampString(r.runtime),
     recordedOn: clampString(r.recordedOn),
+    framing: clampVideoFraming(r.framing),
   };
   // Drop the whole block if nothing is set — keeps the draft tidy and
   // makes the serializer's "omit when empty" branch trivial.
