@@ -183,6 +183,9 @@
 .fs-page .rcard__title {font-family: var(--f-display); font-size: clamp(21px,2.8cqi,26px); color: var(--t-ink); margin-top: 16px; line-height: 1.12; }
 .fs-page .rcard__body {font-size: 16px; color: var(--t-body); margin-top: 10px; line-height: 1.55; max-width: 46ch; }
 .fs-page .bynum {background: var(--ink); color: var(--t-pap); }
+/* Honest-preview marker — only the wizard live preview ever sets it; the
+   published page never carries the flag, so this never paints there. */
+.fs-page .bynum__sample {display: inline-block; margin-left: .6em; padding: 2px 8px; border: 1px solid var(--t-pap-mute); border-radius: 99px; font-family: var(--f-mono); font-size: 9.5px; letter-spacing: .14em; text-transform: uppercase; color: var(--t-pap-mute); vertical-align: middle; }
 .fs-page .cmp {margin-top: clamp(22px,3.5cqi,34px); }
 .fs-page .cmp__label {font-family: var(--f-mono); font-size: 11.5px; letter-spacing: .22em; text-transform: uppercase; color: var(--t-pap-soft); }
 .fs-page .cmp__row {display: flex; align-items: flex-end; gap: clamp(20px,5cqi,56px); margin-top: 22px; flex-wrap: wrap; }

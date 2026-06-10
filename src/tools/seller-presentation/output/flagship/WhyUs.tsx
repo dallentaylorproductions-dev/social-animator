@@ -73,6 +73,11 @@ export function WhyUs({
   // The guarantee renders here (constant) or in the Agent block (seller).
   const guarantee = whyUs?.guarantee;
   const stats = whyUs?.performanceStats ?? [];
+  // PREVIEW-ONLY honest sample: the wizard live preview keeps the band visible
+  // with sample figures before the agent fills their own. Set ONLY by
+  // `draftPreviewPayload`; the published payload never carries it, so the tag
+  // never renders on a real page (byte-identical).
+  const statsAreSample = payload.whyUsStatsSample === true;
 
   // ----- Route the per-listing pitch cards by their auto-icon theme.
   const pitch = payload.pitchPublicCards.map((c, i) => {
@@ -247,6 +252,14 @@ export function WhyUs({
           <div className="reveal">
             <div className="eyebrow on-dark">
               By The Numbers <span className="rule" aria-hidden="true" />
+              {statsAreSample && (
+                <span
+                  className="bynum__sample"
+                  data-testid="fs-whyus-stats-sample"
+                >
+                  Sample
+                </span>
+              )}
             </div>
           </div>
           <HeadlineStat stat={headline} testid="fs-whyus-bar-0" />

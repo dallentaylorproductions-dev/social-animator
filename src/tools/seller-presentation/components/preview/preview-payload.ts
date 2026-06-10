@@ -118,7 +118,7 @@ export function draftPreviewPayload(
 ): PublicPayload {
   const { agentContact, brandReviews, brandColors, brandWhyUs } =
     brandToPublishInputs(brand);
-  return toPublicPayload(
+  const payload = toPublicPayload(
     clampDraft(draft),
     agentContact,
     brandReviews,
@@ -129,4 +129,30 @@ export function draftPreviewPayload(
     false,
     brandWhyUs,
   );
+
+  // Honest preview: the By-the-numbers band looks good, so Dallen wants it to
+  // STAY visible in the live preview even before the agent fills their track
+  // record. When the agent's own stats are empty (the band would otherwise
+  // flex out), drop in the SAMPLE figures behind a "Sample" tag so the band
+  // reads as an example, never as the agent's real data. PREVIEW-ONLY: the
+  // publish path builds its payload through `toPublicPayload` directly (never
+  // this helper), so an empty track record still hides the band on the real
+  // published page — only the live preview substitutes the sample.
+  const hasOwnStats = (payload.whyUs?.performanceStats?.length ?? 0) > 0;
+  if (hasOwnStats) return payload;
+
+  const sampleStats = FULL_PAYLOAD.whyUs?.performanceStats ?? [];
+  if (sampleStats.length === 0) return payload;
+
+  return {
+    ...payload,
+    whyUs: {
+      differentiators: payload.whyUs?.differentiators ?? [],
+      marketingApproach: payload.whyUs?.marketingApproach ?? [],
+      howWeWork: payload.whyUs?.howWeWork ?? [],
+      ...payload.whyUs,
+      performanceStats: sampleStats,
+    },
+    whyUsStatsSample: true,
+  };
 }
