@@ -3,7 +3,10 @@ import { auth } from "@/lib/auth";
 import { publishHandout } from "@/lib/share-urls";
 import { loadAgentProfile } from "@/lib/entitlements/load-agent-profile";
 import { resolveEntitlements } from "@/lib/entitlements/resolver";
-import { clampDraft } from "@/tools/seller-presentation/engine/types";
+import {
+  clampDraft,
+  describeMissingRequiredInputs,
+} from "@/tools/seller-presentation/engine/types";
 import {
   toPublicPayload,
   type AgentBranding,
@@ -99,19 +102,24 @@ export async function POST(req: Request) {
   }
 
   // Defense at boundary: clamp the incoming draft to the canonical
-  // shape, then re-check the export-gating fields explicitly. The
-  // wizard's StepReview validateForExport already ran client-side,
-  // but the server must not trust that.
+  // shape, then re-check the export-gating fields. We delegate to the
+  // SAME `getMissingRequiredInputs` (via describeMissingRequiredInputs)
+  // the wizard's StepReview gate uses, so the server can't disagree with
+  // the client about what "complete" means. The old hand-rolled check
+  // here required a single `recommendedPrice` and rejected a draft that
+  // carried only a low-high RANGE (UX-2a / #43) — exactly Aaron's
+  // "haven't seen the house, put your range down" case. That divergence
+  // made a fully-filled range draft fail publish with no named field.
   const draft = clampDraft(payload.draft as Parameters<typeof clampDraft>[0]);
-  if (
-    !draft.propertyAddress?.trim() ||
-    !draft.recommendedPrice?.trim() ||
-    draft.comps.length === 0 ||
-    !draft.comps[0].address.trim() ||
-    !draft.comps[0].soldPrice.trim()
-  ) {
+  const missing = describeMissingRequiredInputs(draft);
+  if (missing.length > 0) {
+    // Name the field(s) in the server log AND the client-visible error so
+    // a publish failure is never opaque again.
+    console.warn(
+      `[sp/publish] rejected, required fields missing: ${missing.join(", ")}`,
+    );
     return NextResponse.json(
-      { ok: false, error: "Required fields missing on draft" },
+      { ok: false, error: `Missing required: ${missing.join(", ")}` },
       { status: 400, headers: { "Cache-Control": "no-store" } },
     );
   }

@@ -547,6 +547,33 @@ export function getMissingRequiredInputs(
 }
 
 /**
+ * Friendly labels for the required-input keys `getMissingRequiredInputs`
+ * returns. Shared so StepReview's "Missing: X" hint and the publish
+ * route's named-rejection message read the SAME human label client- and
+ * server-side. Plain words, no em-dash (LS-1 truthful-copy gate).
+ */
+export const REQUIRED_INPUT_LABELS: Record<string, string> = {
+  propertyAddress: "property address",
+  recommendedPrice: "recommended price",
+  comps: "at least one comp",
+  "comps[0]": "Comp 1 address and sold price",
+};
+
+/**
+ * The missing required inputs as human labels (via REQUIRED_INPUT_LABELS).
+ * The publish route uses this to turn the old opaque "Required fields
+ * missing on draft" into a message that NAMES the field(s), so a publish
+ * failure is never a guessing game again.
+ */
+export function describeMissingRequiredInputs(
+  draft: SellerPresentationDraft,
+): string[] {
+  return getMissingRequiredInputs(draft).map(
+    (key) => REQUIRED_INPUT_LABELS[key] ?? key,
+  );
+}
+
+/**
  * The single field key blocking export, or null when none. Convenience
  * over `getMissingRequiredInputs[0]` for the StepReview / button paths
  * that only show one blocker at a time. Mirrors the SIR + OH Prep
