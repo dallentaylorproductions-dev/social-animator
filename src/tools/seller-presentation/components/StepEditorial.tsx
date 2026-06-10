@@ -10,7 +10,6 @@ import {
 import { ImageUploadField } from "@/components/ImageUploadField";
 import { VideoUploadField } from "@/components/VideoUploadField";
 import { CurrencyInput } from "@/components/inputs/CurrencyInput";
-import { NumberInput } from "@/components/inputs/NumberInput";
 import { PercentInput } from "@/components/inputs/PercentInput";
 import {
   getVideoUploadSessionState,
@@ -813,31 +812,15 @@ function AreaStatsEditor({ draft, setDraft }: StepEditorialProps) {
     persistSeries(labels, nextPrices);
   };
 
-  // FR-2 — one-tap "Use" affordance for a comp-derived value. Renders only
-  // for an empty field that has a derived value: tapping it promotes the
-  // derived value to a manual entry (so it "sticks" visibly). Even untapped,
-  // the value still publishes via projectAreaStats — this is purely the
-  // visible override handle.
-  const renderDerivedFill = (
-    field: "medianSale" | "daysOnMarket" | "closings90d" | "listToSaleRatio",
-    current: string | undefined,
-    testid: string,
-  ) => {
-    const value = derived[field];
-    if ((current && current.trim()) || typeof value !== "string" || !value) {
-      return null;
-    }
-    return (
-      <button
-        type="button"
-        className="area-derived-fill"
-        data-testid={testid}
-        onClick={() => update({ [field]: value })}
-      >
-        From your comps: <strong>{value}</strong> · Use
-      </button>
-    );
-  };
+  // FR-2 / P1-#6 — when the comps yield a median and the agent hasn't typed
+  // their own, the field READS AS FILLED with the derived value (see the
+  // CurrencyInput `value` below) plus an "Auto from comps" chip — no greyed
+  // placeholder, no separate "Use" button to re-enter what already publishes.
+  // Typing overrides it (switches to a manual value); clearing the field
+  // reverts to the auto value. Display-only: the draft stays untouched while
+  // auto, so projectAreaStats publishes the same derived figure either way.
+  const medianIsAuto =
+    !stats.medianSale?.trim() && !!derived.medianSale?.trim();
 
   const manualSeries = stats.monthlySeries ?? [];
   const showDerivedMonthly =
@@ -872,15 +855,18 @@ function AreaStatsEditor({ draft, setDraft }: StepEditorialProps) {
           <span className="field-label">Median sale price</span>
           <CurrencyInput
             className="input"
-            value={stats.medianSale ?? ""}
+            value={stats.medianSale ?? derived.medianSale ?? ""}
             onChange={(v) => update({ medianSale: v || undefined })}
-            placeholder={derived.medianSale ?? "$642,000"}
+            placeholder="$642,000"
             aria-label="area-median-sale"
           />
-          {renderDerivedFill(
-            "medianSale",
-            stats.medianSale,
-            "step-editorial-area-derived-medianSale",
+          {medianIsAuto && (
+            <span
+              className="area-auto-chip"
+              data-testid="step-editorial-area-auto-medianSale"
+            >
+              Auto from your comps. Type to override.
+            </span>
           )}
         </label>
         <label className="field-block">
@@ -894,64 +880,14 @@ function AreaStatsEditor({ draft, setDraft }: StepEditorialProps) {
             aria-label="area-yoy"
           />
         </label>
-        <label className="field-block">
-          <span className="field-label">Days on market</span>
-          <NumberInput
-            className="input"
-            value={stats.daysOnMarket ?? ""}
-            onChange={(v) => update({ daysOnMarket: v || undefined })}
-            placeholder={derived.daysOnMarket ?? "14"}
-            aria-label="area-dom"
-          />
-          {renderDerivedFill(
-            "daysOnMarket",
-            stats.daysOnMarket,
-            "step-editorial-area-derived-daysOnMarket",
-          )}
-        </label>
-        <label className="field-block">
-          <span className="field-label">Area DOM comparison</span>
-          <input
-            type="text"
-            className="input"
-            value={stats.daysOnMarketZipAvg ?? ""}
-            onChange={(e) =>
-              update({ daysOnMarketZipAvg: e.target.value || undefined })
-            }
-            placeholder="vs Tremont avg 21"
-            data-testid="step-editorial-area-dom-comp"
-          />
-        </label>
-        <label className="field-block">
-          <span className="field-label">Closings in last 90 days</span>
-          <NumberInput
-            className="input"
-            value={stats.closings90d ?? ""}
-            onChange={(v) => update({ closings90d: v || undefined })}
-            placeholder={derived.closings90d ?? "38"}
-            aria-label="area-closings"
-          />
-          {renderDerivedFill(
-            "closings90d",
-            stats.closings90d,
-            "step-editorial-area-derived-closings90d",
-          )}
-        </label>
-        <label className="field-block">
-          <span className="field-label">List-to-sale ratio</span>
-          <PercentInput
-            className="input"
-            value={stats.listToSaleRatio ?? ""}
-            onChange={(v) => update({ listToSaleRatio: v || undefined })}
-            placeholder={derived.listToSaleRatio ?? "101%"}
-            aria-label="area-ratio"
-          />
-          {renderDerivedFill(
-            "listToSaleRatio",
-            stats.listToSaleRatio,
-            "step-editorial-area-derived-listToSaleRatio",
-          )}
-        </label>
+        {/* P1-#4 — Days on market, Area DOM comparison, Closings (90d), and
+            List-to-sale ratio inputs were removed: the §05 "Recent area sales"
+            band publishes ONLY the median, the YoY sub, and the monthly chart
+            (the LOCKED SPLIT in output/flagship/AreaStats.tsx — the others
+            duplicate the agent track-record stats in "By the numbers"). Those
+            inputs collected data the page never renders, so they were wasted
+            steps. The model fields + the comp-derivation (mergeAreaStats) are
+            untouched — anything already published stays byte-identical. */}
       </div>
 
       <div className="sec5-monthly" data-testid="step-editorial-area-monthly">

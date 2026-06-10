@@ -717,6 +717,20 @@ export function BrandKitForm({
           <span className="preview__label">Preview</span>
           <span className="preview__live">Live</span>
         </div>
+        {/* P1-#2A — the embedded preview renders the shared EXAMPLE fixture
+            (FULL_PAYLOAD), so its "By the numbers" band shows demo figures
+            even when the agent has saved nothing. Label it plainly so the
+            demo stats can't be mistaken for the agent's own saved data. The
+            colors ARE the agent's (the live bridge), but the content is the
+            sample. */}
+        <p
+          className="preview__example"
+          data-testid="brand-preview-example-note"
+        >
+          <span className="preview__example-tag">Example</span>
+          Sample content in your colors. Your saved details appear on your real
+          presentation.
+        </p>
         <div className="phone">
           <div className="phone__screen">
             <iframe

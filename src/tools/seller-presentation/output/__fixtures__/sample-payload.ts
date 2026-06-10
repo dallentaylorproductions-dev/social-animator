@@ -30,8 +30,8 @@ export const FULL_PAYLOAD: PublicPayload = {
   propertyAddress: "1742 Kenilworth Avenue",
   // A7c cosmetic fix: city WITHOUT state baked in. The renderer
   // composes `${city}, ${state} ${zip}` — pre-A7c the city included
-  // ", OH" which rendered "TREMONT, OH, OH 44113" (doubled state).
-  propertyCity: "Tremont",
+  // ", OH" which rendered "TACOMA, WA, WA 98406" (doubled state).
+  propertyCity: "Tacoma",
   recommendedPrice: "$675,000",
   priceRationale:
     "Three recently-sold homes within four blocks anchor the recommendation. Each closed in the last ninety days and shares the bones of your home — era, footprint, lot orientation. At $675,000 you're a step above the average closing price for the block, which reflects the original woodwork, the south-facing kitchen, and the recent mechanicals — without pricing past the comparable range. We'll see strong activity in the first two weekends.",
@@ -65,7 +65,7 @@ export const FULL_PAYLOAD: PublicPayload = {
     phone: "2165550188",
     email: "marisol@hhanna.com",
     licenseNumber: "SAL.2018003412",
-    areasServed: "Tremont · Ohio City · Detroit-Shoreway",
+    areasServed: "Tacoma · North End · Proctor District",
     photoUrl: undefined,
     bioShort:
       "I work with eight families a year, on purpose. It means your sale gets the time and attention I'd want for my own.",
@@ -85,10 +85,10 @@ export const FULL_PAYLOAD: PublicPayload = {
     address: "1742 Kenilworth Avenue",
     // A7c: city WITHOUT state baked in (the renderer composes
     // "${city}, ${state} ${zip}" — doubling produced the
-    // "TREMONT, OH, OH 44113" cosmetic bug A7b.2 smoke caught).
-    city: "Tremont",
-    state: "OH",
-    zip: "44113",
+    // "TACOMA, WA, WA 98406" cosmetic bug A7b.2 smoke caught).
+    city: "Tacoma",
+    state: "WA",
+    zip: "98406",
     // A real, license-safe LOCAL house photo (committed under public/sample-
     // assets) so the preview/sample hero reads as a photo — not a flat block an
     // agent might fear carries to their page. The template renders it as the
@@ -183,7 +183,7 @@ export const FULL_PAYLOAD: PublicPayload = {
     medianSale: "$642k",
     medianSaleDeltaYoy: "+4.1% vs prior year",
     daysOnMarket: "14",
-    daysOnMarketZipAvg: "vs Tremont avg 21",
+    daysOnMarketZipAvg: "vs Tacoma avg 21",
     closings90d: "38",
     listToSaleRatio: "101%",
     monthlySeries: [
@@ -277,7 +277,7 @@ export const FULL_PAYLOAD: PublicPayload = {
     phone: "2165550188",
     email: "marisol@hhanna.com",
     licenseNumber: "SAL.2018003412",
-    areasServed: "Tremont · Ohio City · Detroit-Shoreway",
+    areasServed: "Tacoma · North End · Proctor District",
     photoUrl: undefined,
     bioShort:
       "I work with eight families a year, on purpose. It means your sale gets the time and attention I'd want for my own.",

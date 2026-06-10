@@ -440,7 +440,7 @@ function ReviewsSection({
                     attributionStreet: e.target.value || undefined,
                   })
                 }
-                placeholder="Tremont"
+                placeholder="Proctor"
                 data-testid={`brand-review-street-${idx}`}
                 className="w-full bg-neutral-900 border border-neutral-800 rounded-md px-3 py-2 text-base lg:text-sm focus:outline-none focus:border-mint"
               />

@@ -77,7 +77,7 @@ async function reachEditorialStep(page: import('@playwright/test').Page) {
     timeout: 10_000,
   });
   await page.getByTestId('step-property-address').fill('1742 Kenilworth Avenue');
-  await page.getByTestId('step-property-city').fill('Tremont');
+  await page.getByTestId('step-property-city').fill('Tacoma');
   await page.getByTestId('step-property-state').fill('OH');
   await page.getByTestId('step-property-zip').fill('44113');
   const next = page.getByTestId('wizard-next');

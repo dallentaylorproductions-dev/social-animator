@@ -856,7 +856,7 @@ test.describe('Seller Presentation — A7c wizard input round-trip', () => {
     // A7c agent extensions.
     await page
       .getByPlaceholder('Tacoma · Gig Harbor · Federal Way')
-      .fill('Tremont · Ohio City · Detroit-Shoreway');
+      .fill('Tacoma · North End · Proctor District');
     // A7c.2 swapped the URL-only headshot for the shared
     // <ImageUploadField>. The URL-paste fallback is the second
     // input rendered inside it; target by test id.
@@ -885,7 +885,7 @@ test.describe('Seller Presentation — A7c wizard input round-trip', () => {
         const parsed = JSON.parse(raw) as Record<string, unknown>;
         return (
           parsed.agentName === 'Marisol Reyes' &&
-          parsed.agentAreasServed === 'Tremont · Ohio City · Detroit-Shoreway' &&
+          parsed.agentAreasServed === 'Tacoma · North End · Proctor District' &&
           parsed.agentPhotoUrl === 'https://example.com/marisol.jpg' &&
           typeof parsed.agentBioShort === 'string' &&
           parsed.agentYearsInArea === '11' &&
@@ -905,9 +905,9 @@ test.describe('Seller Presentation — A7c wizard input round-trip', () => {
     await page
       .getByTestId('step-property-address')
       .fill('1742 Kenilworth Avenue');
-    await page.getByTestId('step-property-city').fill('Tremont');
-    await page.getByTestId('step-property-state').fill('OH');
-    await page.getByTestId('step-property-zip').fill('44113');
+    await page.getByTestId('step-property-city').fill('Tacoma');
+    await page.getByTestId('step-property-state').fill('WA');
+    await page.getByTestId('step-property-zip').fill('98406');
     await page
       .getByTestId('step-property-hero-url')
       .fill('https://example.com/hero.jpg');
@@ -981,9 +981,9 @@ test.describe('Seller Presentation — A7c wizard input round-trip', () => {
           return (
             parsed.currentStep === 'review' &&
             d.propertyAddress === '1742 Kenilworth Avenue' &&
-            d.propertyCity === 'Tremont' &&
-            d.propertyState === 'OH' &&
-            d.propertyZip === '44113' &&
+            d.propertyCity === 'Tacoma' &&
+            d.propertyState === 'WA' &&
+            d.propertyZip === '98406' &&
             d.heroPhotoUrl === 'https://example.com/hero.jpg' &&
             d.preparedFor === 'the Halloran family' &&
             // B4: 3 Tier 1 seeded rows, all title-bearing (2 overwritten
@@ -1019,9 +1019,9 @@ test.describe('Seller Presentation — A7c wizard input round-trip', () => {
     await expect(page.getByTestId('step-property-address')).toHaveValue(
       '1742 Kenilworth Avenue',
     );
-    await expect(page.getByTestId('step-property-city')).toHaveValue('Tremont');
-    await expect(page.getByTestId('step-property-state')).toHaveValue('OH');
-    await expect(page.getByTestId('step-property-zip')).toHaveValue('44113');
+    await expect(page.getByTestId('step-property-city')).toHaveValue('Tacoma');
+    await expect(page.getByTestId('step-property-state')).toHaveValue('WA');
+    await expect(page.getByTestId('step-property-zip')).toHaveValue('98406');
     // A7c.7: the paste-URL fallback unmounts once a value is set
     // (post-upload URL readout is suppressed). On reload, the value
     // is rehydrated and the preview takes over — the persisted URL
@@ -1072,9 +1072,9 @@ test.describe('Seller Presentation — A7c wizard input round-trip', () => {
     } | null;
     expect(body).not.toBeNull();
     expect(body!.draft).toBeDefined();
-    expect(body!.draft!.propertyCity).toBe('Tremont');
-    expect(body!.draft!.propertyState).toBe('OH');
-    expect(body!.draft!.propertyZip).toBe('44113');
+    expect(body!.draft!.propertyCity).toBe('Tacoma');
+    expect(body!.draft!.propertyState).toBe('WA');
+    expect(body!.draft!.propertyZip).toBe('98406');
     expect(body!.draft!.heroPhotoUrl).toBe('https://example.com/hero.jpg');
     expect(body!.draft!.preparedFor).toBe('the Halloran family');
     const pitchPoints = body!.draft!.pitchPoints as Array<{
@@ -1097,7 +1097,7 @@ test.describe('Seller Presentation — A7c wizard input round-trip', () => {
     expect(body!.agentContact!.name).toBe('Marisol Reyes');
     expect(body!.agentContact!.brokerage).toBe('Howard Hanna Real Estate');
     expect(body!.agentContact!.areasServed).toBe(
-      'Tremont · Ohio City · Detroit-Shoreway',
+      'Tacoma · North End · Proctor District',
     );
     expect(body!.agentContact!.photoUrl).toBe('https://example.com/marisol.jpg');
     expect(typeof body!.agentContact!.bioShort).toBe('string');
@@ -1526,9 +1526,9 @@ test.describe('Seller Presentation — A7d editorial extras', () => {
     // Walk through Steps 1–4 with the minimum-required + drive into
     // the editorial step.
     await page.getByTestId('step-property-address').fill('1742 Kenilworth Avenue');
-    await page.getByTestId('step-property-city').fill('Tremont');
-    await page.getByTestId('step-property-state').fill('OH');
-    await page.getByTestId('step-property-zip').fill('44113');
+    await page.getByTestId('step-property-city').fill('Tacoma');
+    await page.getByTestId('step-property-state').fill('WA');
+    await page.getByTestId('step-property-zip').fill('98406');
     const nextButton = page.getByTestId('wizard-next');
     await nextButton.click();
     await addFirstComp(page, '2218 W 14th Street', '648000');
@@ -1599,17 +1599,11 @@ test.describe('Seller Presentation — A7d editorial extras', () => {
     // YoY → PercentInput (signed). Type "+4.6"; "%" appended on blur.
     await page.getByLabel('area-yoy').fill('+4.6');
     await page.getByLabel('area-yoy').blur();
-    // DOM → NumberInput (numeric keypad + commas on blur).
-    await page.getByLabel('area-dom').fill('14');
-    // DOM comparison stays as text — short usable example placeholder.
-    await page
-      .getByTestId('step-editorial-area-dom-comp')
-      .fill('vs Tremont avg 21');
-    // Closings → NumberInput.
-    await page.getByLabel('area-closings').fill('38');
-    // List-to-sale ratio → PercentInput.
-    await page.getByLabel('area-ratio').fill('101');
-    await page.getByLabel('area-ratio').blur();
+    // P1-#4: the Days-on-market, Area-DOM-comparison, Closings (90d), and
+    // List-to-sale-ratio inputs were removed from the wizard (§05 publishes
+    // only median + YoY + the monthly chart). The model fields remain, but
+    // the agent no longer enters them here, so this round-trip drives only
+    // the surviving inputs.
     // Month chart input — A7d.4 redesign: native month picker for the
     // anchor + count stepper for how many months back, auto-generated
     // labels, one CurrencyInput per row. Agent only enters prices.
@@ -1722,21 +1716,14 @@ test.describe('Seller Presentation — A7d editorial extras', () => {
     const stats = d.areaStats as {
       medianSale?: string;
       medianSaleDeltaYoy?: string;
-      daysOnMarket?: string;
-      daysOnMarketZipAvg?: string;
-      closings90d?: string;
-      listToSaleRatio?: string;
       monthlySeries?: Array<{ month?: string; medianPrice?: string }>;
     };
-    // A7d.4: every Area-snapshot field now stores its post-format value
-    // (currency keypad → $-formatted, percent input → trailing %, number
-    // input → comma-grouped).
+    // A7d.4: the surviving Area-snapshot fields store their post-format value
+    // (currency keypad → $-formatted, percent input → trailing %). P1-#4
+    // removed the days-on-market / DOM-comparison / closings / list-to-sale
+    // inputs, so they're no longer entered or asserted here.
     expect(stats.medianSale).toBe('$642,000');
     expect(stats.medianSaleDeltaYoy).toBe('+4.6%');
-    expect(stats.daysOnMarket).toBe('14');
-    expect(stats.daysOnMarketZipAvg).toBe('vs Tremont avg 21');
-    expect(stats.closings90d).toBe('38');
-    expect(stats.listToSaleRatio).toBe('101%');
     expect(stats.monthlySeries?.[0]?.month).toBe("May '26");
     expect(stats.monthlySeries?.[0]?.medianPrice).toBe('$642,000');
 
@@ -1868,7 +1855,7 @@ test.describe('Seller Presentation — A7d editorial extras', () => {
             body: 'She walked us through every offer in plain English.',
             attributionName: 'The Halloran family',
             attributionYear: '2025',
-            attributionStreet: 'Tremont',
+            attributionStreet: 'Proctor',
           },
         ],
         reviewsOutlinkUrl: 'https://www.zillow.com/profile/marisolreyes',

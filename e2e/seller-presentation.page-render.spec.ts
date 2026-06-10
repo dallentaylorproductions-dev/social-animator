@@ -41,7 +41,7 @@ test.describe('Seller Presentation — A7b premium page render', () => {
     const caption = page.getByTestId('sep-caption-card');
     await expect(caption).toBeVisible();
     await expect(caption).toContainText('1742 Kenilworth Avenue');
-    await expect(caption).toContainText('Tremont, OH');
+    await expect(caption).toContainText('Tacoma, WA');
     await expect(page.getByTestId('sep-prepared-for')).toContainText(
       'For the Halloran family',
     );

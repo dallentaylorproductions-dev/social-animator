@@ -52,9 +52,9 @@ const REAL_MONTHLY_SERIES = [
 // area-stats step). No fixture; nothing skipped from the schema.
 const REAL_WIZARD_DRAFT = {
   propertyAddress: '1742 Kenilworth Avenue',
-  propertyCity: 'Tremont',
-  propertyState: 'OH',
-  propertyZip: '44113',
+  propertyCity: 'Tacoma',
+  propertyState: 'WA',
+  propertyZip: '98406',
   recommendedPrice: '$675,000',
   priceRationale:
     'Three recently-sold homes within four blocks anchor the recommendation.',
@@ -79,7 +79,7 @@ const REAL_WIZARD_DRAFT = {
     medianSale: '$642k',
     medianSaleDeltaYoy: '+4.1% vs prior year',
     daysOnMarket: '14',
-    daysOnMarketZipAvg: 'vs Tremont avg 21',
+    daysOnMarketZipAvg: 'vs Tacoma avg 21',
     closings90d: '38',
     listToSaleRatio: '101%',
     monthlySeries: REAL_MONTHLY_SERIES,

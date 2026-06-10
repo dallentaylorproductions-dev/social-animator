@@ -133,7 +133,7 @@ test.describe('Seller Presentation — A7d.8 video poster', () => {
       await page
         .getByTestId('step-property-address')
         .fill('1742 Kenilworth Avenue');
-      await page.getByTestId('step-property-city').fill('Tremont');
+      await page.getByTestId('step-property-city').fill('Tacoma');
       await page.getByTestId('step-property-state').fill('OH');
       await page.getByTestId('step-property-zip').fill('44113');
       const nextButton = page.getByTestId('wizard-next');
