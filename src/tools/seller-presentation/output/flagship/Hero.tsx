@@ -24,8 +24,14 @@ export function Hero({ payload }: { payload: PublicPayload }) {
     <section className="hero" data-testid="fs-hero">
       <div className="hero__photo">
         {family && (
-          <div className="hero__pers">
-            <span>For the {family} Family</span>
+          <div className="hero__pers" data-testid="fs-hero-pers">
+            {/* `preparedFor` is a free-form greeting (the wizard promises
+                "Appears as For {X}"): render it verbatim, matching the v1
+                page + footer disclaimer. Never re-wrap as "For the X Family"
+                — the value already carries its own article/noun, and a
+                surname template would double ("the Halloran family") and
+                mangle non-"Family" greetings ("The Smiths", "Mr. Smith"). */}
+            <span>For {family}</span>
             <span className="dot" aria-hidden="true" />
           </div>
         )}

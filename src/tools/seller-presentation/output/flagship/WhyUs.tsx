@@ -283,7 +283,7 @@ export function WhyUs({
               <span className="rule" aria-hidden="true" />
             </div>
           </div>
-          <div className="mcards">
+          <div className="mcards" data-count={marketCards.length}>
             {marketCards.map((c) => (
               <div className="mcard reveal" key={c.testid} data-testid={c.testid}>
                 <div className="card-mark">

@@ -110,6 +110,26 @@ test.describe("D1-FIX — desktop hero is side-by-side", () => {
   });
 });
 
+test.describe("D1-FIX2 — hero personalization renders the greeting verbatim, once", () => {
+  test("no doubled 'the'/'Family'; reads exactly 'For {preparedFor}'", async ({
+    page,
+  }) => {
+    await page.goto(FLAGSHIP);
+    // The FULL fixture's preparedFor is the greeting "the Halloran family".
+    // The line renders `For {preparedFor}` verbatim (matching the v1 page +
+    // footer disclaimer) — NOT a "For the X Family" surname template, which
+    // would double the article/noun the value already carries.
+    const pers = page.getByTestId("fs-hero-pers");
+    await expect(pers).toHaveText("For the Halloran family");
+    const text = (await pers.textContent())!;
+    // The pre-fix regression rendered "For the the Halloran family Family".
+    expect(text).not.toMatch(/the\s+the/i);
+    expect(text).not.toMatch(/family\s+family/i); // no appended "Family" after the greeting's own noun
+    // The greeting subject appears exactly once.
+    expect(text.match(/halloran/gi)?.length).toBe(1);
+  });
+});
+
 test.describe("D1 — four dark beats, evenly spaced, none adjacent", () => {
   test("hero · by-the-numbers · reviews · agent are dark; the bands between are light", async ({
     page,
