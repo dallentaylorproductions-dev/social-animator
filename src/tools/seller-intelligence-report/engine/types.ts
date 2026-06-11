@@ -75,17 +75,28 @@ export interface Comp {
    * agent's own content, fine to store). It takes precedence over Street
    * View at render.
    *
-   * `streetViewPanoId` + `hasStreetView` are the ONLY Google data we
+   * `streetViewPanoId` + `hasStreetView` are the ONLY Google IMAGERY data we
    * persist — resolved at authoring time from the FREE Street View
    * metadata endpoint. The pano id is explicitly EXEMPT from Google's
    * caching restriction; the IMAGE itself is NEVER stored — it is fetched
    * fresh client-side at view time. `hasStreetView === false` (resolved,
-   * no coverage) lays out as a clean text-only comp. All three are absent
-   * when the flag is off, so legacy/SIR drafts are unaffected.
+   * no coverage) lays out as a clean text-only comp.
+   *
+   * `streetViewHeading` + `houseLat`/`houseLng` AIM the camera at the home.
+   * The heading is a derived compass bearing (pano -> house); the house
+   * lat/lng is storable under Google's terms. Resolved at authoring time and
+   * used to build the static-image URL at render. NO raw geocode payload is
+   * ever stored — only the two coordinates + the computed heading number.
+   *
+   * All of these are absent when the flag is off, so legacy/SIR drafts are
+   * unaffected.
    */
   photoUrl?: string;
   streetViewPanoId?: string;
   hasStreetView?: boolean;
+  streetViewHeading?: number;
+  houseLat?: number;
+  houseLng?: number;
 }
 
 export interface SellerIntelligenceReportDraft {

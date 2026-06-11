@@ -1,5 +1,10 @@
 import type { PublicComp, PublicPayload } from "../public-payload";
-import { streetViewStaticUrl } from "@/lib/seller-presentation/street-view";
+import {
+  streetViewStaticUrl,
+  STREET_VIEW_IMG_SIZE,
+  STREET_VIEW_FOV,
+  STREET_VIEW_PITCH,
+} from "@/lib/seller-presentation/street-view";
 import { countSentence, hasCount } from "./copy";
 
 /**
@@ -82,7 +87,15 @@ function CompCard({
   // its bottom-left watermark; see flagship.css `.comp-card__photo img`).
   const streetViewUrl =
     !manualPhoto && comp.hasStreetView === true
-      ? streetViewStaticUrl(comp.streetViewPanoId)
+      ? streetViewStaticUrl(comp.streetViewPanoId, {
+          // Requested at the card's display aspect (≈16:10), cover-cropped by
+          // CSS without distortion. `heading` aims the camera at the home
+          // (undefined => Google's default heading); fov/pitch frame it.
+          size: STREET_VIEW_IMG_SIZE,
+          heading: comp.streetViewHeading,
+          fov: STREET_VIEW_FOV,
+          pitch: STREET_VIEW_PITCH,
+        })
       : null;
   const hasPhoto = !!manualPhoto || !!streetViewUrl;
   const meta = [
