@@ -10,6 +10,7 @@ import {
   type PointerEvent as ReactPointerEvent,
 } from "react";
 import {
+  cacheInstance,
   createInstance,
   deleteInstance,
   listInstances,
@@ -18,6 +19,12 @@ import {
   setInstanceArchived,
 } from "@/skills/workflow-instance-storage";
 import type { WorkflowInstance } from "@/skills/workflow-instance";
+import {
+  deleteServerDraft,
+  fetchServerDraft,
+  fetchServerDrafts,
+  putServerDraft,
+} from "@/tools/seller-presentation/hooks/server-draft-client";
 import {
   EMPTY_DRAFT,
   type SellerPresentationDraft,
@@ -108,7 +115,25 @@ function spInstances(): WorkflowInstance<SellerPresentationDraft>[] {
   return listInstances() as WorkflowInstance<SellerPresentationDraft>[];
 }
 
-export function PagesLibrary({ ownerEmail }: { ownerEmail: string | null }) {
+export function PagesLibrary({
+  ownerEmail,
+  serverDraftsEnabled = false,
+}: {
+  ownerEmail: string | null;
+  /**
+   * SP-KEYSTONE — when true the DRAFT slice is sourced from the owner-scoped
+   * SERVER store (so a draft created on any device appears + opens here) and
+   * draft mutations (new / duplicate / update-live / archive / delete) operate
+   * on the server. Default false ⇒ today's localStorage-only behavior.
+   */
+  serverDraftsEnabled?: boolean;
+}) {
+  // SP-KEYSTONE — the server's draft instances for this agent (the DRAFT slice
+  // when the flag is on). null = not loaded / the fetch failed ⇒ fall back to
+  // the localStorage cache so the library never blanks the drafts on a blip.
+  const draftInstancesRef = useRef<
+    WorkflowInstance<SellerPresentationDraft>[] | null
+  >(null);
   const [loading, setLoading] = useState(true);
   const [loadError, setLoadError] = useState<string | null>(null);
   const [serverPages, setServerPages] = useState<ServerPageSummary[]>([]);
@@ -164,30 +189,55 @@ export function PagesLibrary({ ownerEmail }: { ownerEmail: string | null }) {
     }
   }
 
+  // The DRAFT slice feeding mergePages. Server-sourced when the flag is on
+  // (cross-device); else the localStorage cache. On a failed server fetch the
+  // ref is null and we fall back to the cache so drafts never vanish.
+  const draftSlice = useCallback((): WorkflowInstance<SellerPresentationDraft>[] => {
+    if (serverDraftsEnabled) return draftInstancesRef.current ?? spInstances();
+    return spInstances();
+  }, [serverDraftsEnabled]);
+
   const rebuildCards = useCallback(
     (pages: ServerPageSummary[]) => {
       setCards(
         mergePages({
           serverPages: pages,
-          instances: spInstances(),
+          instances: draftSlice(),
           sessionEmail: ownerEmail,
         }),
       );
     },
-    [ownerEmail],
+    [ownerEmail, draftSlice],
   );
+
+  // SP-KEYSTONE — refresh the server draft slice. Mirrors each server record
+  // into the localStorage cache (offline fallback) and stores it in the ref.
+  // On failure leaves the ref null so `draftSlice` falls back to the cache.
+  const refreshServerDrafts = useCallback(async () => {
+    if (!serverDraftsEnabled) return;
+    const drafts = await fetchServerDrafts();
+    if (drafts) {
+      for (const d of drafts) cacheInstance(d);
+      draftInstancesRef.current = drafts;
+    } else {
+      draftInstancesRef.current = null;
+    }
+  }, [serverDraftsEnabled]);
 
   const load = useCallback(async () => {
     setLoading(true);
     setLoadError(null);
     try {
+      // Pull the server draft slice first (when on) so the cards built below
+      // reconcile the freshest cross-device drafts with the published pages.
+      await refreshServerDrafts();
       const res = await fetch("/api/seller-presentation/pages", {
         credentials: "same-origin",
       });
       const body = (await res.json().catch(() => ({}))) as PagesResponse;
       if (!res.ok || !body.ok) {
         setLoadError(body.error ?? `Could not load your pages (${res.status})`);
-        // Still show local drafts even if the server slice failed.
+        // Still show drafts even if the published slice failed.
         setServerPages([]);
         rebuildCards([]);
         return;
@@ -204,7 +254,7 @@ export function PagesLibrary({ ownerEmail }: { ownerEmail: string | null }) {
     } finally {
       setLoading(false);
     }
-  }, [rebuildCards]);
+  }, [rebuildCards, refreshServerDrafts]);
 
   useEffect(() => {
     load();
@@ -267,37 +317,56 @@ export function PagesLibrary({ ownerEmail }: { ownerEmail: string | null }) {
     window.location.assign(`/seller-presentation?id=${instanceId}`);
   }
 
-  function newPage() {
+  async function newPage() {
     const created = createInstance<SellerPresentationDraft>({
       skillId: "seller-presentation",
       draft: { ...EMPTY_DRAFT, themeId: seedThemeId() },
       currentStep: "property",
       ownerEmail: ownerEmail ?? undefined,
     });
+    // SP-KEYSTONE — push the fresh draft to the server before navigating so it
+    // is openable from any device immediately (not only after the first edit).
+    // A failed push is non-fatal: the wizard pushes again on first autosave.
+    if (serverDraftsEnabled) await putServerDraft(created);
     goToInstance(created.instanceId);
   }
 
-  function duplicate(card: PageCard) {
+  async function duplicate(card: PageCard) {
     if (!card.instanceId) return;
-    const source = loadInstance<SellerPresentationDraft>(card.instanceId);
-    if (!source) {
-      setActionError("That draft is no longer on this device.");
-      return;
-    }
-    // Deep-clone + rename via the pure helper. A duplicate is ALWAYS a fresh
-    // Draft: createInstance never sets publishedSlug/publishedAt, so the copy
-    // has no live link and the original's published page is untouched.
-    const clonedDraft = buildDuplicateDraft(source.draft);
-    createInstance<SellerPresentationDraft>({
-      skillId: "seller-presentation",
-      draft: clonedDraft,
-      currentStep: "property",
-      ownerEmail: ownerEmail ?? undefined,
-    });
-    // Stay in the library and surface the new Draft (it lives in Active).
     setActionError(null);
-    setTab("active");
-    rebuildCards(serverPages);
+    setBusyKey(card.key);
+    try {
+      // SP-KEYSTONE — the source draft may live only on the server (it was
+      // built on another device), so fetch it from there first; the local
+      // cache is the offline fallback.
+      let source = serverDraftsEnabled
+        ? await fetchServerDraft(card.instanceId)
+        : null;
+      if (!source) source = loadInstance<SellerPresentationDraft>(card.instanceId);
+      if (!source) {
+        setActionError("That draft could not be loaded.");
+        return;
+      }
+      // Deep-clone + rename via the pure helper. A duplicate is ALWAYS a fresh
+      // Draft: createInstance never sets publishedSlug/publishedAt, so the copy
+      // has no live link and the original's published page is untouched.
+      const clonedDraft = buildDuplicateDraft(source.draft);
+      const copy = createInstance<SellerPresentationDraft>({
+        skillId: "seller-presentation",
+        draft: clonedDraft,
+        currentStep: "property",
+        ownerEmail: ownerEmail ?? undefined,
+      });
+      if (serverDraftsEnabled) {
+        await putServerDraft(copy);
+        await refreshServerDrafts();
+      }
+      // Stay in the library and surface the new Draft (it lives in Active).
+      setTab("active");
+      rebuildCards(serverPages);
+    } finally {
+      setBusyKey(null);
+    }
   }
 
   async function copyLink(card: PageCard) {
@@ -344,6 +413,30 @@ export function PagesLibrary({ ownerEmail }: { ownerEmail: string | null }) {
       return true;
     }
     if (card.instanceId) {
+      // Draft archive/restore. SP-KEYSTONE — when server drafts are on, flip
+      // the flag on the SERVER record (so it reflects cross-device); the local
+      // cache mirrors it. The flag does NOT bump updatedAt (mirror of
+      // setInstanceArchived) so an archive never trips edits-pending.
+      if (serverDraftsEnabled) {
+        const inst =
+          (await fetchServerDraft(card.instanceId)) ??
+          loadInstance<SellerPresentationDraft>(card.instanceId);
+        if (!inst) {
+          setActionError("That draft could not be loaded.");
+          return false;
+        }
+        const next: WorkflowInstance<SellerPresentationDraft> = {
+          ...inst,
+          archivedAt: archived ? new Date().toISOString() : undefined,
+        };
+        const res = await putServerDraft(next);
+        cacheInstance(res.ok && res.instance ? res.instance : next);
+        if (!res.ok) {
+          setActionError("Archive failed.");
+          return false;
+        }
+        return true;
+      }
       // Local draft: flip the instance's local archive flag.
       setInstanceArchived(card.instanceId, archived);
       return true;
@@ -369,7 +462,19 @@ export function PagesLibrary({ ownerEmail }: { ownerEmail: string | null }) {
         return false;
       }
     }
-    if (card.instanceId) deleteInstance(card.instanceId);
+    if (card.instanceId) {
+      // SP-KEYSTONE — purge the SERVER draft too (owner-checked), then clear
+      // the local cache copy. A failed server delete is surfaced so the agent
+      // never thinks a draft is gone when it still exists on the server.
+      if (serverDraftsEnabled) {
+        const ok = await deleteServerDraft(card.instanceId);
+        if (!ok) {
+          setActionError("Delete failed.");
+          return false;
+        }
+      }
+      deleteInstance(card.instanceId);
+    }
     return true;
   }
 
@@ -414,9 +519,16 @@ export function PagesLibrary({ ownerEmail }: { ownerEmail: string | null }) {
     setActionError(null);
     setBusyKey(card.key);
     try {
-      const instance = loadInstance<SellerPresentationDraft>(card.instanceId);
+      // SP-KEYSTONE — the working draft may live only on the server (built /
+      // edited on another device), which is exactly what makes "Update live
+      // page" work cross-device. Fetch from the server first; fall back to the
+      // local cache offline.
+      const instance =
+        (serverDraftsEnabled
+          ? await fetchServerDraft(card.instanceId)
+          : null) ?? loadInstance<SellerPresentationDraft>(card.instanceId);
       if (!instance) {
-        setActionError("That draft is no longer on this device.");
+        setActionError("That draft could not be loaded.");
         return;
       }
       const { agentContact, brandReviews, brandColors, brandWhyUs } =
@@ -443,7 +555,16 @@ export function PagesLibrary({ ownerEmail }: { ownerEmail: string | null }) {
         return;
       }
       // Reset publishedAt so the card drops back to plain "Live".
-      markPublished(card.instanceId, body.slug);
+      // markPublished returns the stamped instance; persist it server-side so
+      // the Live/edits-pending state is correct on every device (not just this
+      // one). It bumps from the local cache copy; mirror the freshest draft
+      // first so the stamp lands on the right content.
+      cacheInstance(instance);
+      const stamped = markPublished<SellerPresentationDraft>(
+        card.instanceId,
+        body.slug,
+      );
+      if (serverDraftsEnabled && stamped) await putServerDraft(stamped);
       await load();
     } catch {
       setActionError("Update failed. Please try again.");
@@ -509,6 +630,7 @@ export function PagesLibrary({ ownerEmail }: { ownerEmail: string | null }) {
     return {
       card,
       nowMs,
+      serverDraftsEnabled,
       busy: busyKey === card.key || bulkBusy,
       copied: copiedKey === card.key,
       selectMode,
@@ -845,6 +967,8 @@ interface PageItemProps {
   card: PageCard;
   /** Client snapshot of Date.now() for relative-time meta (List rows only). */
   nowMs: number;
+  /** SP-KEYSTONE — server drafts on ⇒ the cross-device note copy is honest. */
+  serverDraftsEnabled: boolean;
   busy: boolean;
   copied: boolean;
   selectMode: boolean;
@@ -1019,11 +1143,14 @@ function useLongPress(
 function ExplainNote({
   copied,
   withActions,
+  serverDraftsEnabled,
   onViewLive,
   onCopyLink,
 }: {
   copied: boolean;
   withActions: boolean;
+  /** When server drafts are on, this published page simply has no saved draft. */
+  serverDraftsEnabled: boolean;
   onViewLive: () => void;
   onCopyLink: () => void;
 }) {
@@ -1035,8 +1162,9 @@ function ExplainNote({
       data-testid="lib-explain"
     >
       <p className="lib-explain-text">
-        This page was created on another device. Editing from any device is
-        coming soon.
+        {serverDraftsEnabled
+          ? "This published page has no saved draft to edit. You can still view it or copy its link."
+          : "This page was created on another device. Editing from any device is coming soon."}
       </p>
       {withActions && (
         <div className="lib-explain-actions">
@@ -1064,6 +1192,7 @@ function ExplainNote({
 
 function PageCardView({
   card,
+  serverDraftsEnabled,
   busy,
   copied,
   selectMode,
@@ -1191,6 +1320,7 @@ function PageCardView({
           <ExplainNote
             copied={copied}
             withActions={false}
+            serverDraftsEnabled={serverDraftsEnabled}
             onViewLive={onViewLive}
             onCopyLink={onCopyLink}
           />
@@ -1297,6 +1427,7 @@ function PageCardView({
 function PageRowView({
   card,
   nowMs,
+  serverDraftsEnabled,
   busy,
   copied,
   selectMode,
@@ -1423,6 +1554,7 @@ function PageRowView({
         <ExplainNote
           copied={copied}
           withActions
+          serverDraftsEnabled={serverDraftsEnabled}
           onViewLive={onViewLive}
           onCopyLink={onCopyLink}
         />
