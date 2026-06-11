@@ -112,6 +112,17 @@
    whole hero. Sits above the photo (z-index 1) and below the line's text. */
 .fs-page .hero__pers::before {content: ""; position: absolute; left: 0; right: 0; top: -16px; height: 70px; z-index: -1; pointer-events: none; background: linear-gradient(to bottom, rgba(8, 15, 18, .5), rgba(8, 15, 18, 0)); }
 .fs-page .hero__pers .dot {width: 4px; height: 4px; border-radius: 50%; background: var(--mint); }
+/* Installed-PWA / display-mode: standalone — the hero photo is intentionally
+   full-bleed under the iOS status bar (viewport-fit=cover + black-translucent;
+   see src/app/layout.tsx), but the "For {family}" personalization line then sits
+   under the notch and is unreadable. Push ONLY the line down by the top
+   safe-area inset (its scrim ::before is a child, so it travels with the text);
+   the photo stays full-bleed. Scoped to standalone so the normal mobile-Safari
+   tab — where sellers open the texted link — is byte-identical (the override
+   does not exist outside standalone). Same safe-area pattern as the M-2 fix. */
+@media (display-mode: standalone) {
+  .fs-page .hero__pers {top: calc(16px + env(safe-area-inset-top, 0px)); }
+}
 .fs-page .hero__band {padding: clamp(28px,6cqi,48px) clamp(22px,6cqi,84px) 0; }
 .fs-page .hero__eyebrow {font-family: var(--f-mono); font-size: 11px; letter-spacing: .2em; text-transform: uppercase; color: var(--t-pap-mute); margin-bottom: 18px; }
 .fs-page .hero__addr {font-family: var(--f-display); font-weight: 400; font-size: clamp(38px, 8.6cqi, 80px); line-height: 1.0; letter-spacing: -.02em; margin: 0; color: var(--t-pap); }
