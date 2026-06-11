@@ -1,4 +1,6 @@
 import { test, expect } from "@playwright/test";
+import { readFileSync } from "fs";
+import path from "path";
 import type { HandoutRecord } from "../src/lib/share-urls";
 import type { WorkflowInstance } from "../src/skills/workflow-instance";
 import type { SellerPresentationDraft } from "../src/tools/seller-presentation/engine/types";
@@ -765,5 +767,44 @@ test.describe("isCrossDeviceOnly (published elsewhere, no local draft)", () => {
         card({ status: "live-edits-pending", slug: "s1", instanceId: "wf_1" }),
       ),
     ).toBe(false);
+  });
+});
+
+// ===========================================================================
+// Select-mode checkbox visual (SP-LIB-4 fix). The selected fill + checkmark
+// MUST be driven by the shared `data-checked` state, not a CSS
+// `.lib-check input:checked + .lib-check-box` sibling rule — that rule only
+// reached the Cards box and left every List-row checkbox stuck empty on mobile
+// (where List is the default). These are pure-Node source/CSS contract checks:
+// the library is flag-gated OFF, so the browser harness never renders it (same
+// reason the rest of this file is node-context). They fail loudly if anyone
+// reverts to the layout-scoped approach.
+// ===========================================================================
+
+test.describe("select-mode checkbox is bound to selected state in BOTH layouts", () => {
+  const tsx = readFileSync(
+    path.resolve(__dirname, "../src/app/seller-presentation/PagesLibrary.tsx"),
+    "utf8",
+  );
+  const css = readFileSync(
+    path.resolve(__dirname, "../src/app/seller-presentation/pages-library.css"),
+    "utf8",
+  );
+
+  test("both checkbox sites bind the box fill to `checked` and render the glyph", () => {
+    // Cards (.lib-check) AND List (.lib-row-check) each render the box with the
+    // data-checked binding + the conditional CheckGlyph — two occurrences each.
+    const dataBound = tsx.match(/data-checked=\{checked \? "true" : undefined\}/g);
+    expect(dataBound?.length).toBe(2);
+    const glyph = tsx.match(/\{checked && <CheckGlyph \/>\}/g);
+    expect(glyph?.length).toBe(2);
+    // The glyph component exists.
+    expect(tsx).toContain("function CheckGlyph()");
+  });
+
+  test("the filled state is keyed off data-checked, shared across both boxes", () => {
+    expect(css).toContain('.lib-check-box[data-checked="true"]');
+    // The brittle, Cards-only sibling rules that left List empty are gone.
+    expect(css).not.toContain(".lib-check input:checked + .lib-check-box");
   });
 });

@@ -412,27 +412,28 @@
 .sep-library .lib-check input {
   position: absolute; opacity: 0; width: 0; height: 0;
 }
+/* The box + its checkmark are driven by `data-checked` (the SAME selected state
+   that paints the green border), NOT a CSS `input:checked` sibling rule — that
+   rule was scoped to `.lib-check` and never reached the List-row box, so it
+   rendered empty on mobile. One class, both layouts. */
 .sep-library .lib-check-box {
+  position: relative;
+  display: inline-flex; align-items: center; justify-content: center;
   width: 22px; height: 22px;
   border-radius: 7px;
   border: 1.5px solid var(--border-hi);
   background: color-mix(in oklch, var(--bg) 70%, transparent);
   backdrop-filter: blur(6px);
+  color: var(--bg); /* the check glyph reads dark on the mint fill */
   transition: background .2s, border-color .2s;
 }
-.sep-library .lib-check input:checked + .lib-check-box {
+.sep-library .lib-check-box[data-checked="true"] {
   background: var(--accent);
   border-color: var(--accent);
 }
-.sep-library .lib-check input:checked + .lib-check-box::after {
-  content: "";
-  position: absolute; left: 7px; top: 3px;
-  width: 6px; height: 11px;
-  border: solid var(--bg);
-  border-width: 0 2px 2px 0;
-  transform: rotate(45deg);
-}
-.sep-library .lib-check input:focus-visible + .lib-check-box {
+.sep-library .lib-check-glyph { display: block; }
+.sep-library .lib-check input:focus-visible + .lib-check-box,
+.sep-library .lib-row-check input:focus-visible + .lib-check-box {
   outline: 2px solid var(--accent); outline-offset: 2px;
 }
 

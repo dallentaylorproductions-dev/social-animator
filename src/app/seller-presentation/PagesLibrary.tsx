@@ -867,6 +867,31 @@ interface PageItemProps {
 }
 
 /**
+ * The select-mode checkmark. A rendered SVG (the same stroked check the comps
+ * step uses) shown inside a filled box, driven directly by the item's selected
+ * state — NOT a CSS `input:checked` sibling rule, which only ever reached the
+ * Cards checkbox and left every List-row box stuck empty.
+ */
+function CheckGlyph() {
+  return (
+    <svg
+      className="lib-check-glyph"
+      viewBox="0 0 24 24"
+      width="14"
+      height="14"
+      fill="none"
+      stroke="currentColor"
+      strokeWidth="3"
+      strokeLinecap="round"
+      strokeLinejoin="round"
+      aria-hidden="true"
+    >
+      <path d="M20 6L9 17l-5-5" />
+    </svg>
+  );
+}
+
+/**
  * Quiet haptic on long-press where the platform supports it. Android fires a
  * short buzz; iOS Safari has no Vibration API, so this is a guarded no-op there
  * (the visual lift into select mode is the feedback on iPhone). Never throws.
@@ -1124,7 +1149,13 @@ function PageCardView({
             aria-label={`Select ${card.propertyLine}`}
             data-testid="lib-card-check"
           />
-          <span className="lib-check-box" aria-hidden="true" />
+          <span
+            className="lib-check-box"
+            data-checked={checked ? "true" : undefined}
+            aria-hidden="true"
+          >
+            {checked && <CheckGlyph />}
+          </span>
         </label>
       )}
 
@@ -1334,7 +1365,13 @@ function PageRowView({
               aria-label={`Select ${card.propertyLine}`}
               data-testid="lib-row-check"
             />
-            <span className="lib-check-box" aria-hidden="true" />
+            <span
+              className="lib-check-box"
+              data-checked={checked ? "true" : undefined}
+              aria-hidden="true"
+            >
+              {checked && <CheckGlyph />}
+            </span>
           </label>
         )}
 
