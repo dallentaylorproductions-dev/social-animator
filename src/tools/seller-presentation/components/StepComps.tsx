@@ -5,7 +5,7 @@ import { CurrencyInput } from "@/components/inputs/CurrencyInput";
 import { NumberInput } from "@/components/inputs/NumberInput";
 import { ImageUploadField } from "@/components/ImageUploadField";
 import { computeCompMedian } from "@/lib/seller-presentation/median";
-import { resolveStreetViewMeta } from "@/lib/seller-presentation/street-view";
+import { resolveCompCoverage } from "@/lib/seller-presentation/street-view";
 import type { Comp, SellerPresentationDraft } from "../engine/types";
 import { useImportComps } from "../hooks/useImportComps";
 import { useSPEntitlement } from "./SPEntitlementContext";
@@ -447,13 +447,16 @@ function CompEditor({
           onChange={(e) =>
             onChange(
               // When the flag is on, editing the address invalidates any
-              // resolved Street View coverage so the effect re-resolves the
-              // new address (undefined => "not yet resolved").
+              // resolved Street View coverage AND aiming data so the effect
+              // re-resolves the new address (undefined => "not yet resolved").
               compPhotos
                 ? {
                     address: e.target.value,
                     streetViewPanoId: undefined,
                     hasStreetView: undefined,
+                    streetViewHeading: undefined,
+                    houseLat: undefined,
+                    houseLng: undefined,
                   }
                 : { address: e.target.value },
             )
@@ -897,7 +900,7 @@ export function StepComps({ draft, setDraft }: StepCompsProps) {
         const results = await Promise.all(
           pending.map(async (c) => ({
             address: c.address,
-            meta: await resolveStreetViewMeta(c.address),
+            cov: await resolveCompCoverage(c.address),
           })),
         );
         if (cancelled) return;
@@ -911,10 +914,17 @@ export function StepComps({ draft, setDraft }: StepCompsProps) {
               return c;
             const hit = results.find((r) => r.address === c.address);
             if (!hit) return c;
+            // Persist coverage + the compliant aiming data (heading + house
+            // latlng). heading/houseLat/houseLng are undefined when the geocode
+            // failed or the address has no coverage — the comp then renders at
+            // Street View's default heading (still a photo, just unaimed).
             return {
               ...c,
-              streetViewPanoId: hit.meta.panoId,
-              hasStreetView: hit.meta.hasStreetView,
+              streetViewPanoId: hit.cov.panoId,
+              hasStreetView: hit.cov.hasStreetView,
+              streetViewHeading: hit.cov.heading,
+              houseLat: hit.cov.houseLat,
+              houseLng: hit.cov.houseLng,
             };
           }),
         });

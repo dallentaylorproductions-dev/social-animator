@@ -25,6 +25,13 @@ import {
   resolveStreetViewMeta,
   isCompPhotosEnabled,
   streetViewBrowserKey,
+  parsePanoLatLng,
+  parseGeocode,
+  geocodeUrl,
+  resolveGeocode,
+  resolveCompCoverage,
+  computeHeading,
+  normalizeHeading,
 } from "../src/lib/seller-presentation/street-view";
 import {
   toPublicPayload,
@@ -51,6 +58,36 @@ const COVERED_META = {
 const ZERO_RESULTS_META = { status: "ZERO_RESULTS" };
 const NOT_FOUND_META = { status: "NOT_FOUND" };
 
+// A full Geocoding payload — deliberately fat with the fields we must NEVER
+// persist (formatted_address, place_id, address_components, viewport,
+// location_type). parseGeocode must pluck ONLY geometry.location.{lat,lng}.
+const GEOCODE_OK = {
+  status: "OK",
+  results: [
+    {
+      formatted_address: "200 Street View Rd, Tacoma, WA 98403, USA",
+      place_id: "ChIJ_PLACE_ID_XYZ",
+      address_components: [
+        { long_name: "200", short_name: "200", types: ["street_number"] },
+      ],
+      geometry: {
+        location: { lat: 47.2601, lng: -122.4385 },
+        location_type: "ROOFTOP",
+        viewport: {
+          northeast: { lat: 47.2614, lng: -122.4371 },
+          southwest: { lat: 47.2587, lng: -122.4398 },
+        },
+      },
+    },
+  ],
+};
+const GEOCODE_DENIED = {
+  status: "REQUEST_DENIED",
+  error_message: "This API project is not authorized to use this API.",
+  results: [],
+};
+const GEOCODE_ZERO = { status: "ZERO_RESULTS", results: [] };
+
 /** A Response-like stub for the injected fetch. */
 function fakeFetch(body: unknown, ok = true): typeof fetch {
   return (async () =>
@@ -58,6 +95,37 @@ function fakeFetch(body: unknown, ok = true): typeof fetch {
       ok,
       json: async () => body,
     }) as unknown as Response) as unknown as typeof fetch;
+}
+
+/**
+ * A URL-aware fetch stub: routes the Street View metadata URL to `meta` and
+ * the Geocoding URL to `geo` (or fails them), so `resolveCompCoverage` (which
+ * hits BOTH endpoints) can be exercised without live Google.
+ */
+function routedFetch(opts: {
+  meta?: unknown;
+  metaOk?: boolean;
+  geo?: unknown;
+  geoOk?: boolean;
+  geoThrows?: boolean;
+}): typeof fetch {
+  return (async (input: unknown) => {
+    const url = String(input);
+    if (url.includes("/streetview/metadata")) {
+      return {
+        ok: opts.metaOk ?? true,
+        json: async () => opts.meta,
+      } as unknown as Response;
+    }
+    if (url.includes("/geocode/json")) {
+      if (opts.geoThrows) throw new Error("CORS / network");
+      return {
+        ok: opts.geoOk ?? true,
+        json: async () => opts.geo,
+      } as unknown as Response;
+    }
+    throw new Error(`unexpected fetch url: ${url}`);
+  }) as unknown as typeof fetch;
 }
 
 function draftWith(comps: Comp[]): SellerPresentationDraft {
@@ -162,6 +230,41 @@ test.describe("street-view · URL builders", () => {
     });
   });
 
+  test("static url: no opts => no aiming/framing params (byte-identical)", () => {
+    void withEnv({ [KEY_ENV]: TEST_KEY }, () => {
+      const u = new URL(streetViewStaticUrl("PANO_X")!);
+      expect(u.searchParams.get("heading")).toBeNull();
+      expect(u.searchParams.get("fov")).toBeNull();
+      expect(u.searchParams.get("pitch")).toBeNull();
+    });
+  });
+
+  test("static url: heading + fov + pitch are added when supplied", () => {
+    void withEnv({ [KEY_ENV]: TEST_KEY }, () => {
+      const u = new URL(
+        streetViewStaticUrl("PANO_X", {
+          size: "640x400",
+          heading: 123.4,
+          fov: 80,
+          pitch: 6,
+        })!,
+      );
+      expect(u.searchParams.get("size")).toBe("640x400");
+      expect(u.searchParams.get("heading")).toBe("123.4");
+      expect(u.searchParams.get("fov")).toBe("80");
+      expect(u.searchParams.get("pitch")).toBe("6");
+    });
+  });
+
+  test("static url: heading is normalized into [0,360)", () => {
+    void withEnv({ [KEY_ENV]: TEST_KEY }, () => {
+      const wrap = new URL(streetViewStaticUrl("P", { heading: 370 })!);
+      expect(wrap.searchParams.get("heading")).toBe("10");
+      const neg = new URL(streetViewStaticUrl("P", { heading: -90 })!);
+      expect(neg.searchParams.get("heading")).toBe("270");
+    });
+  });
+
   test("metadata url: free endpoint with location + key", () => {
     void withEnv({ [KEY_ENV]: TEST_KEY }, () => {
       const url = streetViewMetadataUrl("1015 N Prospect St, Tacoma WA");
@@ -229,6 +332,164 @@ test.describe("street-view · resolveStreetViewMeta (mock Google)", () => {
   });
 });
 
+/* ---- aiming: heading math --------------------------------------------- */
+test.describe("street-view · computeHeading (bearing)", () => {
+  test("cardinal directions from the equator/prime-meridian", () => {
+    const origin = { lat: 0, lng: 0 };
+    expect(computeHeading(origin, { lat: 1, lng: 0 })).toBeCloseTo(0, 4); // N
+    expect(computeHeading(origin, { lat: 0, lng: 1 })).toBeCloseTo(90, 4); // E
+    expect(computeHeading(origin, { lat: -1, lng: 0 })).toBeCloseTo(180, 4); // S
+    expect(computeHeading(origin, { lat: 0, lng: -1 })).toBeCloseTo(270, 4); // W
+  });
+
+  test("a real pano->house pair yields a heading in [0,360)", () => {
+    // Pano SW of the house => camera looks roughly NE (0–90).
+    const h = computeHeading(
+      { lat: 47.25, lng: -122.44 },
+      { lat: 47.2601, lng: -122.4385 },
+    );
+    expect(h).toBeGreaterThanOrEqual(0);
+    expect(h).toBeLessThan(360);
+    expect(h).toBeGreaterThan(0);
+    expect(h).toBeLessThan(90);
+  });
+
+  test("normalizeHeading wraps any finite bearing into [0,360)", () => {
+    expect(normalizeHeading(0)).toBe(0);
+    expect(normalizeHeading(360)).toBe(0);
+    expect(normalizeHeading(450)).toBe(90);
+    expect(normalizeHeading(-45)).toBe(315);
+  });
+});
+
+/* ---- aiming: pano latlng + geocode parsing ----------------------------- */
+test.describe("street-view · parsePanoLatLng + parseGeocode", () => {
+  test("parsePanoLatLng reads the pano's location", () => {
+    expect(parsePanoLatLng(COVERED_META)).toEqual({ lat: 47.25, lng: -122.44 });
+  });
+
+  test("parsePanoLatLng => null when absent/malformed", () => {
+    for (const v of [
+      null,
+      {},
+      { location: null },
+      { location: { lat: "x", lng: 1 } },
+      ZERO_RESULTS_META,
+    ]) {
+      expect(parsePanoLatLng(v)).toBeNull();
+    }
+  });
+
+  test("parseGeocode plucks ONLY geometry.location.{lat,lng}", () => {
+    expect(parseGeocode(GEOCODE_OK)).toEqual({ lat: 47.2601, lng: -122.4385 });
+  });
+
+  test("parseGeocode => null on denied / zero-results / malformed", () => {
+    for (const v of [GEOCODE_DENIED, GEOCODE_ZERO, null, {}, { status: "OK" }]) {
+      expect(parseGeocode(v)).toBeNull();
+    }
+  });
+
+  test("geocodeUrl is key-gated and addresses by free-text", () => {
+    void withEnv({ [KEY_ENV]: undefined }, () => {
+      expect(geocodeUrl("200 Street View Rd")).toBeNull();
+    });
+    void withEnv({ [KEY_ENV]: TEST_KEY }, () => {
+      const u = new URL(geocodeUrl("200 Street View Rd")!);
+      expect(u.origin + u.pathname).toBe(
+        "https://maps.googleapis.com/maps/api/geocode/json",
+      );
+      expect(u.searchParams.get("address")).toBe("200 Street View Rd");
+      expect(u.searchParams.get("key")).toBe(TEST_KEY);
+    });
+  });
+});
+
+/* ---- aiming: resolveGeocode + resolveCompCoverage (mock Google) -------- */
+test.describe("street-view · resolveGeocode (mock Google)", () => {
+  test("OK => latlng; denied/throw/no-key => null (degrades)", async () => {
+    await withEnv({ [KEY_ENV]: TEST_KEY }, async () => {
+      expect(await resolveGeocode("addr", fakeFetch(GEOCODE_OK))).toEqual({
+        lat: 47.2601,
+        lng: -122.4385,
+      });
+      expect(await resolveGeocode("addr", fakeFetch(GEOCODE_DENIED))).toBeNull();
+      const thrower = (async () => {
+        throw new Error("CORS");
+      }) as unknown as typeof fetch;
+      expect(await resolveGeocode("addr", thrower)).toBeNull();
+    });
+    await withEnv({ [KEY_ENV]: undefined }, async () => {
+      expect(await resolveGeocode("addr", fakeFetch(GEOCODE_OK))).toBeNull();
+    });
+  });
+});
+
+test.describe("street-view · resolveCompCoverage (metadata + geocode)", () => {
+  test("covered + geocoded => pano + flag + heading + house latlng", async () => {
+    await withEnv({ [KEY_ENV]: TEST_KEY }, async () => {
+      const cov = await resolveCompCoverage(
+        "200 Street View Rd",
+        routedFetch({ meta: COVERED_META, geo: GEOCODE_OK }),
+      );
+      expect(cov.panoId).toBe("PANO_COVERED_ABC123");
+      expect(cov.hasStreetView).toBe(true);
+      expect(cov.houseLat).toBe(47.2601);
+      expect(cov.houseLng).toBe(-122.4385);
+      expect(cov.heading).toBeGreaterThanOrEqual(0);
+      expect(cov.heading).toBeLessThan(360);
+      // bearing from pano (47.25,-122.44) -> house (47.2601,-122.4385).
+      expect(cov.heading).toBeCloseTo(
+        computeHeading(
+          { lat: 47.25, lng: -122.44 },
+          { lat: 47.2601, lng: -122.4385 },
+        ),
+        6,
+      );
+    });
+  });
+
+  test("covered but geocode fails => coverage WITHOUT heading (clean degrade)", async () => {
+    await withEnv({ [KEY_ENV]: TEST_KEY }, async () => {
+      const cov = await resolveCompCoverage(
+        "200 Street View Rd",
+        routedFetch({ meta: COVERED_META, geoThrows: true }),
+      );
+      expect(cov).toEqual({
+        panoId: "PANO_COVERED_ABC123",
+        hasStreetView: true,
+      });
+      expect(cov.heading).toBeUndefined();
+      expect(cov.houseLat).toBeUndefined();
+    });
+  });
+
+  test("no coverage => { hasStreetView: false }, geocode never consulted", async () => {
+    await withEnv({ [KEY_ENV]: TEST_KEY }, async () => {
+      const cov = await resolveCompCoverage(
+        "middle of nowhere",
+        routedFetch({ meta: ZERO_RESULTS_META, geo: GEOCODE_OK }),
+      );
+      expect(cov).toEqual({ hasStreetView: false });
+    });
+  });
+
+  test("metadata non-ok / no key => graceful no-coverage", async () => {
+    await withEnv({ [KEY_ENV]: TEST_KEY }, async () => {
+      const cov = await resolveCompCoverage(
+        "x",
+        routedFetch({ meta: COVERED_META, metaOk: false }),
+      );
+      expect(cov).toEqual({ hasStreetView: false });
+    });
+    await withEnv({ [KEY_ENV]: undefined }, async () => {
+      expect(
+        await resolveCompCoverage("x", routedFetch({ meta: COVERED_META })),
+      ).toEqual({ hasStreetView: false });
+    });
+  });
+});
+
 /* ---- flag gate --------------------------------------------------------- */
 test.describe("street-view · isCompPhotosEnabled", () => {
   test("strict 'true' only", () => {
@@ -261,6 +522,16 @@ const noCoverageComp: Comp = {
   address: "300 No Coverage Ln",
   soldPrice: "$650,000",
   hasStreetView: false,
+  counted: true,
+};
+const aimedComp: Comp = {
+  address: "400 Aimed Way",
+  soldPrice: "$695,000",
+  streetViewPanoId: "PANO_AIMED_999",
+  hasStreetView: true,
+  streetViewHeading: 123.45,
+  houseLat: 47.2601,
+  houseLng: -122.4385,
   counted: true,
 };
 
@@ -323,6 +594,56 @@ test.describe("public-payload · COMP_PHOTOS flag gate", () => {
     expect(p.comps[0]).not.toHaveProperty("photoUrl");
   });
 
+  test("flag ON: aiming data (heading + house latlng) carries, clamped", () => {
+    const p = toPublicPayload(draftWith([aimedComp]), {}, {}, {}, false, {}, true);
+    expect(p.comps[0].streetViewPanoId).toBe("PANO_AIMED_999");
+    expect(p.comps[0].streetViewHeading).toBe(123.45);
+    expect(p.comps[0].houseLat).toBe(47.2601);
+    expect(p.comps[0].houseLng).toBe(-122.4385);
+  });
+
+  test("flag ON: out-of-range aiming data is dropped/normalized", () => {
+    const bad: Comp = {
+      address: "9 Bad Coords",
+      soldPrice: "$1",
+      streetViewPanoId: "PANO_B",
+      hasStreetView: true,
+      streetViewHeading: 450, // wraps to 90
+      houseLat: 200, // out of range => dropped
+      houseLng: -122.4, // valid
+      counted: true,
+    };
+    const p = toPublicPayload(draftWith([bad]), {}, {}, {}, false, {}, true);
+    expect(p.comps[0].streetViewHeading).toBe(90);
+    expect(p.comps[0]).not.toHaveProperty("houseLat");
+    expect(p.comps[0].houseLng).toBe(-122.4);
+  });
+
+  test("flag OFF: aiming data never emitted (byte-identical)", () => {
+    const on = toPublicPayload(draftWith([aimedComp]), {}, {}, {}, false, {}, true);
+    const off = toPublicPayload(
+      draftWith([aimedComp]),
+      {},
+      {},
+      {},
+      false,
+      {},
+      false,
+    );
+    // OFF strips every photo/aiming key.
+    for (const k of [
+      "streetViewPanoId",
+      "hasStreetView",
+      "streetViewHeading",
+      "houseLat",
+      "houseLng",
+    ]) {
+      expect(off.comps[0]).not.toHaveProperty(k);
+    }
+    // ON carries them; the two differ ONLY by the gated keys.
+    expect(on.comps[0].streetViewHeading).toBe(123.45);
+  });
+
   test("flag ON: resolved no-coverage carries hasStreetView=false, no pano", () => {
     const p = toPublicPayload(
       draftWith([noCoverageComp]),
@@ -370,7 +691,24 @@ test.describe("public-payload · clampPublicComp carries + sanitizes", () => {
     expect(byAddr("300 No Coverage Ln").hasStreetView).toBe(false);
   });
 
-  test("tampered photo fields are dropped at the read boundary", () => {
+  test("aiming fields round-trip through the read clamp", () => {
+    const published = toPublicPayload(
+      draftWith([aimedComp]),
+      {},
+      {},
+      {},
+      false,
+      {},
+      true,
+    );
+    const reclamped = clampPublicPayload(JSON.parse(JSON.stringify(published)));
+    const c = reclamped.comps[0];
+    expect(c.streetViewHeading).toBe(123.45);
+    expect(c.houseLat).toBe(47.2601);
+    expect(c.houseLng).toBe(-122.4385);
+  });
+
+  test("tampered photo + aiming fields are dropped at the read boundary", () => {
     const tampered = clampPublicPayload({
       templateVersion: 2,
       comps: [
@@ -380,6 +718,9 @@ test.describe("public-payload · clampPublicComp carries + sanitizes", () => {
           photoUrl: 42, // non-string
           streetViewPanoId: { nope: true }, // non-string
           hasStreetView: "true", // non-boolean
+          streetViewHeading: "90", // non-number
+          houseLat: 999, // out of range
+          houseLng: {}, // non-number
         },
       ],
     });
@@ -387,6 +728,9 @@ test.describe("public-payload · clampPublicComp carries + sanitizes", () => {
     expect(c).not.toHaveProperty("photoUrl");
     expect(c).not.toHaveProperty("streetViewPanoId");
     expect(c).not.toHaveProperty("hasStreetView");
+    expect(c).not.toHaveProperty("streetViewHeading");
+    expect(c).not.toHaveProperty("houseLat");
+    expect(c).not.toHaveProperty("houseLng");
   });
 });
 
@@ -412,6 +756,41 @@ test.describe("public-payload · COMPLIANCE (no Google imagery persisted)", () =
       expect(json).not.toContain("streetview");
       expect(json).not.toContain(TEST_KEY);
       expect(json).not.toContain("data:image");
+    });
+  });
+
+  test("aiming persists ONLY heading + house latlng, NEVER raw geocode JSON", () => {
+    void withEnv({ [KEY_ENV]: TEST_KEY }, () => {
+      const published = toPublicPayload(
+        draftWith([aimedComp]),
+        {},
+        {},
+        {},
+        false,
+        {},
+        true,
+      );
+      const json = JSON.stringify(published);
+      // The allowlisted aiming data IS present (heading + house latlng).
+      expect(json).toContain("streetViewHeading");
+      expect(json).toContain("houseLat");
+      expect(json).toContain("47.2601");
+      // NONE of the raw Geocoding payload's fields are ever carried — only the
+      // two coordinates + the derived heading number are persisted.
+      for (const leak of [
+        "formatted_address",
+        "place_id",
+        "address_components",
+        "location_type",
+        "viewport",
+        "geometry",
+        "results",
+        "ChIJ_PLACE_ID_XYZ",
+      ]) {
+        expect(json).not.toContain(leak);
+      }
+      // And still no imagery host/url.
+      expect(json).not.toContain("maps.googleapis.com");
     });
   });
 });

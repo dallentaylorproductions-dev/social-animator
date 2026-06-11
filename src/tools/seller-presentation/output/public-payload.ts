@@ -203,13 +203,23 @@ export interface PublicComp {
    */
   photoUrl?: string;
   /**
-   * Street View coverage for the comp's address — the ONLY Google data we
-   * persist. The renderer requests the IMAGE fresh from Google at view time
+   * Street View coverage for the comp's address — the ONLY Google IMAGERY data
+   * we persist. The renderer requests the IMAGE fresh from Google at view time
    * by `streetViewPanoId`; the bytes are never stored/proxied. `hasStreetView`
    * gates whether a Street View photo is shown at all.
    */
   streetViewPanoId?: string;
   hasStreetView?: boolean;
+  /**
+   * Camera aiming data. `streetViewHeading` (a derived compass bearing 0–360,
+   * pano -> house) points the Static image at the home; the renderer passes it
+   * through. `houseLat`/`houseLng` are the resolved home coordinates — storable
+   * under Google's terms (lat/lng is not imagery). NO raw geocode payload is
+   * ever emitted, only these clamped numbers.
+   */
+  streetViewHeading?: number;
+  houseLat?: number;
+  houseLng?: number;
   // ---- A6 deprecated — never populated by toPublicPayload post-A7a.
   //      Type kept for A6 functional renderer back-compat ONLY.
   /** @deprecated A7a removed from public emit. Will be removed once A7b ships. */
@@ -389,13 +399,18 @@ function projectComp(comp: Comp, compPhotos: boolean): PublicComp {
  * pano id + coverage flag are emitted for Street View — never an image URL,
  * never any other Google datum.
  */
-function projectCompPhotoFields(
-  comp: Comp,
-): Pick<PublicComp, "photoUrl" | "streetViewPanoId" | "hasStreetView"> {
-  const out: Pick<
-    PublicComp,
-    "photoUrl" | "streetViewPanoId" | "hasStreetView"
-  > = {};
+type CompPhotoFields = Pick<
+  PublicComp,
+  | "photoUrl"
+  | "streetViewPanoId"
+  | "hasStreetView"
+  | "streetViewHeading"
+  | "houseLat"
+  | "houseLng"
+>;
+
+function projectCompPhotoFields(comp: Comp): CompPhotoFields {
+  const out: CompPhotoFields = {};
   const manual =
     typeof comp.photoUrl === "string" && comp.photoUrl.trim()
       ? comp.photoUrl.trim()
@@ -412,7 +427,47 @@ function projectCompPhotoFields(
   if (typeof comp.hasStreetView === "boolean") {
     out.hasStreetView = comp.hasStreetView;
   }
+  // Aiming data — clamped + only added when valid, so an unaimed comp (no
+  // geocode) stays key-free. heading is normalized to [0,360); lat/lng to
+  // their geographic ranges. NO raw geocode payload is ever projected.
+  const heading = clampHeading(comp.streetViewHeading);
+  if (heading !== undefined) out.streetViewHeading = heading;
+  const houseLat = clampLat(comp.houseLat);
+  if (houseLat !== undefined) out.houseLat = houseLat;
+  const houseLng = clampLng(comp.houseLng);
+  if (houseLng !== undefined) out.houseLng = houseLng;
   return out;
+}
+
+/**
+ * COMP_PHOTOS aiming clamps (defense-at-boundary). A heading is normalized
+ * into [0,360); lat/lng are validated to their geographic ranges. Anything
+ * non-finite / out-of-range → undefined, so a tampered draft or KV record
+ * drops the field and the comp renders at the default heading rather than an
+ * off-axis or invalid one.
+ */
+function clampHeading(value: unknown): number | undefined {
+  if (typeof value !== "number" || !Number.isFinite(value)) return undefined;
+  // Already-in-range values pass through unchanged (no modulo drift); only
+  // out-of-range bearings are wrapped into [0,360).
+  if (value >= 0 && value < 360) return value;
+  return ((value % 360) + 360) % 360;
+}
+function clampLat(value: unknown): number | undefined {
+  return typeof value === "number" &&
+    Number.isFinite(value) &&
+    value >= -90 &&
+    value <= 90
+    ? value
+    : undefined;
+}
+function clampLng(value: unknown): number | undefined {
+  return typeof value === "number" &&
+    Number.isFinite(value) &&
+    value >= -180 &&
+    value <= 180
+    ? value
+    : undefined;
 }
 
 /**
@@ -999,6 +1054,14 @@ function clampPublicComp(raw: unknown): PublicComp | null {
       : undefined;
   if (pano) out.streetViewPanoId = pano;
   if (typeof r.hasStreetView === "boolean") out.hasStreetView = r.hasStreetView;
+  // Re-clamp the aiming data at the read boundary so a hand-edited KV record
+  // can't smuggle an off-range heading/coordinate into the render URL.
+  const heading = clampHeading(r.streetViewHeading);
+  if (heading !== undefined) out.streetViewHeading = heading;
+  const houseLat = clampLat(r.houseLat);
+  if (houseLat !== undefined) out.houseLat = houseLat;
+  const houseLng = clampLng(r.houseLng);
+  if (houseLng !== undefined) out.houseLng = houseLng;
   return out;
 }
 
