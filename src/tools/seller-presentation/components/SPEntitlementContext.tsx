@@ -62,6 +62,10 @@ interface SPEntitlement {
    *  Street View coverage and never shows the per-comp upload (text-only comps,
    *  exact current behavior). */
   compPhotosEnabled: boolean | null;
+  /** SP-LIB feature-flag state for the "Your pages" library landing. `null`
+   *  while loading; `false` ⇒ the tool lands on today's wizard (byte-identical)
+   *  and the library never renders. */
+  sellerPagesLibraryEnabled: boolean | null;
 }
 
 const Ctx = createContext<SPEntitlement>({
@@ -73,6 +77,7 @@ const Ctx = createContext<SPEntitlement>({
   compImportEnabled: null,
   areaChartRentcastEnabled: null,
   compPhotosEnabled: null,
+  sellerPagesLibraryEnabled: null,
 });
 
 export function useSPEntitlement(): SPEntitlement {
@@ -89,6 +94,7 @@ export function SPEntitlementProvider({ children }: { children: ReactNode }) {
     compImportEnabled: null,
     areaChartRentcastEnabled: null,
     compPhotosEnabled: null,
+    sellerPagesLibraryEnabled: null,
   });
 
   useEffect(() => {
@@ -115,6 +121,8 @@ export function SPEntitlementProvider({ children }: { children: ReactNode }) {
           compImportEnabled: !!data.features?.compImportEnabled,
           areaChartRentcastEnabled: !!data.features?.areaChartRentcastEnabled,
           compPhotosEnabled: !!data.features?.compPhotosEnabled,
+          sellerPagesLibraryEnabled:
+            !!data.features?.sellerPagesLibraryEnabled,
         });
       })
       .catch(() => {

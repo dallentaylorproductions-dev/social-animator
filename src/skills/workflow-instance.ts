@@ -107,4 +107,41 @@ export interface WorkflowInstance<TDraft = unknown> {
   /** Cached validation snapshot. A3 leaves this unset; A4+ writes it. */
   validation?: WorkflowInstanceValidation;
   timestamps: WorkflowInstanceTimestamps;
+  /**
+   * Lowercased email of the authenticated agent who owns this instance,
+   * stamped at creation from the server session (SP-LIB). Optional for
+   * back-compat — legacy instances created before SP-LIB have none.
+   *
+   * The "Your pages" library scopes its DRAFT cards strictly by this
+   * field (an instance with no `ownerEmail`, or one that doesn't match
+   * the current session, is never shown). Published pages are scoped
+   * independently + authoritatively by the server handout owner index;
+   * this field only governs the localStorage draft slice. The wizard
+   * itself ignores it — adding it does not change any rendered output,
+   * so the flag-off landing stays byte-identical.
+   */
+  ownerEmail?: string;
+  /**
+   * SP-LIB — the public handout slug this instance was last published
+   * to, recorded by `markPublished` after a successful publish. Its
+   * presence is what makes a card "Live" (vs "Draft"); re-publishing
+   * reuses this slug so the seller's existing /h/<slug> link stays
+   * stable ("Update live page"). Unset = never published = a Draft.
+   */
+  publishedSlug?: string;
+  /**
+   * SP-LIB — ISO 8601 UTC of the most recent publish. Compared against
+   * `timestamps.updatedAt` to derive "Live · edits pending": the working
+   * draft has unpublished edits iff `updatedAt > publishedAt`. Stamped
+   * equal to `updatedAt` at publish time so a freshly-published page is
+   * never falsely flagged as pending.
+   */
+  publishedAt?: string;
+  /**
+   * SP-LIB — ISO 8601 UTC of when the agent archived this instance from
+   * the library (reversible). Set for DRAFT cards archived locally;
+   * published-page archival lives on the server handout record instead
+   * (so the public page stops serving). Unset = not archived.
+   */
+  archivedAt?: string;
 }

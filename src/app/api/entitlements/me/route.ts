@@ -74,6 +74,14 @@ export async function GET(req: Request) {
       // never shows the per-comp upload, and the serializer emits no photo
       // keys (exact current behavior).
       compPhotosEnabled: process.env.COMP_PHOTOS_ENABLED === "true",
+      // SP-LIB — the "Your pages" library landing for the Seller Presentation
+      // tool. OFF by default; when false the tool lands on today's wizard
+      // (byte-identical), the /pages + /archive routes 503, and the landing
+      // gate never renders the library. The server page reads the same env
+      // var directly to pick the landing — this exposure is for any future
+      // client affordance + parity with the other SP flags.
+      sellerPagesLibraryEnabled:
+        process.env.SELLER_PAGES_LIBRARY_ENABLED === "true",
     },
   });
 }

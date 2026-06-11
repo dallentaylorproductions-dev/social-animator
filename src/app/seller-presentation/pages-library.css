@@ -1,0 +1,319 @@
+/* pages-library.css — "Your pages" library landing (SP-LIB).
+ *
+ * A literal port of the home-dashboard card treatment (sep-studio.css):
+ * same warm-dark token values, same tile surface / poster / body
+ * structure, same mint accent — so the library and the dashboard read
+ * as one product. EVERY selector is scoped under `.sep-library` (the
+ * descendant combinator) so nothing leaks into the wizard, /h/[slug], or
+ * any other route — exactly how sep-studio.css walls off `.sep-studio`.
+ *
+ * Animation-ready, NOT pre-animated: cards carry a semantic `data-status`
+ * and isolate as `.lib-card` units; motion here is hover/transition only.
+ * The later delight pass keys off these state hooks without a reshuffle.
+ */
+
+.sep-library,
+.sep-library *,
+.sep-library *::before,
+.sep-library *::after { box-sizing: border-box; }
+.sep-library button { font: inherit; color: inherit; background: none; border: 0; cursor: pointer; }
+.sep-library a { color: inherit; text-decoration: none; }
+
+.sep-library {
+  /* Tokens — literal-reuse of the dashboard's warm-dark set. */
+  --accent: #5BF5C9;
+  --bg:      oklch(0.165 0.008 80);
+  --bg-2:    oklch(0.205 0.008 80);
+  --surface: oklch(0.215 0.009 80);
+  --surface-hi: oklch(0.245 0.010 80);
+  --border:  oklch(0.30 0.009 80);
+  --border-hi: oklch(0.40 0.010 80);
+  --fg:      oklch(0.97 0.005 80);
+  --fg-mute: oklch(0.72 0.005 80);
+  --fg-dim:  oklch(0.50 0.005 80);
+  --fg-faint:oklch(0.38 0.005 80);
+
+  /* Status hues */
+  --st-live:    oklch(0.85 0.16 175);  /* mint */
+  --st-draft:   oklch(0.78 0.13 65);   /* amber */
+  --st-pending: oklch(0.80 0.14 95);   /* warm gold */
+  --st-archived:oklch(0.62 0.02 80);   /* muted */
+
+  --gap-grid: 20px;
+  --radius-lg: 20px;
+  --radius-md: 14px;
+  --radius-sm: 10px;
+
+  background: var(--bg);
+  color: var(--fg);
+  font-family: var(--font-geist-sans), ui-sans-serif, system-ui, -apple-system, sans-serif;
+  font-feature-settings: 'ss01', 'cv11';
+  -webkit-font-smoothing: antialiased;
+  -moz-osx-font-smoothing: grayscale;
+  min-height: 100vh;
+  overflow-x: hidden;
+  position: relative;
+  isolation: isolate;
+}
+
+.sep-library .lib-shell {
+  max-width: 1200px;
+  margin: 0 auto;
+  padding: 28px 28px 96px;
+}
+
+/* ─── header ─────────────────────────────────────────────────────────── */
+.sep-library .lib-back {
+  display: inline-block;
+  font-size: 13px;
+  color: var(--fg-mute);
+  margin-bottom: 22px;
+  transition: color .2s;
+}
+.sep-library .lib-back:hover { color: var(--fg); }
+
+.sep-library .lib-head-row {
+  display: flex;
+  align-items: flex-end;
+  justify-content: space-between;
+  gap: 20px;
+  flex-wrap: wrap;
+}
+.sep-library .lib-eyebrow {
+  display: inline-flex; align-items: center; gap: 7px;
+  font-family: var(--font-geist-mono), monospace;
+  font-size: 10.5px; letter-spacing: 0.14em; text-transform: uppercase;
+  color: var(--fg-dim);
+  margin-bottom: 10px;
+}
+.sep-library .lib-eyebrow-dot {
+  width: 6px; height: 6px; border-radius: 50%;
+  background: var(--accent);
+  box-shadow: 0 0 8px var(--accent);
+}
+.sep-library .lib-title {
+  margin: 0;
+  font-size: 30px; font-weight: 600; letter-spacing: -0.02em;
+  color: var(--fg);
+}
+.sep-library .lib-subtitle {
+  margin: 6px 0 0;
+  font-size: 13.5px; color: var(--fg-mute);
+}
+.sep-library .lib-head-actions {
+  display: flex; align-items: center; gap: 14px;
+}
+.sep-library .lib-meter {
+  font-family: var(--font-geist-mono), monospace;
+  font-size: 11.5px; letter-spacing: 0.04em;
+  color: var(--fg-mute);
+  padding: 7px 12px;
+  border: 1px solid var(--border);
+  border-radius: 999px;
+  white-space: nowrap;
+}
+.sep-library .lib-meter[data-at-limit="true"] {
+  color: var(--st-pending);
+  border-color: color-mix(in oklch, var(--st-pending) 45%, var(--border));
+}
+.sep-library .lib-newbtn {
+  font-size: 13px; font-weight: 600;
+  color: var(--bg);
+  background: var(--accent);
+  padding: 10px 16px;
+  border-radius: var(--radius-sm);
+  transition: filter .2s, transform .2s;
+  white-space: nowrap;
+}
+.sep-library .lib-newbtn:hover { filter: brightness(1.06); transform: translateY(-1px); }
+
+/* ─── banners ────────────────────────────────────────────────────────── */
+.sep-library .lib-banner {
+  margin-top: 22px;
+  padding: 14px 16px;
+  border-radius: var(--radius-md);
+  font-size: 13px; line-height: 1.5;
+  color: var(--fg);
+  background: color-mix(in oklch, var(--st-pending) 12%, var(--surface));
+  border: 1px solid color-mix(in oklch, var(--st-pending) 35%, var(--border));
+}
+.sep-library .lib-banner-warn {
+  background: color-mix(in oklch, oklch(0.65 0.17 25) 12%, var(--surface));
+  border-color: color-mix(in oklch, oklch(0.65 0.17 25) 35%, var(--border));
+}
+
+/* ─── states ─────────────────────────────────────────────────────────── */
+.sep-library .lib-loading {
+  margin-top: 60px;
+  text-align: center;
+  color: var(--fg-mute);
+  font-size: 14px;
+}
+
+.sep-library .lib-empty {
+  margin: 64px auto 0;
+  max-width: 440px;
+  text-align: center;
+  background: var(--surface);
+  border: 1px solid var(--border);
+  border-radius: var(--radius-lg);
+  padding: 48px 36px;
+}
+.sep-library .lib-empty-art {
+  font-size: 34px; color: var(--accent);
+  opacity: 0.85; margin-bottom: 18px;
+}
+.sep-library .lib-empty-title {
+  margin: 0 0 10px;
+  font-size: 20px; font-weight: 600; letter-spacing: -0.01em;
+}
+.sep-library .lib-empty-body {
+  margin: 0 0 24px;
+  font-size: 13.5px; line-height: 1.6; color: var(--fg-mute);
+  text-wrap: pretty;
+}
+.sep-library .lib-empty-cta { font-size: 14px; padding: 11px 20px; }
+
+/* ─── grid + card (ported from .tile) ────────────────────────────────── */
+.sep-library .lib-grid {
+  margin-top: 28px;
+  display: grid;
+  gap: var(--gap-grid);
+  grid-template-columns: repeat(3, minmax(0, 1fr));
+}
+
+.sep-library .lib-card {
+  position: relative;
+  display: flex; flex-direction: column;
+  background: var(--surface);
+  border: 1px solid var(--border);
+  border-radius: var(--radius-lg);
+  overflow: hidden;
+  min-width: 0;
+  transition: border-color .2s, transform .2s, background .2s;
+}
+.sep-library .lib-card:hover {
+  border-color: var(--border-hi);
+  background: var(--surface-hi);
+  transform: translateY(-2px);
+}
+.sep-library .lib-card:hover .lib-poster-img { transform: scale(1.02); }
+.sep-library .lib-card[data-status="archived"] { opacity: 0.72; }
+
+.sep-library .lib-poster {
+  position: relative;
+  aspect-ratio: 16 / 11;
+  background: var(--bg-2);
+  border-bottom: 1px solid var(--border);
+  overflow: hidden;
+}
+.sep-library .lib-poster-img {
+  position: absolute; inset: 0;
+  width: 100%; height: 100%; object-fit: cover;
+  transition: transform .4s cubic-bezier(.2,.8,.2,1);
+}
+.sep-library .lib-poster-empty {
+  position: absolute; inset: 0;
+  display: flex; align-items: center; justify-content: center;
+  color: var(--fg-faint); font-size: 28px;
+  background:
+    radial-gradient(120% 120% at 50% 0%, color-mix(in oklch, var(--accent) 7%, transparent), transparent 60%),
+    var(--bg-2);
+}
+
+/* status chip */
+.sep-library .lib-chip {
+  position: absolute; top: 12px; left: 12px;
+  font-family: var(--font-geist-mono), monospace;
+  font-size: 10px; letter-spacing: 0.06em;
+  padding: 4px 9px;
+  border-radius: 999px;
+  background: color-mix(in oklch, var(--bg) 78%, transparent);
+  backdrop-filter: blur(6px);
+  border: 1px solid var(--border);
+  color: var(--fg-mute);
+}
+.sep-library .lib-chip[data-status="live"] {
+  color: var(--st-live);
+  border-color: color-mix(in oklch, var(--st-live) 50%, var(--border));
+}
+.sep-library .lib-chip[data-status="live-edits-pending"] {
+  color: var(--st-pending);
+  border-color: color-mix(in oklch, var(--st-pending) 50%, var(--border));
+}
+.sep-library .lib-chip[data-status="draft"] {
+  color: var(--st-draft);
+  border-color: color-mix(in oklch, var(--st-draft) 50%, var(--border));
+}
+.sep-library .lib-chip[data-status="archived"] {
+  color: var(--st-archived);
+}
+
+.sep-library .lib-body {
+  padding: 16px 16px 18px;
+  display: flex; flex-direction: column; gap: 6px;
+  flex: 1;
+}
+.sep-library .lib-card-title {
+  margin: 0;
+  font-size: 15px; font-weight: 600; letter-spacing: -0.01em;
+  color: var(--fg);
+  overflow: hidden; text-overflow: ellipsis; white-space: nowrap;
+}
+.sep-library .lib-card-sub {
+  margin: 0;
+  font-size: 12.5px; color: var(--fg-mute);
+  overflow: hidden; text-overflow: ellipsis; white-space: nowrap;
+}
+.sep-library .lib-card-views {
+  margin: 0;
+  font-family: var(--font-geist-mono), monospace;
+  font-size: 11px; color: var(--fg-dim);
+}
+.sep-library .lib-pending-note {
+  margin: 6px 0 2px;
+  font-size: 11.5px; line-height: 1.45;
+  color: var(--st-pending);
+  text-wrap: pretty;
+}
+
+/* actions */
+.sep-library .lib-actions {
+  margin-top: 12px;
+  display: flex; flex-wrap: wrap; gap: 7px;
+}
+.sep-library .lib-btn {
+  font-size: 12px; font-weight: 500;
+  color: var(--fg);
+  padding: 7px 11px;
+  border-radius: var(--radius-sm);
+  border: 1px solid var(--border);
+  transition: border-color .2s, background .2s, color .2s, opacity .2s;
+}
+.sep-library .lib-btn:hover { border-color: var(--border-hi); background: var(--bg-2); }
+.sep-library .lib-btn:disabled { opacity: 0.45; cursor: default; }
+.sep-library .lib-btn-primary {
+  color: var(--bg);
+  background: var(--fg);
+  border-color: var(--fg);
+  font-weight: 600;
+}
+.sep-library .lib-btn-primary:hover { filter: brightness(0.94); background: var(--fg); }
+.sep-library .lib-btn-accent {
+  color: var(--bg);
+  background: var(--accent);
+  border-color: var(--accent);
+  font-weight: 600;
+}
+.sep-library .lib-btn-accent:hover { filter: brightness(1.06); background: var(--accent); }
+.sep-library .lib-btn-quiet { color: var(--fg-mute); }
+
+/* ─── responsive ─────────────────────────────────────────────────────── */
+@media (max-width: 1000px) {
+  .sep-library .lib-grid { grid-template-columns: repeat(2, minmax(0, 1fr)); }
+}
+@media (max-width: 640px) {
+  .sep-library .lib-grid { grid-template-columns: 1fr; }
+  .sep-library .lib-shell { padding: 22px 16px 80px; }
+  .sep-library .lib-head-row { align-items: flex-start; }
+}

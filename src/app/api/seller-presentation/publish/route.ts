@@ -1,6 +1,6 @@
 import { NextResponse } from "next/server";
 import { auth } from "@/lib/auth";
-import { publishHandout } from "@/lib/share-urls";
+import { publishHandout, updateHandout } from "@/lib/share-urls";
 import { loadAgentProfile } from "@/lib/entitlements/load-agent-profile";
 import { resolveEntitlements } from "@/lib/entitlements/resolver";
 import { isCompPhotosEnabled } from "@/lib/seller-presentation/street-view";
@@ -80,6 +80,15 @@ interface PublishPayload {
    * in KV.
    */
   brandWhyUs?: unknown;
+  /**
+   * SP-LIB — the existing handout slug to re-publish into, for the
+   * library's "Update live page" action. When present (and the SP-LIB
+   * flag is on, and the caller owns it), the route UPDATES that record
+   * in place so the seller's existing /h/<slug> link stays stable.
+   * Absent / flag-off / not-owned ⇒ a brand-new random slug is minted,
+   * exactly as today.
+   */
+  slug?: string;
 }
 
 export async function POST(req: Request) {
@@ -177,11 +186,38 @@ export async function POST(req: Request) {
     isCompPhotosEnabled(),
   );
 
+  const data = publicPayload as unknown as Record<string, unknown>;
+
+  // SP-LIB — "Update live page": when the library hands back the slug a
+  // page is already live at (and the flag is on), update that record in
+  // place so the seller's existing link is preserved. updateHandout
+  // enforces the owner check itself; a false return (missing record or
+  // owner mismatch) falls through to a fresh publish so the agent is
+  // never left unable to re-publish. Flag-off ⇒ this branch is skipped
+  // entirely and behavior is byte-identical to today (always new slug).
+  const libraryEnabled = process.env.SELLER_PAGES_LIBRARY_ENABLED === "true";
+  const reuseSlug =
+    libraryEnabled && typeof payload.slug === "string" && payload.slug
+      ? payload.slug
+      : null;
+
   try {
+    if (reuseSlug) {
+      const updated = await updateHandout(reuseSlug, email, { data });
+      if (updated) {
+        return NextResponse.json(
+          { ok: true, slug: reuseSlug },
+          { status: 200, headers: { "Cache-Control": "no-store" } },
+        );
+      }
+      // Fall through to a fresh publish below if the slug was gone /
+      // not owned by this agent.
+    }
+
     const result = await publishHandout({
       type: "seller-presentation",
       ownerEmail: email,
-      data: publicPayload as unknown as Record<string, unknown>,
+      data,
     });
     if (!result.ok) {
       return NextResponse.json(

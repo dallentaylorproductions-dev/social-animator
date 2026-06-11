@@ -113,6 +113,13 @@ export interface CreateInstanceInput<TDraft> {
   resolvedPrimitives?: WorkflowInstanceResolvedPrimitives;
   currentStep?: string;
   validation?: WorkflowInstanceValidation;
+  /**
+   * SP-LIB — lowercased owner email, stamped from the server session so
+   * the "Your pages" library can scope DRAFT cards to the authenticated
+   * agent. Optional; omitting it leaves the instance unowned (and thus
+   * invisible to the library, the safe default).
+   */
+  ownerEmail?: string;
 }
 
 /**
@@ -135,6 +142,11 @@ export function createInstance<TDraft>(
     currentStep: input.currentStep,
     validation: input.validation,
     timestamps: { createdAt: now, updatedAt: now },
+    // SP-LIB — stamp owner from the (lowercased) session email when the
+    // caller supplies it. Normalize here so the library's scope check
+    // (`ownerEmail === session.email.toLowerCase()`) is a plain string
+    // compare regardless of how the caller cased it.
+    ownerEmail: input.ownerEmail ? input.ownerEmail.toLowerCase() : undefined,
   };
   if (hasStorage()) {
     try {
@@ -221,6 +233,77 @@ export function markOpened<TDraft = unknown>(
       lastOpenedAt: now,
       updatedAt: now,
     },
+  };
+  if (hasStorage()) {
+    try {
+      window.localStorage.setItem(recordKey(persisted.instanceId), JSON.stringify(persisted));
+      addToIndex(persisted.instanceId);
+    } catch {
+      // ignore quota / storage-disabled
+    }
+  }
+  return persisted;
+}
+
+/**
+ * SP-LIB — record a successful publish onto the instance. Stamps
+ * `publishedSlug` (the /h/<slug> the seller now sees) and `publishedAt`,
+ * and bumps `updatedAt` to the SAME timestamp so the freshly-published
+ * page is never mis-derived as "Live · edits pending" (which is
+ * `updatedAt > publishedAt`). A later draft edit bumps `updatedAt` past
+ * `publishedAt` and the pending state lights up — exactly the signal the
+ * library needs so an agent never assumes the seller sees unpublished
+ * edits.
+ *
+ * No-op + returns null if the instance doesn't exist (e.g. published from
+ * a device whose localStorage was cleared). Mirror of `markOpened`.
+ */
+export function markPublished<TDraft = unknown>(
+  instanceId: string,
+  slug: string,
+): WorkflowInstance<TDraft> | null {
+  const existing = loadInstance<TDraft>(instanceId);
+  if (!existing) return null;
+  const now = new Date().toISOString();
+  const persisted: WorkflowInstance<TDraft> = {
+    ...existing,
+    publishedSlug: slug,
+    publishedAt: now,
+    timestamps: {
+      ...existing.timestamps,
+      updatedAt: now,
+    },
+  };
+  if (hasStorage()) {
+    try {
+      window.localStorage.setItem(recordKey(persisted.instanceId), JSON.stringify(persisted));
+      addToIndex(persisted.instanceId);
+    } catch {
+      // ignore quota / storage-disabled
+    }
+  }
+  return persisted;
+}
+
+/**
+ * SP-LIB — set or clear the local archive flag on an instance (used for
+ * DRAFT cards; published-page archival is a server handout mutation so
+ * the public page stops serving). `archived: true` stamps `archivedAt`
+ * to now; `false` clears it (restore). Does NOT bump `updatedAt` — an
+ * archive/restore is library bookkeeping, not a draft edit, and bumping
+ * it would falsely trip the edits-pending derivation on a Live card.
+ *
+ * No-op + returns null if the instance doesn't exist.
+ */
+export function setInstanceArchived<TDraft = unknown>(
+  instanceId: string,
+  archived: boolean,
+): WorkflowInstance<TDraft> | null {
+  const existing = loadInstance<TDraft>(instanceId);
+  if (!existing) return null;
+  const persisted: WorkflowInstance<TDraft> = {
+    ...existing,
+    archivedAt: archived ? new Date().toISOString() : undefined,
   };
   if (hasStorage()) {
     try {
