@@ -3,6 +3,7 @@ import { auth } from "@/lib/auth";
 import { publishHandout } from "@/lib/share-urls";
 import { loadAgentProfile } from "@/lib/entitlements/load-agent-profile";
 import { resolveEntitlements } from "@/lib/entitlements/resolver";
+import { isCompPhotosEnabled } from "@/lib/seller-presentation/street-view";
 import {
   clampDraft,
   describeMissingRequiredInputs,
@@ -170,6 +171,10 @@ export async function POST(req: Request) {
     brandColors,
     entitlements.whiteLabel,
     brandWhyUs,
+    // COMP_PHOTOS kill switch. OFF => no per-comp photo/Street-View keys reach
+    // KV (exact current behavior). Only the pano id + coverage flag are ever
+    // persisted; no Google image bytes touch the payload.
+    isCompPhotosEnabled(),
   );
 
   try {

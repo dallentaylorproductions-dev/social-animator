@@ -195,13 +195,21 @@ export interface PublicComp {
   sqft?: string;
   yearBuilt?: number;
   /**
-   * D1 — agent-uploaded/URL comp photo SLOT. The flagship comp card renders a
-   * photo when this is set and a clean text-only card when it is absent (the
-   * slot flexes in/out). D1 ships the slot only; `projectComp` does NOT populate
-   * it yet, so every D1 comp stays text-only — D3 wires the real upload. Photos
-   * are never scraped.
+   * COMP_PHOTOS (flag-gated) — per-comp home photo. The flagship comp card
+   * renders a photo when one is available and a clean text-only card when not
+   * (the slot flexes in/out). `photoUrl` is the AGENT's own uploaded image
+   * (camera roll -> Blob) and takes precedence at render. `projectComp`
+   * populates these ONLY when the flag is on (off => byte-identical to today).
    */
   photoUrl?: string;
+  /**
+   * Street View coverage for the comp's address — the ONLY Google data we
+   * persist. The renderer requests the IMAGE fresh from Google at view time
+   * by `streetViewPanoId`; the bytes are never stored/proxied. `hasStreetView`
+   * gates whether a Street View photo is shown at all.
+   */
+  streetViewPanoId?: string;
+  hasStreetView?: boolean;
   // ---- A6 deprecated — never populated by toPublicPayload post-A7a.
   //      Type kept for A6 functional renderer back-compat ONLY.
   /** @deprecated A7a removed from public emit. Will be removed once A7b ships. */
@@ -356,7 +364,7 @@ function projectBrandColors(
  * private by default — only an edit to this function (and the
  * corresponding spec assertion) opens the gate.
  */
-function projectComp(comp: Comp): PublicComp {
+function projectComp(comp: Comp, compPhotos: boolean): PublicComp {
   return {
     address: comp.address,
     soldPrice: comp.soldPrice,
@@ -366,7 +374,45 @@ function projectComp(comp: Comp): PublicComp {
       typeof comp.yearBuilt === "number" && Number.isFinite(comp.yearBuilt)
         ? comp.yearBuilt
         : undefined,
+    // COMP_PHOTOS — only opened when the flag is on. Keys are added ONLY when
+    // there's actual photo data (manual upload, or resolved Street View
+    // coverage), so a flag-on draft with no photos stays byte-identical to a
+    // flag-off publish. Manual `photoUrl` and the Street View pano are carried
+    // independently; the renderer applies manual-over-Street-View precedence.
+    ...(compPhotos ? projectCompPhotoFields(comp) : {}),
   };
+}
+
+/**
+ * The COMP_PHOTOS allowlist for one comp. Returns ONLY the keys that have a
+ * value, so undefined never widens the public shape. Compliance: only the
+ * pano id + coverage flag are emitted for Street View — never an image URL,
+ * never any other Google datum.
+ */
+function projectCompPhotoFields(
+  comp: Comp,
+): Pick<PublicComp, "photoUrl" | "streetViewPanoId" | "hasStreetView"> {
+  const out: Pick<
+    PublicComp,
+    "photoUrl" | "streetViewPanoId" | "hasStreetView"
+  > = {};
+  const manual =
+    typeof comp.photoUrl === "string" && comp.photoUrl.trim()
+      ? comp.photoUrl.trim()
+      : undefined;
+  if (manual) out.photoUrl = manual;
+  const pano =
+    typeof comp.streetViewPanoId === "string" && comp.streetViewPanoId.trim()
+      ? comp.streetViewPanoId.trim()
+      : undefined;
+  if (pano) out.streetViewPanoId = pano;
+  // Emit the coverage flag whenever it has been RESOLVED (true or false) so
+  // "checked, no coverage" (false) is distinct from "not yet resolved"
+  // (undefined, never emitted). Off-flag and unresolved comps stay key-free.
+  if (typeof comp.hasStreetView === "boolean") {
+    out.hasStreetView = comp.hasStreetView;
+  }
+  return out;
 }
 
 /**
@@ -688,6 +734,10 @@ export function toPublicPayload(
   // from BrandSettings. Wire-permissive; projected/clamped field-by-field.
   // Appended last so every existing call site stays valid.
   brandWhyUs: BrandWhyUsInput = {},
+  // COMP_PHOTOS — the per-comp photo kill switch. OFF by default so every
+  // existing call site (and every flag-off publish) stays byte-identical:
+  // when false, `projectComp` emits no photo/Street-View keys at all.
+  compPhotos: boolean = false,
 ): PublicPayload {
   const propertyAddress = draft.propertyAddress ?? "";
   const recommendedPrice = draft.recommendedPrice ?? "";
@@ -712,7 +762,7 @@ export function toPublicPayload(
   // reaches projectComp (which emits the allowlisted public shape).
   const publicComps = draft.comps
     .filter((c) => c.counted !== false)
-    .map(projectComp);
+    .map((c) => projectComp(c, compPhotos));
   const publicCards = draft.pitchPoints
     .filter((p) => p.visibility === "public")
     .map(projectPitchCard)
@@ -924,7 +974,7 @@ function clampPublicComp(raw: unknown): PublicComp | null {
   // Only the A7a locked-design keys are populated on read — deprecated
   // keys (daysOnMarket / saleToListPercent / squareFeet / distanceMiles)
   // are intentionally ignored even if present in the source record.
-  return {
+  const out: PublicComp = {
     address: r.address,
     soldPrice: r.soldPrice,
     soldDate: typeof r.soldDate === "string" ? r.soldDate : undefined,
@@ -934,6 +984,22 @@ function clampPublicComp(raw: unknown): PublicComp | null {
         ? r.yearBuilt
         : undefined,
   };
+  // COMP_PHOTOS — re-clamp the photo fields at the read boundary so a
+  // hand-edited KV record can't smuggle a non-string photo through. Added
+  // ONLY when present (their presence in the stored record already reflects
+  // the publish-time flag), so a no-photo record stays shape-identical. We
+  // re-validate that `streetViewPanoId` is a string (the only Google datum we
+  // ever persist); no image URL is read back here.
+  const manual =
+    typeof r.photoUrl === "string" && r.photoUrl.trim() ? r.photoUrl : undefined;
+  if (manual) out.photoUrl = manual;
+  const pano =
+    typeof r.streetViewPanoId === "string" && r.streetViewPanoId.trim()
+      ? r.streetViewPanoId
+      : undefined;
+  if (pano) out.streetViewPanoId = pano;
+  if (typeof r.hasStreetView === "boolean") out.hasStreetView = r.hasStreetView;
+  return out;
 }
 
 function clampPublicPitchCard(raw: unknown): PublicPitchCard | null {

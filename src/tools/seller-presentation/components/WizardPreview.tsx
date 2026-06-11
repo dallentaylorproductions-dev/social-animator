@@ -3,6 +3,7 @@
 import { useEffect, useRef, useState } from "react";
 import type { HandoutRecord } from "@/lib/share-urls";
 import { useBrandSettings } from "@/lib/brand";
+import { useSPEntitlement } from "./SPEntitlementContext";
 import type { SellerPresentationDraft } from "../engine/types";
 import type { StepId } from "../hooks/useSellerPresentationState";
 import { FlagshipPage } from "../output/flagship/FlagshipPage";
@@ -266,6 +267,7 @@ export function WizardPreview({
   currentStep: StepId;
 }) {
   const { settings: brand } = useBrandSettings();
+  const { compPhotosEnabled } = useSPEntitlement();
   const debouncedDraft = useDebounced(draft, DEBOUNCE_MS);
 
   const [mounted, setMounted] = useState(false);
@@ -344,7 +346,7 @@ export function WizardPreview({
   const sparse = isDraftSparse(debouncedDraft);
   const payload = sparse
     ? samplePayload(brand)
-    : draftPreviewPayload(debouncedDraft, brand);
+    : draftPreviewPayload(debouncedDraft, brand, compPhotosEnabled === true);
   const handout: HandoutRecord = {
     ...PREVIEW_RECORD_BASE,
     data: payload as unknown as Record<string, unknown>,
