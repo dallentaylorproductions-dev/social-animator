@@ -9,6 +9,8 @@ import {
   type MouseEvent as ReactMouseEvent,
   type PointerEvent as ReactPointerEvent,
 } from "react";
+import { Reorder, useDragControls, useReducedMotion } from "framer-motion";
+import { GripVertical } from "lucide-react";
 import {
   cacheInstance,
   createInstance,
@@ -26,12 +28,17 @@ import {
   putServerDraft,
 } from "@/tools/seller-presentation/hooks/server-draft-client";
 import {
+  fetchPageOrder,
+  putPageOrder,
+} from "@/tools/seller-presentation/hooks/pages-order-client";
+import {
   EMPTY_DRAFT,
   type SellerPresentationDraft,
 } from "@/tools/seller-presentation/engine/types";
 import { DEFAULT_BRAND_THEME_ID, loadBrandSettings } from "@/lib/brand";
 import { brandToPublishInputs } from "@/tools/seller-presentation/components/preview/preview-payload";
 import {
+  applyManualOrder,
   buildDuplicateDraft,
   bulkActionValidity,
   filterByTab,
@@ -41,7 +48,9 @@ import {
   LONG_PRESS_MS,
   mergePages,
   movedBeyond,
+  PAGES_ORDER_CACHE_KEY,
   resolveViewMode,
+  sanitizePageOrder,
   secondaryRowActions,
   tabCounts,
   VIEW_MODE_STORAGE_KEY,
@@ -99,6 +108,32 @@ const STATUS_LABEL: Record<PageStatus, string> = {
   archived: "Archived",
 };
 
+/**
+ * How long after the last reorder swap before the order is written to the
+ * server (SP-LIB-5). One settle per drag, not a write per row crossed; the
+ * order is also cached locally on every change, so nothing is lost in the gap.
+ */
+const ORDER_PERSIST_DEBOUNCE_MS = 600;
+
+/**
+ * The reorder motion (SP-LIB-5). A gentle, slightly-bouncy spring for the
+ * settle — fluid, NOT a hard snap — and a subtle lift while dragging. Kept as
+ * isolated primitives so the later app-wide delight pass can extend the feel
+ * without touching the row. Both are bypassed under prefers-reduced-motion.
+ */
+const ROW_REORDER_SPRING = {
+  type: "spring",
+  stiffness: 620,
+  damping: 34,
+  mass: 0.7,
+} as const;
+
+const ROW_REORDER_LIFT = {
+  scale: 1.025,
+  boxShadow: "0 14px 32px rgba(0, 0, 0, 0.30)",
+  cursor: "grabbing",
+} as const;
+
 interface ConfirmState {
   title: string;
   body: string;
@@ -118,6 +153,7 @@ function spInstances(): WorkflowInstance<SellerPresentationDraft>[] {
 export function PagesLibrary({
   ownerEmail,
   serverDraftsEnabled = false,
+  reorderEnabled = false,
 }: {
   ownerEmail: string | null;
   /**
@@ -127,6 +163,13 @@ export function PagesLibrary({
    * on the server. Default false ⇒ today's localStorage-only behavior.
    */
   serverDraftsEnabled?: boolean;
+  /**
+   * SP-LIB-5 — when true the agent can drag to reorder the Active tab (List
+   * view), and that owner-scoped order is persisted server-side + applied as
+   * the Active default in Cards + List. Default false ⇒ byte-identical to
+   * today's library: no drag handle, fixed most-recent-first sort.
+   */
+  reorderEnabled?: boolean;
 }) {
   // SP-KEYSTONE — the server's draft instances for this agent (the DRAFT slice
   // when the flag is on). null = not loaded / the fetch failed ⇒ fall back to
@@ -167,6 +210,90 @@ export function PagesLibrary({
   // server and first client render agree and render stays pure.
   const [nowMs, setNowMs] = useState(0);
 
+  // v5 — the agent's manual order for the Active tab (SP-LIB-5). A list of
+  // card KEYS, owner-scoped + persisted server-side (cross-device). `order`
+  // drives the render; `orderRef` mirrors it for the async prune/persist paths
+  // (no stale closures); `orderTimerRef` debounces the server write so a drag
+  // is one settle, not a write per swap. All inert unless `reorderEnabled`.
+  const [order, setOrderState] = useState<string[]>([]);
+  const orderRef = useRef<string[]>([]);
+  const orderTimerRef = useRef<number | null>(null);
+  // Count of in-flight order PUTs. A debounced write nulls its timer the moment
+  // it FIRES, but the PUT is still on the wire after that — so the timer alone
+  // is not enough to tell refreshOrder "a local write is outstanding." This
+  // counter stays > 0 until the PUT resolves, so refreshOrder never adopts a
+  // server copy that predates a write we just sent (which would revert a drag).
+  const orderWritesInFlightRef = useRef(0);
+
+  // Set the order locally (state + ref + offline cache). Never writes the
+  // server — persistence is an explicit, separate step so a load() refresh
+  // can adopt the server copy without echoing it straight back.
+  const setOrderLocal = useCallback((next: string[]) => {
+    orderRef.current = next;
+    setOrderState(next);
+    try {
+      window.localStorage.setItem(PAGES_ORDER_CACHE_KEY, JSON.stringify(next));
+    } catch {
+      // storage disabled / quota — the server copy is still authoritative
+    }
+  }, []);
+
+  // Write the order to the server, tracking the request as in-flight so a
+  // concurrent refreshOrder won't adopt a now-stale server copy mid-flight.
+  const flushOrderWrite = useCallback(async (next: string[]) => {
+    orderWritesInFlightRef.current += 1;
+    try {
+      await putPageOrder(next);
+    } finally {
+      orderWritesInFlightRef.current -= 1;
+    }
+  }, []);
+
+  // Debounced server write of the order (one settle per drag, not per swap).
+  const persistOrderDebounced = useCallback(
+    (next: string[]) => {
+      if (orderTimerRef.current !== null) {
+        window.clearTimeout(orderTimerRef.current);
+      }
+      orderTimerRef.current = window.setTimeout(() => {
+        orderTimerRef.current = null;
+        void flushOrderWrite(next);
+      }, ORDER_PERSIST_DEBOUNCE_MS);
+    },
+    [flushOrderWrite],
+  );
+
+  // A drag settled (or fired mid-drag as rows cross): adopt the new key order
+  // locally and schedule the server write.
+  const handleReorder = useCallback(
+    (nextKeys: string[]) => {
+      setOrderLocal(nextKeys);
+      persistOrderDebounced(nextKeys);
+    },
+    [setOrderLocal, persistOrderDebounced],
+  );
+
+  // Drop key(s) from the order and persist immediately (awaited). Used when a
+  // card leaves the Active set for good: archived (so Restore re-slots it on
+  // top, since it's "unknown" to the order again) or deleted (cleanup). The
+  // immediate write lands before the caller's following load() re-reads it.
+  // Batched so a bulk archive/delete is one write, not one per card.
+  const pruneOrderKeys = useCallback(
+    async (keys: string[]) => {
+      if (!reorderEnabled || keys.length === 0) return;
+      const drop = new Set(keys);
+      if (!orderRef.current.some((k) => drop.has(k))) return;
+      const next = orderRef.current.filter((k) => !drop.has(k));
+      setOrderLocal(next);
+      if (orderTimerRef.current !== null) {
+        window.clearTimeout(orderTimerRef.current);
+        orderTimerRef.current = null;
+      }
+      await flushOrderWrite(next);
+    },
+    [reorderEnabled, setOrderLocal, flushOrderWrite],
+  );
+
   useEffect(() => {
     if (typeof window === "undefined") return;
     let saved: string | null = null;
@@ -177,7 +304,35 @@ export function PagesLibrary({
     }
     setViewMode(resolveViewMode(saved, window.innerWidth));
     setNowMs(Date.now());
-  }, []);
+    // Seed the order from the offline cache for an immediate ordered paint;
+    // load() refreshes it from the server (the cross-device source of truth).
+    if (reorderEnabled) {
+      try {
+        const cached = window.localStorage.getItem(PAGES_ORDER_CACHE_KEY);
+        if (cached) {
+          const parsed = sanitizePageOrder(JSON.parse(cached));
+          if (parsed.length) setOrderLocal(parsed);
+        }
+      } catch {
+        // no cache / parse error — the server fetch in load() fills it in
+      }
+    }
+  }, [reorderEnabled, setOrderLocal]);
+
+  // On unmount, FLUSH (not drop) a pending debounced order write — otherwise a
+  // reorder made in the last debounce window before navigating away is lost
+  // (the cache would then be overwritten by the stale server copy on return).
+  // Fire-and-forget: the cleanup can't await, and the write is idempotent.
+  useEffect(
+    () => () => {
+      if (orderTimerRef.current !== null) {
+        window.clearTimeout(orderTimerRef.current);
+        orderTimerRef.current = null;
+        void putPageOrder(orderRef.current);
+      }
+    },
+    [],
+  );
 
   function chooseView(next: ViewMode) {
     setViewMode(next);
@@ -224,13 +379,34 @@ export function PagesLibrary({
     }
   }, [serverDraftsEnabled]);
 
+  // SP-LIB-5 — refresh the manual order from the server (the cross-device
+  // source of truth). Skips while a local reorder write is still pending so a
+  // stale server read can't clobber the just-arranged order; on a failed fetch
+  // the cache-seeded order stands (never blanks the arrangement on a blip).
+  const refreshOrder = useCallback(async () => {
+    // Skip while a local write is pending OR still in flight, so a stale server
+    // copy can never revert an order we just arranged (the timer alone misses
+    // the window between the debounce firing and the PUT resolving).
+    if (
+      !reorderEnabled ||
+      orderTimerRef.current !== null ||
+      orderWritesInFlightRef.current > 0
+    ) {
+      return;
+    }
+    const serverOrder = await fetchPageOrder();
+    if (serverOrder) setOrderLocal(serverOrder);
+  }, [reorderEnabled, setOrderLocal]);
+
   const load = useCallback(async () => {
     setLoading(true);
     setLoadError(null);
     try {
       // Pull the server draft slice first (when on) so the cards built below
       // reconcile the freshest cross-device drafts with the published pages.
-      await refreshServerDrafts();
+      // The order refresh is independent (applied at render, not in the merge),
+      // so it rides alongside rather than adding a serial round trip.
+      await Promise.all([refreshServerDrafts(), refreshOrder()]);
       const res = await fetch("/api/seller-presentation/pages", {
         credentials: "same-origin",
       });
@@ -254,7 +430,7 @@ export function PagesLibrary({
     } finally {
       setLoading(false);
     }
-  }, [rebuildCards, refreshServerDrafts]);
+  }, [rebuildCards, refreshServerDrafts, refreshOrder]);
 
   useEffect(() => {
     load();
@@ -267,6 +443,22 @@ export function PagesLibrary({
 
   const counts = useMemo(() => tabCounts(cards), [cards]);
   const visibleCards = useMemo(() => filterByTab(cards, tab), [cards, tab]);
+  // SP-LIB-5 — the Active tab renders in the agent's manual order (Cards + List
+  // both). For Archived (and whenever reorder is off) this is exactly today's
+  // sort, so `orderedCards === visibleCards` ⇒ the flag-off render is
+  // byte-identical and the Archived tab is never manually reordered.
+  const orderedCards = useMemo(
+    () =>
+      reorderEnabled && tab === "active"
+        ? applyManualOrder(visibleCards, order)
+        : visibleCards,
+    [reorderEnabled, tab, visibleCards, order],
+  );
+  // Drag-to-reorder is List-view + Active-tab only, and never during select
+  // mode (which owns the press gesture). Cards view still shows the order; it
+  // just isn't draggable this round (card-grid drag is a noted follow-up).
+  const canReorder =
+    reorderEnabled && tab === "active" && viewMode === "list" && !selectMode;
   const selectedCards = useMemo(
     () => visibleCards.filter((c) => selected.has(c.key)),
     [visibleCards, selected],
@@ -485,7 +677,13 @@ export function PagesLibrary({
     setBusyKey(card.key);
     try {
       const ok = await archiveOne(card, archived);
-      if (ok) await load();
+      if (ok) {
+        // Archiving removes the card from the order so a later Restore re-slots
+        // it on top (SP-LIB-5). Restore itself needs no order change — the card
+        // is "unknown" to the order again, which applyManualOrder floats to top.
+        if (archived) await pruneOrderKeys([card.key]);
+        await load();
+      }
     } catch {
       setActionError("Archive failed. Please try again.");
     } finally {
@@ -504,7 +702,11 @@ export function PagesLibrary({
         setBusyKey(card.key);
         try {
           const ok = await deleteOne(card);
-          if (ok) await load();
+          if (ok) {
+            // Drop the deleted card's key from the order (cleanup; SP-LIB-5).
+            await pruneOrderKeys([card.key]);
+            await load();
+          }
         } catch {
           setActionError("Delete failed. Please try again.");
         } finally {
@@ -595,11 +797,16 @@ export function PagesLibrary({
     setBulkBusy(true);
     let failures = 0;
     try {
+      const removed: string[] = [];
       for (const card of targets) {
         // setActionError inside op already surfaces the last failure reason.
         const ok = await op(card);
         if (!ok) failures += 1;
+        else removed.push(card.key);
       }
+      // Both bulk ops (archive / delete) take cards OUT of Active, so drop the
+      // succeeded keys from the order in one write (SP-LIB-5).
+      await pruneOrderKeys(removed);
       await load();
       if (failures === 0) exitSelect();
     } catch {
@@ -805,15 +1012,33 @@ export function PagesLibrary({
           <EmptyState onCreate={newPage} />
         ) : visibleCards.length === 0 ? (
           <TabEmpty tab={tab} />
+        ) : canReorder ? (
+          // SP-LIB-5 — the draggable Active List. framer-motion's Reorder gives
+          // the fluid lift / flow / spring settle; drag is HANDLE-only
+          // (dragListener=false + per-row dragControls), so tap-to-open and
+          // long-press-select on the row are untouched. The order of `values`
+          // IS the render order; onReorder hands back the new key order.
+          <Reorder.Group
+            as="div"
+            axis="y"
+            values={orderedCards.map((c) => c.key)}
+            onReorder={handleReorder}
+            className="lib-list"
+            data-testid="lib-list"
+          >
+            {orderedCards.map((card) => (
+              <PageRowView key={card.key} {...rowProps(card)} reorderable />
+            ))}
+          </Reorder.Group>
         ) : viewMode === "list" ? (
           <div className="lib-list" data-testid="lib-list">
-            {visibleCards.map((card) => (
+            {orderedCards.map((card) => (
               <PageRowView key={card.key} {...rowProps(card)} />
             ))}
           </div>
         ) : (
           <div className="lib-grid" data-testid="lib-grid">
-            {visibleCards.map((card) => (
+            {orderedCards.map((card) => (
               <PageCardView key={card.key} {...rowProps(card)} />
             ))}
           </div>
@@ -985,6 +1210,11 @@ interface PageItemProps {
   copied: boolean;
   selectMode: boolean;
   checked: boolean;
+  /**
+   * SP-LIB-5 — render this row as a draggable Reorder.Item with a grip handle.
+   * List rows only, set by the Active-tab draggable branch. Cards ignore it.
+   */
+  reorderable?: boolean;
   /** Is this card's "created on another device" note currently open? */
   explainOpen: boolean;
   onToggleSelect: () => void;
@@ -1444,6 +1674,7 @@ function PageRowView({
   copied,
   selectMode,
   checked,
+  reorderable,
   explainOpen,
   onToggleSelect,
   onLongPressSelect,
@@ -1470,6 +1701,12 @@ function PageRowView({
   const actions = secondaryRowActions(card);
 
   const longPress = useLongPress(onLongPressSelect, !selectMode);
+  // SP-LIB-5 — drag plumbing. Hooks run unconditionally (Rules of Hooks); they
+  // only matter when `reorderable`. `dragControls` lets the grip handle start
+  // the drag while the rest of the row keeps its tap / long-press gestures;
+  // `reduceMotion` collapses the spring to an instant move for users who ask.
+  const dragControls = useDragControls();
+  const reduceMotion = useReducedMotion();
 
   // The whole row is the tap target (packet). The ⋯ menu + checkbox carry
   // data-no-longpress and sit outside the hit button, so they never reach here.
@@ -1487,18 +1724,17 @@ function PageRowView({
     if (!primaryDisabled) primaryAction();
   }
 
-  return (
-    <div
-      className="lib-row"
-      data-status={card.status}
-      data-testid="lib-row"
-      data-slug={card.slug}
-      data-selectable={selectMode ? "true" : undefined}
-      data-checked={selectMode && checked ? "true" : undefined}
-      data-cross-device={crossDevice ? "true" : undefined}
-      {...longPress.handlers}
-    >
+  // The row's inner content — identical whether the root is a plain div or a
+  // draggable Reorder.Item, so the two paths can never drift. The grip handle
+  // leads the scan line ONLY when reorderable (it carries data-no-longpress, so
+  // pressing it never trips long-press-select; it starts the framer drag).
+  const body = (
+    <>
       <div className="lib-row-line">
+        {reorderable && (
+          <DragHandle controls={dragControls} label={card.propertyLine} />
+        )}
+
         {selectMode && (
           <label className="lib-row-check" data-no-longpress="true">
             <input
@@ -1571,7 +1807,80 @@ function PageRowView({
           onCopyLink={onCopyLink}
         />
       )}
+    </>
+  );
+
+  // The same data hooks for both roots, so CSS can't tell them apart.
+  const rootData = {
+    "data-status": card.status,
+    "data-testid": "lib-row",
+    "data-slug": card.slug,
+    "data-selectable": selectMode ? "true" : undefined,
+    "data-checked": selectMode && checked ? "true" : undefined,
+    "data-cross-device": crossDevice ? "true" : undefined,
+  } as const;
+
+  if (reorderable) {
+    // Draggable root: drag is HANDLE-only (dragListener=false), so the row's
+    // own pointer handlers (long-press-select) are untouched. The settle is a
+    // gentle spring; `whileDrag` lifts the row; reduced-motion makes both
+    // instant. The lift is isolated here so the later delight pass can extend
+    // it without restructuring the row.
+    return (
+      <Reorder.Item
+        as="div"
+        value={card.key}
+        className="lib-row"
+        {...rootData}
+        {...longPress.handlers}
+        dragListener={false}
+        dragControls={dragControls}
+        data-reorderable="true"
+        transition={reduceMotion ? { duration: 0 } : ROW_REORDER_SPRING}
+        whileDrag={reduceMotion ? undefined : ROW_REORDER_LIFT}
+      >
+        {body}
+      </Reorder.Item>
+    );
+  }
+
+  return (
+    <div className="lib-row" {...rootData} {...longPress.handlers}>
+      {body}
     </div>
+  );
+}
+
+/**
+ * The drag handle (SP-LIB-5). A dedicated grip so the gestures never collide:
+ * tap the row = open, long-press the row = select, drag THIS = reorder. It
+ * carries `data-no-longpress` (a press here is the handle's, not the row's) and
+ * starts the framer drag on pointer-down — `touch-action: none` (CSS) lets a
+ * touch-drag move the row instead of scrolling the page.
+ */
+function DragHandle({
+  controls,
+  label,
+}: {
+  controls: ReturnType<typeof useDragControls>;
+  label: string;
+}) {
+  return (
+    <button
+      type="button"
+      className="lib-row-grip"
+      data-no-longpress="true"
+      aria-label={`Drag to reorder ${label}`}
+      onPointerDown={(e) => {
+        // Begin the drag from the handle only; stop the press becoming a text
+        // selection / scroll start.
+        e.preventDefault();
+        controls.start(e);
+      }}
+      data-testid="lib-row-grip"
+    >
+      <GripVertical size={18} aria-hidden="true" />
+    </button>
   );
 }
 

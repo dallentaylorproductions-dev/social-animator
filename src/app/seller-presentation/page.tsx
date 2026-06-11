@@ -57,6 +57,13 @@ export default async function SellerPresentationPage({
   // above returns the bare wizard untouched, so it can never engage there.
   const serverDraftsEnabled = process.env.SERVER_DRAFTS_ENABLED === "true";
 
+  // SP-LIB-5 — manual drag-to-reorder of the library's Active tab. OFF by
+  // default; when on, the library reads + persists an owner-scoped page order
+  // server-side (cross-device, riding the keystone). Read server-side and
+  // threaded down as a prop (mirroring serverDraftsEnabled) so the client needs
+  // no separate public flag. Only the library uses it; the wizard is untouched.
+  const reorderEnabled = process.env.PAGES_REORDER_ENABLED === "true";
+
   const sp = await searchParams;
   const idParam = sp?.id;
   const hasId =
@@ -78,6 +85,7 @@ export default async function SellerPresentationPage({
     <PagesLibrary
       ownerEmail={ownerEmail}
       serverDraftsEnabled={serverDraftsEnabled}
+      reorderEnabled={reorderEnabled}
     />
   );
 }

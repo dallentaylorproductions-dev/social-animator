@@ -549,6 +549,74 @@ export function movedBeyond(
   return Math.abs(x - startX) > threshold || Math.abs(y - startY) > threshold;
 }
 
+// ===========================================================================
+// Library v5 — manual drag-to-reorder (SP-LIB-5 / PAGES_REORDER_ENABLED).
+//
+// The agent can arrange the ACTIVE tab into a custom order by dragging (List
+// view). That order is owner-scoped and persisted SERVER-side (so it follows
+// the agent across devices, now that drafts are server-sourced — SP-KEYSTONE),
+// and applies as the Active list's default order in BOTH Cards and List.
+//
+// Everything here is PURE: the order is a plain list of card KEYS (the same
+// `card.key` mergePages mints — instanceId when a local/server draft backs the
+// card, else the slug), and `applyManualOrder` projects that key list onto the
+// live card set. Archived is never manually ordered (it stays most-recently-
+// archived-first via filterByTab). Kept here, no React/KV/DOM, so the route,
+// the client, and the unit tests share one implementation.
+// ===========================================================================
+
+/** localStorage key mirroring the server order — an offline fallback only. */
+export const PAGES_ORDER_CACHE_KEY = "sep-pages-order";
+
+/**
+ * Coerce an untrusted value (KV blob, request body, cached string) into a
+ * clean key list: an array of non-empty strings, de-duplicated (first wins),
+ * with everything else dropped. PURE — the store, the route, and the client
+ * all funnel through this so a corrupt order can never crash a render or
+ * persist garbage. A non-array yields [].
+ */
+export function sanitizePageOrder(raw: unknown): string[] {
+  if (!Array.isArray(raw)) return [];
+  const seen = new Set<string>();
+  const out: string[] = [];
+  for (const value of raw) {
+    if (typeof value !== "string") continue;
+    const key = value.trim();
+    if (!key || seen.has(key)) continue;
+    seen.add(key);
+    out.push(key);
+  }
+  return out;
+}
+
+/**
+ * Apply a manual key order to the ACTIVE cards. Cards whose key is in `order`
+ * sort by their position there; cards NOT in `order` (a brand-new page, or one
+ * just restored from Archived) keep their incoming order — which mergePages /
+ * filterByTab already sort most-recent-first — and sit ON TOP. This is what
+ * makes the two stated slotting rules fall out for free:
+ *   - New page  → its key isn't in the order yet ⇒ top.
+ *   - Restore   → archiving removed its key from the order (see the component),
+ *                 so a restored page is "unknown" again ⇒ top.
+ *   - Archive   → the card leaves the Active set entirely (it's archived).
+ *
+ * Stable + total: never drops or duplicates a card, and a stale key in `order`
+ * (its card archived/deleted) is simply skipped. PURE — `order` comes from the
+ * server (owner-scoped), the cards from the merge.
+ */
+export function applyManualOrder(cards: PageCard[], order: string[]): PageCard[] {
+  if (order.length === 0) return cards;
+  const rank = new Map<string, number>();
+  order.forEach((key, i) => rank.set(key, i));
+  const known: PageCard[] = [];
+  const unknown: PageCard[] = [];
+  for (const card of cards) {
+    (rank.has(card.key) ? known : unknown).push(card);
+  }
+  known.sort((a, b) => rank.get(a.key)! - rank.get(b.key)!);
+  return [...unknown, ...known];
+}
+
 /**
  * Does this card's primary tap have nowhere to go because it was published from
  * another device (no local draft to resume)? Such a page reads as Live but has
