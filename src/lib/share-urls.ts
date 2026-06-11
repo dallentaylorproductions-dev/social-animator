@@ -258,6 +258,39 @@ export async function setHandoutArchived(
   return true;
 }
 
+export type DeleteHandoutResult =
+  | { ok: true }
+  | { ok: false; reason: "not-found" | "forbidden" | "is-live" };
+
+/**
+ * SP-LIB-2 — PERMANENTLY delete a handout: remove the KV record AND drop its
+ * slug from the owner index. Unlike `revokeHandout` (a reversible soft-delete
+ * that keeps the record for owner visibility), this purges it for good — used
+ * by the "Your pages" library's Delete action to clear space.
+ *
+ * Owner must match (same guard as revoke). HARD SAFETY GATE: a LIVE page (not
+ * archived, not revoked) is refused with `is-live` — a page must be taken
+ * offline (archived or revoked) before it can be deleted, so it is impossible
+ * to permanently delete a page a seller is actively viewing. The library only
+ * surfaces Delete on Draft/Archived cards, and this re-checks server-side.
+ */
+export async function deleteHandout(
+  slug: string,
+  ownerEmail: string,
+): Promise<DeleteHandoutResult> {
+  const record = await kv.get<HandoutRecord>(handoutKey(slug));
+  if (!record) return { ok: false, reason: "not-found" };
+  if (record.ownerEmail !== ownerEmail.toLowerCase()) {
+    return { ok: false, reason: "forbidden" };
+  }
+  if (!record.archived && !record.revoked) {
+    return { ok: false, reason: "is-live" };
+  }
+  await kv.del(handoutKey(slug));
+  await kv.srem(ownerIndexKey(record.ownerEmail), slug);
+  return { ok: true };
+}
+
 // ===========================================================================
 // B0c — durable per-agent pre-listing page.
 //

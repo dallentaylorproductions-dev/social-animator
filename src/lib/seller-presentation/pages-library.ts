@@ -77,6 +77,14 @@ export interface PageCard {
   sellerLine?: string;
   /** ISO 8601 — drives most-recent-first ordering. */
   updatedAt: string;
+  /**
+   * ISO 8601 — when this card was archived, iff status === "archived".
+   * Drives the Archived tab's "most-recently-archived-first" order. For a
+   * local draft it is the instance's `archivedAt`; for a published page it
+   * is the server record's `updatedAt` (the archive mutation bumped it).
+   * Undefined on every non-archived card.
+   */
+  archivedAt?: string;
   viewCount?: number;
 }
 
@@ -225,6 +233,9 @@ export function mergePages(input: MergeInput): PageCard[] {
         propertyLine: fields.propertyLine || serverPage.propertyLine || UNTITLED,
         sellerLine: fields.sellerLine ?? serverPage.sellerLine,
         updatedAt: instance.timestamps.updatedAt,
+        // Archive bumped the server record's updatedAt, so it is the best
+        // "archived at" signal for an instance-backed published page.
+        archivedAt: status === "archived" ? serverPage.updatedAt : undefined,
         viewCount: serverPage.viewCount,
       });
       continue;
@@ -241,6 +252,7 @@ export function mergePages(input: MergeInput): PageCard[] {
       propertyLine: fields.propertyLine || UNTITLED,
       sellerLine: fields.sellerLine,
       updatedAt: instance.timestamps.updatedAt,
+      archivedAt: instance.archivedAt,
     });
   }
 
@@ -256,6 +268,7 @@ export function mergePages(input: MergeInput): PageCard[] {
       propertyLine: page.propertyLine || UNTITLED,
       sellerLine: page.sellerLine,
       updatedAt: page.updatedAt,
+      archivedAt: page.archived ? page.updatedAt : undefined,
       viewCount: page.viewCount,
     });
   }
@@ -286,4 +299,104 @@ export function countLivePages(serverPages: ServerPageSummary[]): number {
  */
 export function isAtOrOverLiveCap(liveCount: number, cap: number): boolean {
   return liveCount >= cap;
+}
+
+// ===========================================================================
+// Library v2 — organization + management (SP-LIB-2).
+//
+// Pure derivations for the Active/Archived tabs, "duplicate is always a fresh
+// Draft", and the bulk-action validity rules. Kept here (no React) so the
+// component and the unit tests share one source of truth — same discipline as
+// mergePages above.
+// ===========================================================================
+
+/** The two library views. Active = Draft + Live (+ edits-pending); Archived = archived only. */
+export type LibraryTab = "active" | "archived";
+
+/** A card belongs to the Archived tab iff its derived status is "archived". */
+export function isArchivedCard(card: PageCard): boolean {
+  return card.status === "archived";
+}
+
+/**
+ * Split the merged cards into the tab the agent is viewing.
+ *
+ *   - Active  → every non-archived card, kept in mergePages' most-recent-
+ *     activity order. Archiving moves a card OUT of this list (it becomes
+ *     archived), so an archive can never bump an item to the top of Active.
+ *   - Archived → only archived cards, ordered most-recently-archived first
+ *     (by `archivedAt`, falling back to `updatedAt` for any card that
+ *     somehow lacks the stamp).
+ */
+export function filterByTab(cards: PageCard[], tab: LibraryTab): PageCard[] {
+  if (tab === "archived") {
+    return cards
+      .filter(isArchivedCard)
+      .sort((a, b) =>
+        (b.archivedAt ?? b.updatedAt).localeCompare(a.archivedAt ?? a.updatedAt),
+      );
+  }
+  return cards.filter((c) => !isArchivedCard(c));
+}
+
+/** Per-tab counts for the segmented toggle. */
+export function tabCounts(cards: PageCard[]): { active: number; archived: number } {
+  let archived = 0;
+  for (const card of cards) if (isArchivedCard(card)) archived += 1;
+  return { active: cards.length - archived, archived };
+}
+
+const DUPLICATE_FALLBACK_NAME = "page";
+
+/**
+ * Build the draft for a duplicate. Deep-clones the source content (comps,
+ * photos, pitch, by-the-numbers, everything) so the copy shares NO references
+ * with the original, then prefixes the address with "Copy of " so the new
+ * card is unmistakable in the library.
+ *
+ * Publish state is NOT a draft field — `publishedSlug` / `publishedAt` live on
+ * the WorkflowInstance, and `createInstance` never sets them — so a duplicate
+ * built from this draft is always a fresh, unpublished Draft with no slug. The
+ * original's published page and seller link are never touched.
+ */
+export function buildDuplicateDraft(
+  source: SellerPresentationDraft,
+): SellerPresentationDraft {
+  const clone = JSON.parse(JSON.stringify(source)) as SellerPresentationDraft;
+  const base = nonEmpty(source.propertyAddress) ?? DUPLICATE_FALLBACK_NAME;
+  clone.propertyAddress = `Copy of ${base}`;
+  return clone;
+}
+
+/**
+ * Which bulk actions are valid for a selection (mirrors the single-card
+ * rules). Archive is valid on Draft + Live (reversible); Delete is valid on
+ * Draft + Archived only, NEVER on a Live page (a live page must be archived
+ * first so we can never delete one a seller is actively viewing). If the
+ * selection contains an item ineligible for an action, that action is disabled
+ * with a short reason rather than partially applied — predictable over clever.
+ */
+export interface BulkValidity {
+  canArchive: boolean;
+  archiveReason?: string;
+  canDelete: boolean;
+  deleteReason?: string;
+}
+
+export function bulkActionValidity(selected: PageCard[]): BulkValidity {
+  if (selected.length === 0) {
+    return { canArchive: false, canDelete: false };
+  }
+  const hasArchived = selected.some((c) => c.status === "archived");
+  const hasLive = selected.some(
+    (c) => c.status === "live" || c.status === "live-edits-pending",
+  );
+  return {
+    canArchive: !hasArchived,
+    archiveReason: hasArchived
+      ? "Some selected pages are already archived"
+      : undefined,
+    canDelete: !hasLive,
+    deleteReason: hasLive ? "Archive live pages before deleting" : undefined,
+  };
 }

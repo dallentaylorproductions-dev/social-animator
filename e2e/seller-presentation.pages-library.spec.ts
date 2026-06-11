@@ -3,12 +3,17 @@ import type { HandoutRecord } from "../src/lib/share-urls";
 import type { WorkflowInstance } from "../src/skills/workflow-instance";
 import type { SellerPresentationDraft } from "../src/tools/seller-presentation/engine/types";
 import {
+  buildDuplicateDraft,
+  bulkActionValidity,
   countLivePages,
+  filterByTab,
   hasPendingEdits,
   isAtOrOverLiveCap,
   mergePages,
   projectHandoutSummary,
   publicUrlForSlug,
+  tabCounts,
+  type PageCard,
   type ServerPageSummary,
 } from "../src/lib/seller-presentation/pages-library";
 import {
@@ -300,7 +305,7 @@ test.describe("misc helpers", () => {
     expect(maxLivePagesCap("nonsense")).toBe(MAX_LIVE_PAGES_CAP_FALLBACK);
   });
 
-  test("most-recent-first ordering", () => {
+  test("most-recent-first ordering (active)", () => {
     const older = instance({
       timestamps: {
         createdAt: "2026-06-01T00:00:00.000Z",
@@ -322,5 +327,207 @@ test.describe("misc helpers", () => {
       newer.instanceId,
       older.instanceId,
     ]);
+  });
+});
+
+// ===========================================================================
+// Library v2 — organization + management (SP-LIB-2).
+// ===========================================================================
+
+function card(over: Partial<PageCard> = {}): PageCard {
+  return {
+    key: "k",
+    status: "draft",
+    propertyLine: "123 Main St",
+    updatedAt: "2026-06-01T00:00:00.000Z",
+    ...over,
+  };
+}
+
+test.describe("tabs: Active / Archived split", () => {
+  test("Active excludes archived; Archived holds only archived", () => {
+    const cards = [
+      card({ key: "d", status: "draft" }),
+      card({ key: "l", status: "live" }),
+      card({ key: "p", status: "live-edits-pending" }),
+      card({ key: "a", status: "archived" }),
+    ];
+    expect(filterByTab(cards, "active").map((c) => c.key)).toEqual([
+      "d",
+      "l",
+      "p",
+    ]);
+    expect(filterByTab(cards, "archived").map((c) => c.key)).toEqual(["a"]);
+  });
+
+  test("counts reflect the split", () => {
+    const cards = [
+      card({ key: "d", status: "draft" }),
+      card({ key: "l", status: "live" }),
+      card({ key: "a1", status: "archived" }),
+      card({ key: "a2", status: "archived" }),
+    ];
+    expect(tabCounts(cards)).toEqual({ active: 2, archived: 2 });
+  });
+
+  test("archiving a draft moves it OUT of Active into Archived", () => {
+    // The draft instance, then the SAME instance after a local archive.
+    const before = mergePages({
+      serverPages: [],
+      instances: [instance({ instanceId: "wf_a" })],
+      sessionEmail: OWNER,
+    });
+    expect(filterByTab(before, "active")).toHaveLength(1);
+    expect(filterByTab(before, "archived")).toHaveLength(0);
+
+    const after = mergePages({
+      serverPages: [],
+      instances: [
+        instance({ instanceId: "wf_a", archivedAt: "2026-06-05T00:00:00.000Z" }),
+      ],
+      sessionEmail: OWNER,
+    });
+    expect(filterByTab(after, "active")).toHaveLength(0);
+    expect(filterByTab(after, "archived")).toHaveLength(1);
+  });
+
+  test("Active preserves mergePages order; a recently-archived card never appears", () => {
+    // filterByTab("active") does NOT re-sort — it preserves the most-recent-
+    // first order mergePages already produced. The point: an archived card,
+    // even with the freshest timestamp, is filtered OUT of Active entirely, so
+    // archiving can never bump the Active order.
+    const newer = card({ key: "new", updatedAt: "2026-06-08T00:00:00.000Z" });
+    const older = card({ key: "old", updatedAt: "2026-06-01T00:00:00.000Z" });
+    const archivedRecent = card({
+      key: "arch",
+      status: "archived",
+      updatedAt: "2026-06-09T00:00:00.000Z",
+      archivedAt: "2026-06-09T00:00:00.000Z",
+    });
+    // Input is in mergePages order (most-recent-first), archived last.
+    const active = filterByTab([newer, older, archivedRecent], "active");
+    expect(active.map((c) => c.key)).toEqual(["new", "old"]);
+  });
+
+  test("Archived is ordered most-recently-archived first", () => {
+    const a = card({
+      key: "a",
+      status: "archived",
+      archivedAt: "2026-06-02T00:00:00.000Z",
+    });
+    const b = card({
+      key: "b",
+      status: "archived",
+      archivedAt: "2026-06-09T00:00:00.000Z",
+    });
+    const c = card({
+      key: "c",
+      status: "archived",
+      archivedAt: "2026-06-05T00:00:00.000Z",
+    });
+    expect(filterByTab([a, b, c], "archived").map((x) => x.key)).toEqual([
+      "b",
+      "c",
+      "a",
+    ]);
+  });
+});
+
+test.describe("duplicate is always a fresh, unpublished Draft", () => {
+  test("deep-clones content and renames to 'Copy of <address>'", () => {
+    const source = draft({
+      propertyAddress: "9 Oak Ave",
+      comps: [{ id: "c1" }] as unknown as SellerPresentationDraft["comps"],
+    });
+    const dup = buildDuplicateDraft(source);
+    expect(dup.propertyAddress).toBe("Copy of 9 Oak Ave");
+    // Deep clone: mutating the copy's nested content never touches the source.
+    (dup.comps as unknown[]).push({ id: "c2" });
+    expect((source.comps as unknown[]).length).toBe(1);
+  });
+
+  test("falls back to a neutral name when the source has no address", () => {
+    const dup = buildDuplicateDraft(draft({ propertyAddress: undefined }));
+    expect(dup.propertyAddress).toBe("Copy of page");
+  });
+
+  test("duplicating a Live page yields a Draft; original stays Live + keeps its slug", () => {
+    // Original: a live instance backed by its server page.
+    const original = instance({
+      instanceId: "wf_orig",
+      publishedSlug: "liveSLUG",
+      publishedAt: "2026-06-02T00:00:00.000Z",
+      timestamps: {
+        createdAt: "2026-06-01T00:00:00.000Z",
+        updatedAt: "2026-06-02T00:00:00.000Z",
+      },
+    });
+    // The duplicate is a brand-new instance with NO publishedSlug (createInstance
+    // never carries one) — modeled here as a fresh instance off the cloned draft.
+    const dup = instance({
+      instanceId: "wf_dup",
+      draft: buildDuplicateDraft(original.draft),
+      publishedSlug: undefined,
+      publishedAt: undefined,
+      timestamps: {
+        createdAt: "2026-06-10T00:00:00.000Z",
+        updatedAt: "2026-06-10T00:00:00.000Z",
+      },
+    });
+    const cards = mergePages({
+      serverPages: [serverPage({ slug: "liveSLUG" })],
+      instances: [original, dup],
+      sessionEmail: OWNER,
+    });
+    const orig = cards.find((c) => c.instanceId === "wf_orig");
+    const copy = cards.find((c) => c.instanceId === "wf_dup");
+    expect(orig?.status).toBe("live");
+    expect(orig?.slug).toBe("liveSLUG"); // seller link untouched
+    expect(copy?.status).toBe("draft");
+    expect(copy?.slug).toBeUndefined(); // no link minted for the copy
+  });
+});
+
+test.describe("bulk action validity (mirrors single-card rules)", () => {
+  test("empty selection disables both actions", () => {
+    expect(bulkActionValidity([])).toEqual({
+      canArchive: false,
+      canDelete: false,
+    });
+  });
+
+  test("Draft + Live selection: archive OK, delete blocked (live present)", () => {
+    const v = bulkActionValidity([
+      card({ status: "draft" }),
+      card({ status: "live" }),
+    ]);
+    expect(v.canArchive).toBe(true);
+    expect(v.canDelete).toBe(false);
+    expect(v.deleteReason).toMatch(/archive live pages/i);
+  });
+
+  test("edits-pending counts as live for delete-block", () => {
+    const v = bulkActionValidity([card({ status: "live-edits-pending" })]);
+    expect(v.canDelete).toBe(false);
+    expect(v.canArchive).toBe(true);
+  });
+
+  test("Draft + Archived selection: delete OK, archive blocked (already archived)", () => {
+    const v = bulkActionValidity([
+      card({ status: "draft" }),
+      card({ status: "archived" }),
+    ]);
+    expect(v.canDelete).toBe(true);
+    expect(v.canArchive).toBe(false);
+    expect(v.archiveReason).toMatch(/already archived/i);
+  });
+
+  test("all-Draft selection: both actions valid", () => {
+    const v = bulkActionValidity([
+      card({ status: "draft" }),
+      card({ status: "draft" }),
+    ]);
+    expect(v.canArchive).toBe(true);
+    expect(v.canDelete).toBe(true);
   });
 });
