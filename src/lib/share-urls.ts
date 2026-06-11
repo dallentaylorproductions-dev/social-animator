@@ -56,6 +56,15 @@ export interface HandoutRecord {
   expiresAt?: string;
   /** Soft-delete flag. Set true to take the handout down; the record stays for owner-list visibility. */
   revoked?: boolean;
+  /**
+   * SP-LIB — reversible archive flag for the "Your pages" library. An
+   * archived page stops serving publicly (treated like `revoked` at
+   * fetch time, so the seller's link 404s) yet stays visible in the
+   * owner's library so the agent can Restore it. Distinct from `revoked`
+   * (a harder take-down) so the two intents stay separable: archived =
+   * "closed listing, free the slot, keep it to restore later."
+   */
+  archived?: boolean;
   /** Type-specific payload. Validated by the consuming tool. */
   data: Record<string, unknown>;
 }
@@ -132,6 +141,10 @@ export async function fetchHandout(slug: string): Promise<HandoutRecord | null> 
   const record = await kv.get<HandoutRecord>(handoutKey(slug));
   if (!record) return null;
   if (record.revoked) return null;
+  // SP-LIB — an archived page is taken down publicly (same visitor-facing
+  // outcome as revoked: 404). The owner still sees it via the library's
+  // owner-scoped listing so they can Restore it.
+  if (record.archived) return null;
   if (record.expiresAt && new Date(record.expiresAt).getTime() < Date.now()) {
     return null;
   }
@@ -190,6 +203,59 @@ export async function listOwnerHandouts(
 ): Promise<string[]> {
   const slugs = await kv.smembers(ownerIndexKey(ownerEmail));
   return slugs ?? [];
+}
+
+/**
+ * SP-LIB — fetch the FULL records for every handout an agent owns, in no
+ * particular order. Unlike the visitor-facing `fetchHandout`, this returns
+ * revoked + archived + expired records too (the owner needs to see them in
+ * the library to Restore / understand state). Dangling index entries
+ * (slug in the set but record gone) are silently dropped.
+ *
+ * Owner-scoped by construction: it only reads slugs from THIS agent's
+ * owner index, so it can never surface another agent's pages — the
+ * privacy spine of the "Your pages" library.
+ */
+export async function listOwnerHandoutRecords(
+  ownerEmail: string,
+): Promise<HandoutRecord[]> {
+  const slugs = await listOwnerHandouts(ownerEmail);
+  if (slugs.length === 0) return [];
+  const records = await Promise.all(
+    slugs.map((slug) => kv.get<HandoutRecord>(handoutKey(slug))),
+  );
+  const out: HandoutRecord[] = [];
+  for (const record of records) {
+    if (!record) continue;
+    // Defense-in-depth: never trust a record whose ownerEmail doesn't
+    // match the index it came from (a corrupt index entry must not leak
+    // someone else's page).
+    if (record.ownerEmail.toLowerCase() !== ownerEmail.toLowerCase()) continue;
+    out.push(record);
+  }
+  return out;
+}
+
+/**
+ * SP-LIB — toggle a handout's reversible archive flag. Owner must match
+ * (same guard as `revokeHandout`). `archived: true` takes the page down
+ * publicly and frees its cap slot; `false` restores it. Refreshes
+ * `updatedAt`. Returns false for a missing record or an owner mismatch.
+ */
+export async function setHandoutArchived(
+  slug: string,
+  ownerEmail: string,
+  archived: boolean,
+): Promise<boolean> {
+  const record = await kv.get<HandoutRecord>(handoutKey(slug));
+  if (!record) return false;
+  if (record.ownerEmail !== ownerEmail.toLowerCase()) return false;
+  await kv.set(handoutKey(slug), {
+    ...record,
+    archived,
+    updatedAt: new Date().toISOString(),
+  });
+  return true;
 }
 
 // ===========================================================================

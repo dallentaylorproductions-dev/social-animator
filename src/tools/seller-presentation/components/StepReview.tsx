@@ -59,6 +59,20 @@ type StepId =
 interface StepReviewProps {
   draft: SellerPresentationDraft;
   goToStep: (stepId: StepId) => void;
+  /**
+   * SP-LIB — the slug this instance is already published to, if any.
+   * When present, publish re-publishes into the SAME page (the publish
+   * route calls updateHandout) so the seller's existing link is stable.
+   * Undefined for a never-published draft, or when the library flag is
+   * off (the page passes nothing, byte-identical to today).
+   */
+  publishedSlug?: string;
+  /**
+   * SP-LIB — called with the assigned slug after a successful publish so
+   * the page can stamp the instance (markPublished) and the library can
+   * derive Live / edits-pending. Optional; absent when the flag is off.
+   */
+  onPublished?: (slug: string) => void;
 }
 
 type PublishState =
@@ -89,7 +103,12 @@ function fieldToStep(field: string): { stepId: StepId; label: string } {
   }
 }
 
-export function StepReview({ draft, goToStep }: StepReviewProps) {
+export function StepReview({
+  draft,
+  goToStep,
+  publishedSlug,
+  onPublished,
+}: StepReviewProps) {
   const [publishState, setPublishState] = useState<PublishState>({
     kind: "idle",
   });
@@ -134,6 +153,10 @@ export function StepReview({ draft, goToStep }: StepReviewProps) {
           brandReviews,
           brandColors,
           brandWhyUs,
+          // SP-LIB — re-publish into the existing page when we have one.
+          // Undefined here ⇒ omitted ⇒ the route mints a fresh slug
+          // (today's behavior, and the flag-off path).
+          slug: publishedSlug,
         }),
       });
       const body = (await res.json().catch(() => ({}))) as {
@@ -149,6 +172,8 @@ export function StepReview({ draft, goToStep }: StepReviewProps) {
         return;
       }
       setPublishState({ kind: "published", slug: body.slug });
+      // SP-LIB — record the publish onto the instance (Live + stable link).
+      onPublished?.(body.slug);
     } catch (err) {
       setPublishState({
         kind: "error",

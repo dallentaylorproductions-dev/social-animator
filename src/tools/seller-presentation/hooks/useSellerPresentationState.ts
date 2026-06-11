@@ -1,10 +1,11 @@
 "use client";
 
-import { useEffect, useState } from "react";
+import { useEffect, useRef, useState } from "react";
 import {
   createInstance,
   findLatestInProgress,
   markOpened,
+  markPublished,
   saveInstance,
 } from "@/skills/workflow-instance-storage";
 import type { WorkflowInstance } from "@/skills/workflow-instance";
@@ -110,12 +111,39 @@ export interface SellerPresentationState {
    * reload still resolves to this new instance.
    */
   startNew: () => void;
+  /**
+   * SP-LIB — record a successful publish onto the current instance so
+   * the "Your pages" library can mark it Live and, on the next edit,
+   * "Live · edits pending". Stamps `publishedSlug` + `publishedAt` (via
+   * `markPublished`) and mirrors the bumped record into local state.
+   * No-op when no instance is loaded.
+   */
+  applyPublished: (slug: string) => void;
 }
 
-export function useSellerPresentationState(): SellerPresentationState {
+/**
+ * @param ownerEmail Lowercased session email from the server page. Stamped
+ *   onto every instance this hook CREATES so the library can scope drafts
+ *   to the authenticated agent. Read through a ref so the once-on-mount
+ *   resolve effect always sees the latest value without re-running.
+ */
+export function useSellerPresentationState(
+  ownerEmail?: string | null,
+): SellerPresentationState {
   const [instance, setInstance] =
     useState<WorkflowInstance<SellerPresentationDraft> | null>(null);
   const [currentStep, setCurrentStepState] = useState<StepId>("property");
+
+  // Keep the latest ownerEmail reachable from the mount-only resolve
+  // effect (which intentionally has an empty dep array) without making
+  // that effect re-run on prop identity changes. The ref is seeded with
+  // the first-render prop (already the correct server value, so the
+  // mount effect reads it correctly on first run) and kept in sync via
+  // an effect — never reassigned during render.
+  const ownerEmailRef = useRef<string | null>(ownerEmail ?? null);
+  useEffect(() => {
+    ownerEmailRef.current = ownerEmail ?? null;
+  }, [ownerEmail]);
 
   // Mount: resolve which instance to open. Three branches:
   //   (a) explicit ?id= → markOpened that one
@@ -151,6 +179,7 @@ export function useSellerPresentationState(): SellerPresentationState {
       skillId: SKILL_ID,
       draft: { ...EMPTY_DRAFT, themeId: seedDraftThemeId() },
       currentStep: "property",
+      ownerEmail: ownerEmailRef.current ?? undefined,
     });
     adoptInstance(created);
 
@@ -173,11 +202,23 @@ export function useSellerPresentationState(): SellerPresentationState {
     }
   }, []);
 
+  // SP-LIB — set true by applyPublished so the very next autosave cycle is
+  // skipped. markPublished already persisted the instance with
+  // publishedAt === updatedAt; letting the autosave effect run would bump
+  // updatedAt past publishedAt and falsely flag a just-published page as
+  // "Live · edits pending". Only that one publish-triggered cycle is
+  // skipped; every real draft edit saves normally.
+  const skipNextSaveRef = useRef(false);
+
   // Persist any change to the instance (draft or currentStep). saveInstance
   // bumps updatedAt server-side; the React state's updatedAt lags by one
   // save cycle, which is fine — no consumer renders updatedAt mid-session.
   useEffect(() => {
     if (!instance) return;
+    if (skipNextSaveRef.current) {
+      skipNextSaveRef.current = false;
+      return;
+    }
     saveInstance(instance);
   }, [instance]);
 
@@ -204,6 +245,7 @@ export function useSellerPresentationState(): SellerPresentationState {
       skillId: SKILL_ID,
       draft: { ...EMPTY_DRAFT, themeId: seedDraftThemeId() },
       currentStep: "property",
+      ownerEmail: ownerEmailRef.current ?? undefined,
     });
     setInstance(created);
     setCurrentStepState("property");
@@ -211,5 +253,25 @@ export function useSellerPresentationState(): SellerPresentationState {
     window.history.replaceState({}, "", newUrl);
   };
 
-  return { instance, currentStep, setStep, setDraft, startNew };
+  const applyPublished = (slug: string) => {
+    // Skip the autosave cycle this state change triggers — markPublished
+    // already persisted with publishedAt === updatedAt.
+    skipNextSaveRef.current = true;
+    setInstance((prev) => {
+      if (!prev) {
+        skipNextSaveRef.current = false;
+        return prev;
+      }
+      // markPublished writes localStorage + returns the stamped record;
+      // mirror it into state so the wizard's autosave effect doesn't
+      // clobber the publishedSlug/publishedAt on its next run.
+      const stamped = markPublished<SellerPresentationDraft>(
+        prev.instanceId,
+        slug,
+      );
+      return stamped ?? prev;
+    });
+  };
+
+  return { instance, currentStep, setStep, setDraft, startNew, applyPublished };
 }
