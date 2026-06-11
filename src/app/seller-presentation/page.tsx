@@ -48,6 +48,15 @@ export default async function SellerPresentationPage({
   const session = await auth();
   const ownerEmail = session?.user?.email ?? null;
 
+  // SP-KEYSTONE — server-side draft store. OFF by default; when on, the wizard
+  // + library treat the owner-scoped KV draft store as the source of truth
+  // (migrate + load + autosave cross-device) instead of per-device
+  // localStorage. Read server-side and threaded down as a prop (mirroring
+  // `libraryEnabled`) so the client never needs a separate public flag. It
+  // rides the library-on code paths below; the flag-off (library-off) branch
+  // above returns the bare wizard untouched, so it can never engage there.
+  const serverDraftsEnabled = process.env.SERVER_DRAFTS_ENABLED === "true";
+
   const sp = await searchParams;
   const idParam = sp?.id;
   const hasId =
@@ -58,8 +67,17 @@ export default async function SellerPresentationPage({
   // A specific instance opens the wizard; the bare landing is the library.
   if (hasId) {
     return (
-      <SellerPresentationWizard ownerEmail={ownerEmail} libraryEnabled />
+      <SellerPresentationWizard
+        ownerEmail={ownerEmail}
+        libraryEnabled
+        serverDraftsEnabled={serverDraftsEnabled}
+      />
     );
   }
-  return <PagesLibrary ownerEmail={ownerEmail} />;
+  return (
+    <PagesLibrary
+      ownerEmail={ownerEmail}
+      serverDraftsEnabled={serverDraftsEnabled}
+    />
+  );
 }

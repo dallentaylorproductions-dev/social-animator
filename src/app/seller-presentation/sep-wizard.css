@@ -2780,3 +2780,25 @@
 .sep-video-authoring-preview::-webkit-media-controls-start-playback-button {
   display: none !important;
 }
+
+/* SP-KEYSTONE — autosave status chip (server-drafts mode only). A quiet line
+   under the top nav reflecting the SERVER acknowledgement of the debounced
+   autosave. Animation-ready, not pre-animated: the color keys off
+   data-state so a later delight pass can transition it without restructuring. */
+.sep-wizard .sep-savestatus {
+  margin-top: 6px;
+  font-size: 12px;
+  line-height: 1.4;
+  letter-spacing: 0.01em;
+  color: var(--sep-muted, #6b7280);
+  min-height: 16px;
+}
+.sep-wizard .sep-savestatus[data-state="saved"] {
+  color: var(--sep-mint-deep, #2f9e6f);
+}
+.sep-wizard .sep-savestatus[data-state="retrying"] {
+  color: var(--sep-amber, #b8860b);
+}
+.sep-wizard .sep-savestatus[data-state="error"] {
+  color: var(--sep-muted, #6b7280);
+}

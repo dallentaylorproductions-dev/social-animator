@@ -9,6 +9,7 @@ import {
 import {
   STEPS,
   useSellerPresentationState,
+  type DraftSaveState,
   type StepId,
 } from "@/tools/seller-presentation/hooks/useSellerPresentationState";
 import { StepProperty } from "@/tools/seller-presentation/components/StepProperty";
@@ -63,12 +64,27 @@ function isStepValid(
 export function SellerPresentationWizard({
   ownerEmail = null,
   libraryEnabled = false,
+  serverDraftsEnabled = false,
 }: {
   ownerEmail?: string | null;
   libraryEnabled?: boolean;
+  /**
+   * SP-KEYSTONE — when true, the wizard's drafts live in the owner-scoped
+   * server store (cross-device edit + republish) instead of per-device
+   * localStorage, with a debounced autosave whose status this shell surfaces.
+   * Default false ⇒ today's localStorage behavior, byte-identical.
+   */
+  serverDraftsEnabled?: boolean;
 }) {
-  const { instance, currentStep, setStep, setDraft, startNew, applyPublished } =
-    useSellerPresentationState(ownerEmail);
+  const {
+    instance,
+    currentStep,
+    setStep,
+    setDraft,
+    startNew,
+    applyPublished,
+    saveState,
+  } = useSellerPresentationState(ownerEmail, serverDraftsEnabled);
   const setCurrentStep = setStep;
 
   // A7c.9 — reset window scroll to the top on every step transition so
@@ -135,6 +151,15 @@ export function SellerPresentationWizard({
             + Start a new presentation
           </button>
         </div>
+
+        {/* SP-KEYSTONE — autosave status. Rendered ONLY when the server draft
+            store is on, so the flag-off wizard is byte-identical (no new
+            node). It reflects the SERVER acknowledgement: "Saving…" while a
+            write is debounced/in flight, "Saved automatically" on ack,
+            "Reconnecting…" while retrying a transient failure, and a calm
+            "Saved on this device" if retries are exhausted (the work is still
+            safe in the local cache and the next edit re-arms the save). */}
+        {serverDraftsEnabled && <SaveStatus state={saveState} />}
 
         <div className="brandhead">
           <div className="eyebrow">
@@ -251,6 +276,37 @@ export function SellerPresentationWizard({
     </div>
     </div>
     </SPEntitlementProvider>
+  );
+}
+
+/**
+ * SP-KEYSTONE — the autosave status chip (server-drafts mode only). A quiet,
+ * non-interactive `role="status"` line so a screen reader announces save
+ * progress without stealing focus. Hidden entirely when idle (e.g. right
+ * after a fresh load) so it never adds noise. The "error" copy is
+ * deliberately reassuring, not alarming: the work is safe on the device.
+ */
+const SAVE_STATUS_LABEL: Record<DraftSaveState, string | null> = {
+  idle: null,
+  saving: "Saving…",
+  saved: "Saved automatically",
+  retrying: "Reconnecting…",
+  error: "Saved on this device",
+};
+
+function SaveStatus({ state }: { state: DraftSaveState }) {
+  const label = SAVE_STATUS_LABEL[state];
+  if (!label) return null;
+  return (
+    <div
+      className="sep-savestatus"
+      data-state={state}
+      role="status"
+      aria-live="polite"
+      data-testid="wizard-save-status"
+    >
+      {label}
+    </div>
   );
 }
 

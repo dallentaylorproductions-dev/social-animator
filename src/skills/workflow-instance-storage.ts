@@ -213,6 +213,30 @@ export function saveInstance<TDraft>(
 }
 
 /**
+ * SP-KEYSTONE — write a record into the local store VERBATIM, without
+ * bumping `updatedAt`. This is the optimistic-cache primitive for the
+ * server-drafts path: when the editor loads the authoritative server copy
+ * (or pushes one), it mirrors that exact record into localStorage so the
+ * device has an offline/crash fallback that matches the server byte-for-byte
+ * (`saveInstance` can't be used for this — it would advance `updatedAt` and
+ * desync the cache from the server's last-write-wins clock). Adds to the
+ * index. No-op off-browser. Returns the record it wrote.
+ */
+export function cacheInstance<TDraft>(
+  instance: WorkflowInstance<TDraft>,
+): WorkflowInstance<TDraft> {
+  if (hasStorage()) {
+    try {
+      window.localStorage.setItem(recordKey(instance.instanceId), JSON.stringify(instance));
+      addToIndex(instance.instanceId);
+    } catch {
+      // ignore quota / storage-disabled
+    }
+  }
+  return instance;
+}
+
+/**
  * Stamp `lastOpenedAt` to now and persist. The wizard calls this when
  * the agent re-opens an instance; it's distinct from `saveInstance`
  * (which fires on every keystroke during a session) so the dashboard
