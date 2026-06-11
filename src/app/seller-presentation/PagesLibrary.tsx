@@ -1,6 +1,6 @@
 "use client";
 
-import { useCallback, useEffect, useMemo, useState } from "react";
+import { useCallback, useEffect, useMemo, useRef, useState } from "react";
 import {
   createInstance,
   deleteInstance,
@@ -21,12 +21,18 @@ import {
   bulkActionValidity,
   filterByTab,
   isAtOrOverLiveCap,
+  listMetaLine,
   mergePages,
+  resolveViewMode,
+  secondaryRowActions,
   tabCounts,
+  VIEW_MODE_STORAGE_KEY,
   type LibraryTab,
   type PageCard,
   type PageStatus,
+  type RowAction,
   type ServerPageSummary,
+  type ViewMode,
 } from "@/lib/seller-presentation/pages-library";
 import "./pages-library.css";
 
@@ -110,6 +116,38 @@ export function PagesLibrary({ ownerEmail }: { ownerEmail: string | null }) {
   const [selected, setSelected] = useState<Set<string>>(new Set());
   const [bulkBusy, setBulkBusy] = useState(false);
   const [confirm, setConfirm] = useState<ConfirmState | null>(null);
+
+  // v3 — Cards / List view (SP-LIB-3). Initialize to a STABLE constant so the
+  // server and first client render agree (this repo has been bitten by SSR
+  // hydration mismatches). The real choice — a saved preference, else the
+  // viewport default — is read + applied in the effect below, after mount.
+  const [viewMode, setViewMode] = useState<ViewMode>("cards");
+  // Client-only "now" for the List rows' relative-time meta ("Started 2 days
+  // ago"). Snapshotted in the mount effect (not read during render) so the
+  // server and first client render agree and render stays pure.
+  const [nowMs, setNowMs] = useState(0);
+
+  useEffect(() => {
+    if (typeof window === "undefined") return;
+    let saved: string | null = null;
+    try {
+      saved = window.localStorage.getItem(VIEW_MODE_STORAGE_KEY);
+    } catch {
+      // storage disabled / private mode — fall through to the viewport default
+    }
+    setViewMode(resolveViewMode(saved, window.innerWidth));
+    setNowMs(Date.now());
+  }, []);
+
+  function chooseView(next: ViewMode) {
+    setViewMode(next);
+    // Persist the explicit choice so it wins over the viewport default next time.
+    try {
+      window.localStorage.setItem(VIEW_MODE_STORAGE_KEY, next);
+    } catch {
+      // ignore quota / storage-disabled
+    }
+  }
 
   const rebuildCards = useCallback(
     (pages: ServerPageSummary[]) => {
@@ -434,6 +472,28 @@ export function PagesLibrary({ ownerEmail }: { ownerEmail: string | null }) {
 
   const anyAction = busyKey !== null || bulkBusy;
 
+  // One wiring, two layouts: Cards and List render from the SAME prop bundle so
+  // a row can never drift from a card (identical handlers, identical validity).
+  function rowProps(card: PageCard): PageItemProps {
+    return {
+      card,
+      nowMs,
+      busy: busyKey === card.key || bulkBusy,
+      copied: copiedKey === card.key,
+      selectMode,
+      checked: selected.has(card.key),
+      onToggleSelect: () => toggleSelected(card.key),
+      onContinue: () => card.instanceId && goToInstance(card.instanceId),
+      onUpdateLive: () => updateLive(card),
+      onViewLive: () => viewLive(card),
+      onCopyLink: () => copyLink(card),
+      onArchive: () => setArchived(card, true),
+      onRestore: () => setArchived(card, false),
+      onDuplicate: () => duplicate(card),
+      onDelete: () => requestDelete(card),
+    };
+  }
+
   return (
     <div className="sep-library" data-testid="seller-pages-library">
       <div className="lib-shell">
@@ -526,17 +586,47 @@ export function PagesLibrary({ ownerEmail }: { ownerEmail: string | null }) {
             </button>
           </div>
 
-          {!loading && cards.length > 0 && (
-            <button
-              type="button"
-              className="lib-btn lib-select-toggle"
-              data-active={selectMode ? "true" : undefined}
-              onClick={() => (selectMode ? exitSelect() : setSelectMode(true))}
-              data-testid="lib-select-toggle"
+          <div className="lib-toolbar-right">
+            <div
+              className="lib-viewtoggle"
+              role="group"
+              aria-label="Choose layout"
+              data-testid="lib-view-toggle"
             >
-              {selectMode ? "Cancel" : "Select"}
-            </button>
-          )}
+              <button
+                type="button"
+                className="lib-tab lib-viewbtn"
+                aria-pressed={viewMode === "cards"}
+                data-active={viewMode === "cards" ? "true" : undefined}
+                onClick={() => chooseView("cards")}
+                data-testid="lib-view-cards"
+              >
+                Cards
+              </button>
+              <button
+                type="button"
+                className="lib-tab lib-viewbtn"
+                aria-pressed={viewMode === "list"}
+                data-active={viewMode === "list" ? "true" : undefined}
+                onClick={() => chooseView("list")}
+                data-testid="lib-view-list"
+              >
+                List
+              </button>
+            </div>
+
+            {!loading && cards.length > 0 && (
+              <button
+                type="button"
+                className="lib-btn lib-select-toggle"
+                data-active={selectMode ? "true" : undefined}
+                onClick={() => (selectMode ? exitSelect() : setSelectMode(true))}
+                data-testid="lib-select-toggle"
+              >
+                {selectMode ? "Cancel" : "Select"}
+              </button>
+            )}
+          </div>
         </div>
 
         {loading ? (
@@ -547,28 +637,16 @@ export function PagesLibrary({ ownerEmail }: { ownerEmail: string | null }) {
           <EmptyState onCreate={newPage} />
         ) : visibleCards.length === 0 ? (
           <TabEmpty tab={tab} />
+        ) : viewMode === "list" ? (
+          <div className="lib-list" data-testid="lib-list">
+            {visibleCards.map((card) => (
+              <PageRowView key={card.key} {...rowProps(card)} />
+            ))}
+          </div>
         ) : (
           <div className="lib-grid" data-testid="lib-grid">
             {visibleCards.map((card) => (
-              <PageCardView
-                key={card.key}
-                card={card}
-                busy={busyKey === card.key || bulkBusy}
-                copied={copiedKey === card.key}
-                selectMode={selectMode}
-                checked={selected.has(card.key)}
-                onToggleSelect={() => toggleSelected(card.key)}
-                onContinue={() =>
-                  card.instanceId && goToInstance(card.instanceId)
-                }
-                onUpdateLive={() => updateLive(card)}
-                onViewLive={() => viewLive(card)}
-                onCopyLink={() => copyLink(card)}
-                onArchive={() => setArchived(card, true)}
-                onRestore={() => setArchived(card, false)}
-                onDuplicate={() => duplicate(card)}
-                onDelete={() => requestDelete(card)}
-              />
+              <PageCardView key={card.key} {...rowProps(card)} />
             ))}
           </div>
         )}
@@ -720,6 +798,30 @@ function ConfirmDialog({
   );
 }
 
+/**
+ * The shared per-item wiring. Cards and List rows both render from this exact
+ * bundle (see `rowProps`) so the two layouts can never enforce different action
+ * rules — there is one set of handlers, projected two ways.
+ */
+interface PageItemProps {
+  card: PageCard;
+  /** Client snapshot of Date.now() for relative-time meta (List rows only). */
+  nowMs: number;
+  busy: boolean;
+  copied: boolean;
+  selectMode: boolean;
+  checked: boolean;
+  onToggleSelect: () => void;
+  onContinue: () => void;
+  onUpdateLive: () => void;
+  onViewLive: () => void;
+  onCopyLink: () => void;
+  onArchive: () => void;
+  onRestore: () => void;
+  onDuplicate: () => void;
+  onDelete: () => void;
+}
+
 function PageCardView({
   card,
   busy,
@@ -735,22 +837,7 @@ function PageCardView({
   onRestore,
   onDuplicate,
   onDelete,
-}: {
-  card: PageCard;
-  busy: boolean;
-  copied: boolean;
-  selectMode: boolean;
-  checked: boolean;
-  onToggleSelect: () => void;
-  onContinue: () => void;
-  onUpdateLive: () => void;
-  onViewLive: () => void;
-  onCopyLink: () => void;
-  onArchive: () => void;
-  onRestore: () => void;
-  onDuplicate: () => void;
-  onDelete: () => void;
-}) {
+}: PageItemProps) {
   const isArchived = card.status === "archived";
   const isLive = card.status === "live" || card.status === "live-edits-pending";
   const isDraft = card.status === "draft";
@@ -904,5 +991,248 @@ function PageCardView({
         )}
       </div>
     </article>
+  );
+}
+
+/**
+ * The List-view row (SP-LIB-3) — the same card, compacted for scanning many
+ * pages on a small screen. It renders from the SAME `PageItemProps` bundle as
+ * `PageCardView`, so the behavior can never diverge:
+ *   - Tapping the row IS the primary action (Open / Continue / Restore), the
+ *     exact `onClick`/disabled rule the card's primary button uses.
+ *   - The "⋯" menu holds precisely the card's remaining (secondary) actions,
+ *     in the order `secondaryRowActions` derives — never a second rule set.
+ *   - Select mode swaps the tap for a checkbox toggle and hides the menu, just
+ *     like the card.
+ */
+function PageRowView({
+  card,
+  nowMs,
+  busy,
+  copied,
+  selectMode,
+  checked,
+  onToggleSelect,
+  onContinue,
+  onUpdateLive,
+  onViewLive,
+  onCopyLink,
+  onArchive,
+  onRestore,
+  onDuplicate,
+  onDelete,
+}: PageItemProps) {
+  const isArchived = card.status === "archived";
+  const canResume = !!card.instanceId;
+  // Same primary mapping + disabled rule as the card's primary button: Draft →
+  // Continue, Live → Open, Archived → Restore; disabled when busy or (for a
+  // non-archived standalone page) there is no local draft to resume.
+  const primaryAction = isArchived ? onRestore : onContinue;
+  const primaryDisabled = busy || (!isArchived && !canResume);
+  const actions = secondaryRowActions(card);
+
+  function onRowClick() {
+    if (selectMode) {
+      onToggleSelect();
+      return;
+    }
+    if (!primaryDisabled) primaryAction();
+  }
+
+  return (
+    <div
+      className="lib-row"
+      data-status={card.status}
+      data-testid="lib-row"
+      data-slug={card.slug}
+      data-selectable={selectMode ? "true" : undefined}
+      data-checked={selectMode && checked ? "true" : undefined}
+    >
+      {selectMode && (
+        <label className="lib-row-check">
+          <input
+            type="checkbox"
+            checked={checked}
+            onChange={onToggleSelect}
+            aria-label={`Select ${card.propertyLine}`}
+            data-testid="lib-row-check"
+          />
+          <span className="lib-check-box" aria-hidden="true" />
+        </label>
+      )}
+
+      <button
+        type="button"
+        className="lib-row-hit"
+        onClick={onRowClick}
+        disabled={!selectMode && primaryDisabled}
+        data-testid="lib-row-hit"
+      >
+        <span className="lib-row-thumb" aria-hidden="true">
+          {card.cover ? (
+            // eslint-disable-next-line @next/next/no-img-element
+            <img className="lib-row-thumb-img" src={card.cover} alt="" />
+          ) : (
+            <span className="lib-row-thumb-empty">◇</span>
+          )}
+        </span>
+        <span className="lib-row-main">
+          <span className="lib-row-title">{card.propertyLine}</span>
+          <span className="lib-row-meta">{listMetaLine(card, nowMs)}</span>
+        </span>
+      </button>
+
+      <span className="lib-chip lib-row-chip" data-status={card.status}>
+        {STATUS_LABEL[card.status]}
+      </span>
+
+      {!selectMode && (
+        <RowMenu
+          card={card}
+          actions={actions}
+          busy={busy}
+          copied={copied}
+          onUpdateLive={onUpdateLive}
+          onViewLive={onViewLive}
+          onCopyLink={onCopyLink}
+          onArchive={onArchive}
+          onDuplicate={onDuplicate}
+          onDelete={onDelete}
+        />
+      )}
+    </div>
+  );
+}
+
+const ROW_ACTION_LABEL: Record<RowAction, string> = {
+  "update-live": "Update live page",
+  "view-live": "View live page",
+  "copy-link": "Copy link",
+  archive: "Archive",
+  duplicate: "Duplicate",
+  delete: "Delete",
+};
+
+// View + copy are read-only and stay live while a mutating action is in flight,
+// exactly as on the card; everything else disables until the action settles.
+const ROW_ACTION_BLOCKS_ON_BUSY: Record<RowAction, boolean> = {
+  "update-live": true,
+  "view-live": false,
+  "copy-link": false,
+  archive: true,
+  duplicate: true,
+  delete: true,
+};
+
+/**
+ * The row's "⋯" overflow menu. Keyboard-accessible (Escape closes and returns
+ * focus to the trigger; the first item is focused on open) and CSS-positioned
+ * (absolute, never `position: fixed`). It only ever renders the actions
+ * `secondaryRowActions` deemed valid, and each item calls the SAME shared
+ * handler the card uses.
+ */
+function RowMenu({
+  card,
+  actions,
+  busy,
+  copied,
+  onUpdateLive,
+  onViewLive,
+  onCopyLink,
+  onArchive,
+  onDuplicate,
+  onDelete,
+}: {
+  card: PageCard;
+  actions: RowAction[];
+  busy: boolean;
+  copied: boolean;
+  onUpdateLive: () => void;
+  onViewLive: () => void;
+  onCopyLink: () => void;
+  onArchive: () => void;
+  onDuplicate: () => void;
+  onDelete: () => void;
+}) {
+  const [open, setOpen] = useState(false);
+  const wrapRef = useRef<HTMLDivElement>(null);
+  const btnRef = useRef<HTMLButtonElement>(null);
+  const menuRef = useRef<HTMLDivElement>(null);
+
+  const handlerFor: Record<RowAction, () => void> = {
+    "update-live": onUpdateLive,
+    "view-live": onViewLive,
+    "copy-link": onCopyLink,
+    archive: onArchive,
+    duplicate: onDuplicate,
+    delete: onDelete,
+  };
+
+  useEffect(() => {
+    if (!open) return;
+    function onDocPointer(e: MouseEvent) {
+      if (wrapRef.current && !wrapRef.current.contains(e.target as Node)) {
+        setOpen(false);
+      }
+    }
+    function onKey(e: KeyboardEvent) {
+      if (e.key === "Escape") {
+        setOpen(false);
+        btnRef.current?.focus();
+      }
+    }
+    document.addEventListener("mousedown", onDocPointer);
+    document.addEventListener("keydown", onKey);
+    // Move focus into the menu so keyboard users land on an action.
+    menuRef.current
+      ?.querySelector<HTMLButtonElement>("button:not(:disabled)")
+      ?.focus();
+    return () => {
+      document.removeEventListener("mousedown", onDocPointer);
+      document.removeEventListener("keydown", onKey);
+    };
+  }, [open]);
+
+  function run(fn: () => void) {
+    setOpen(false);
+    fn();
+  }
+
+  return (
+    <div className="lib-row-menu" ref={wrapRef}>
+      <button
+        ref={btnRef}
+        type="button"
+        className="lib-row-menu-btn"
+        aria-haspopup="menu"
+        aria-expanded={open}
+        aria-label={`Actions for ${card.propertyLine}`}
+        onClick={() => setOpen((o) => !o)}
+        data-testid="lib-row-menu-btn"
+      >
+        <span aria-hidden="true">⋯</span>
+      </button>
+      {open && (
+        <div className="lib-menu" role="menu" ref={menuRef} data-testid="lib-row-menu">
+          {actions.map((action) => (
+            <button
+              key={action}
+              type="button"
+              role="menuitem"
+              className={
+                action === "delete"
+                  ? "lib-menu-item lib-menu-item-danger"
+                  : "lib-menu-item"
+              }
+              disabled={ROW_ACTION_BLOCKS_ON_BUSY[action] && busy}
+              onClick={() => run(handlerFor[action])}
+              data-testid={`lib-row-action-${action}`}
+            >
+              {action === "copy-link" && copied ? "Copied" : ROW_ACTION_LABEL[action]}
+            </button>
+          ))}
+        </div>
+      )}
+    </div>
   );
 }

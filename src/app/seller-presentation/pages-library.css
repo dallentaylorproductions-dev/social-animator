@@ -212,12 +212,25 @@
 }
 .sep-library .lib-tab[data-active="true"] .lib-tab-count { color: var(--fg-mute); }
 
+.sep-library .lib-toolbar-right {
+  display: inline-flex; align-items: center; gap: 12px;
+}
 .sep-library .lib-select-toggle { padding: 8px 14px; }
 .sep-library .lib-select-toggle[data-active="true"] {
   color: var(--fg);
   border-color: var(--border-hi);
   background: var(--bg-2);
 }
+
+/* Cards / List segmented toggle — same pill treatment as the filter tabs. */
+.sep-library .lib-viewtoggle {
+  display: inline-flex; gap: 4px;
+  padding: 4px;
+  background: var(--bg-2);
+  border: 1px solid var(--border);
+  border-radius: 999px;
+}
+.sep-library .lib-viewbtn { padding: 7px 13px; }
 
 .sep-library .lib-tabempty {
   margin: 56px auto 0;
@@ -464,6 +477,148 @@
   display: flex; justify-content: flex-end; gap: 8px;
 }
 
+/* ─── List view: compact rows (SP-LIB-3) ─────────────────────────────── */
+.sep-library .lib-list {
+  margin-top: 28px;
+  display: flex; flex-direction: column;
+  gap: 8px;
+}
+.sep-library .lib-row {
+  position: relative;
+  display: flex; align-items: center; gap: 12px;
+  min-height: 64px;
+  padding: 8px 10px 8px 8px;
+  background: var(--surface);
+  border: 1px solid var(--border);
+  border-radius: var(--radius-md);
+  transition: border-color .2s, background .2s;
+}
+.sep-library .lib-row:hover {
+  border-color: var(--border-hi);
+  background: var(--surface-hi);
+}
+.sep-library .lib-row[data-status="archived"] { opacity: 0.72; }
+.sep-library .lib-row[data-selectable="true"] { cursor: pointer; }
+.sep-library .lib-row[data-checked="true"] {
+  border-color: var(--accent);
+  box-shadow: 0 0 0 1px var(--accent);
+}
+
+/* the primary-action hit area: thumb + text, fills the row, tap = primary */
+.sep-library .lib-row-hit {
+  display: flex; align-items: center; gap: 12px;
+  flex: 1; min-width: 0;
+  text-align: left;
+  padding: 4px;
+  border-radius: var(--radius-sm);
+}
+.sep-library .lib-row-hit:disabled { cursor: default; }
+.sep-library .lib-row-hit:not(:disabled):hover .lib-row-title { color: var(--accent); }
+.sep-library .lib-row-hit:focus-visible {
+  outline: 2px solid var(--accent); outline-offset: 2px;
+}
+
+.sep-library .lib-row-thumb {
+  position: relative;
+  flex: 0 0 auto;
+  width: 56px; height: 44px;
+  border-radius: var(--radius-sm);
+  overflow: hidden;
+  background: var(--bg-2);
+  border: 1px solid var(--border);
+  display: inline-flex; align-items: center; justify-content: center;
+}
+.sep-library .lib-row-thumb-img {
+  width: 100%; height: 100%; object-fit: cover;
+}
+.sep-library .lib-row-thumb-empty {
+  color: var(--fg-faint); font-size: 16px;
+}
+
+.sep-library .lib-row-main {
+  display: flex; flex-direction: column; gap: 2px;
+  min-width: 0; flex: 1;
+}
+.sep-library .lib-row-title {
+  font-size: 14px; font-weight: 600; letter-spacing: -0.01em;
+  color: var(--fg);
+  overflow: hidden; text-overflow: ellipsis; white-space: nowrap;
+  transition: color .2s;
+}
+.sep-library .lib-row-meta {
+  font-size: 12px; color: var(--fg-mute);
+  overflow: hidden; text-overflow: ellipsis; white-space: nowrap;
+}
+
+/* the chip reuses .lib-chip colors but sits inline (not absolutely placed) */
+.sep-library .lib-row-chip {
+  position: static;
+  flex: 0 0 auto;
+  top: auto; left: auto;
+  backdrop-filter: none;
+  background: var(--bg-2);
+}
+
+.sep-library .lib-row-check {
+  flex: 0 0 auto;
+  display: inline-flex; cursor: pointer;
+  padding-left: 4px;
+}
+.sep-library .lib-row-check input {
+  position: absolute; opacity: 0; width: 0; height: 0;
+}
+
+/* ─── row "⋯" overflow menu (CSS-positioned, never fixed) ─────────────── */
+.sep-library .lib-row-menu { position: relative; flex: 0 0 auto; }
+.sep-library .lib-row-menu-btn {
+  display: inline-flex; align-items: center; justify-content: center;
+  width: 34px; height: 34px;
+  border-radius: var(--radius-sm);
+  color: var(--fg-mute);
+  font-size: 18px; line-height: 1;
+  border: 1px solid transparent;
+  transition: color .2s, background .2s, border-color .2s;
+}
+.sep-library .lib-row-menu-btn:hover {
+  color: var(--fg);
+  background: var(--bg-2);
+  border-color: var(--border);
+}
+.sep-library .lib-row-menu-btn:focus-visible {
+  outline: 2px solid var(--accent); outline-offset: 2px;
+}
+.sep-library .lib-menu {
+  position: absolute;
+  top: calc(100% + 6px); right: 0;
+  z-index: 30;
+  min-width: 168px;
+  padding: 6px;
+  background: var(--surface-hi);
+  border: 1px solid var(--border-hi);
+  border-radius: var(--radius-md);
+  box-shadow: 0 16px 44px -10px oklch(0 0 0 / 0.55);
+  display: flex; flex-direction: column; gap: 2px;
+}
+.sep-library .lib-menu-item {
+  text-align: left;
+  font-size: 13px;
+  color: var(--fg);
+  padding: 9px 11px;
+  border-radius: var(--radius-sm);
+  transition: background .15s, color .15s;
+}
+.sep-library .lib-menu-item:hover:not(:disabled) { background: var(--bg-2); }
+.sep-library .lib-menu-item:focus-visible {
+  outline: none;
+  background: var(--bg-2);
+  box-shadow: inset 0 0 0 1px var(--border-hi);
+}
+.sep-library .lib-menu-item:disabled { opacity: 0.45; cursor: default; }
+.sep-library .lib-menu-item-danger { color: oklch(0.72 0.15 25); }
+.sep-library .lib-menu-item-danger:hover:not(:disabled) {
+  background: color-mix(in oklch, oklch(0.65 0.17 25) 12%, var(--bg-2));
+}
+
 /* ─── responsive ─────────────────────────────────────────────────────── */
 @media (max-width: 1000px) {
   .sep-library .lib-grid { grid-template-columns: repeat(2, minmax(0, 1fr)); }
@@ -472,4 +627,8 @@
   .sep-library .lib-grid { grid-template-columns: 1fr; }
   .sep-library .lib-shell { padding: 22px 16px 80px; }
   .sep-library .lib-head-row { align-items: flex-start; }
+  /* Keep the row tappable + scannable on a phone; trim the inner padding and
+     let the title/meta truncate so the chip + "⋯" always stay in view. */
+  .sep-library .lib-row { gap: 10px; padding-right: 6px; }
+  .sep-library .lib-row-thumb { width: 48px; height: 40px; }
 }
