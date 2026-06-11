@@ -8,8 +8,11 @@ import { test, expect, type Page } from "@playwright/test";
  * standalone), the hero photo is intentionally full-bleed under the iOS status
  * bar (viewport-fit=cover + black-translucent; see src/app/layout.tsx), but the
  * personalization line (.hero__pers) then sits under the notch and is
- * unreadable. The fix offsets ONLY that line down by env(safe-area-inset-top),
- * scoped to `@media (display-mode: standalone)`, leaving the photo full-bleed.
+ * unreadable. The fix drops ONLY that line down to clear the status bar by the
+ * inset amount (`max(16px, env(safe-area-inset-top))` — floored at the base, no
+ * over-push), and re-anchors the line's scrim ::before back up to the photo's
+ * top edge so it reads as one blended darkening, not a detached band. Scoped to
+ * `@media (display-mode: standalone)`; the photo is left full-bleed.
  *
  * Driven via the stateless flagship preview route — the SAME flagship.css the
  * /h/ route serves.
@@ -19,8 +22,9 @@ import { test, expect, type Page } from "@playwright/test";
  *      so the override must not apply: .hero__pers keeps its base top: 16px.
  *   2. PHOTO NOT INSET — the full-bleed image layer (.hero__slot) stays inset:0;
  *      and the standalone rule targets the line, never the photo.
- *   3. INSET WIRED — the served CSS carries a `display-mode: standalone` rule
- *      that offsets .hero__pers with env(safe-area-inset-top).
+ *   3. INSET WIRED, FLOORED, SCRIM RE-ANCHORED — the served standalone rule
+ *      offsets .hero__pers with a max()-floored env(safe-area-inset-top) (no
+ *      v1-style double-add) and also adjusts the scrim ::before.
  *
  * What CI CANNOT verify: the real standalone inset (insets are 0 off a notched
  * device, and headless CI is never display-mode: standalone). Dallen's
@@ -83,7 +87,7 @@ test.describe("Flagship hero — standalone top safe-area on the personalization
     expect(await slot.evaluate((el) => getComputedStyle(el).top)).toBe("0px");
   });
 
-  test("the served CSS wires env(safe-area-inset-top) on the line, scoped to standalone, and never the photo", async ({
+  test("the served CSS floors the inset with max(), re-anchors the scrim, and never the photo", async ({
     page,
   }) => {
     await page.goto(FLAGSHIP);
@@ -94,6 +98,15 @@ test.describe("Flagship hero — standalone top safe-area on the personalization
       true,
     );
     expect(rule.text).toContain("env(safe-area-inset-top");
+    // v2: the offset is floored with max() so it clears the bar by the inset
+    // amount itself — NOT v1's `16px + env(...)` which over-pushed ~60px down.
+    expect(rule.text).toContain("max(");
+    expect(rule.text, "the offset must not re-add the 16px base on top of the inset").not.toContain(
+      "16px + env",
+    );
+    // v2: the line's scrim ::before is re-anchored in the same standalone rule
+    // so it reads as one blended darkening, not a band detached from the top.
+    expect(rule.text).toContain("::before");
     expect(
       rule.touchesPhoto,
       "the standalone rule must not inset the hero photo",

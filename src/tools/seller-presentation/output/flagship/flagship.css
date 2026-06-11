@@ -115,13 +115,20 @@
 /* Installed-PWA / display-mode: standalone — the hero photo is intentionally
    full-bleed under the iOS status bar (viewport-fit=cover + black-translucent;
    see src/app/layout.tsx), but the "For {family}" personalization line then sits
-   under the notch and is unreadable. Push ONLY the line down by the top
-   safe-area inset (its scrim ::before is a child, so it travels with the text);
-   the photo stays full-bleed. Scoped to standalone so the normal mobile-Safari
-   tab — where sellers open the texted link — is byte-identical (the override
-   does not exist outside standalone). Same safe-area pattern as the M-2 fix. */
+   under the notch and is unreadable. Drop the line to just clear the status bar
+   by the inset amount ITSELF — max() floors it at the 16px base and prevents
+   over-pushing (v1's 16px + inset landed it ~60px down, too far). The photo
+   stays full-bleed (never inset). Scoped to standalone so the normal mobile-
+   Safari tab, where sellers open the texted link, is byte-identical: the
+   override does not exist outside standalone. Same safe-area pattern as M-2. */
 @media (display-mode: standalone) {
-  .fs-page .hero__pers {top: calc(16px + env(safe-area-inset-top, 0px)); }
+  .fs-page .hero__pers {--notch: max(16px, env(safe-area-inset-top, 0px)); top: var(--notch); }
+  /* Re-anchor the scrim to the photo's top edge and stretch it back up under
+     the status bar (top: -notch reaches y=0; height grows by the same notch
+     delta). It reads as ONE blended darkening behind the text — not a detached
+     band that rode down with the line (v1). At the non-notch base (notch=16px)
+     this is byte-identical to the base ::before (top -16px, height 70px). */
+  .fs-page .hero__pers::before {top: calc(-1 * var(--notch)); height: calc(var(--notch) + 54px); }
 }
 .fs-page .hero__band {padding: clamp(28px,6cqi,48px) clamp(22px,6cqi,84px) 0; }
 .fs-page .hero__eyebrow {font-family: var(--f-mono); font-size: 11px; letter-spacing: .2em; text-transform: uppercase; color: var(--t-pap-mute); margin-bottom: 18px; }
