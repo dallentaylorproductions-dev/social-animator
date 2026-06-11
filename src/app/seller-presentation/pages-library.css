@@ -60,6 +60,13 @@
   max-width: 1200px;
   margin: 0 auto;
   padding: 28px 28px 96px;
+  /* Installed-PWA / display-mode: standalone — the iOS status bar paints
+     full-bleed over the top (black-translucent + viewport-fit=cover; see
+     src/app/layout.tsx). Push the top region (the "← Dashboard" back control)
+     below the notch with the SAME max(base, env(safe-area-inset-top)) treatment
+     the wizard / settings / editor already use (M-2). Insets resolve to 0 in a
+     normal browser tab, so this is a no-op there. */
+  padding-top: max(28px, env(safe-area-inset-top, 0px));
 }
 
 /* ─── header ─────────────────────────────────────────────────────────── */
@@ -212,12 +219,25 @@
 }
 .sep-library .lib-tab[data-active="true"] .lib-tab-count { color: var(--fg-mute); }
 
+.sep-library .lib-toolbar-right {
+  display: inline-flex; align-items: center; gap: 12px;
+}
 .sep-library .lib-select-toggle { padding: 8px 14px; }
 .sep-library .lib-select-toggle[data-active="true"] {
   color: var(--fg);
   border-color: var(--border-hi);
   background: var(--bg-2);
 }
+
+/* Cards / List segmented toggle — same pill treatment as the filter tabs. */
+.sep-library .lib-viewtoggle {
+  display: inline-flex; gap: 4px;
+  padding: 4px;
+  background: var(--bg-2);
+  border: 1px solid var(--border);
+  border-radius: 999px;
+}
+.sep-library .lib-viewbtn { padding: 7px 13px; }
 
 .sep-library .lib-tabempty {
   margin: 56px auto 0;
@@ -377,6 +397,9 @@
 }
 
 /* ─── select mode: checkbox + selected state (SP-LIB-2) ───────────────── */
+/* The whole card is a tap target for its primary action (SP-LIB-4), so it reads
+   as clickable in both normal and select mode. */
+.sep-library .lib-card { cursor: pointer; }
 .sep-library .lib-card[data-selectable="true"] { cursor: pointer; }
 .sep-library .lib-card[data-checked="true"] {
   border-color: var(--accent);
@@ -389,27 +412,28 @@
 .sep-library .lib-check input {
   position: absolute; opacity: 0; width: 0; height: 0;
 }
+/* The box + its checkmark are driven by `data-checked` (the SAME selected state
+   that paints the green border), NOT a CSS `input:checked` sibling rule — that
+   rule was scoped to `.lib-check` and never reached the List-row box, so it
+   rendered empty on mobile. One class, both layouts. */
 .sep-library .lib-check-box {
+  position: relative;
+  display: inline-flex; align-items: center; justify-content: center;
   width: 22px; height: 22px;
   border-radius: 7px;
   border: 1.5px solid var(--border-hi);
   background: color-mix(in oklch, var(--bg) 70%, transparent);
   backdrop-filter: blur(6px);
+  color: var(--bg); /* the check glyph reads dark on the mint fill */
   transition: background .2s, border-color .2s;
 }
-.sep-library .lib-check input:checked + .lib-check-box {
+.sep-library .lib-check-box[data-checked="true"] {
   background: var(--accent);
   border-color: var(--accent);
 }
-.sep-library .lib-check input:checked + .lib-check-box::after {
-  content: "";
-  position: absolute; left: 7px; top: 3px;
-  width: 6px; height: 11px;
-  border: solid var(--bg);
-  border-width: 0 2px 2px 0;
-  transform: rotate(45deg);
-}
-.sep-library .lib-check input:focus-visible + .lib-check-box {
+.sep-library .lib-check-glyph { display: block; }
+.sep-library .lib-check input:focus-visible + .lib-check-box,
+.sep-library .lib-row-check input:focus-visible + .lib-check-box {
   outline: 2px solid var(--accent); outline-offset: 2px;
 }
 
@@ -464,6 +488,198 @@
   display: flex; justify-content: flex-end; gap: 8px;
 }
 
+/* ─── List view: roomier, photo-forward rows (SP-LIB-3 / SP-LIB-4) ─────── */
+.sep-library .lib-list {
+  margin-top: 28px;
+  display: flex; flex-direction: column;
+  gap: 10px;
+}
+/* The row is a column: the horizontal scan line, plus an optional full-width
+   note below it (the cross-device explanation). */
+.sep-library .lib-row {
+  position: relative;
+  display: flex; flex-direction: column;
+  background: var(--surface);
+  border: 1px solid var(--border);
+  border-radius: var(--radius-md);
+  transition: border-color .2s, background .2s;
+}
+.sep-library .lib-row:hover {
+  border-color: var(--border-hi);
+  background: var(--surface-hi);
+}
+.sep-library .lib-row[data-status="archived"] { opacity: 0.72; }
+.sep-library .lib-row[data-selectable="true"] { cursor: pointer; }
+.sep-library .lib-row[data-checked="true"] {
+  border-color: var(--accent);
+  box-shadow: 0 0 0 1px var(--accent);
+}
+
+/* the horizontal scan line: thumb + text + chip (the hit button) then ⋯ */
+.sep-library .lib-row-line {
+  display: flex; align-items: center; gap: 14px;
+  padding: 8px 8px 8px 8px;
+}
+
+/* the primary-action hit area: photo + text + chip, fills the row, tap = primary */
+.sep-library .lib-row-hit {
+  display: flex; align-items: center; gap: 14px;
+  flex: 1; min-width: 0;
+  text-align: left;
+  padding: 4px;
+  border-radius: var(--radius-sm);
+}
+.sep-library .lib-row-hit:disabled { cursor: default; }
+.sep-library .lib-row-hit:not(:disabled):hover .lib-row-title { color: var(--accent); }
+.sep-library .lib-row-hit:focus-visible {
+  outline: 2px solid var(--accent); outline-offset: 2px;
+}
+/* cross-device page: the primary can't run, so the title reads quieter (the tap
+   still works — it opens the explanation). */
+.sep-library .lib-row-hit[data-disabled="true"] .lib-row-title { color: var(--fg-mute); }
+.sep-library .lib-row-hit[data-disabled="true"]:hover .lib-row-title { color: var(--fg-mute); }
+
+.sep-library .lib-row-thumb {
+  position: relative;
+  flex: 0 0 auto;
+  width: 116px; height: 84px;
+  border-radius: var(--radius-sm);
+  overflow: hidden;
+  background: var(--bg-2);
+  border: 1px solid var(--border);
+  display: inline-flex; align-items: center; justify-content: center;
+}
+.sep-library .lib-row-thumb-img {
+  width: 100%; height: 100%; object-fit: cover;
+}
+.sep-library .lib-row-thumb-empty {
+  color: var(--fg-faint); font-size: 22px;
+}
+
+.sep-library .lib-row-main {
+  display: flex; flex-direction: column; gap: 4px;
+  min-width: 0; flex: 1;
+}
+.sep-library .lib-row-title {
+  font-size: 15px; font-weight: 600; letter-spacing: -0.01em;
+  color: var(--fg);
+  overflow: hidden; text-overflow: ellipsis; white-space: nowrap;
+  transition: color .2s;
+}
+.sep-library .lib-row-meta {
+  font-size: 12.5px; color: var(--fg-mute);
+  overflow: hidden; text-overflow: ellipsis; white-space: nowrap;
+}
+
+/* the chip reuses .lib-chip colors but sits inline (not absolutely placed) */
+.sep-library .lib-row-chip {
+  position: static;
+  flex: 0 0 auto;
+  top: auto; left: auto;
+  backdrop-filter: none;
+  background: var(--bg-2);
+}
+
+.sep-library .lib-row-check {
+  flex: 0 0 auto;
+  display: inline-flex; cursor: pointer;
+  padding-left: 4px;
+}
+.sep-library .lib-row-check input {
+  position: absolute; opacity: 0; width: 0; height: 0;
+}
+
+/* ─── row "⋯" overflow menu (CSS-positioned, never fixed) ─────────────── */
+.sep-library .lib-row-menu { position: relative; flex: 0 0 auto; }
+.sep-library .lib-row-menu-btn {
+  display: inline-flex; align-items: center; justify-content: center;
+  width: 34px; height: 34px;
+  border-radius: var(--radius-sm);
+  color: var(--fg-mute);
+  font-size: 18px; line-height: 1;
+  border: 1px solid transparent;
+  transition: color .2s, background .2s, border-color .2s;
+}
+.sep-library .lib-row-menu-btn:hover {
+  color: var(--fg);
+  background: var(--bg-2);
+  border-color: var(--border);
+}
+.sep-library .lib-row-menu-btn:focus-visible {
+  outline: 2px solid var(--accent); outline-offset: 2px;
+}
+.sep-library .lib-menu {
+  position: absolute;
+  top: calc(100% + 6px); right: 0;
+  z-index: 30;
+  min-width: 168px;
+  padding: 6px;
+  background: var(--surface-hi);
+  border: 1px solid var(--border-hi);
+  border-radius: var(--radius-md);
+  box-shadow: 0 16px 44px -10px oklch(0 0 0 / 0.55);
+  display: flex; flex-direction: column; gap: 2px;
+}
+.sep-library .lib-menu-item {
+  text-align: left;
+  font-size: 13px;
+  color: var(--fg);
+  padding: 9px 11px;
+  border-radius: var(--radius-sm);
+  transition: background .15s, color .15s;
+}
+.sep-library .lib-menu-item:hover:not(:disabled) { background: var(--bg-2); }
+.sep-library .lib-menu-item:focus-visible {
+  outline: none;
+  background: var(--bg-2);
+  box-shadow: inset 0 0 0 1px var(--border-hi);
+}
+.sep-library .lib-menu-item:disabled { opacity: 0.45; cursor: default; }
+.sep-library .lib-menu-item-danger { color: oklch(0.72 0.15 25); }
+.sep-library .lib-menu-item-danger:hover:not(:disabled) {
+  background: color-mix(in oklch, oklch(0.65 0.17 25) 12%, var(--bg-2));
+}
+
+/* ─── cross-device explanation note (SP-LIB-4) ───────────────────────── */
+/* A calm note, NOT the red warn banner: a published page made on another
+   device has no local draft, so its primary tap explains the limit and (in the
+   List row, where actions hide in the ⋯ menu) surfaces the ones that work. */
+.sep-library .lib-explain {
+  display: flex; flex-direction: column; gap: 10px;
+  font-size: 12.5px; line-height: 1.5;
+  color: var(--fg-mute);
+}
+.sep-library .lib-explain-text {
+  margin: 0;
+  text-wrap: pretty;
+}
+.sep-library .lib-explain-actions {
+  display: flex; flex-wrap: wrap; gap: 7px;
+}
+/* In a card the note slots into the body, above the action row. */
+.sep-library .lib-body .lib-explain {
+  margin: 2px 0 2px;
+  padding: 10px 12px;
+  background: var(--bg-2);
+  border: 1px solid var(--border);
+  border-radius: var(--radius-sm);
+}
+/* In a List row the note is a full-width band below the scan line. */
+.sep-library .lib-row > .lib-explain {
+  margin: 0 8px;
+  padding: 11px 4px 12px;
+  border-top: 1px solid var(--border);
+}
+
+/* the card's primary reads quieter when it can't run (cross-device) */
+.sep-library .lib-card[data-cross-device="true"] .lib-card-title { color: var(--fg-mute); }
+
+/* ─── select-mode hint (SP-LIB-4) ────────────────────────────────────── */
+.sep-library .lib-bulk-hint {
+  color: var(--fg-dim);
+  font-weight: 400;
+}
+
 /* ─── responsive ─────────────────────────────────────────────────────── */
 @media (max-width: 1000px) {
   .sep-library .lib-grid { grid-template-columns: repeat(2, minmax(0, 1fr)); }
@@ -471,5 +687,16 @@
 @media (max-width: 640px) {
   .sep-library .lib-grid { grid-template-columns: 1fr; }
   .sep-library .lib-shell { padding: 22px 16px 80px; }
+  /* Standalone PWA: keep the back control clear of the status bar (see base). */
+  .sep-library .lib-shell { padding-top: max(22px, env(safe-area-inset-top, 0px)); }
   .sep-library .lib-head-row { align-items: flex-start; }
+  /* Keep the photo prominent (~116x84) and let the title/meta truncate so the
+     chip + "⋯" always stay in view; trim the line padding to buy room. */
+  .sep-library .lib-row-line { gap: 12px; padding: 8px 6px 8px 8px; }
+  .sep-library .lib-row-hit { gap: 12px; }
+}
+@media (max-width: 380px) {
+  /* Narrowest phones: ease the photo down a touch so two-line addresses still
+     have room, while staying clearly photo-forward. */
+  .sep-library .lib-row-thumb { width: 96px; height: 72px; }
 }

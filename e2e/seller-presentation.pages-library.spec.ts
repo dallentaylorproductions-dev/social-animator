@@ -1,4 +1,6 @@
 import { test, expect } from "@playwright/test";
+import { readFileSync } from "fs";
+import path from "path";
 import type { HandoutRecord } from "../src/lib/share-urls";
 import type { WorkflowInstance } from "../src/skills/workflow-instance";
 import type { SellerPresentationDraft } from "../src/tools/seller-presentation/engine/types";
@@ -9,9 +11,19 @@ import {
   filterByTab,
   hasPendingEdits,
   isAtOrOverLiveCap,
+  isCrossDeviceOnly,
+  isViewMode,
+  LIBRARY_MOBILE_MAX_WIDTH,
+  listMetaLine,
+  LONG_PRESS_MOVE_CANCEL_PX,
+  LONG_PRESS_MS,
   mergePages,
+  movedBeyond,
   projectHandoutSummary,
   publicUrlForSlug,
+  relativeTimeAgo,
+  resolveViewMode,
+  secondaryRowActions,
   tabCounts,
   type PageCard,
   type ServerPageSummary,
@@ -529,5 +541,270 @@ test.describe("bulk action validity (mirrors single-card rules)", () => {
     ]);
     expect(v.canArchive).toBe(true);
     expect(v.canDelete).toBe(true);
+  });
+});
+
+// ===========================================================================
+// Library v3 — Cards / List view (SP-LIB-3).
+// ===========================================================================
+
+test.describe("view mode: default-by-viewport + saved-choice override", () => {
+  test("no saved choice → List on mobile width, Cards on desktop", () => {
+    expect(resolveViewMode(null, LIBRARY_MOBILE_MAX_WIDTH)).toBe("list");
+    expect(resolveViewMode(null, LIBRARY_MOBILE_MAX_WIDTH - 1)).toBe("list");
+    expect(resolveViewMode(null, LIBRARY_MOBILE_MAX_WIDTH + 1)).toBe("cards");
+    expect(resolveViewMode(null, 1280)).toBe("cards");
+  });
+
+  test("an explicit saved choice always wins over the viewport default", () => {
+    // Saved "cards" on a phone, saved "list" on a desktop — the choice sticks.
+    expect(resolveViewMode("cards", 360)).toBe("cards");
+    expect(resolveViewMode("list", 1440)).toBe("list");
+  });
+
+  test("a junk saved value falls back to the viewport default", () => {
+    expect(resolveViewMode("garbage", 360)).toBe("list");
+    expect(resolveViewMode("", 1440)).toBe("cards");
+  });
+
+  test("isViewMode guards the stored value", () => {
+    expect(isViewMode("cards")).toBe(true);
+    expect(isViewMode("list")).toBe(true);
+    expect(isViewMode("grid")).toBe(false);
+    expect(isViewMode(null)).toBe(false);
+  });
+});
+
+test.describe("row '⋯' menu = the card's secondary actions, per status", () => {
+  test("Draft: archive, duplicate, delete (no view/copy, no update)", () => {
+    expect(secondaryRowActions(card({ status: "draft", instanceId: "wf_1" }))).toEqual([
+      "archive",
+      "duplicate",
+      "delete",
+    ]);
+  });
+
+  test("Live: view, copy, archive, duplicate (NEVER delete)", () => {
+    expect(
+      secondaryRowActions(
+        card({ status: "live", instanceId: "wf_1", slug: "s1" }),
+      ),
+    ).toEqual(["view-live", "copy-link", "archive", "duplicate"]);
+  });
+
+  test("Live · edits pending: update-live leads, then view/copy/archive/duplicate", () => {
+    expect(
+      secondaryRowActions(
+        card({ status: "live-edits-pending", instanceId: "wf_1", slug: "s1" }),
+      ),
+    ).toEqual([
+      "update-live",
+      "view-live",
+      "copy-link",
+      "archive",
+      "duplicate",
+    ]);
+  });
+
+  test("Archived: duplicate + delete only (Restore is the row tap, never Archive)", () => {
+    expect(
+      secondaryRowActions(
+        card({ status: "archived", instanceId: "wf_1", slug: "s1" }),
+      ),
+    ).toEqual(["duplicate", "delete"]);
+  });
+
+  test("standalone Live page (no local draft): view + copy + archive, no duplicate", () => {
+    // No instanceId → can't resume → no Duplicate (matches the card rule).
+    expect(secondaryRowActions(card({ status: "live", slug: "s1" }))).toEqual([
+      "view-live",
+      "copy-link",
+      "archive",
+    ]);
+  });
+
+  test("standalone Archived page (no local draft): delete only", () => {
+    expect(secondaryRowActions(card({ status: "archived", slug: "s1" }))).toEqual([
+      "delete",
+    ]);
+  });
+
+  test("Delete is offered ONLY on Draft + Archived, never on Live or edits-pending", () => {
+    const has = (c: PageCard) => secondaryRowActions(c).includes("delete");
+    expect(has(card({ status: "draft", instanceId: "wf_1" }))).toBe(true);
+    expect(has(card({ status: "archived", instanceId: "wf_1" }))).toBe(true);
+    expect(has(card({ status: "live", instanceId: "wf_1", slug: "s" }))).toBe(false);
+    expect(
+      has(card({ status: "live-edits-pending", instanceId: "wf_1", slug: "s" })),
+    ).toBe(false);
+  });
+});
+
+test.describe("row meta line", () => {
+  const NOW = Date.parse("2026-06-10T00:00:00.000Z");
+
+  test("draft → 'Started X ago'", () => {
+    const c = card({ status: "draft", updatedAt: "2026-06-08T00:00:00.000Z" });
+    expect(listMetaLine(c, NOW)).toBe("Started 2 days ago");
+  });
+
+  test("live → 'seller · N views' when both present", () => {
+    const c = card({
+      status: "live",
+      sellerLine: "The Reyes Family",
+      viewCount: 12,
+    });
+    expect(listMetaLine(c, NOW)).toBe("The Reyes Family · 12 views");
+  });
+
+  test("live with seller, views not tracked → just the seller", () => {
+    const c = card({ status: "live", sellerLine: "The Reyes Family" });
+    expect(listMetaLine(c, NOW)).toBe("The Reyes Family");
+  });
+
+  test("live with neither seller nor views → 'Live X ago'", () => {
+    const c = card({ status: "live", updatedAt: "2026-06-09T00:00:00.000Z" });
+    expect(listMetaLine(c, NOW)).toBe("Live 1 day ago");
+  });
+
+  test("archived → 'Archived X ago' by archivedAt (not updatedAt)", () => {
+    const c = card({
+      status: "archived",
+      archivedAt: "2026-06-06T00:00:00.000Z", // 4 days before NOW
+      updatedAt: "2026-06-01T00:00:00.000Z", // older — must be ignored
+    });
+    expect(listMetaLine(c, NOW)).toBe("Archived 4 days ago");
+  });
+
+  test("singular view count is not pluralized", () => {
+    const c = card({ status: "live", sellerLine: "Sam", viewCount: 1 });
+    expect(listMetaLine(c, NOW)).toBe("Sam · 1 view");
+  });
+});
+
+test.describe("relativeTimeAgo buckets", () => {
+  const NOW = Date.parse("2026-06-10T12:00:00.000Z");
+  const ago = (ms: number) => relativeTimeAgo(new Date(NOW - ms).toISOString(), NOW);
+
+  test("sub-minute reads 'just now'; future (clock skew) too", () => {
+    expect(ago(30_000)).toBe("just now");
+    expect(relativeTimeAgo(new Date(NOW + 60_000).toISOString(), NOW)).toBe("just now");
+  });
+
+  test("minutes / hours / days / weeks / months / years", () => {
+    expect(ago(5 * 60_000)).toBe("5 minutes ago");
+    expect(ago(60 * 60_000)).toBe("1 hour ago");
+    expect(ago(3 * 24 * 60 * 60_000)).toBe("3 days ago");
+    expect(ago(2 * 7 * 24 * 60 * 60_000)).toBe("2 weeks ago");
+    expect(ago(2 * 30 * 24 * 60 * 60_000)).toBe("2 months ago");
+    expect(ago(400 * 24 * 60 * 60_000)).toBe("1 year ago");
+  });
+
+  test("unparseable input → empty string", () => {
+    expect(relativeTimeAgo("not-a-date", NOW)).toBe("");
+  });
+});
+
+// ===========================================================================
+// Library v4 — list polish: long-press select + cross-device tap (SP-LIB-4).
+// ===========================================================================
+
+test.describe("long-press movement threshold", () => {
+  test("constants are sane (held > 0, drift > 0)", () => {
+    expect(LONG_PRESS_MS).toBeGreaterThan(0);
+    expect(LONG_PRESS_MOVE_CANCEL_PX).toBeGreaterThan(0);
+  });
+
+  test("a stationary (or sub-threshold) press does NOT cancel", () => {
+    // exactly at the threshold is still a press (strict >), as is no movement.
+    expect(movedBeyond(100, 100, 100, 100)).toBe(false);
+    expect(
+      movedBeyond(100, 100, 100 + LONG_PRESS_MOVE_CANCEL_PX, 100),
+    ).toBe(false);
+    expect(
+      movedBeyond(100, 100, 100, 100 - LONG_PRESS_MOVE_CANCEL_PX),
+    ).toBe(false);
+  });
+
+  test("a drag past the threshold on EITHER axis cancels", () => {
+    expect(
+      movedBeyond(100, 100, 100 + LONG_PRESS_MOVE_CANCEL_PX + 1, 100),
+    ).toBe(true); // horizontal
+    expect(
+      movedBeyond(100, 100, 100, 100 + LONG_PRESS_MOVE_CANCEL_PX + 1),
+    ).toBe(true); // vertical (a scroll)
+  });
+
+  test("a custom threshold overrides the default", () => {
+    expect(movedBeyond(0, 0, 5, 0, 4)).toBe(true);
+    expect(movedBeyond(0, 0, 4, 0, 4)).toBe(false);
+  });
+});
+
+test.describe("isCrossDeviceOnly (published elsewhere, no local draft)", () => {
+  test("a standalone Live page (no instance) is cross-device", () => {
+    expect(isCrossDeviceOnly(card({ status: "live", slug: "s1" }))).toBe(true);
+  });
+
+  test("a Live page WITH a local draft is NOT cross-device", () => {
+    expect(
+      isCrossDeviceOnly(card({ status: "live", slug: "s1", instanceId: "wf_1" })),
+    ).toBe(false);
+  });
+
+  test("Draft / Archived are never cross-device (their primary always works)", () => {
+    expect(isCrossDeviceOnly(card({ status: "draft", instanceId: "wf_1" }))).toBe(
+      false,
+    );
+    expect(isCrossDeviceOnly(card({ status: "archived", slug: "s1" }))).toBe(
+      false,
+    );
+  });
+
+  test("an edits-pending card always has an instance, so never cross-device", () => {
+    expect(
+      isCrossDeviceOnly(
+        card({ status: "live-edits-pending", slug: "s1", instanceId: "wf_1" }),
+      ),
+    ).toBe(false);
+  });
+});
+
+// ===========================================================================
+// Select-mode checkbox visual (SP-LIB-4 fix). The selected fill + checkmark
+// MUST be driven by the shared `data-checked` state, not a CSS
+// `.lib-check input:checked + .lib-check-box` sibling rule — that rule only
+// reached the Cards box and left every List-row checkbox stuck empty on mobile
+// (where List is the default). These are pure-Node source/CSS contract checks:
+// the library is flag-gated OFF, so the browser harness never renders it (same
+// reason the rest of this file is node-context). They fail loudly if anyone
+// reverts to the layout-scoped approach.
+// ===========================================================================
+
+test.describe("select-mode checkbox is bound to selected state in BOTH layouts", () => {
+  const tsx = readFileSync(
+    path.resolve(__dirname, "../src/app/seller-presentation/PagesLibrary.tsx"),
+    "utf8",
+  );
+  const css = readFileSync(
+    path.resolve(__dirname, "../src/app/seller-presentation/pages-library.css"),
+    "utf8",
+  );
+
+  test("both checkbox sites bind the box fill to `checked` and render the glyph", () => {
+    // Cards (.lib-check) AND List (.lib-row-check) each render the box with the
+    // data-checked binding + the conditional CheckGlyph — two occurrences each.
+    const dataBound = tsx.match(/data-checked=\{checked \? "true" : undefined\}/g);
+    expect(dataBound?.length).toBe(2);
+    const glyph = tsx.match(/\{checked && <CheckGlyph \/>\}/g);
+    expect(glyph?.length).toBe(2);
+    // The glyph component exists.
+    expect(tsx).toContain("function CheckGlyph()");
+  });
+
+  test("the filled state is keyed off data-checked, shared across both boxes", () => {
+    expect(css).toContain('.lib-check-box[data-checked="true"]');
+    // The brittle, Cards-only sibling rules that left List empty are gone.
+    expect(css).not.toContain(".lib-check input:checked + .lib-check-box");
   });
 });

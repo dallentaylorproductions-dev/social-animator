@@ -400,3 +400,187 @@ export function bulkActionValidity(selected: PageCard[]): BulkValidity {
     deleteReason: hasLive ? "Archive live pages before deleting" : undefined,
   };
 }
+
+// ===========================================================================
+// Library v3 — Cards / List view (SP-LIB-3).
+//
+// A compact List view for scanning many pages on a small screen. Everything
+// here is pure derivation: which view to default to (by viewport), the ordered
+// set of secondary actions a row's "⋯" menu exposes (a projection of the SAME
+// rules the cards enforce — never a second rule set), and the row's meta line.
+// The component stays a thin shell that wires these to the SHARED card action
+// handlers; see PagesLibrary.tsx.
+// ===========================================================================
+
+/** The two ways the library can render its pages. */
+export type ViewMode = "cards" | "list";
+
+/** localStorage key for the per-device Cards/List preference. */
+export const VIEW_MODE_STORAGE_KEY = "sep-library-view-mode";
+
+/**
+ * Viewport width (px) at or below which the library defaults to List. Phones
+ * and small tablets get the dense scan view; wider screens get Cards. Only the
+ * DEFAULT keys off this — once the agent toggles explicitly, their saved choice
+ * wins on every width.
+ */
+export const LIBRARY_MOBILE_MAX_WIDTH = 768;
+
+/** Type guard: is this a stored value we recognize as a ViewMode? */
+export function isViewMode(value: unknown): value is ViewMode {
+  return value === "cards" || value === "list";
+}
+
+/**
+ * Resolve the view to show. An explicit saved choice always wins (it overrides
+ * the viewport default). With no valid saved choice, fall back to the
+ * viewport default: List on mobile widths, Cards otherwise. PURE — the caller
+ * reads localStorage + window.innerWidth in an effect (never during render, to
+ * stay hydration-safe) and passes them in.
+ */
+export function resolveViewMode(
+  saved: string | null,
+  viewportWidth: number,
+): ViewMode {
+  if (isViewMode(saved)) return saved;
+  return viewportWidth <= LIBRARY_MOBILE_MAX_WIDTH ? "list" : "cards";
+}
+
+/**
+ * The ordered secondary actions a row's "⋯" menu exposes for a card. This is a
+ * PROJECTION of the exact same rules the cards enforce, NOT a second rule set:
+ * the row's primary tap maps to the card's primary button (Open / Continue /
+ * Restore), and this list is precisely the card's remaining (non-primary)
+ * buttons, in the same order:
+ *   - update-live  iff edits-pending AND a local draft backs it
+ *   - view-live + copy-link  iff Live (or edits-pending)
+ *   - archive      iff not already archived (Restore is the row-tap primary)
+ *   - duplicate    iff a local draft backs it
+ *   - delete       iff Draft or Archived (never Live)
+ */
+export type RowAction =
+  | "update-live"
+  | "view-live"
+  | "copy-link"
+  | "archive"
+  | "duplicate"
+  | "delete";
+
+export function secondaryRowActions(card: PageCard): RowAction[] {
+  const isArchived = card.status === "archived";
+  const isLive = card.status === "live" || card.status === "live-edits-pending";
+  const isPending = card.status === "live-edits-pending";
+  const isDraft = card.status === "draft";
+  const canResume = !!card.instanceId;
+  const canDelete = isDraft || isArchived;
+
+  const actions: RowAction[] = [];
+  if (isPending && canResume) actions.push("update-live");
+  if (isLive) {
+    actions.push("view-live");
+    actions.push("copy-link");
+  }
+  if (!isArchived) actions.push("archive");
+  if (canResume) actions.push("duplicate");
+  if (canDelete) actions.push("delete");
+  return actions;
+}
+
+const MINUTE_MS = 60_000;
+const HOUR_MS = 60 * MINUTE_MS;
+const DAY_MS = 24 * HOUR_MS;
+const WEEK_MS = 7 * DAY_MS;
+const MONTH_MS = 30 * DAY_MS;
+const YEAR_MS = 365 * DAY_MS;
+
+/**
+ * A coarse "2 days ago" style relative label. PURE — `nowMs` is passed in so
+ * the component supplies Date.now() and tests stay deterministic. Future times
+ * (clock skew) read as "just now".
+ */
+export function relativeTimeAgo(iso: string, nowMs: number): string {
+  const then = Date.parse(iso);
+  if (Number.isNaN(then)) return "";
+  const diff = nowMs - then;
+  if (diff < MINUTE_MS) return "just now";
+  const pick = (n: number, unit: string) =>
+    `${n} ${unit}${n === 1 ? "" : "s"} ago`;
+  if (diff < HOUR_MS) return pick(Math.floor(diff / MINUTE_MS), "minute");
+  if (diff < DAY_MS) return pick(Math.floor(diff / HOUR_MS), "hour");
+  if (diff < WEEK_MS) return pick(Math.floor(diff / DAY_MS), "day");
+  if (diff < MONTH_MS) return pick(Math.floor(diff / WEEK_MS), "week");
+  if (diff < YEAR_MS) return pick(Math.floor(diff / MONTH_MS), "month");
+  return pick(Math.floor(diff / YEAR_MS), "year");
+}
+
+// ===========================================================================
+// Library v4 — list polish: long-press select + cross-device tap (SP-LIB-4).
+//
+// Pure constants + a movement helper for the long-press-to-select gesture, kept
+// here (no React, no DOM) so the timing/threshold are one source of truth the
+// component wires and the unit tests pin. The hook itself (pointer wiring,
+// guarded haptics) lives in PagesLibrary.tsx; only the numbers + geometry are
+// pure.
+// ===========================================================================
+
+/** How long a touch must be held (ms) before it enters select mode. */
+export const LONG_PRESS_MS = 450;
+
+/**
+ * How far (px, per-axis) a touch may drift before it is treated as a scroll /
+ * drag and the pending long-press is cancelled. Keeps a normal scroll from ever
+ * tripping select mode.
+ */
+export const LONG_PRESS_MOVE_CANCEL_PX = 10;
+
+/**
+ * Has the pointer moved far enough from its start to count as a scroll/drag
+ * (and thus cancel a pending long-press)? Per-axis box test — cheaper than a
+ * hypot and indistinguishable at this threshold. PURE so the cancel rule is
+ * unit-pinned independent of any DOM event plumbing.
+ */
+export function movedBeyond(
+  startX: number,
+  startY: number,
+  x: number,
+  y: number,
+  threshold: number = LONG_PRESS_MOVE_CANCEL_PX,
+): boolean {
+  return Math.abs(x - startX) > threshold || Math.abs(y - startY) > threshold;
+}
+
+/**
+ * Does this card's primary tap have nowhere to go because it was published from
+ * another device (no local draft to resume)? Such a page reads as Live but has
+ * no `instanceId`, so Open/Continue is disabled. Tapping it must explain the
+ * cross-device limit and surface the actions that DO work (View live, Copy
+ * link) rather than silently no-op. Archived pages restore server-side, so they
+ * are never in this state. PURE — the component branches its tap on this.
+ */
+export function isCrossDeviceOnly(card: PageCard): boolean {
+  const isLive = card.status === "live" || card.status === "live-edits-pending";
+  return isLive && !card.instanceId;
+}
+
+/**
+ * The row's secondary meta line (the status chip is rendered separately):
+ *   - Draft     → "Started X ago"
+ *   - Archived  → "Archived X ago" (by archivedAt, falling back to updatedAt)
+ *   - Live / edits-pending → "seller · N views", whichever parts exist; with
+ *     neither (no seller, views not yet tracked) → "Live X ago".
+ */
+export function listMetaLine(card: PageCard, nowMs: number): string {
+  if (card.status === "draft") {
+    return `Started ${relativeTimeAgo(card.updatedAt, nowMs)}`;
+  }
+  if (card.status === "archived") {
+    return `Archived ${relativeTimeAgo(card.archivedAt ?? card.updatedAt, nowMs)}`;
+  }
+  const parts: string[] = [];
+  if (card.sellerLine) parts.push(card.sellerLine);
+  if (typeof card.viewCount === "number") {
+    parts.push(`${card.viewCount} ${card.viewCount === 1 ? "view" : "views"}`);
+  }
+  if (parts.length === 0) return `Live ${relativeTimeAgo(card.updatedAt, nowMs)}`;
+  return parts.join(" · ");
+}
