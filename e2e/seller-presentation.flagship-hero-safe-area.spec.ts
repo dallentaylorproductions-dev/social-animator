@@ -25,6 +25,9 @@ import { test, expect, type Page } from "@playwright/test";
  *   3. INSET WIRED, FLOORED, SCRIM RE-ANCHORED — the served standalone rule
  *      offsets .hero__pers with a max()-floored env(safe-area-inset-top) (no
  *      v1-style double-add) and also adjusts the scrim ::before.
+ *   4. EMBEDDED PREVIEWS SCOPED OUT — the offset is for the real /h/ page only;
+ *      the rule resets the in-wizard live preview (.fs-static) and the settings
+ *      embed (.sep-embed), which render the same .fs-page off the device notch.
  *
  * What CI CANNOT verify: the real standalone inset (insets are 0 off a notched
  * device, and headless CI is never display-mode: standalone). Dallen's
@@ -107,6 +110,17 @@ test.describe("Flagship hero — standalone top safe-area on the personalization
     // v2: the line's scrim ::before is re-anchored in the same standalone rule
     // so it reads as one blended darkening, not a band detached from the top.
     expect(rule.text).toContain("::before");
+    // v3: the offset is for the REAL top-of-viewport /h/ page only. The same
+    // .fs-page is embedded (NOT under the notch) in the in-wizard live preview
+    // (.fs-static) and the Brand-kit settings embed (<html class="sep-embed">);
+    // when that app is itself a standalone PWA the offset would leak into the
+    // mockup. The rule must reset both embedded contexts back to the base.
+    expect(rule.text, "the in-wizard live preview (.fs-static) must be scoped out").toContain(
+      "fs-static",
+    );
+    expect(rule.text, "the settings embed (.sep-embed) must be scoped out").toContain(
+      "sep-embed",
+    );
     expect(
       rule.touchesPhoto,
       "the standalone rule must not inset the hero photo",

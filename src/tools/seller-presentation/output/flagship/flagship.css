@@ -129,6 +129,18 @@
      band that rode down with the line (v1). At the non-notch base (notch=16px)
      this is byte-identical to the base ::before (top -16px, height 70px). */
   .fs-page .hero__pers::before {top: calc(-1 * var(--notch)); height: calc(var(--notch) + 54px); }
+  /* The notch offset is for the REAL top-of-viewport consumer page (/h/<slug>)
+     only. The same flagship .fs-page is ALSO embedded, NOT under the device
+     notch, in two previews: the in-wizard live preview (wrapped in .fs-static)
+     and the Brand-kit settings embed (EmbedBridge marks <html class="sep-
+     embed">). When the wizard/settings app is itself an installed PWA the whole
+     document is display-mode: standalone, so the rules above would wrongly push
+     those embedded previews' line down. Reset them to the base fitment (the
+     descendant-of-marker selectors outrank the .fs-page offset on specificity).
+     The non-embed dev preview route carries neither marker, so it keeps the
+     offset as a faithful proxy for the real page. */
+  .fs-static .fs-page .hero__pers, .sep-embed .fs-page .hero__pers {--notch: 16px; top: 16px; }
+  .fs-static .fs-page .hero__pers::before, .sep-embed .fs-page .hero__pers::before {top: -16px; height: 70px; }
 }
 .fs-page .hero__band {padding: clamp(28px,6cqi,48px) clamp(22px,6cqi,84px) 0; }
 .fs-page .hero__eyebrow {font-family: var(--f-mono); font-size: 11px; letter-spacing: .2em; text-transform: uppercase; color: var(--t-pap-mute); margin-bottom: 18px; }
