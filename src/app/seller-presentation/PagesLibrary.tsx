@@ -564,7 +564,19 @@ export function PagesLibrary({
         card.instanceId,
         body.slug,
       );
-      if (serverDraftsEnabled && stamped) await putServerDraft(stamped);
+      // The page itself is already republished (the seller sees the new
+      // content). Persist the publish stamp onto the SERVER draft record so the
+      // Live / edits-pending state is correct on every device. If that sync
+      // fails, the publish still stands; surface a soft note rather than
+      // pretend the cross-device state is current.
+      if (serverDraftsEnabled && stamped) {
+        const synced = await putServerDraft(stamped);
+        if (!synced.ok) {
+          setActionError(
+            "Your page was updated, but syncing the draft state failed. It will retry next time you open it.",
+          );
+        }
+      }
       await load();
     } catch {
       setActionError("Update failed. Please try again.");

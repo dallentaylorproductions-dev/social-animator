@@ -5,6 +5,7 @@ import {
   isDraftOwnedBy,
   isSellerDraftInstance,
   scopeOwnedDrafts,
+  serverCopyIsNewer,
   stampOwner,
   type DraftRecord,
 } from "../src/lib/seller-presentation/draft-store";
@@ -136,6 +137,28 @@ test.describe("isSellerDraftInstance (wire-boundary guard)", () => {
     expect(
       isSellerDraftInstance({ instanceId: "wf", skillId: "seller-presentation", resolvedPrimitives: {} }),
     ).toBe(false); // no timestamps
+  });
+});
+
+test.describe("serverCopyIsNewer (last-write-wins, never clobber a fresher edit)", () => {
+  const older = "2026-06-01T00:00:00.000Z";
+  const newer = "2026-06-02T00:00:00.000Z";
+
+  test("a strictly-newer stored copy supersedes the incoming write", () => {
+    expect(serverCopyIsNewer(record({ updatedAt: newer }), older)).toBe(true);
+  });
+
+  test("an equal timestamp is NOT newer (idempotent re-save overwrites)", () => {
+    expect(serverCopyIsNewer(record({ updatedAt: older }), older)).toBe(false);
+  });
+
+  test("an older stored copy yields to the incoming (fresher) write", () => {
+    expect(serverCopyIsNewer(record({ updatedAt: older }), newer)).toBe(false);
+  });
+
+  test("no existing record ⇒ always accept (first write)", () => {
+    expect(serverCopyIsNewer(null, older)).toBe(false);
+    expect(serverCopyIsNewer(undefined, newer)).toBe(false);
   });
 });
 

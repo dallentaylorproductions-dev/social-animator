@@ -142,6 +142,28 @@ function latestInProgressFrom(instances: SPInstance[]): SPInstance | null {
   return candidates[0];
 }
 
+/**
+ * SP-KEYSTONE (ON mode) — is a locally-cached instance owned by this session?
+ * Fail-closed: no email, or an instance with no/other owner, is never owned.
+ * Mirrors the server-side `isDraftOwnedBy` so the local-fallback read paths
+ * scope identically to every server read (the cross-agent gate).
+ */
+function isOwnedLocally(
+  inst: SPInstance,
+  email: string | null,
+): boolean {
+  if (!email) return false;
+  return inst.ownerEmail?.toLowerCase() === email.toLowerCase();
+}
+
+/** Every localStorage SP instance owned by this session (empty if no email). */
+function ownedLocalInstances(email: string | null): SPInstance[] {
+  if (!email) return [];
+  return (listInstances() as SPInstance[]).filter((i) =>
+    isOwnedLocally(i, email),
+  );
+}
+
 export interface SellerPresentationState {
   instance: WorkflowInstance<SellerPresentationDraft> | null;
   currentStep: StepId;
@@ -241,6 +263,22 @@ export function useSellerPresentationState(
   const flushTimerRef = useRef<number | null>(null);
   const latestPersistedRef = useRef<SPInstance | null>(null);
   const retryCountRef = useRef(0);
+  // True while `latestPersistedRef` holds work NOT yet acknowledged by the
+  // server (set on schedule, cleared on a confirmed save). Drives the
+  // flush-on-unmount: a debounced edit that hasn't fired when the wizard
+  // unmounts (back to library, route change) must still reach the server, or
+  // it would be stale on every other device until the next same-device open.
+  const pendingSaveRef = useRef(false);
+  // SP-LIB / SP-KEYSTONE — set true to skip exactly ONE upcoming autosave
+  // cycle. Two users: (1) applyPublished — markPublished already persisted with
+  // publishedAt === updatedAt, and an autosave would bump updatedAt past it and
+  // falsely flag "Live · edits pending"; (2) the ON-mode adopt / startNew paths
+  // — the setInstance that adopts a loaded (or freshly created) draft would
+  // otherwise trip the autosave effect, bump updatedAt, and PUT a spurious edit
+  // to the server, lighting "edits pending" on EVERY device right after merely
+  // opening a live page. The adopt/create paths persist deliberately via their
+  // own flushNow, so the piggybacked autosave must be suppressed.
+  const skipNextSaveRef = useRef(false);
   // The publishedAt we last pushed, so the publish-mirror effect fires once
   // per publish and never re-pushes an already-synced live draft on resume.
   const lastPushedPublishedAtRef = useRef<string | undefined>(undefined);
@@ -253,10 +291,14 @@ export function useSellerPresentationState(
   function flushNow(): void {
     const toSave = latestPersistedRef.current;
     if (!toSave) return;
+    // Mark unacknowledged so an unmount mid-flight still flushes (covers the
+    // explicit flushNow callers: fresh-create, startNew, publish-mirror).
+    pendingSaveRef.current = true;
     setSaveState("saving");
     void putServerDraft(toSave).then((res) => {
       if (res.ok) {
         retryCountRef.current = 0;
+        pendingSaveRef.current = false;
         setSaveState("saved");
         return;
       }
@@ -277,6 +319,7 @@ export function useSellerPresentationState(
   }
 
   function scheduleServerFlush(): void {
+    pendingSaveRef.current = true;
     setSaveState("saving");
     if (flushTimerRef.current !== null) window.clearTimeout(flushTimerRef.current);
     flushTimerRef.current = window.setTimeout(
@@ -285,10 +328,18 @@ export function useSellerPresentationState(
     );
   }
 
-  // Tidy the debounce/backoff timer on unmount.
+  // Unmount: tidy the debounce/backoff timer AND, if a save is still pending
+  // (a debounced edit never fired, or retries were exhausted), fire one final
+  // best-effort PUT so the last edits aren't stranded on this device. No
+  // setState here (the component is unmounting); the local cache already holds
+  // the work as the ultimate backstop, and migration re-pushes it on the next
+  // open if this beacon-style PUT doesn't complete.
   useEffect(() => {
     return () => {
       if (flushTimerRef.current !== null) window.clearTimeout(flushTimerRef.current);
+      if (pendingSaveRef.current && latestPersistedRef.current) {
+        void putServerDraft(latestPersistedRef.current);
+      }
     };
   }, []);
 
@@ -367,6 +418,11 @@ export function useSellerPresentationState(
   function adoptFromServer(loaded: SPInstance) {
     cacheInstance(loaded);
     lastPushedPublishedAtRef.current = loaded.publishedAt;
+    // Suppress the autosave that this adopt's setInstance would otherwise
+    // trigger: the loaded copy is already authoritative, and bumping its
+    // updatedAt + PUTting it would falsely light "edits pending" cross-device
+    // on a page the agent only opened. Real edits after this save normally.
+    skipNextSaveRef.current = true;
     setInstance(loaded);
     if (isValidStepId(loaded.currentStep)) {
       setCurrentStepState(loaded.currentStep);
@@ -430,8 +486,13 @@ export function useSellerPresentationState(
       }
       // Server miss: fall back to the local cache so an offline reload (or a
       // just-created draft mid-migration) still opens rather than blanking.
+      // OWNER-SCOPED (gate 2): only adopt the cached copy if it belongs to the
+      // signed-in agent. On a shared browser this stops agent B from opening
+      // (and, via the next autosave, CLAIMING) agent A's cached draft through a
+      // shared/bookmarked ?id= URL — the migration planner already refuses to
+      // claim a non-owned draft, and this read path must hold the same line.
       const local = loadInstance<SellerPresentationDraft>(id);
-      if (local) {
+      if (local && isOwnedLocally(local, email)) {
         adoptFromServer(local);
         return;
       }
@@ -439,10 +500,13 @@ export function useSellerPresentationState(
     }
 
     // (b) Resume the most recent in-progress SP draft — from the SERVER list,
-    //     so resume works cross-device. Offline, fall back to local resume.
+    //     so resume works cross-device. Offline, fall back to local resume,
+    //     but ONLY over drafts THIS agent owns (gate 2): an un-scoped
+    //     findLatestInProgress would resume — and then claim — another agent's
+    //     draft left in this shared browser.
     const resumed = serverReachable
       ? latestInProgressFrom(effectiveServer)
-      : findLatestInProgress<SellerPresentationDraft>(SKILL_ID);
+      : latestInProgressFrom(ownedLocalInstances(email));
     if (resumed) {
       adoptFromServer(resumed);
       return;
@@ -460,14 +524,6 @@ export function useSellerPresentationState(
     latestPersistedRef.current = created;
     flushNow();
   }
-
-  // SP-LIB — set true by applyPublished so the very next autosave cycle is
-  // skipped. markPublished already persisted the instance with
-  // publishedAt === updatedAt; letting the autosave effect run would bump
-  // updatedAt past publishedAt and falsely flag a just-published page as
-  // "Live · edits pending". Only that one publish-triggered cycle is
-  // skipped; every real draft edit saves normally.
-  const skipNextSaveRef = useRef(false);
 
   // Persist any change to the instance (draft or currentStep). In BOTH modes
   // the local cache write happens here via `saveInstance` (today's exact
@@ -517,12 +573,18 @@ export function useSellerPresentationState(
       currentStep: "property",
       ownerEmail: ownerEmailRef.current ?? undefined,
     });
+    // SP-KEYSTONE — in ON mode we push the fresh draft ourselves (flushNow,
+    // below), so suppress the autosave the setInstance would otherwise trigger
+    // and avoid a redundant second PUT of the identical record. Set BEFORE
+    // setInstance so the effect sees it. (OFF mode leaves it false — the
+    // autosave effect's saveInstance is its byte-identical persist path.)
+    if (serverDraftsRef.current) skipNextSaveRef.current = true;
     setInstance(created);
     setCurrentStepState("property");
     const newUrl = `${window.location.pathname}?id=${created.instanceId}`;
     window.history.replaceState({}, "", newUrl);
-    // SP-KEYSTONE — push the fresh draft to the server immediately so it is
-    // openable from another device right away.
+    // Push the fresh draft to the server immediately so it is openable from
+    // another device right away (not only after the first edit).
     if (serverDraftsRef.current) {
       lastPushedPublishedAtRef.current = undefined;
       latestPersistedRef.current = created;

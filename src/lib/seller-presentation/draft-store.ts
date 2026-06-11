@@ -139,6 +139,20 @@ export function scopeOwnedDrafts(
 }
 
 /**
+ * Last-write-wins decision (PURE): does an already-stored record strictly
+ * supersede an incoming write? ISO `updatedAt` strings compare
+ * lexicographically == chronologically. True ⇒ drop the incoming (stale)
+ * write so a slow second device / an older migration re-push can't clobber a
+ * fresher edit. Equal timestamps are NOT newer (idempotent re-save overwrites).
+ */
+export function serverCopyIsNewer(
+  existing: DraftRecord | null | undefined,
+  incomingUpdatedAt: string,
+): boolean {
+  return !!existing && existing.updatedAt > incomingUpdatedAt;
+}
+
+/**
  * Build the authoritative record for an incoming instance: stamp the owner
  * (lowercased session email) onto BOTH the top-level record and the nested
  * instance, overwriting whatever the client sent — the client is never
@@ -173,7 +187,14 @@ export type PutDraftResult =
  *   - If a record already exists at this id owned by a DIFFERENT agent,
  *     REFUSE with `forbidden` (never overwrite another agent's draft — the
  *     cross-agent gate). A non-existent id, or one this agent owns, proceeds.
- *   - SET the record + SADD the id into this agent's owner index.
+ *   - CONFLICT POLICY — last-write-wins by `updatedAt`: if the stored copy is
+ *     STRICTLY NEWER than the incoming one, the write is a NO-OP and the newer
+ *     server copy stands (returned as `record` so the caller can re-sync its
+ *     local cache). This is what makes the policy real rather than
+ *     last-PUT-wins: a stale second device, or a migration re-push of an older
+ *     local copy, can never clobber a fresher edit made elsewhere. An EQUAL
+ *     timestamp overwrites (idempotent re-save of the same content).
+ *   - Otherwise SET the record + SADD the id into this agent's owner index.
  *
  * Because the key is the stable instanceId, re-running (migration retry,
  * re-save) overwrites in place — no duplicates, never a lost draft.
@@ -186,6 +207,11 @@ export async function putDraft(
   const existing = await kv.get<DraftRecord>(draftKey(record.instanceId));
   if (existing && !isDraftOwnedBy(existing, email)) {
     return { ok: false, reason: "forbidden" };
+  }
+  // Last-write-wins by updatedAt: a strictly-newer stored copy wins; the
+  // incoming stale write is dropped to protect the fresher edit.
+  if (serverCopyIsNewer(existing, record.updatedAt)) {
+    return { ok: true, record: existing as DraftRecord };
   }
   await kv.set(draftKey(record.instanceId), record);
   await kv.sadd(ownerIndexKey(record.ownerEmail), record.instanceId);
