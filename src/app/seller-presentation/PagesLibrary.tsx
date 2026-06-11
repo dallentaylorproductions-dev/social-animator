@@ -1,6 +1,14 @@
 "use client";
 
-import { useCallback, useEffect, useMemo, useRef, useState } from "react";
+import {
+  useCallback,
+  useEffect,
+  useMemo,
+  useRef,
+  useState,
+  type MouseEvent as ReactMouseEvent,
+  type PointerEvent as ReactPointerEvent,
+} from "react";
 import {
   createInstance,
   deleteInstance,
@@ -21,8 +29,11 @@ import {
   bulkActionValidity,
   filterByTab,
   isAtOrOverLiveCap,
+  isCrossDeviceOnly,
   listMetaLine,
+  LONG_PRESS_MS,
   mergePages,
+  movedBeyond,
   resolveViewMode,
   secondaryRowActions,
   tabCounts,
@@ -116,6 +127,10 @@ export function PagesLibrary({ ownerEmail }: { ownerEmail: string | null }) {
   const [selected, setSelected] = useState<Set<string>>(new Set());
   const [bulkBusy, setBulkBusy] = useState(false);
   const [confirm, setConfirm] = useState<ConfirmState | null>(null);
+
+  // v4 — the key of the card whose "created on another device" note is open
+  // (SP-LIB-4). At most one at a time; tapping a cross-device page toggles it.
+  const [explainKey, setExplainKey] = useState<string | null>(null);
 
   // v3 — Cards / List view (SP-LIB-3). Initialize to a STABLE constant so the
   // server and first client render agree (this repo has been bitten by SSR
@@ -216,11 +231,27 @@ export function PagesLibrary({ ownerEmail }: { ownerEmail: string | null }) {
     setTab(next);
     // Selection is per-view; a tab switch always clears it (packet).
     setSelected(new Set());
+    setExplainKey(null);
   }
 
   function exitSelect() {
     setSelectMode(false);
     setSelected(new Set());
+  }
+
+  // Long-press entry (SP-LIB-4): enter select mode AND select the pressed item
+  // in one motion, from either layout. Any open cross-device note is dismissed
+  // so the surfaces never stack.
+  function beginSelectFrom(key: string) {
+    setExplainKey(null);
+    setSelectMode(true);
+    setSelected(new Set([key]));
+  }
+
+  // Toggle the cross-device explanation for a card (tapping its disabled primary
+  // a second time closes it). Only one note is ever open.
+  function toggleExplain(key: string) {
+    setExplainKey((k) => (k === key ? null : key));
   }
 
   function toggleSelected(key: string) {
@@ -482,7 +513,10 @@ export function PagesLibrary({ ownerEmail }: { ownerEmail: string | null }) {
       copied: copiedKey === card.key,
       selectMode,
       checked: selected.has(card.key),
+      explainOpen: explainKey === card.key,
       onToggleSelect: () => toggleSelected(card.key),
+      onLongPressSelect: () => beginSelectFrom(card.key),
+      onExplain: () => toggleExplain(card.key),
       onContinue: () => card.instanceId && goToInstance(card.instanceId),
       onUpdateLive: () => updateLive(card),
       onViewLive: () => viewLive(card),
@@ -656,7 +690,11 @@ export function PagesLibrary({ ownerEmail }: { ownerEmail: string | null }) {
       {selectMode && (
         <div className="lib-bulkbar" role="region" aria-label="Bulk actions" data-testid="lib-bulkbar">
           <span className="lib-bulk-count" data-testid="lib-bulk-count">
-            {selectedCards.length} selected
+            {selectedCards.length > 0 ? (
+              `${selectedCards.length} selected`
+            ) : (
+              <span className="lib-bulk-hint">Tap pages to select</span>
+            )}
           </span>
           <div className="lib-bulk-actions">
             <button
@@ -811,7 +849,13 @@ interface PageItemProps {
   copied: boolean;
   selectMode: boolean;
   checked: boolean;
+  /** Is this card's "created on another device" note currently open? */
+  explainOpen: boolean;
   onToggleSelect: () => void;
+  /** Long-press → enter select mode AND select this item (both layouts). */
+  onLongPressSelect: () => void;
+  /** Tap on a cross-device-only page's primary → toggle its explanation. */
+  onExplain: () => void;
   onContinue: () => void;
   onUpdateLive: () => void;
   onViewLive: () => void;
@@ -822,13 +866,187 @@ interface PageItemProps {
   onDelete: () => void;
 }
 
+/**
+ * Quiet haptic on long-press where the platform supports it. Android fires a
+ * short buzz; iOS Safari has no Vibration API, so this is a guarded no-op there
+ * (the visual lift into select mode is the feedback on iPhone). Never throws.
+ */
+function tryVibrate(ms: number): void {
+  if (typeof navigator === "undefined") return;
+  const nav = navigator as Navigator & { vibrate?: (p: number | number[]) => boolean };
+  if (typeof nav.vibrate !== "function") return;
+  try {
+    nav.vibrate(ms);
+  } catch {
+    // some browsers throw if called outside a user gesture — ignore
+  }
+}
+
+interface LongPressApi {
+  handlers: {
+    onPointerDown: (e: ReactPointerEvent) => void;
+    onPointerMove: (e: ReactPointerEvent) => void;
+    onPointerUp: () => void;
+    onPointerLeave: () => void;
+    onPointerCancel: () => void;
+  };
+  /**
+   * Call at the top of the trailing onClick: if a long-press just fired, the
+   * click is its synthetic tail and must be swallowed (returns true, once).
+   */
+  consumeIfFired: () => boolean;
+}
+
+/**
+ * Long-press-to-select (SP-LIB-4). After LONG_PRESS_MS of a stationary touch,
+ * fire `onLongPress` (+ a guarded haptic). A drag past LONG_PRESS_MOVE_CANCEL_PX
+ * cancels it so scrolling never trips select mode; a quick tap leaves it unfired
+ * so the normal click (primary action) runs. Mouse is excluded — desktop uses
+ * the explicit Select button — so this is purely a touch/pen affordance.
+ *
+ * Animation-ready, not pre-animated: this only flips state; the lift is CSS that
+ * keys off `data-checked` later.
+ */
+function useLongPress(
+  onLongPress: () => void,
+  enabled: boolean,
+): LongPressApi {
+  const timerRef = useRef<number | null>(null);
+  const startRef = useRef<{ x: number; y: number } | null>(null);
+  const firedRef = useRef(false);
+
+  const clearTimer = useCallback(() => {
+    if (timerRef.current !== null) {
+      window.clearTimeout(timerRef.current);
+      timerRef.current = null;
+    }
+    startRef.current = null;
+  }, []);
+
+  // Tidy any pending timer if the item unmounts mid-press.
+  useEffect(() => clearTimer, [clearTimer]);
+
+  const onPointerDown = useCallback(
+    (e: ReactPointerEvent) => {
+      // Any fresh press clears a stale "fired" flag (e.g. a long-press whose
+      // synthetic click never landed because the DOM changed under it), so the
+      // next real tap is never wrongly swallowed.
+      firedRef.current = false;
+      if (!enabled) return;
+      // Mouse has the Select button; reserve long-press for touch/pen.
+      if (e.pointerType === "mouse") return;
+      // A press that begins on a discrete control (the ⋯ menu, the card's
+      // action buttons, the checkbox) is that control's press, not the item's.
+      if ((e.target as HTMLElement).closest("[data-no-longpress]")) return;
+      startRef.current = { x: e.clientX, y: e.clientY };
+      timerRef.current = window.setTimeout(() => {
+        timerRef.current = null;
+        startRef.current = null;
+        firedRef.current = true;
+        tryVibrate(15);
+        onLongPress();
+      }, LONG_PRESS_MS);
+    },
+    [enabled, onLongPress],
+  );
+
+  const onPointerMove = useCallback((e: ReactPointerEvent) => {
+    const start = startRef.current;
+    if (!start) return;
+    if (movedBeyond(start.x, start.y, e.clientX, e.clientY)) {
+      // a scroll/drag — not a press; cancel without firing
+      if (timerRef.current !== null) {
+        window.clearTimeout(timerRef.current);
+        timerRef.current = null;
+      }
+      startRef.current = null;
+    }
+  }, []);
+
+  const consumeIfFired = useCallback(() => {
+    if (firedRef.current) {
+      firedRef.current = false;
+      return true;
+    }
+    return false;
+  }, []);
+
+  return {
+    handlers: {
+      onPointerDown,
+      onPointerMove,
+      onPointerUp: clearTimer,
+      onPointerLeave: clearTimer,
+      onPointerCancel: clearTimer,
+    },
+    consumeIfFired,
+  };
+}
+
+/**
+ * The calm "created on another device" note (SP-LIB-4). Shown when a page's
+ * primary tap has nowhere to go because it was published from another device
+ * (no local draft to resume). Explains the limit and, when asked, surfaces the
+ * actions that DO work; the card already shows those buttons, so it passes
+ * `withActions={false}`, while the List row (whose actions hide in the menu)
+ * passes `true`.
+ */
+function ExplainNote({
+  copied,
+  withActions,
+  onViewLive,
+  onCopyLink,
+}: {
+  copied: boolean;
+  withActions: boolean;
+  onViewLive: () => void;
+  onCopyLink: () => void;
+}) {
+  return (
+    <div
+      className="lib-explain"
+      data-state="open"
+      data-no-longpress="true"
+      data-testid="lib-explain"
+    >
+      <p className="lib-explain-text">
+        This page was created on another device. Editing from any device is
+        coming soon.
+      </p>
+      {withActions && (
+        <div className="lib-explain-actions">
+          <button
+            type="button"
+            className="lib-btn"
+            onClick={onViewLive}
+            data-testid="lib-explain-view"
+          >
+            View live page
+          </button>
+          <button
+            type="button"
+            className="lib-btn"
+            onClick={onCopyLink}
+            data-testid="lib-explain-copy"
+          >
+            {copied ? "Copied" : "Copy link"}
+          </button>
+        </div>
+      )}
+    </div>
+  );
+}
+
 function PageCardView({
   card,
   busy,
   copied,
   selectMode,
   checked,
+  explainOpen,
   onToggleSelect,
+  onLongPressSelect,
+  onExplain,
   onContinue,
   onUpdateLive,
   onViewLive,
@@ -847,6 +1065,10 @@ function PageCardView({
   // bulk path enforces. A published archived card carries a slug + maybe an
   // instance; a draft (archived or not) carries only an instance.
   const canDelete = isDraft || isArchived;
+  // A page published from another device has no local draft to resume, so its
+  // primary (Open) is disabled. Tapping the card explains that instead of a
+  // silent no-op (SP-LIB-4).
+  const crossDevice = isCrossDeviceOnly(card);
 
   // Primary action by status (packet): Draft → Continue, Live → Open,
   // Archived → Restore.
@@ -855,6 +1077,27 @@ function PageCardView({
     : isDraft
       ? { label: "Continue", onClick: onContinue }
       : { label: "Open", onClick: onContinue };
+  const primaryDisabled = busy || (primary.label !== "Restore" && !canResume);
+
+  const longPress = useLongPress(onLongPressSelect, !selectMode);
+
+  // The whole card is the primary tap target (packet). Inner controls
+  // (buttons / the checkbox) self-handle, so a click that bubbled up from one
+  // is ignored here; a long-press just fired swallows its trailing click.
+  function onCardClick(e: ReactMouseEvent) {
+    if (longPress.consumeIfFired()) return;
+    if ((e.target as HTMLElement).closest("button, a, label, input")) return;
+    if (selectMode) {
+      onToggleSelect();
+      return;
+    }
+    if (busy) return;
+    if (crossDevice) {
+      onExplain();
+      return;
+    }
+    if (!primaryDisabled) primary.onClick();
+  }
 
   return (
     <article
@@ -864,10 +1107,16 @@ function PageCardView({
       data-slug={card.slug}
       data-selectable={selectMode ? "true" : undefined}
       data-checked={selectMode && checked ? "true" : undefined}
-      onClick={selectMode ? onToggleSelect : undefined}
+      data-cross-device={crossDevice ? "true" : undefined}
+      onClick={onCardClick}
+      {...longPress.handlers}
     >
       {selectMode && (
-        <label className="lib-check" onClick={(e) => e.stopPropagation()}>
+        <label
+          className="lib-check"
+          data-no-longpress="true"
+          onClick={(e) => e.stopPropagation()}
+        >
           <input
             type="checkbox"
             checked={checked}
@@ -907,13 +1156,22 @@ function PageCardView({
           </p>
         )}
 
+        {!selectMode && explainOpen && crossDevice && (
+          <ExplainNote
+            copied={copied}
+            withActions={false}
+            onViewLive={onViewLive}
+            onCopyLink={onCopyLink}
+          />
+        )}
+
         {!selectMode && (
-          <div className="lib-actions">
+          <div className="lib-actions" data-no-longpress="true">
             <button
               type="button"
               className="lib-btn lib-btn-primary"
               onClick={primary.onClick}
-              disabled={busy || (primary.label !== "Restore" && !canResume)}
+              disabled={primaryDisabled}
               data-testid="lib-action-primary"
             >
               {primary.label}
@@ -1012,7 +1270,10 @@ function PageRowView({
   copied,
   selectMode,
   checked,
+  explainOpen,
   onToggleSelect,
+  onLongPressSelect,
+  onExplain,
   onContinue,
   onUpdateLive,
   onViewLive,
@@ -1029,11 +1290,24 @@ function PageRowView({
   // non-archived standalone page) there is no local draft to resume.
   const primaryAction = isArchived ? onRestore : onContinue;
   const primaryDisabled = busy || (!isArchived && !canResume);
+  // The disabled case that isn't just "busy": a page published from another
+  // device. A tap explains that rather than silently no-op-ing (SP-LIB-4).
+  const crossDevice = isCrossDeviceOnly(card);
   const actions = secondaryRowActions(card);
 
+  const longPress = useLongPress(onLongPressSelect, !selectMode);
+
+  // The whole row is the tap target (packet). The ⋯ menu + checkbox carry
+  // data-no-longpress and sit outside the hit button, so they never reach here.
   function onRowClick() {
+    if (longPress.consumeIfFired()) return;
     if (selectMode) {
       onToggleSelect();
+      return;
+    }
+    if (busy) return;
+    if (crossDevice) {
+      onExplain();
       return;
     }
     if (!primaryDisabled) primaryAction();
@@ -1047,61 +1321,84 @@ function PageRowView({
       data-slug={card.slug}
       data-selectable={selectMode ? "true" : undefined}
       data-checked={selectMode && checked ? "true" : undefined}
+      data-cross-device={crossDevice ? "true" : undefined}
+      {...longPress.handlers}
     >
-      {selectMode && (
-        <label className="lib-row-check">
-          <input
-            type="checkbox"
-            checked={checked}
-            onChange={onToggleSelect}
-            aria-label={`Select ${card.propertyLine}`}
-            data-testid="lib-row-check"
+      <div className="lib-row-line">
+        {selectMode && (
+          <label className="lib-row-check" data-no-longpress="true">
+            <input
+              type="checkbox"
+              checked={checked}
+              onChange={onToggleSelect}
+              aria-label={`Select ${card.propertyLine}`}
+              data-testid="lib-row-check"
+            />
+            <span className="lib-check-box" aria-hidden="true" />
+          </label>
+        )}
+
+        <button
+          type="button"
+          className="lib-row-hit"
+          onClick={onRowClick}
+          // Enabled even when the primary is cross-device-disabled, so the tap
+          // can surface the explanation; a true busy state still blocks it.
+          disabled={!selectMode && busy}
+          data-disabled={!selectMode && crossDevice ? "true" : undefined}
+          aria-label={`${primaryActionLabel(card)} ${card.propertyLine}`}
+          data-testid="lib-row-hit"
+        >
+          <span className="lib-row-thumb" aria-hidden="true">
+            {card.cover ? (
+              // eslint-disable-next-line @next/next/no-img-element
+              <img className="lib-row-thumb-img" src={card.cover} alt="" />
+            ) : (
+              <span className="lib-row-thumb-empty">◇</span>
+            )}
+          </span>
+          <span className="lib-row-main">
+            <span className="lib-row-title">{card.propertyLine}</span>
+            <span className="lib-row-meta">{listMetaLine(card, nowMs)}</span>
+          </span>
+          <span className="lib-chip lib-row-chip" data-status={card.status}>
+            {STATUS_LABEL[card.status]}
+          </span>
+        </button>
+
+        {!selectMode && (
+          <RowMenu
+            card={card}
+            actions={actions}
+            busy={busy}
+            copied={copied}
+            onUpdateLive={onUpdateLive}
+            onViewLive={onViewLive}
+            onCopyLink={onCopyLink}
+            onArchive={onArchive}
+            onDuplicate={onDuplicate}
+            onDelete={onDelete}
           />
-          <span className="lib-check-box" aria-hidden="true" />
-        </label>
-      )}
+        )}
+      </div>
 
-      <button
-        type="button"
-        className="lib-row-hit"
-        onClick={onRowClick}
-        disabled={!selectMode && primaryDisabled}
-        data-testid="lib-row-hit"
-      >
-        <span className="lib-row-thumb" aria-hidden="true">
-          {card.cover ? (
-            // eslint-disable-next-line @next/next/no-img-element
-            <img className="lib-row-thumb-img" src={card.cover} alt="" />
-          ) : (
-            <span className="lib-row-thumb-empty">◇</span>
-          )}
-        </span>
-        <span className="lib-row-main">
-          <span className="lib-row-title">{card.propertyLine}</span>
-          <span className="lib-row-meta">{listMetaLine(card, nowMs)}</span>
-        </span>
-      </button>
-
-      <span className="lib-chip lib-row-chip" data-status={card.status}>
-        {STATUS_LABEL[card.status]}
-      </span>
-
-      {!selectMode && (
-        <RowMenu
-          card={card}
-          actions={actions}
-          busy={busy}
+      {!selectMode && explainOpen && crossDevice && (
+        <ExplainNote
           copied={copied}
-          onUpdateLive={onUpdateLive}
+          withActions
           onViewLive={onViewLive}
           onCopyLink={onCopyLink}
-          onArchive={onArchive}
-          onDuplicate={onDuplicate}
-          onDelete={onDelete}
         />
       )}
     </div>
   );
+}
+
+/** The verb a row's primary tap performs, for the hit button's accessible name. */
+function primaryActionLabel(card: PageCard): string {
+  if (card.status === "archived") return "Restore";
+  if (card.status === "draft") return "Continue";
+  return "Open";
 }
 
 const ROW_ACTION_LABEL: Record<RowAction, string> = {
@@ -1199,7 +1496,7 @@ function RowMenu({
   }
 
   return (
-    <div className="lib-row-menu" ref={wrapRef}>
+    <div className="lib-row-menu" ref={wrapRef} data-no-longpress="true">
       <button
         ref={btnRef}
         type="button"

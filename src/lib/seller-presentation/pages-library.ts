@@ -513,6 +513,55 @@ export function relativeTimeAgo(iso: string, nowMs: number): string {
   return pick(Math.floor(diff / YEAR_MS), "year");
 }
 
+// ===========================================================================
+// Library v4 — list polish: long-press select + cross-device tap (SP-LIB-4).
+//
+// Pure constants + a movement helper for the long-press-to-select gesture, kept
+// here (no React, no DOM) so the timing/threshold are one source of truth the
+// component wires and the unit tests pin. The hook itself (pointer wiring,
+// guarded haptics) lives in PagesLibrary.tsx; only the numbers + geometry are
+// pure.
+// ===========================================================================
+
+/** How long a touch must be held (ms) before it enters select mode. */
+export const LONG_PRESS_MS = 450;
+
+/**
+ * How far (px, per-axis) a touch may drift before it is treated as a scroll /
+ * drag and the pending long-press is cancelled. Keeps a normal scroll from ever
+ * tripping select mode.
+ */
+export const LONG_PRESS_MOVE_CANCEL_PX = 10;
+
+/**
+ * Has the pointer moved far enough from its start to count as a scroll/drag
+ * (and thus cancel a pending long-press)? Per-axis box test — cheaper than a
+ * hypot and indistinguishable at this threshold. PURE so the cancel rule is
+ * unit-pinned independent of any DOM event plumbing.
+ */
+export function movedBeyond(
+  startX: number,
+  startY: number,
+  x: number,
+  y: number,
+  threshold: number = LONG_PRESS_MOVE_CANCEL_PX,
+): boolean {
+  return Math.abs(x - startX) > threshold || Math.abs(y - startY) > threshold;
+}
+
+/**
+ * Does this card's primary tap have nowhere to go because it was published from
+ * another device (no local draft to resume)? Such a page reads as Live but has
+ * no `instanceId`, so Open/Continue is disabled. Tapping it must explain the
+ * cross-device limit and surface the actions that DO work (View live, Copy
+ * link) rather than silently no-op. Archived pages restore server-side, so they
+ * are never in this state. PURE — the component branches its tap on this.
+ */
+export function isCrossDeviceOnly(card: PageCard): boolean {
+  const isLive = card.status === "live" || card.status === "live-edits-pending";
+  return isLive && !card.instanceId;
+}
+
 /**
  * The row's secondary meta line (the status chip is rendered separately):
  *   - Draft     → "Started X ago"

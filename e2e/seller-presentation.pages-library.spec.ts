@@ -9,10 +9,14 @@ import {
   filterByTab,
   hasPendingEdits,
   isAtOrOverLiveCap,
+  isCrossDeviceOnly,
   isViewMode,
   LIBRARY_MOBILE_MAX_WIDTH,
   listMetaLine,
+  LONG_PRESS_MOVE_CANCEL_PX,
+  LONG_PRESS_MS,
   mergePages,
+  movedBeyond,
   projectHandoutSummary,
   publicUrlForSlug,
   relativeTimeAgo,
@@ -696,5 +700,70 @@ test.describe("relativeTimeAgo buckets", () => {
 
   test("unparseable input → empty string", () => {
     expect(relativeTimeAgo("not-a-date", NOW)).toBe("");
+  });
+});
+
+// ===========================================================================
+// Library v4 — list polish: long-press select + cross-device tap (SP-LIB-4).
+// ===========================================================================
+
+test.describe("long-press movement threshold", () => {
+  test("constants are sane (held > 0, drift > 0)", () => {
+    expect(LONG_PRESS_MS).toBeGreaterThan(0);
+    expect(LONG_PRESS_MOVE_CANCEL_PX).toBeGreaterThan(0);
+  });
+
+  test("a stationary (or sub-threshold) press does NOT cancel", () => {
+    // exactly at the threshold is still a press (strict >), as is no movement.
+    expect(movedBeyond(100, 100, 100, 100)).toBe(false);
+    expect(
+      movedBeyond(100, 100, 100 + LONG_PRESS_MOVE_CANCEL_PX, 100),
+    ).toBe(false);
+    expect(
+      movedBeyond(100, 100, 100, 100 - LONG_PRESS_MOVE_CANCEL_PX),
+    ).toBe(false);
+  });
+
+  test("a drag past the threshold on EITHER axis cancels", () => {
+    expect(
+      movedBeyond(100, 100, 100 + LONG_PRESS_MOVE_CANCEL_PX + 1, 100),
+    ).toBe(true); // horizontal
+    expect(
+      movedBeyond(100, 100, 100, 100 + LONG_PRESS_MOVE_CANCEL_PX + 1),
+    ).toBe(true); // vertical (a scroll)
+  });
+
+  test("a custom threshold overrides the default", () => {
+    expect(movedBeyond(0, 0, 5, 0, 4)).toBe(true);
+    expect(movedBeyond(0, 0, 4, 0, 4)).toBe(false);
+  });
+});
+
+test.describe("isCrossDeviceOnly (published elsewhere, no local draft)", () => {
+  test("a standalone Live page (no instance) is cross-device", () => {
+    expect(isCrossDeviceOnly(card({ status: "live", slug: "s1" }))).toBe(true);
+  });
+
+  test("a Live page WITH a local draft is NOT cross-device", () => {
+    expect(
+      isCrossDeviceOnly(card({ status: "live", slug: "s1", instanceId: "wf_1" })),
+    ).toBe(false);
+  });
+
+  test("Draft / Archived are never cross-device (their primary always works)", () => {
+    expect(isCrossDeviceOnly(card({ status: "draft", instanceId: "wf_1" }))).toBe(
+      false,
+    );
+    expect(isCrossDeviceOnly(card({ status: "archived", slug: "s1" }))).toBe(
+      false,
+    );
+  });
+
+  test("an edits-pending card always has an instance, so never cross-device", () => {
+    expect(
+      isCrossDeviceOnly(
+        card({ status: "live-edits-pending", slug: "s1", instanceId: "wf_1" }),
+      ),
+    ).toBe(false);
   });
 });
