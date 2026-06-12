@@ -5,7 +5,9 @@ import { useListingProfile } from "@/lib/listing-profile";
 import { CurrencyInput } from "@/components/inputs/CurrencyInput";
 import { NumberInput } from "@/components/inputs/NumberInput";
 import { ImageUploadField } from "@/components/ImageUploadField";
-import type { SellerPresentationDraft } from "../engine/types";
+import { isInvitationStatus, type SellerPresentationDraft } from "../engine/types";
+import { formatAppointment } from "../engine/appointment";
+import { useSPEntitlement } from "./SPEntitlementContext";
 
 /**
  * Seller Presentation Step 1 — Property + personalization.
@@ -54,6 +56,7 @@ interface StepPropertyProps {
 
 export function StepProperty({ draft, setDraft }: StepPropertyProps) {
   const { settings, update, hydrated } = useListingProfile();
+  const { sellerStateAEnabled } = useSPEntitlement();
 
   // Mirror the shared Property primitive → draft so the shell's
   // gating reads from a single source. Effect deps intentionally
@@ -142,6 +145,11 @@ export function StepProperty({ draft, setDraft }: StepPropertyProps) {
       </div>
 
       <div className="fields">
+        {/* ---- Seller State A: mode + appointment (flag-gated) ---- */}
+        {sellerStateAEnabled === true && (
+          <StateAMode draft={draft} setDraft={setDraft} />
+        )}
+
         {/* ---- Address ---- */}
         <div className="field-block">
           <label className="field-label" htmlFor="sp-address">
@@ -435,6 +443,96 @@ function SubjectDetails({ draft, setDraft }: StepPropertyProps) {
               aria-label="subject-lot-sqft"
             />
           </label>
+        </div>
+      )}
+    </div>
+  );
+}
+
+/**
+ * Seller State A — the mode toggle + appointment picker (flag-gated; rendered
+ * only when SELLER_STATE_A_ENABLED is on, so flag-off StepProperty is unchanged).
+ *
+ * The agent explicitly chooses between the prepared invitation (the
+ * before-appointment page, no price yet) and the full presentation (today's
+ * page). Picking the invitation sets `valuationStatus =
+ * preparing_for_walkthrough`; the appointment date+time is then the page's
+ * premise. Picking the full presentation sets `revealed` (the default behavior).
+ */
+function StateAMode({ draft, setDraft }: StepPropertyProps) {
+  const invitation = isInvitationStatus(draft.valuationStatus);
+  const appt = formatAppointment(draft.appointmentAt);
+
+  const setMode = (mode: "invitation" | "full") => {
+    setDraft({
+      ...draft,
+      valuationStatus:
+        mode === "invitation" ? "preparing_for_walkthrough" : "revealed",
+    });
+  };
+
+  return (
+    <div className="field-block" data-testid="step-property-state-a">
+      <label className="field-label">
+        Page type <span className="opt">when are you sending this?</span>
+      </label>
+      <div className="mode-toggle" role="radiogroup" aria-label="Page type">
+        <button
+          type="button"
+          role="radio"
+          aria-checked={invitation}
+          className={`mode-option${invitation ? " is-active" : ""}`}
+          onClick={() => setMode("invitation")}
+          data-testid="step-property-mode-invitation"
+        >
+          <span className="mode-option-title">Prepared invitation</span>
+          <span className="mode-option-sub">
+            Before the appointment. Shows your prep, not a price yet.
+          </span>
+        </button>
+        <button
+          type="button"
+          role="radio"
+          aria-checked={!invitation}
+          className={`mode-option${!invitation ? " is-active" : ""}`}
+          onClick={() => setMode("full")}
+          data-testid="step-property-mode-full"
+        >
+          <span className="mode-option-title">Full presentation</span>
+          <span className="mode-option-sub">
+            At or after the appointment. The complete page.
+          </span>
+        </button>
+      </div>
+
+      {invitation && (
+        <div className="appt-field" data-testid="step-property-appointment-field">
+          <label className="field-label" htmlFor="sp-appointment">
+            Appointment date and time
+          </label>
+          <input
+            id="sp-appointment"
+            type="datetime-local"
+            className="input"
+            value={draft.appointmentAt ?? ""}
+            onChange={(e) =>
+              setDraft({
+                ...draft,
+                appointmentAt: e.target.value || undefined,
+              })
+            }
+            data-testid="step-property-appointment"
+          />
+          <p className="hint">
+            {appt ? (
+              <>
+                Appears as{" "}
+                <span className="cap-preview">{appt.full}</span> on the page.
+              </>
+            ) : (
+              <>Powers the &ldquo;prepared for [day]&rdquo; invitation copy.</>
+            )}
+          </p>
         </div>
       )}
     </div>

@@ -119,6 +119,10 @@ export function draftPreviewPayload(
   // photos exactly when the published page would. Defaults false so existing
   // callers (and a flag-off session) render byte-identically to today.
   compPhotos: boolean = false,
+  // SELLER_STATE_A — mirror the publish-time flag so the live preview resolves
+  // to the prepared-invitation render exactly when the published page would.
+  // Defaults false so existing callers (and a flag-off session) are unchanged.
+  sellerStateA: boolean = false,
 ): PublicPayload {
   const { agentContact, brandReviews, brandColors, brandWhyUs } =
     brandToPublishInputs(brand);
@@ -133,6 +137,7 @@ export function draftPreviewPayload(
     false,
     brandWhyUs,
     compPhotos,
+    sellerStateA,
   );
 
   // Honest preview: the By-the-numbers band looks good, so Dallen wants it to

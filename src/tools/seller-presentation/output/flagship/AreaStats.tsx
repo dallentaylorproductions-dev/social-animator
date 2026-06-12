@@ -15,7 +15,20 @@ import { priceRangeMidpoint } from "../../engine/price-range";
  * whole section flexes out when there's neither a median nor a chart series
  * (LS-1 — no "snapshot on the way" placeholder ever reaches a real page).
  */
-export function AreaStats({ payload }: { payload: PublicPayload }) {
+export function AreaStats({
+  payload,
+  showRecommended = true,
+}: {
+  payload: PublicPayload;
+  /**
+   * Whether to overlay the subject home's RECOMMENDED price on the neighborhood
+   * chart (the "Recommended $X" cap + the dashed reference line). Default true =
+   * today's full-presentation render, byte-identical. Seller State A passes
+   * false: the prepared invitation shows the neighborhood trend ONLY, with NO
+   * subject price anywhere (a real number means seeing the home first).
+   */
+  showRecommended?: boolean;
+}) {
   const stats = payload.areaStats;
   const series = (stats?.monthlySeries ?? [])
     .map((m) => ({ month: m.month, v: parseK(m.medianPrice) }))
@@ -25,14 +38,17 @@ export function AreaStats({ payload }: { payload: PublicPayload }) {
   const hasChart = series.length >= 2;
   if (!stats || (!hasMedian && !hasChart)) return null;
 
-  const recommended =
-    priceRangeMidpoint(
-      payload.property.recommendedListLow,
-      payload.property.recommendedListHigh,
-    ) ||
-    payload.property.recommendedList ||
-    payload.recommendedPrice;
-  const recK = parseK(recommended);
+  // State A (showRecommended false) never derives a subject price — recK stays
+  // null so the chart draws only the neighborhood median trend, no price overlay.
+  const recommended = showRecommended
+    ? priceRangeMidpoint(
+        payload.property.recommendedListLow,
+        payload.property.recommendedListHigh,
+      ) ||
+      payload.property.recommendedList ||
+      payload.recommendedPrice
+    : undefined;
+  const recK = showRecommended ? parseK(recommended) : null;
 
   return (
     <section className="section area z-paper" data-testid="fs-area">
@@ -58,7 +74,13 @@ export function AreaStats({ payload }: { payload: PublicPayload }) {
             </div>
           </div>
         )}
-        {hasChart && <AreaChart series={series} recK={recK} />}
+        {hasChart && (
+          <AreaChart
+            series={series}
+            recK={recK}
+            showRecommended={showRecommended}
+          />
+        )}
       </div>
     </section>
   );
@@ -68,9 +90,13 @@ export function AreaStats({ payload }: { payload: PublicPayload }) {
 function AreaChart({
   series,
   recK,
+  showRecommended = true,
 }: {
   series: Array<{ month: string; v: number }>;
   recK: number | null;
+  /** State A passes false: drop the recommended cap + dashline, and scale the
+   *  y-axis to the series alone (no subject price influencing the range). */
+  showRecommended?: boolean;
 }) {
   const W = 640,
     H = 250,
@@ -80,8 +106,10 @@ function AreaChart({
     padB = 34;
   const ys = series.map((p) => p.v);
   const rec = recK ?? Math.max(...ys);
-  const min = Math.min(...ys, rec) - 8;
-  const max = Math.max(...ys, rec) + 8;
+  // Default path includes `rec` in the scale (byte-identical); State A scales to
+  // the series only so the absent price never widens the neighborhood trend.
+  const min = (showRecommended ? Math.min(...ys, rec) : Math.min(...ys)) - 8;
+  const max = (showRecommended ? Math.max(...ys, rec) : Math.max(...ys)) + 8;
   const x = (i: number) =>
     padL + (series.length === 1 ? 0.5 : i / (series.length - 1)) * (W - padL - padR);
   const y = (v: number) => padT + (1 - (v - min) / (max - min || 1)) * (H - padT - padB);
@@ -101,10 +129,12 @@ function AreaChart({
   return (
     <div className="chart reveal">
       <div className="chart__head">
-        <div className="chart__cap">
-          <span className="k">Recommended</span>
-          <span className="v pill">{compactK(rec)}</span>
-        </div>
+        {showRecommended && (
+          <div className="chart__cap">
+            <span className="k">Recommended</span>
+            <span className="v pill">{compactK(rec)}</span>
+          </div>
+        )}
         <div className="chart__cap r">
           <span className="k">{cur.month} · Current</span>
           <span className="v">{compactK(cur.v)}</span>
@@ -120,7 +150,7 @@ function AreaChart({
               </text>
             </g>
           ))}
-          {recK != null && (
+          {showRecommended && recK != null && (
             <line className="dashline" x1={padL} x2={W - padR} y1={y(rec)} y2={y(rec)} />
           )}
           <path className="area-fill" d={areaPath} />

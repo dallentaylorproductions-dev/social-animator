@@ -1,3 +1,4 @@
+import type { ReactNode } from "react";
 import type { PublicPayload } from "../public-payload";
 import {
   effectivePosterUrl,
@@ -12,28 +13,55 @@ import {
  * prototype's video frame; absent, the column flexes out and the note still
  * reads complete (the grid collapses to one column).
  */
-export function AgentNote({ payload }: { payload: PublicPayload }) {
+export function AgentNote({
+  payload,
+  eyebrow,
+  heading,
+  lede,
+  testId = "fs-note",
+}: {
+  payload: PublicPayload;
+  /**
+   * Seller State A copy overrides. Default (unset) = the full-presentation
+   * copy, byte-identical to today. State A passes a warm pre-appointment
+   * welcome whose lede must NOT reference "this number" (there is no price yet).
+   * The video implementation (poster precedence, iOS first-frame, framing) is
+   * shared verbatim so State A and the revealed page never drift.
+   */
+  eyebrow?: ReactNode;
+  heading?: ReactNode;
+  lede?: ReactNode;
+  testId?: string;
+}) {
   const v = payload.video;
   const hasVideo = !!v?.videoUrl;
   const poster = v ? effectivePosterUrl(v) : undefined;
   const framing = effectiveFraming(v);
 
   return (
-    <section className="section note z-offwhite" data-testid="fs-note">
+    <section className="section note z-offwhite" data-testid={testId}>
       <div
         className="note__grid"
         style={hasVideo ? undefined : { gridTemplateColumns: "1fr" }}
       >
         <div className="note__copy reveal">
           <div className="eyebrow">
-            <span className="num">01</span> · A Short Note From Your Agent
+            {eyebrow ?? (
+              <>
+                <span className="num">01</span> · A Short Note From Your Agent
+              </>
+            )}
           </div>
           <h2 className="head">
-            Two <em>minutes</em>, on your home.
+            {heading ?? (
+              <>
+                Two <em>minutes</em>, on your home.
+              </>
+            )}
           </h2>
           <p className="lede">
-            A quick walkthrough of how I arrived at this number and what I&apos;d
-            do first, so nothing about the plan is a surprise.
+            {lede ??
+              "A quick walkthrough of how I arrived at this number and what I'd do first, so nothing about the plan is a surprise."}
           </p>
         </div>
         {hasVideo && (

@@ -524,3 +524,61 @@ export const FLAGSHIP_PRIVACY_PAYLOAD = {
     ),
   },
 } as unknown as PublicPayload;
+
+/**
+ * Seller State A — the prepared invitation (rich). Derived from FULL_PAYLOAD so
+ * the supporting data (comps for nearby-sold context, area snapshot, whyUs track
+ * record + marketing, reviews) is present and each proof item renders truthfully.
+ * The SUBJECT price is stripped EVERYWHERE (recommendedPrice / recommendedList /
+ * range / rationale all blank) so the render carries no price for the home being
+ * valued; the comp sold prices remain as neighborhood context only. Carries the
+ * invitation `valuationStatus` + an `appointmentAt`, so the consumer dispatch
+ * resolves to the StateAPage exactly like a real State A publish.
+ */
+export const STATE_A_FULL_PAYLOAD: PublicPayload = {
+  ...FULL_PAYLOAD,
+  recommendedPrice: "",
+  priceRationale: "",
+  property: {
+    ...FULL_PAYLOAD.property,
+    recommendedList: "",
+    recommendedListLow: undefined,
+    recommendedListHigh: undefined,
+    rationaleShort: "",
+  },
+  whyPrice: {
+    ...FULL_PAYLOAD.whyPrice,
+    publicRationale: "",
+  },
+  valuationStatus: "preparing_for_walkthrough",
+  appointmentAt: "2026-06-20T14:00",
+};
+
+/**
+ * Seller State A — the minimal invitation: only an address, the agent, the
+ * status, and the appointment. NO comps, area, whyUs, or reviews, so every proof
+ * item AND every optional block flexes out (no hollow checkmarks, no empty
+ * blocks). The appointment + valuation-being-prepared + what-we-confirm + CTA
+ * blocks still render so the page reads complete with little data.
+ */
+export const STATE_A_MINIMAL_PAYLOAD: PublicPayload = {
+  ...MINIMAL_PAYLOAD,
+  recommendedPrice: "",
+  comps: [],
+  property: {
+    address: "1234 Test Drive NE",
+    recommendedList: "",
+  },
+  whyPrice: {
+    publicRationale: "",
+    comps: [],
+  },
+  agent: {
+    name: "Aaron Test",
+    brokerage: "Test Realty",
+    phone: "2532028825",
+    email: "aaron@example.com",
+  },
+  valuationStatus: "preparing_for_walkthrough",
+  appointmentAt: "2026-06-20T14:00",
+};

@@ -11,6 +11,8 @@ import {
   POSTER_NONE_PAYLOAD,
   POSTER_OVERRIDE_WINS_PAYLOAD,
   POSTER_SCRUB_OVER_AUTO_PAYLOAD,
+  STATE_A_FULL_PAYLOAD,
+  STATE_A_MINIMAL_PAYLOAD,
 } from "@/tools/seller-presentation/output/__fixtures__/sample-payload";
 import { EmbedBridge } from "./EmbedBridge";
 
@@ -121,6 +123,13 @@ export default async function SellerPresentationPreview({ searchParams }: PagePr
     // sample is Zillow), so the suite + smoke can exercise the Google "G"
     // treatment. Pair with `&template=flagship&reviewSourceLogos=1`.
     "full-google",
+    // SELLER_STATE_A - the prepared invitation. `state-a` is the rich
+    // (price-less, full supporting data) variant; `state-a-minimal` flexes every
+    // proof item + optional block out. Both carry an invitation valuationStatus,
+    // so SellerPresentationPage dispatches to the StateAPage on its own (no
+    // `?template` needed) - the same way a v2 stamp routes to the flagship.
+    "state-a",
+    "state-a-minimal",
   ] as const;
   type Variant = (typeof VARIANTS)[number];
   const variant = (VARIANTS as readonly string[]).includes(fixture ?? "")
@@ -159,7 +168,11 @@ export default async function SellerPresentationPreview({ searchParams }: PagePr
                             url: "https://www.google.com/maps/place/?cid=12345",
                           },
                         }
-                      : FULL_PAYLOAD;
+                      : variant === "state-a"
+                        ? STATE_A_FULL_PAYLOAD
+                        : variant === "state-a-minimal"
+                          ? STATE_A_MINIMAL_PAYLOAD
+                          : FULL_PAYLOAD;
 
   // E.0 — optional brand-color override (drives the brand-colors e2e
   // regression spec + Dallen's browser smoke). Validated hex only; merged
