@@ -36,6 +36,6 @@ test.describe("Flagship — privacy (rogue private keys never render)", () => {
     // Sanity: the PUBLIC content DID render (proves we asserted on a real page,
     // not an empty/error surface).
     await expect(page.getByTestId("fs-why")).toBeVisible();
-    await expect(page.getByTestId("fs-comp-0")).toContainText("$648,000");
+    await expect(page.getByTestId("fs-comp-0")).toContainText("$592,000");
   });
 });

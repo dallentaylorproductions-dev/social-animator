@@ -71,7 +71,7 @@ test.describe("By-the-numbers — honest preview substitution", () => {
     expect(values).toContain("101%");
     expect(values).toContain("47");
     // The sample figures never leak in when the agent has their own.
-    expect(values).not.toContain("99.4%");
+    expect(values).not.toContain("101.3%");
   });
 });
 

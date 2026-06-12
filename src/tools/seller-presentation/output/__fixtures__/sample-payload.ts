@@ -32,31 +32,44 @@ export const FULL_PAYLOAD: PublicPayload = {
   // composes `${city}, ${state} ${zip}` — pre-A7c the city included
   // ", OH" which rendered "TACOMA, WA, WA 98406" (doubled state).
   propertyCity: "Tacoma",
-  recommendedPrice: "$675,000",
+  // Recommended price is a RANGE (LOW $619,000 – HIGH $642,000); this single
+  // value is the range midpoint, used only by the v1 count-up + as the range-
+  // less fallback. The flagship hero renders the range from property.recommended
+  // ListLow/High below.
+  recommendedPrice: "$630,000",
   priceRationale:
-    "Three recently-sold homes within four blocks anchor the recommendation. Each closed in the last ninety days and shares the bones of your home — era, footprint, lot orientation. At $675,000 you're a step above the average closing price for the block, which reflects the original woodwork, the south-facing kitchen, and the recent mechanicals — without pricing past the comparable range. We'll see strong activity in the first two weekends.",
+    "Four recently sold homes within a few blocks anchor the recommendation. Each closed in the last several months and shares the bones of your home: era, footprint, and lot orientation. The $619,000 to $642,000 range sits right where those sales landed, high enough to reflect your updates and the original woodwork, without pricing past what buyers just paid nearby. Expect strong activity in the first two weekends.",
+  // North Tacoma (98406) comps. The street-only `address` displays with the
+  // city + sqft + built-year appended by the comp card; the Street View aiming
+  // data lives on `whyPrice.comps` below (the array the flagship renders).
   comps: [
     {
-      address: "2218 W 14th Street",
-      soldPrice: "$648,000",
-      soldDate: "Sold March 14, 2026",
-      sqft: "1,810",
-      yearBuilt: 1908,
+      address: "4210 N 14th St",
+      soldPrice: "$592,000",
+      soldDate: "Sold February 19, 2026",
+      sqft: "2,740",
+      yearBuilt: 1951,
     },
     {
-      address: "1908 Castle Avenue",
-      soldPrice: "$691,000",
-      soldDate: "Sold April 02, 2026",
-      sqft: "1,920",
-      yearBuilt: 1924,
+      address: "1705 N Anderson St",
+      soldPrice: "$580,000",
+      soldDate: "Sold March 6, 2026",
+      sqft: "2,020",
+      yearBuilt: 1919,
     },
-    // Third comp intentionally omits yearBuilt so the FULL fixture
-    // also exercises the graceful-hide path on the comp card.
     {
-      address: "2401 Professor Avenue",
-      soldPrice: "$662,000",
-      soldDate: "Sold April 28, 2026",
-      sqft: "1,760",
+      address: "1722 N Oakes St",
+      soldPrice: "$605,000",
+      soldDate: "Sold April 17, 2026",
+      sqft: "2,010",
+      yearBuilt: 1906,
+    },
+    {
+      address: "1008 N Steele St",
+      soldPrice: "$700,000",
+      soldDate: "Sold May 8, 2026",
+      sqft: "2,715",
+      yearBuilt: 1925,
     },
   ],
   agentBranding: {
@@ -95,7 +108,12 @@ export const FULL_PAYLOAD: PublicPayload = {
     // decorative (aria-hidden) hero background; the scrim band + eyebrow sit
     // over it exactly as on a real page. Fixture DATA only — template untouched.
     heroPhotoUrl: "/sample-assets/exterior.webp",
-    recommendedList: "$675,000",
+    // UX-2a recommended price as a LOW/HIGH range. The flagship Price section
+    // renders "$619,000 – $642,000"; `recommendedList` stays the single midpoint
+    // for the v1 count-up + back-compat, and the area chart reads the midpoint.
+    recommendedList: "$630,000",
+    recommendedListLow: "$619,000",
+    recommendedListHigh: "$642,000",
     rationaleShort:
       "A price the market will meet quickly — and one that gives the right buyer room to fall in love.",
   },
@@ -109,27 +127,62 @@ export const FULL_PAYLOAD: PublicPayload = {
   },
   whyPrice: {
     publicRationale:
-      "Three recently-sold homes within four blocks anchor the recommendation. Each closed in the last ninety days and shares the bones of your home — era, footprint, lot orientation. At $675,000 you're a step above the average closing price for the block, which reflects the original woodwork, the south-facing kitchen, and the recent mechanicals — without pricing past the comparable range. We'll see strong activity in the first two weekends.",
+      "Four recently sold homes within a few blocks anchor the recommendation. Each closed in the last several months and shares the bones of your home: era, footprint, and lot orientation. The $619,000 to $642,000 range sits right where those sales landed, high enough to reflect your updates and the original woodwork, without pricing past what buyers just paid nearby. Expect strong activity in the first two weekends.",
+    // The flagship comp cards render real, aimed Google Street View photos for
+    // each of these 4 North Tacoma (98406) addresses. COMPLIANCE: we persist
+    // ONLY the pano id + coverage flag + the derived aiming data (heading +
+    // house lat/lng) resolved from the FREE metadata + geocoding endpoints. The
+    // image is requested fresh client-side at view time and NEVER stored. The
+    // streetView values were resolved via the same `resolveCompCoverage`
+    // pipeline a real wizard publish runs (see street-view.ts).
     comps: [
       {
-        address: "2218 W 14th Street",
-        soldPrice: "$648,000",
-        soldDate: "Sold March 14, 2026",
-        sqft: "1,810",
-        yearBuilt: 1908,
+        address: "4210 N 14th St",
+        soldPrice: "$592,000",
+        soldDate: "Sold February 19, 2026",
+        sqft: "2,740",
+        yearBuilt: 1951,
+        hasStreetView: true,
+        streetViewPanoId: "TYJpmYKWYPGef4qYTmb59Q",
+        streetViewHeading: 177.49,
+        houseLat: 47.262489,
+        houseLng: -122.493832,
       },
       {
-        address: "1908 Castle Avenue",
-        soldPrice: "$691,000",
-        soldDate: "Sold April 02, 2026",
-        sqft: "1,920",
-        yearBuilt: 1924,
+        address: "1705 N Anderson St",
+        soldPrice: "$580,000",
+        soldDate: "Sold March 6, 2026",
+        sqft: "2,020",
+        yearBuilt: 1919,
+        hasStreetView: true,
+        streetViewPanoId: "Y3d_jpXP8yw2FVY42ukQcA",
+        streetViewHeading: 109.15,
+        houseLat: 47.265223,
+        houseLng: -122.472547,
       },
       {
-        address: "2401 Professor Avenue",
-        soldPrice: "$662,000",
-        soldDate: "Sold April 28, 2026",
-        sqft: "1,760",
+        address: "1722 N Oakes St",
+        soldPrice: "$605,000",
+        soldDate: "Sold April 17, 2026",
+        sqft: "2,010",
+        yearBuilt: 1906,
+        hasStreetView: true,
+        streetViewPanoId: "hMujcWLJiJ_n5Pb55cBs1A",
+        streetViewHeading: 266.46,
+        houseLat: 47.265773,
+        houseLng: -122.471965,
+      },
+      {
+        address: "1008 N Steele St",
+        soldPrice: "$700,000",
+        soldDate: "Sold May 8, 2026",
+        sqft: "2,715",
+        yearBuilt: 1925,
+        hasStreetView: true,
+        streetViewPanoId: "cPSOW7yEdI4yQQtvg4-xyw",
+        streetViewHeading: 259.72,
+        houseLat: 47.258835,
+        houseLng: -122.468442,
       },
     ],
   },
@@ -160,19 +213,19 @@ export const FULL_PAYLOAD: PublicPayload = {
       body: "Marisol made us feel like the only clients she had. She knew the neighborhood cold and was honest with us about which offers to take seriously and which to pass on.",
       attributionName: "J. Mendoza",
       attributionYear: "2024",
-      attributionStreet: "W 14th",
+      attributionStreet: "N Junett",
     },
     {
       body: "Quiet, calm, prepared. We had a clear plan from week one and never once felt like we were chasing her for an answer.",
       attributionName: "A. Park",
       attributionYear: "2024",
-      attributionStreet: "Professor Avenue",
+      attributionStreet: "N Stevens",
     },
     {
       body: "She turned what we thought would be a stressful summer into something almost easy. Closed at ask in nine days.",
       attributionName: "E. & T. Chen",
       attributionYear: "2023",
-      attributionStreet: "Castle Avenue",
+      attributionStreet: "N Cedar",
     },
   ],
   reviewsOutlink: {
@@ -180,25 +233,29 @@ export const FULL_PAYLOAD: PublicPayload = {
     url: "https://www.zillow.com/profile/marisolreyes",
   },
   areaStats: {
-    medianSale: "$642k",
-    medianSaleDeltaYoy: "+4.1% vs prior year",
-    daysOnMarket: "14",
+    medianSale: "$648k",
+    medianSaleDeltaYoy: "+6.2% vs prior year",
+    // §05 hides these neighborhood cells (they duplicate the agent track record
+    // in By-the-numbers); kept in the payload for coherence + back-compat.
+    daysOnMarket: "12",
     daysOnMarketZipAvg: "vs Tacoma avg 21",
-    closings90d: "38",
-    listToSaleRatio: "101%",
+    closings90d: "31",
+    listToSaleRatio: "100%",
+    // A believable North Tacoma monthly median climbing Jul '25 → Jun '26
+    // (oldest-first, gentle realistic wiggle), ending near the current market.
     monthlySeries: [
-      { month: "Jun '25", medianPrice: "605000" },
       { month: "Jul '25", medianPrice: "612000" },
-      { month: "Aug '25", medianPrice: "608000" },
-      { month: "Sep '25", medianPrice: "621000" },
-      { month: "Oct '25", medianPrice: "628000" },
-      { month: "Nov '25", medianPrice: "625000" },
-      { month: "Dec '25", medianPrice: "631000" },
+      { month: "Aug '25", medianPrice: "618000" },
+      { month: "Sep '25", medianPrice: "614000" },
+      { month: "Oct '25", medianPrice: "623000" },
+      { month: "Nov '25", medianPrice: "629000" },
+      { month: "Dec '25", medianPrice: "626000" },
       { month: "Jan '26", medianPrice: "634000" },
-      { month: "Feb '26", medianPrice: "637000" },
-      { month: "Mar '26", medianPrice: "639000" },
-      { month: "Apr '26", medianPrice: "640000" },
-      { month: "May '26", medianPrice: "642000" },
+      { month: "Feb '26", medianPrice: "641000" },
+      { month: "Mar '26", medianPrice: "638000" },
+      { month: "Apr '26", medianPrice: "649000" },
+      { month: "May '26", medianPrice: "656000" },
+      { month: "Jun '26", medianPrice: "662000" },
     ],
   },
   // B0b — the agent-constant "why list with us" layer. Exercises every
@@ -231,18 +288,18 @@ export const FULL_PAYLOAD: PublicPayload = {
     performanceStats: [
       {
         label: "Average sale-to-list",
-        yourValue: "99.4%",
-        marketValue: "97.1%",
+        yourValue: "101.3%",
+        marketValue: "99.0%",
         unit: "%",
       },
       {
         label: "Average days on market",
-        yourValue: "14",
-        marketValue: "27",
+        yourValue: "8",
+        marketValue: "21",
         unit: "days",
       },
-      { label: "Average listing views", yourValue: "1,240", unit: "views" },
-      { label: "Homes sold (last 12 months)", yourValue: "32" },
+      { label: "Homes sold (last 12 months)", yourValue: "24" },
+      { label: "Total reviews", yourValue: "63" },
     ],
     howWeWork: [
       {
