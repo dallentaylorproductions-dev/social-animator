@@ -154,11 +154,13 @@ function PreviewSurface({
   sparse,
   currentStep,
   onClose,
+  reviewSourceLogos = false,
 }: {
   handout: HandoutRecord;
   sparse: boolean;
   currentStep: StepId;
   onClose?: () => void;
+  reviewSourceLogos?: boolean;
 }) {
   const screenRef = useRef<HTMLDivElement>(null);
 
@@ -252,7 +254,7 @@ function PreviewSurface({
           {/* `fs-static` forces the reveal/chart end-states (no scroll-driven
               motion island here) so the snapshot is always legible — see
               wizard-preview.css. No FlagshipPage edit needed. */}
-          <FlagshipPage handout={handout} />
+          <FlagshipPage handout={handout} reviewSourceLogos={reviewSourceLogos} />
         </div>
       </div>
     </div>
@@ -267,7 +269,7 @@ export function WizardPreview({
   currentStep: StepId;
 }) {
   const { settings: brand } = useBrandSettings();
-  const { compPhotosEnabled } = useSPEntitlement();
+  const { compPhotosEnabled, reviewSourceLogosEnabled } = useSPEntitlement();
   const debouncedDraft = useDebounced(draft, DEBOUNCE_MS);
 
   const [mounted, setMounted] = useState(false);
@@ -359,6 +361,7 @@ export function WizardPreview({
           handout={handout}
           sparse={sparse}
           currentStep={currentStep}
+          reviewSourceLogos={reviewSourceLogosEnabled === true}
         />
       </aside>
     );
@@ -382,6 +385,7 @@ export function WizardPreview({
             sparse={sparse}
             currentStep={currentStep}
             onClose={() => setOpen(false)}
+            reviewSourceLogos={reviewSourceLogosEnabled === true}
           />
         </div>
       )}

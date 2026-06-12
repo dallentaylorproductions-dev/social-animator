@@ -61,6 +61,13 @@ interface PageProps {
     //     with the `full-v2` fixture (a templateVersion: 2 payload) to prove a
     //     v2 payload can be forced back to the v1 renderer.
     template?: string;
+    /**
+     * REVIEW_SOURCE_LOGOS_ENABLED - `?reviewSourceLogos=1` forces the review
+     * card's source-logo chip on for this preview render (independent of the
+     * server env flag), so the suite + Dallen's smoke can see the Zillow/Google
+     * mark without flipping a global env. Any other value falls back to the env default.
+     */
+    reviewSourceLogos?: string;
   }>;
 }
 
@@ -74,7 +81,12 @@ export default async function SellerPresentationPreview({ searchParams }: PagePr
     embed,
     template,
     suppressWordmark,
+    reviewSourceLogos,
   } = await searchParams;
+  // `?reviewSourceLogos=1` forces the chip on; otherwise leave undefined so
+  // SellerPresentationPage falls back to the server env flag (off in tests).
+  const reviewSourceLogosOverride =
+    reviewSourceLogos === "1" ? true : undefined;
   const templateOverride =
     template === "flagship" ? "flagship" : template === "v1" ? "v1" : undefined;
   // v3 — embed mode: the Brand kit settings preview iframes this route with
@@ -172,7 +184,11 @@ export default async function SellerPresentationPreview({ searchParams }: PagePr
 
   return (
     <>
-      <SellerPresentationPage handout={handout} templateOverride={templateOverride} />
+      <SellerPresentationPage
+        handout={handout}
+        templateOverride={templateOverride}
+        reviewSourceLogos={reviewSourceLogosOverride}
+      />
       {isEmbed && <EmbedBridge />}
     </>
   );

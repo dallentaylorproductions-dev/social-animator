@@ -81,10 +81,19 @@ const E1_DEFAULTS = {
 export function SellerPresentationPage({
   handout,
   templateOverride,
+  reviewSourceLogos,
 }: {
   handout: HandoutRecord;
   /** Read-time presentation override. "flagship" forces v2; "v1" forces v1. */
   templateOverride?: "flagship" | "v1";
+  /**
+   * REVIEW_SOURCE_LOGOS_ENABLED - show the source's brand-logo chip on the
+   * flagship review card. Defaults to the server env flag (OFF unless set), so
+   * the published `/h/` page picks it up with no route change; the preview
+   * route passes an explicit value to force it on for QA/e2e. v1-only renders
+   * never see it. Flag-off is byte-identical to today.
+   */
+  reviewSourceLogos?: boolean;
 }) {
   const { templateVersion } = clampPublicPayload(handout.data);
   // "v1" override wins outright — render the v1 arm regardless of stored version.
@@ -93,7 +102,10 @@ export function SellerPresentationPage({
     // imported so its module graph — the Newsreader @font-face and the
     // flagship stylesheet — stays in a SEPARATE chunk that never loads on a
     // v1 page, keeping v1 byte-identical.
-    return <FlagshipPage handout={handout} />;
+    const logosOn =
+      reviewSourceLogos ??
+      process.env.REVIEW_SOURCE_LOGOS_ENABLED === "true";
+    return <FlagshipPage handout={handout} reviewSourceLogos={logosOn} />;
   }
   return <SellerPresentationV1 handout={handout} />;
 }

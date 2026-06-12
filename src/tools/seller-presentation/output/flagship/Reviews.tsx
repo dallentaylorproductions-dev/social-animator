@@ -3,6 +3,7 @@ import {
   detectReviewsSource,
   seeAllReviewsCopy,
 } from "../presentation-page";
+import { resolveReviewSourceLogo } from "./review-source-logos";
 
 /** Five filled stars (the prototype's text-mark rating). */
 function Stars({ className = "" }: { className?: string }) {
@@ -23,9 +24,17 @@ function Stars({ className = "" }: { className?: string }) {
 export function Reviews({
   payload,
   eyebrowIndex,
+  sourceLogos = false,
 }: {
   payload: PublicPayload;
   eyebrowIndex?: string;
+  /**
+   * REVIEW_SOURCE_LOGOS_ENABLED - when true (and the detected source has an
+   * official mark), render the source's brand-logo chip at the upper-right of
+   * the rating, in place of the text wordmark. Defaults false so a flag-off
+   * render (and every existing caller) is byte-identical to today.
+   */
+  sourceLogos?: boolean;
 }) {
   void eyebrowIndex;
   const reviews = payload.reviews ?? [];
@@ -33,6 +42,10 @@ export function Reviews({
   if (reviews.length === 0 && !outlink) return null;
 
   const sourceName = outlink ? detectReviewsSource(outlink.url) : null;
+  // Flag + asset gate. `logo` is non-null only when the flag is on AND the
+  // detected source is one we hold a mark for; otherwise the card keeps today's
+  // text-wordmark behavior (graceful for unknown / unmarked sources).
+  const logo = sourceLogos ? resolveReviewSourceLogo(sourceName) : null;
   const seeAll = seeAllReviewsCopy(sourceName);
   const agentFirst = (payload.agent?.name ?? "").trim().split(/\s+/)[0] || "us";
   const hasQuotes = reviews.length > 0;
@@ -89,8 +102,25 @@ export function Reviews({
           <div className="rev-conf__rating">
             <span className="rev-conf__num">5.0</span>
             <Stars className="sm" />
+            {/* REVIEW_SOURCE_LOGOS - the source's brand mark on a light chip,
+                parked at the upper-right of the rating. Paints as a CSS
+                background so a missing asset leaves the chip empty rather than a
+                broken image, and the mark is never recolored or stretched. The
+                calm scroll-in (fade + slight scale) is keyed off the card's
+                `.reveal.in` in flagship.css, so it reuses the page motion
+                island with no extra observer. */}
+            {logo && (
+              <span
+                className="rev-source-logo"
+                data-testid="fs-reviews-source-logo"
+                data-source={sourceName ?? undefined}
+                role="img"
+                aria-label={`Reviews on ${logo.label}`}
+                style={{ backgroundImage: `url(${logo.src})` }}
+              />
+            )}
           </div>
-          {sourceName && (
+          {sourceName && !logo && (
             <div
               className="rev-logos"
               data-testid="fs-reviews-logo-slot"

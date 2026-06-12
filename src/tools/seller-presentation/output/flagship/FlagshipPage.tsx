@@ -36,7 +36,18 @@ import "./flagship.css";
  * the flagship markup adopts the same `.reveal` / `.chart` / price count-up
  * (`data-price-countup`) hooks the driver already keys on.
  */
-export function FlagshipPage({ handout }: { handout: HandoutRecord }) {
+export function FlagshipPage({
+  handout,
+  reviewSourceLogos = false,
+}: {
+  handout: HandoutRecord;
+  /**
+   * REVIEW_SOURCE_LOGOS_ENABLED - forwarded to the review card so it shows the
+   * detected source's brand-logo chip. Defaults false: a flag-off render (and
+   * the wizard live preview before its entitlement resolves) is byte-identical.
+   */
+  reviewSourceLogos?: boolean;
+}) {
   const payload = clampPublicPayload(handout.data);
   const roles = deriveConsumerRoles(payload.brandColors?.accent);
 
@@ -65,7 +76,7 @@ export function FlagshipPage({ handout }: { handout: HandoutRecord }) {
             joins "How we market" (cap 4); the guarantee moves to the Agent block.
             Flexes out entirely when nothing renderable is present. */}
         <WhyUs payload={payload} variant="seller" />
-        <Reviews payload={payload} />
+        <Reviews payload={payload} sourceLogos={reviewSourceLogos} />
         <AreaStats payload={payload} />
         {/* AgentBand now folds in the prototype's agent__foot (wordmark +
             disclaimer). Wordmark is a conditional white-label slot (F4):
