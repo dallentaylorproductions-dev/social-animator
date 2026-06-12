@@ -88,6 +88,12 @@ export async function GET(req: Request) {
       // flag SellerPresentationPage reads, so the preview matches the page.
       reviewSourceLogosEnabled:
         process.env.REVIEW_SOURCE_LOGOS_ENABLED === "true",
+      // SELLER_STATE_A — the "prepared invitation" (pre-appointment) state of the
+      // living seller page. OFF by default; when false the wizard never shows the
+      // mode toggle / appointment input, publishes carry no valuationStatus, and
+      // the consumer page + live preview render today's full presentation
+      // (byte-identical).
+      sellerStateAEnabled: process.env.SELLER_STATE_A_ENABLED === "true",
     },
   });
 }

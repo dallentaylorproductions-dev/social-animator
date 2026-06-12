@@ -7,6 +7,7 @@ import { useSPEntitlement } from "./SPEntitlementContext";
 import type { SellerPresentationDraft } from "../engine/types";
 import type { StepId } from "../hooks/useSellerPresentationState";
 import { FlagshipPage } from "../output/flagship/FlagshipPage";
+import { StateAPage } from "../output/flagship/StateAPage";
 import {
   draftPreviewPayload,
   isDraftSparse,
@@ -152,12 +153,15 @@ function useDebounced<T>(value: T, ms: number): T {
 function PreviewSurface({
   handout,
   sparse,
+  isStateA,
   currentStep,
   onClose,
   reviewSourceLogos = false,
 }: {
   handout: HandoutRecord;
   sparse: boolean;
+  /** Render the prepared-invitation (State A) template instead of the full page. */
+  isStateA: boolean;
   currentStep: StepId;
   onClose?: () => void;
   reviewSourceLogos?: boolean;
@@ -253,8 +257,13 @@ function PreviewSurface({
         >
           {/* `fs-static` forces the reveal/chart end-states (no scroll-driven
               motion island here) so the snapshot is always legible — see
-              wizard-preview.css. No FlagshipPage edit needed. */}
-          <FlagshipPage handout={handout} reviewSourceLogos={reviewSourceLogos} />
+              wizard-preview.css. No FlagshipPage edit needed. State A renders the
+              prepared-invitation template; everything else is the full page. */}
+          {isStateA ? (
+            <StateAPage handout={handout} reviewSourceLogos={reviewSourceLogos} />
+          ) : (
+            <FlagshipPage handout={handout} reviewSourceLogos={reviewSourceLogos} />
+          )}
         </div>
       </div>
     </div>
@@ -269,7 +278,8 @@ export function WizardPreview({
   currentStep: StepId;
 }) {
   const { settings: brand } = useBrandSettings();
-  const { compPhotosEnabled, reviewSourceLogosEnabled } = useSPEntitlement();
+  const { compPhotosEnabled, reviewSourceLogosEnabled, sellerStateAEnabled } =
+    useSPEntitlement();
   const debouncedDraft = useDebounced(draft, DEBOUNCE_MS);
 
   const [mounted, setMounted] = useState(false);
@@ -348,7 +358,18 @@ export function WizardPreview({
   const sparse = isDraftSparse(debouncedDraft);
   const payload = sparse
     ? samplePayload(brand)
-    : draftPreviewPayload(debouncedDraft, brand, compPhotosEnabled === true);
+    : draftPreviewPayload(
+        debouncedDraft,
+        brand,
+        compPhotosEnabled === true,
+        sellerStateAEnabled === true,
+      );
+  // The real draft resolves to State A only when the flag is on AND the payload
+  // carries an invitation status (the sparse sample is always the full page).
+  const isStateA =
+    !sparse &&
+    payload.valuationStatus !== undefined &&
+    payload.valuationStatus !== "revealed";
   const handout: HandoutRecord = {
     ...PREVIEW_RECORD_BASE,
     data: payload as unknown as Record<string, unknown>,
@@ -360,6 +381,7 @@ export function WizardPreview({
         <PreviewSurface
           handout={handout}
           sparse={sparse}
+          isStateA={isStateA}
           currentStep={currentStep}
           reviewSourceLogos={reviewSourceLogosEnabled === true}
         />
@@ -383,6 +405,7 @@ export function WizardPreview({
           <PreviewSurface
             handout={handout}
             sparse={sparse}
+            isStateA={isStateA}
             currentStep={currentStep}
             onClose={() => setOpen(false)}
             reviewSourceLogos={reviewSourceLogosEnabled === true}

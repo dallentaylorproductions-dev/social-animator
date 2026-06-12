@@ -2802,3 +2802,56 @@
 .sep-wizard .sep-savestatus[data-state="error"] {
   color: var(--sep-muted, #6b7280);
 }
+
+/* ============================================================================
+ * Seller State A — the StepProperty mode toggle + appointment picker
+ * (SELLER_STATE_A_ENABLED). Reuses B1's .field-block / .field-label / .input /
+ * .hint bases; only the segmented mode control + the appointment block are new.
+ * Flag-gated in StepProperty, so flag-off StepProperty never renders these.
+ * ==========================================================================*/
+.sep-wizard .mode-toggle {
+  display: grid;
+  grid-template-columns: 1fr 1fr;
+  gap: 10px;
+}
+@media (max-width: 480px) {
+  .sep-wizard .mode-toggle {
+    grid-template-columns: 1fr;
+  }
+}
+.sep-wizard .mode-option {
+  display: flex;
+  flex-direction: column;
+  gap: 4px;
+  text-align: left;
+  padding: 14px 16px;
+  background: var(--panel);
+  border: 1px solid var(--border-strong);
+  border-radius: 13px;
+  color: var(--text);
+  cursor: pointer;
+  transition: border-color 0.18s, box-shadow 0.18s, background 0.18s;
+}
+.sep-wizard .mode-option:hover {
+  border-color: var(--mint-line);
+}
+.sep-wizard .mode-option.is-active {
+  border-color: var(--mint-line);
+  box-shadow: 0 0 0 3px var(--mint-soft);
+  background: var(--bg);
+}
+.sep-wizard .mode-option-title {
+  font-weight: 600;
+  font-size: 15px;
+}
+.sep-wizard .mode-option-sub {
+  font-size: 13px;
+  line-height: 1.45;
+  color: var(--faint);
+}
+.sep-wizard .appt-field {
+  display: flex;
+  flex-direction: column;
+  gap: 10px;
+  margin-top: 14px;
+}

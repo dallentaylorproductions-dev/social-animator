@@ -4,6 +4,7 @@ import { publishHandout, updateHandout } from "@/lib/share-urls";
 import { loadAgentProfile } from "@/lib/entitlements/load-agent-profile";
 import { resolveEntitlements } from "@/lib/entitlements/resolver";
 import { isCompPhotosEnabled } from "@/lib/seller-presentation/street-view";
+import { isSellerStateAEnabled } from "@/lib/seller-presentation/state-a";
 import {
   clampDraft,
   describeMissingRequiredInputs,
@@ -120,7 +121,16 @@ export async function POST(req: Request) {
   // carried only a low-high RANGE (UX-2a / #43) — exactly Aaron's
   // "haven't seen the house, put your range down" case. That divergence
   // made a fully-filled range draft fail publish with no named field.
-  const draft = clampDraft(payload.draft as Parameters<typeof clampDraft>[0]);
+  const sellerStateA = isSellerStateAEnabled();
+  const rawDraft = clampDraft(payload.draft as Parameters<typeof clampDraft>[0]);
+  // SELLER_STATE_A kill switch closed by construction: when the flag is OFF we
+  // strip any State A status/appointment off the draft BEFORE gating + projecting,
+  // so an invitation-status draft can never publish a price-less "revealed" page
+  // (it would fail the price/comp gate) and no State A keys reach KV. Flag-on:
+  // the draft passes through and the invitation gate / projection apply.
+  const draft = sellerStateA
+    ? rawDraft
+    : { ...rawDraft, valuationStatus: undefined, appointmentAt: undefined };
   const missing = describeMissingRequiredInputs(draft);
   if (missing.length > 0) {
     // Name the field(s) in the server log AND the client-visible error so
@@ -184,6 +194,10 @@ export async function POST(req: Request) {
     // KV (exact current behavior). Only the pano id + coverage flag are ever
     // persisted; no Google image bytes touch the payload.
     isCompPhotosEnabled(),
+    // SELLER_STATE_A kill switch. OFF => no valuationStatus/appointmentAt keys
+    // reach KV (byte-identical). The draft was already status-stripped above
+    // when the flag is off, so this only ever emits in a State A publish.
+    sellerStateA,
   );
 
   const data = publicPayload as unknown as Record<string, unknown>;

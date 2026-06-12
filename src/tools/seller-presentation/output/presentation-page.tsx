@@ -21,6 +21,14 @@ const FlagshipPage = dynamic(() =>
   import("./flagship/FlagshipPage").then((m) => m.FlagshipPage),
 );
 
+// Seller State A — the prepared-invitation template, code-split like the
+// flagship so its module graph (state-a.css + the flagship blocks it composes)
+// never loads on a revealed page. Renders ONLY when the baked valuationStatus is
+// an invitation status; a revealed/absent status keeps the existing dispatch.
+const StateAPage = dynamic(() =>
+  import("./flagship/StateAPage").then((m) => m.StateAPage),
+);
+
 // E.1 — v1 unset-brand defaults (the cohort-safe palette). Signature = the
 // agent's brandAccent; surface/ink = layout-owned defaults, overridable.
 //
@@ -95,16 +103,27 @@ export function SellerPresentationPage({
    */
   reviewSourceLogos?: boolean;
 }) {
-  const { templateVersion } = clampPublicPayload(handout.data);
+  const { templateVersion, valuationStatus } = clampPublicPayload(handout.data);
+  const logosOn =
+    reviewSourceLogos ?? process.env.REVIEW_SOURCE_LOGOS_ENABLED === "true";
+
+  // Seller State A — the baked valuation status is the first discriminator,
+  // exactly like templateVersion. An invitation status renders the prepared
+  // invitation; `revealed` (every pre-State-A slug, coerced by the read clamp)
+  // falls through to the existing template dispatch BYTE-IDENTICALLY. The
+  // decision rides the payload (not a runtime flag re-check), so a published
+  // State A page stays correct regardless of later flag state, and a flag-off
+  // publish never wrote an invitation status in the first place.
+  if (valuationStatus !== "revealed") {
+    return <StateAPage handout={handout} reviewSourceLogos={logosOn} />;
+  }
+
   // "v1" override wins outright — render the v1 arm regardless of stored version.
   if (templateOverride !== "v1" && (templateVersion === 2 || templateOverride === "flagship")) {
     // Render the real flagship (v2) template. FlagshipPage is dynamically
     // imported so its module graph — the Newsreader @font-face and the
     // flagship stylesheet — stays in a SEPARATE chunk that never loads on a
     // v1 page, keeping v1 byte-identical.
-    const logosOn =
-      reviewSourceLogos ??
-      process.env.REVIEW_SOURCE_LOGOS_ENABLED === "true";
     return <FlagshipPage handout={handout} reviewSourceLogos={logosOn} />;
   }
   return <SellerPresentationV1 handout={handout} />;

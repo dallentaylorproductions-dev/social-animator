@@ -27,12 +27,54 @@
 
 import type { Comp } from "@/tools/seller-intelligence-report/engine/types";
 import { isPriceRangeActive } from "./price-range";
+import { clampAppointmentAt } from "./appointment";
 
 export type { Comp };
 
 export type ConfidenceLevel = "high" | "medium" | "low";
 
 export type PitchPointVisibility = "public" | "private";
+
+/**
+ * Seller State A — the valuation-status state machine (the living page at one
+ * slug evolves through these states):
+ *   - `preparing_for_walkthrough` — State A, the prepared invitation, BEFORE the
+ *     listing appointment. The home's value reads as being prepared, never a price.
+ *   - `ready_to_review` — State A still, the in-between beat once prep is done but
+ *     the agent hasn't reviewed the home in person yet. Same no-price render.
+ *   - `revealed` — State B, the full presentation AT/AFTER the appointment. This is
+ *     today's seller presentation, untouched.
+ *
+ * DEFAULT (absent on every already-published / pre-State-A draft) is `revealed`:
+ * the projector + the consumer render both treat a missing status as `revealed`,
+ * so today's behavior is byte-identical and nothing breaks. The whole machine is
+ * baked now (not a one-off State A) so the reveal transition (Slice 2) is a status
+ * flip, not a schema change.
+ */
+export type ValuationStatus =
+  | "preparing_for_walkthrough"
+  | "ready_to_review"
+  | "revealed";
+
+export const VALID_VALUATION_STATUS: readonly ValuationStatus[] = [
+  "preparing_for_walkthrough",
+  "ready_to_review",
+  "revealed",
+];
+
+/**
+ * True for the two State A statuses (the page is a prepared invitation, no price).
+ * `revealed` / undefined is the existing full presentation. The single predicate
+ * the projector, the consumer dispatch, and the publish gate all read, so they
+ * never disagree about which render a draft resolves to.
+ */
+export function isInvitationStatus(
+  status: ValuationStatus | undefined,
+): boolean {
+  return (
+    status === "preparing_for_walkthrough" || status === "ready_to_review"
+  );
+}
 
 export interface PitchPoint {
   /** Local UUID for stable list editing across reorders / deletes. */
@@ -318,6 +360,24 @@ export interface SellerPresentationDraft {
   clientId?: string;
   /** Premium theme id (A7d); empty/absent = default theme. */
   themeId?: string;
+
+  // ---- Seller State A: the valuation-status state machine ----
+  /**
+   * Which state of the living page this draft publishes. Absent ⇒ `revealed`
+   * (the existing full presentation) so every pre-State-A draft is byte-identical.
+   * New listings created via the State A flow set `preparing_for_walkthrough`.
+   * Drives the consumer render: invitation statuses render the prepared
+   * invitation (no price); `revealed` renders today's presentation untouched.
+   */
+  valuationStatus?: ValuationStatus;
+  /**
+   * Seller State A — the listing-appointment moment, a wall-clock
+   * "YYYY-MM-DDTHH:MM" from `<input type="datetime-local">` (no timezone; it is
+   * the agent's local time, the same the seller reads). Powers "prepared for
+   * [day]" copy + "Your appointment is set for…". See engine/appointment.ts for
+   * the SSR-safe formatter. Only carried into the public payload in State A.
+   */
+  appointmentAt?: string;
 }
 
 export const EMPTY_DRAFT: SellerPresentationDraft = {
@@ -499,6 +559,15 @@ export function clampDraft(
     agentCtaReassurance: clampString(raw.agentCtaReassurance),
     clientId: clampString(raw.clientId),
     themeId: clampString(raw.themeId),
+    // Seller State A — validate against the known statuses; an unknown / absent
+    // value drops to undefined (the projector + render treat that as `revealed`,
+    // byte-identical to a pre-State-A draft).
+    valuationStatus: VALID_VALUATION_STATUS.includes(
+      raw.valuationStatus as ValuationStatus,
+    )
+      ? (raw.valuationStatus as ValuationStatus)
+      : undefined,
+    appointmentAt: clampAppointmentAt(raw.appointmentAt),
   };
 }
 
@@ -531,6 +600,15 @@ export function getMissingRequiredInputs(
 ): string[] {
   const missing: string[] = [];
   if (!draft.propertyAddress?.trim()) missing.push("propertyAddress");
+  // Seller State A — the prepared invitation deliberately carries NO price and
+  // no comps yet (a real number means seeing the home first). So in an
+  // invitation status we gate ONLY on the address + the dated appointment moment
+  // (the page's whole premise), never price/comps. The full presentation
+  // (`revealed` / absent) keeps its existing price + comp gate untouched.
+  if (isInvitationStatus(draft.valuationStatus)) {
+    if (!draft.appointmentAt?.trim()) missing.push("appointmentAt");
+    return missing;
+  }
   const hasPrice =
     !!draft.recommendedPrice?.trim() ||
     isPriceRangeActive(draft.recommendedPriceLow, draft.recommendedPriceHigh);
@@ -557,6 +635,7 @@ export const REQUIRED_INPUT_LABELS: Record<string, string> = {
   recommendedPrice: "recommended price",
   comps: "at least one comp",
   "comps[0]": "Comp 1 address and sold price",
+  appointmentAt: "appointment date and time",
 };
 
 /**

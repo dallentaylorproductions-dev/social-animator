@@ -70,6 +70,10 @@ interface SPEntitlement {
    *  source brand-logo chip. `null` while loading; `false` ⇒ the live preview's
    *  review card shows today's text wordmark (byte-identical). */
   reviewSourceLogosEnabled: boolean | null;
+  /** SELLER_STATE_A feature-flag state for the "prepared invitation" pre-appointment
+   *  page state. `null` while loading; `false` ⇒ the wizard never shows the mode
+   *  toggle / appointment input and the preview renders today's full presentation. */
+  sellerStateAEnabled: boolean | null;
 }
 
 const Ctx = createContext<SPEntitlement>({
@@ -83,6 +87,7 @@ const Ctx = createContext<SPEntitlement>({
   compPhotosEnabled: null,
   sellerPagesLibraryEnabled: null,
   reviewSourceLogosEnabled: null,
+  sellerStateAEnabled: null,
 });
 
 export function useSPEntitlement(): SPEntitlement {
@@ -101,6 +106,7 @@ export function SPEntitlementProvider({ children }: { children: ReactNode }) {
     compPhotosEnabled: null,
     sellerPagesLibraryEnabled: null,
     reviewSourceLogosEnabled: null,
+    sellerStateAEnabled: null,
   });
 
   useEffect(() => {
@@ -131,6 +137,7 @@ export function SPEntitlementProvider({ children }: { children: ReactNode }) {
             !!data.features?.sellerPagesLibraryEnabled,
           reviewSourceLogosEnabled:
             !!data.features?.reviewSourceLogosEnabled,
+          sellerStateAEnabled: !!data.features?.sellerStateAEnabled,
         });
       })
       .catch(() => {

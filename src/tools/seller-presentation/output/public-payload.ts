@@ -31,9 +31,15 @@ import type {
   Review,
   ReviewsOutlink,
   SellerPresentationDraft,
+  ValuationStatus,
   VideoFraming,
 } from "../engine/types";
-import { clampVideoFraming } from "../engine/types";
+import {
+  clampVideoFraming,
+  isInvitationStatus,
+  VALID_VALUATION_STATUS,
+} from "../engine/types";
+import { clampAppointmentAt } from "../engine/appointment";
 import { PUBLISH_TEMPLATE_VERSION } from "../config/template-version";
 import { isPriceRangeActive } from "../engine/price-range";
 import {
@@ -58,6 +64,7 @@ export type {
   PresentationVideo,
   Review,
   ReviewsOutlink,
+  ValuationStatus,
   VideoFraming,
 };
 
@@ -340,6 +347,24 @@ export interface PublicPayload {
    * track record still hides the band there.
    */
   whyUsStatsSample?: boolean;
+
+  // ---- Seller State A: the valuation-status discriminator ----
+  /**
+   * Which state of the living page this slug renders, baked at publish exactly
+   * like `templateVersion`. EMITTED ONLY in a State A publish (the
+   * `sellerStateA` projector arg true AND an invitation status): a `revealed` /
+   * flag-off publish OMITS the key entirely, so an already-published or full
+   * presentation is byte-identical. The read clamp coerces an absent / unknown
+   * value back to `"revealed"`, so the consumer dispatch reads a single state.
+   */
+  valuationStatus?: ValuationStatus;
+  /**
+   * Seller State A — the listing-appointment moment ("YYYY-MM-DDTHH:MM", agent
+   * wall-clock). Carried only alongside an invitation `valuationStatus`; absent
+   * on a revealed / flag-off publish. The State A render formats it via the
+   * SSR-safe engine/appointment.ts helper.
+   */
+  appointmentAt?: string;
 }
 
 /**
@@ -800,6 +825,11 @@ export function toPublicPayload(
   // existing call site (and every flag-off publish) stays byte-identical:
   // when false, `projectComp` emits no photo/Street-View keys at all.
   compPhotos: boolean = false,
+  // SELLER_STATE_A — the valuation-status kill switch. OFF by default so every
+  // existing call site (and every flag-off publish) stays byte-identical: when
+  // false (or the draft is `revealed`/absent), NO valuationStatus/appointmentAt
+  // keys are emitted and the page is the full presentation exactly as today.
+  sellerStateA: boolean = false,
 ): PublicPayload {
   const propertyAddress = draft.propertyAddress ?? "";
   const recommendedPrice = draft.recommendedPrice ?? "";
@@ -853,6 +883,18 @@ export function toPublicPayload(
     brandWhyUs.reviewsHeadline,
   );
 
+  // SELLER_STATE_A — emit the state discriminator + appointment ONLY for a
+  // State A publish (flag on AND an invitation status). A revealed / flag-off
+  // publish spreads `{}`, so the keys are OMITTED entirely (not set to
+  // undefined) and the property block is byte-identical to a pre-State-A publish.
+  const stateAFields =
+    sellerStateA && isInvitationStatus(draft.valuationStatus)
+      ? {
+          valuationStatus: draft.valuationStatus,
+          appointmentAt: clampAppointmentAt(draft.appointmentAt),
+        }
+      : {};
+
   return {
     // F1 — stamp the publish-time template version. F1 keeps every publish on
     // v1 (PUBLISH_TEMPLATE_VERSION === 1); F3 flips the constant to start
@@ -905,6 +947,9 @@ export function toPublicPayload(
     whyUs: projectedWhyUs,
     agentTagline: projectedTagline,
     reviewsHeadline: projectedReviewsHeadline,
+
+    // Seller State A — spread last; `{}` for every revealed / flag-off publish.
+    ...stateAFields,
   };
 }
 
@@ -990,7 +1035,30 @@ export function clampPublicPayload(raw: unknown): PublicPayload {
     agentTagline: projectPublicWhyUsText(r.agentTagline),
     reviewsHeadline: projectPublicWhyUsText(r.reviewsHeadline),
     reviewsAsOf: projectPublicWhyUsText(r.reviewsAsOf),
+
+    // Seller State A — coerce the discriminator at the trust boundary. An
+    // absent / unknown / tampered value reads as `revealed` so the consumer
+    // dispatch resolves to the existing full presentation (every pre-State-A
+    // slug lands here, byte-identical). `appointmentAt` survives only as a real
+    // datetime-local moment AND only alongside an invitation status (a stray
+    // appointment on a revealed record is dropped, never rendered).
+    valuationStatus: clampValuationStatus(r.valuationStatus),
+    appointmentAt: isInvitationStatus(clampValuationStatus(r.valuationStatus))
+      ? clampAppointmentAt(r.appointmentAt)
+      : undefined,
   };
+}
+
+/**
+ * Seller State A — read-boundary clamp for the valuation-status discriminator.
+ * Only one of the three known statuses survives; anything else (absent on every
+ * pre-State-A slug, or a tampered KV value) coerces to `"revealed"` so the
+ * renderer treats "no status" as the existing full presentation.
+ */
+function clampValuationStatus(raw: unknown): ValuationStatus {
+  return VALID_VALUATION_STATUS.includes(raw as ValuationStatus)
+    ? (raw as ValuationStatus)
+    : "revealed";
 }
 
 /**
@@ -1025,6 +1093,9 @@ function emptyPayload(): PublicPayload {
     whyPrice: { publicRationale: "", comps: [] },
     pitchPublicCards: [],
     agent: {},
+    // Seller State A — an empty/garbage record renders the existing presentation
+    // (never the prepared invitation), so resolve it to `revealed`.
+    valuationStatus: "revealed",
   };
 }
 
