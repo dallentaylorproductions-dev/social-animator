@@ -117,6 +117,10 @@ export default async function SellerPresentationPreview({ searchParams }: PagePr
     // own), and `&template=v1` forces it back through the v1 renderer (the
     // inverse override).
     "full-v2",
+    // REVIEW_SOURCE_LOGOS - the full sample with a Google reviews link (the base
+    // sample is Zillow), so the suite + smoke can exercise the Google "G"
+    // treatment. Pair with `&template=flagship&reviewSourceLogos=1`.
+    "full-google",
   ] as const;
   type Variant = (typeof VARIANTS)[number];
   const variant = (VARIANTS as readonly string[]).includes(fixture ?? "")
@@ -147,7 +151,15 @@ export default async function SellerPresentationPreview({ searchParams }: PagePr
                   ? FLAGSHIP_PRIVACY_PAYLOAD
                   : variant === "full-v2"
                     ? { ...FULL_PAYLOAD, templateVersion: 2 }
-                    : FULL_PAYLOAD;
+                    : variant === "full-google"
+                      ? {
+                          ...FULL_PAYLOAD,
+                          reviewsOutlink: {
+                            label: "See all reviews on Google",
+                            url: "https://www.google.com/maps/place/?cid=12345",
+                          },
+                        }
+                      : FULL_PAYLOAD;
 
   // E.0 — optional brand-color override (drives the brand-colors e2e
   // regression spec + Dallen's browser smoke). Validated hex only; merged

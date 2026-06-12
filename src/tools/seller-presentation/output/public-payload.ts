@@ -322,6 +322,13 @@ export interface PublicPayload {
   agentTagline?: string;
   /** B0b — optional headline for the reviews block (overrides the default lead when set). */
   reviewsHeadline?: string;
+  /**
+   * Optional "as of <Mon YYYY>" stamp for the reviews aggregate rating (e.g.
+   * "Jun 2026"). Surfaced by the v2 review card for a Google source, where
+   * Google's attribution guidance requires an as-of date alongside the rating.
+   * Absent → the renderer falls back to the page's published month.
+   */
+  reviewsAsOf?: string;
 
   /**
    * PREVIEW-ONLY honest-sample marker. The wizard live preview keeps the
@@ -982,6 +989,7 @@ export function clampPublicPayload(raw: unknown): PublicPayload {
     whyUs: clampPublicWhyUs(r.whyUs),
     agentTagline: projectPublicWhyUsText(r.agentTagline),
     reviewsHeadline: projectPublicWhyUsText(r.reviewsHeadline),
+    reviewsAsOf: projectPublicWhyUsText(r.reviewsAsOf),
   };
 }
 

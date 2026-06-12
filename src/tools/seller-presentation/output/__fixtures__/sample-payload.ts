@@ -232,6 +232,10 @@ export const FULL_PAYLOAD: PublicPayload = {
     label: "See all reviews on Zillow",
     url: "https://www.zillow.com/profile/marisolreyes",
   },
+  // "as of <Mon YYYY>" stamp for the reviews aggregate (used by the v2 review
+  // card's Google attribution; harmless for this Zillow sample, which shows the
+  // text-only treatment).
+  reviewsAsOf: "Jun 2026",
   areaStats: {
     medianSale: "$648k",
     medianSaleDeltaYoy: "+6.2% vs prior year",
