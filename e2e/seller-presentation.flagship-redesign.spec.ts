@@ -192,7 +192,7 @@ test.describe("D1 — auto-icons on selling-points + how-we-market cards", () =>
   }) => {
     await page.goto(FLAGSHIP);
     const home = page.locator(".fs-page .cmp__col--you .spark").first();
-    await expect(home).toContainText("99.4");
+    await expect(home).toContainText("101.3");
     const homeColor = await read(home, "color");
     const mktColor = await read(
       page.locator(".fs-page .cmp__col--mkt .cmp__v").first(),

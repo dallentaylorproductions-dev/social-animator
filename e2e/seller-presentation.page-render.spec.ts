@@ -57,7 +57,7 @@ test.describe('Seller Presentation — A7b premium page render', () => {
 
     // Why-this-price + comps.
     await expect(page.getByTestId('sep-why-price')).toBeVisible();
-    for (let i = 0; i < 3; i++) {
+    for (let i = 0; i < 4; i++) {
       await expect(page.getByTestId(`sep-comp-${i}`)).toBeVisible();
     }
 
@@ -348,11 +348,11 @@ test.describe('Seller Presentation — A7b premium page render', () => {
     try {
       await page.goto('/seller-presentation-preview?fixture=full');
       const price = page.locator('.sep-presentation .price-panel .price');
-      await expect(price).toHaveText('$675,000');
+      await expect(price).toHaveText('$630,000');
       // The opt-in data attribute is emitted regardless (the client
       // island, when present, uses it as the entry point). The
       // numeric is the canonical integer with no formatting drift.
-      await expect(price).toHaveAttribute('data-price-final', '675000');
+      await expect(price).toHaveAttribute('data-price-final', '630000');
     } finally {
       await context.close();
     }
@@ -388,7 +388,7 @@ test.describe('Seller Presentation — A7b premium page render', () => {
     // must be the exact true number, no rounding drift, no
     // off-by-one. (The SSR shape is locked separately by the
     // JS-disabled test above; this is the post-enhancement state.)
-    await expect(price).toHaveText('$675,000');
+    await expect(price).toHaveText('$630,000');
   });
 
   test('A7c.8 — reduced-motion short-circuits the count-up; SSR price stays put', async ({
@@ -406,7 +406,7 @@ test.describe('Seller Presentation — A7b premium page render', () => {
       await page.goto('/seller-presentation-preview?fixture=full');
       const price = page.locator('.sep-presentation .price-panel .price');
       await expect(price).toBeVisible();
-      await expect(price).toHaveText('$675,000');
+      await expect(price).toHaveText('$630,000');
       // Give the page a beat to ensure the island has mounted (any
       // hypothetical deferred work would have fired by now). The
       // flag must remain unset because the reduced-motion branch
@@ -484,24 +484,21 @@ test.describe('Seller Presentation — A7b premium page render', () => {
     }
   });
 
-  test('v1.47 Lane A — comp card renders "Built [year]" when yearBuilt is set, hides cleanly when absent', async ({
+  test('v1.47 Lane A: comp card renders "Built [year]" when yearBuilt is set', async ({
     page,
   }) => {
-    // FULL fixture: comps 0 + 1 carry yearBuilt (1908, 1924); comp 2
-    // intentionally omits it so the same fixture exercises both
-    // branches. The caption rides the existing <small> subline next
-    // to sold-date / sqft — no new DOM, just an extra " · " segment.
+    // FULL fixture: all 4 North Tacoma comps carry yearBuilt (1951, 1919,
+    // 1906, 1925). The caption rides the existing <small> subline next to
+    // sold-date / sqft, adding no new DOM, just an extra " · " segment. (The
+    // graceful-hide path when yearBuilt is ABSENT is covered by the MINIMAL
+    // fixture test below.)
     await page.goto('/seller-presentation-preview?fixture=full');
     await expect(page.getByTestId('sep-why-price')).toBeVisible();
 
-    const comp0 = page.getByTestId('sep-comp-0');
-    await expect(comp0).toContainText('Built 1908');
-    const comp1 = page.getByTestId('sep-comp-1');
-    await expect(comp1).toContainText('Built 1924');
-    // Comp 2 has no yearBuilt — must NOT render "Built —" or a stray
-    // "Built" anywhere in its row.
-    const comp2 = page.getByTestId('sep-comp-2');
-    await expect(comp2).not.toContainText('Built');
+    await expect(page.getByTestId('sep-comp-0')).toContainText('Built 1951');
+    await expect(page.getByTestId('sep-comp-1')).toContainText('Built 1919');
+    await expect(page.getByTestId('sep-comp-2')).toContainText('Built 1906');
+    await expect(page.getByTestId('sep-comp-3')).toContainText('Built 1925');
   });
 
   test('v1.47 Lane A — MINIMAL fixture has no "Built …" caption on any comp', async ({

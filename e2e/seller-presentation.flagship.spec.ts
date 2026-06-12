@@ -93,14 +93,14 @@ test.describe("Flagship — per-section render (full fixture)", () => {
 });
 
 test.describe("Flagship — count digit + n-aware grammar", () => {
-  test("N (full = 3 counted comps) → plural", async ({ page }) => {
+  test("N (full = 4 counted comps) → plural", async ({ page }) => {
     await page.goto(FLAGSHIP);
-    await expect(page.getByTestId("fs-count-digit")).toHaveText("3");
+    await expect(page.getByTestId("fs-count-digit")).toHaveText("4");
     await expect(page.getByTestId("fs-count-say")).toHaveText(
       "recent sales nearby anchor this number.",
     );
     await expect(page.getByTestId("fs-price")).toContainText(
-      "Based on 3 recent sales nearby.",
+      "Based on 4 recent sales nearby.",
     );
   });
 

@@ -39,7 +39,7 @@ test.describe("Why-us — per-block render (full fixture)", () => {
     await expect(page.getByTestId("fs-whyus-pitch-2")).toBeVisible();
 
     // Performance: two comparison bars (sale-to-list, days-on-market) + two
-    // single big stats (views, homes sold).
+    // single big stats (homes sold, total reviews).
     await expect(page.getByTestId("fs-whyus-stats")).toBeVisible();
     await expect(page.getByTestId("fs-whyus-bar-0")).toBeVisible();
     await expect(page.getByTestId("fs-whyus-bar-1")).toBeVisible();
@@ -135,7 +135,7 @@ test.describe("By the numbers — agent track record framing (D1-CONSOLIDATE)", 
     // animated fill track (the one signature punch).
     const headline = page.getByTestId("fs-whyus-bar-0");
     await expect(headline).toBeVisible();
-    await expect(headline).toContainText("99.4");
+    await expect(headline).toContainText("101.3");
     await expect(headline.locator(".cmp__col--you .cmp__v")).toBeVisible();
     await expect(page.getByTestId("fs-whyus-bar-0-you")).toBeVisible(); // track
 
@@ -143,9 +143,9 @@ test.describe("By the numbers — agent track record framing (D1-CONSOLIDATE)", 
     // but every value is kept.
     const sub = page.locator(".fs-page .bynum__sub");
     await expect(sub).toBeVisible();
-    await expect(page.getByTestId("fs-whyus-bar-1")).toContainText("14"); // days on market
-    await expect(page.getByTestId("fs-whyus-bigstat-0")).toContainText("1,240"); // views
-    await expect(page.getByTestId("fs-whyus-bigstat-1")).toContainText("32"); // homes sold
+    await expect(page.getByTestId("fs-whyus-bar-1")).toContainText("8"); // days on market
+    await expect(page.getByTestId("fs-whyus-bigstat-0")).toContainText("24"); // homes sold
+    await expect(page.getByTestId("fs-whyus-bigstat-1")).toContainText("63"); // total reviews
     // The standalone stats carry NO fabricated market column.
     await expect(page.getByTestId("fs-whyus-bigstat-0")).not.toContainText(
       "Market",
