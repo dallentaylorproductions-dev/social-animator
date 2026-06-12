@@ -82,6 +82,12 @@ export async function GET(req: Request) {
       // client affordance + parity with the other SP flags.
       sellerPagesLibraryEnabled:
         process.env.SELLER_PAGES_LIBRARY_ENABLED === "true",
+      // REVIEW_SOURCE_LOGOS - the source brand-logo chip on the flagship review
+      // card. OFF by default; when false the live preview's review card renders
+      // today's text wordmark (byte-identical). Mirrors the publish-time env
+      // flag SellerPresentationPage reads, so the preview matches the page.
+      reviewSourceLogosEnabled:
+        process.env.REVIEW_SOURCE_LOGOS_ENABLED === "true",
     },
   });
 }

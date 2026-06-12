@@ -294,6 +294,18 @@
 .fs-page .rev-conf .zillow:hover {transform: translateY(-2px); }
 .fs-page .rev-conf .zillow .lead {font-family: var(--f-display); font-size: clamp(17px,2.2cqi,20px); color: var(--t-pap); }
 .fs-page .rev-conf .zillow .go {font-family: var(--f-mono); font-size: 10.5px; letter-spacing: .18em; text-transform: uppercase; color: var(--teal-500); display: flex; align-items: center; gap: 8px; }
+/* REVIEW_SOURCE_LOGOS_ENABLED - compliant source treatment. The top-right note
+   (`.rev-source-note`) is a refined text label (Zillow text-only per Zillow's
+   terms; Google's "as of <date>"), parked at the upper-right of the rating
+   (margin-left:auto), modest so it never outweighs the agent's own brand. The
+   Google "G" (`.rev-source-g`) is the official four-color mark, unmodified,
+   inline in the link row and centered to the link text (never beside the stars,
+   per Google's attribution guidance). Both do a calm scroll-in (soft fade +
+   slight rise) keyed off the confidence card's own `.reveal.in`, reusing the
+   page motion island - isolated primitives the later delight pass can extend. */
+.fs-page .rev-source-note {margin-left: auto; align-self: center; font-family: var(--f-mono); font-size: 12px; letter-spacing: .12em; text-transform: uppercase; color: var(--t-pap-soft); white-space: nowrap; opacity: 0; transform: translateY(4px); transition: opacity .4s var(--ease), transform .4s var(--ease); transition-delay: .12s; will-change: opacity, transform; }
+.fs-page .rev-source-g {display: inline-block; width: clamp(18px, 5cqi, 20px); height: auto; vertical-align: middle; margin-right: 9px; opacity: 0; transform: translateY(4px); transition: opacity .4s var(--ease), transform .4s var(--ease); transition-delay: .12s; will-change: opacity, transform; }
+.fs-page .reveal.in .rev-source-note, .fs-page .reveal.in .rev-source-g {opacity: 1; transform: none; }
 .fs-page .area {background: var(--paper); }
 .fs-page .area__stats {margin-top: clamp(28px,5cqi,48px); display: grid; gap: clamp(12px,1.6cqi,16px); }
 .fs-page .stat {background: var(--white); border: 1px solid var(--line); border-radius: var(--r-md); box-shadow: var(--lift-1); padding: clamp(20px,3cqi,28px) clamp(18px,3cqi,24px); }
@@ -398,6 +410,8 @@
 .fs-page .reveal.in { opacity: 1; transform: none; }
 @media (prefers-reduced-motion: reduce) {
   .fs-page .reveal { opacity: 1 !important; transform: none !important; transition: none !important; }
+  /* The source note + Google "G" appear instantly (no fade/rise) under reduced motion. */
+  .fs-page .rev-source-note, .fs-page .rev-source-g { opacity: 1 !important; transform: none !important; transition: none !important; }
 }
 @media print {
   .fs-page { -webkit-print-color-adjust: exact; print-color-adjust: exact; background: var(--paper); padding: 0 !important; }

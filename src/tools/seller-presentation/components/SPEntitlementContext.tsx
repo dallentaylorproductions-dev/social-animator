@@ -66,6 +66,10 @@ interface SPEntitlement {
    *  while loading; `false` ⇒ the tool lands on today's wizard (byte-identical)
    *  and the library never renders. */
   sellerPagesLibraryEnabled: boolean | null;
+  /** REVIEW_SOURCE_LOGOS feature-flag state for the flagship review card's
+   *  source brand-logo chip. `null` while loading; `false` ⇒ the live preview's
+   *  review card shows today's text wordmark (byte-identical). */
+  reviewSourceLogosEnabled: boolean | null;
 }
 
 const Ctx = createContext<SPEntitlement>({
@@ -78,6 +82,7 @@ const Ctx = createContext<SPEntitlement>({
   areaChartRentcastEnabled: null,
   compPhotosEnabled: null,
   sellerPagesLibraryEnabled: null,
+  reviewSourceLogosEnabled: null,
 });
 
 export function useSPEntitlement(): SPEntitlement {
@@ -95,6 +100,7 @@ export function SPEntitlementProvider({ children }: { children: ReactNode }) {
     areaChartRentcastEnabled: null,
     compPhotosEnabled: null,
     sellerPagesLibraryEnabled: null,
+    reviewSourceLogosEnabled: null,
   });
 
   useEffect(() => {
@@ -123,6 +129,8 @@ export function SPEntitlementProvider({ children }: { children: ReactNode }) {
           compPhotosEnabled: !!data.features?.compPhotosEnabled,
           sellerPagesLibraryEnabled:
             !!data.features?.sellerPagesLibraryEnabled,
+          reviewSourceLogosEnabled:
+            !!data.features?.reviewSourceLogosEnabled,
         });
       })
       .catch(() => {

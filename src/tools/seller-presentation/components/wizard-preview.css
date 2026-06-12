@@ -142,6 +142,8 @@
    reveal/chart to its final state (mirrors the flagship print / reduced-motion
    contract). Used by BOTH this panel and the Step 5 chart preview. */
 .fs-static .reveal,
+.fs-static .rev-source-note,
+.fs-static .rev-source-g,
 .fs-static .chart .line-stroke,
 .fs-static .chart .area-fill,
 .fs-static .chart .point {

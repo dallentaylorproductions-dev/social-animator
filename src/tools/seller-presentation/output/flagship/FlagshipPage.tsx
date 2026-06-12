@@ -36,9 +36,52 @@ import "./flagship.css";
  * the flagship markup adopts the same `.reveal` / `.chart` / price count-up
  * (`data-price-countup`) hooks the driver already keys on.
  */
-export function FlagshipPage({ handout }: { handout: HandoutRecord }) {
+/** Format an instant as "Mon YYYY" (e.g. "Jun 2026"). */
+function monthYear(d: Date): string {
+  return d.toLocaleDateString("en-US", { month: "short", year: "numeric" });
+}
+
+/**
+ * "Mon YYYY" from an ISO timestamp, or null when it is missing / unparseable /
+ * a sentinel (e.g. the live preview's 1970 placeholder record), so the caller
+ * can fall through to a real date.
+ */
+function monthYearFromIso(iso: string | undefined): string | null {
+  if (!iso) return null;
+  const d = new Date(iso);
+  if (Number.isNaN(d.getTime()) || d.getUTCFullYear() < 2005) return null;
+  return monthYear(d);
+}
+
+/** "Mon YYYY" for the current month - last-resort "as of" fallback. */
+function currentMonthYear(): string {
+  return monthYear(new Date());
+}
+
+export function FlagshipPage({
+  handout,
+  reviewSourceLogos = false,
+}: {
+  handout: HandoutRecord;
+  /**
+   * REVIEW_SOURCE_LOGOS_ENABLED - forwarded to the review card so it shows the
+   * detected source's brand-logo chip. Defaults false: a flag-off render (and
+   * the wizard live preview before its entitlement resolves) is byte-identical.
+   */
+  reviewSourceLogos?: boolean;
+}) {
   const payload = clampPublicPayload(handout.data);
   const roles = deriveConsumerRoles(payload.brandColors?.accent);
+
+  // "as of <Mon YYYY>" for the Google aggregate-rating attribution: the payload
+  // value when set, else the page's published / last-updated month, else the
+  // current month. Resolved here (the review card only receives `payload`) so
+  // both the published page and the live preview share one source of truth.
+  const reviewsAsOf =
+    payload.reviewsAsOf ??
+    monthYearFromIso(handout.updatedAt) ??
+    monthYearFromIso(handout.createdAt) ??
+    currentMonthYear();
 
   // Inline the resolved role hexes as custom properties on the flagship root
   // (the signatured element). These are the live path; no CSS color-mix
@@ -65,7 +108,11 @@ export function FlagshipPage({ handout }: { handout: HandoutRecord }) {
             joins "How we market" (cap 4); the guarantee moves to the Agent block.
             Flexes out entirely when nothing renderable is present. */}
         <WhyUs payload={payload} variant="seller" />
-        <Reviews payload={payload} />
+        <Reviews
+          payload={payload}
+          sourceLogos={reviewSourceLogos}
+          reviewsAsOf={reviewsAsOf}
+        />
         <AreaStats payload={payload} />
         {/* AgentBand now folds in the prototype's agent__foot (wordmark +
             disclaimer). Wordmark is a conditional white-label slot (F4):
