@@ -203,11 +203,32 @@
 .fs-page .comp-card__body {flex: 1; min-width: 0; padding: clamp(15px,2.4cqi,18px) clamp(16px,2.6cqi,20px); display: flex; align-items: center; justify-content: space-between; gap: 14px; }
 .fs-page .comp-card__info {min-width: 0; }
 .fs-page .comp-card__idx {font-family: var(--f-mono); font-size: 10.5px; letter-spacing: .14em; color: var(--t-mute); display: block; margin-bottom: 5px; }
-.fs-page .comp-card__addr {font-family: var(--f-display); font-size: clamp(18px,2.6cqi,22px); color: var(--t-ink); line-height: 1.1; }
+/* min-width:0 + overflow-wrap are the permanent, all-width safety net: a long
+   single-word address (e.g. "Andersonnnnnnnnnn") wraps inside its own box and can
+   never overflow under the pinned price. Fitting text is unaffected, so desktop
+   stays byte-identical. The price keeps its own reserved space (flex:none); there
+   is no absolute-overlap path. */
+.fs-page .comp-card__addr {font-family: var(--f-display); font-size: clamp(18px,2.6cqi,22px); color: var(--t-ink); line-height: 1.1; min-width: 0; overflow-wrap: break-word; }
 .fs-page .comp-card__meta {font-family: var(--f-mono); font-size: 10px; letter-spacing: .07em; color: var(--t-mute); text-transform: uppercase; margin-top: 6px; }
 .fs-page .comp-card__price {text-align: right; flex: none; }
 .fs-page .comp-card__price b {font-family: var(--f-display); font-size: clamp(18px,2.6cqi,23px); color: var(--t-ink); font-weight: 400; display: block; font-variant-numeric: lining-nums tabular-nums; }
 .fs-page .comp-card__price span {font-family: var(--f-mono); font-size: 9.5px; letter-spacing: .18em; color: var(--t-mute); text-transform: uppercase; }
+/* MOBILE COMP CARD (container < 720px): stack the card body as a single column
+   so a long single-word address can never collide with the price. Reading order
+   top-down: address (full width) -> price row -> meta. `display:contents`
+   promotes idx/addr/meta out of .comp-card__info so the price row sits BETWEEN
+   the address and the meta line WITHOUT any DOM change (the same single component
+   renders on the sample, the live preview, and the published /h page). Mutually
+   exclusive with the @container page (min-width:720px) desktop block below, so
+   desktop is left byte-identical. */
+@container page (max-width: 719.98px) {
+.fs-page .comp-card__body {flex-direction: column; align-items: stretch; gap: 0; }
+.fs-page .comp-card__info {display: contents; }
+.fs-page .comp-card__idx {order: 0; }
+.fs-page .comp-card__addr {order: 1; overflow-wrap: anywhere; }
+.fs-page .comp-card__price {order: 2; flex: none; text-align: left; display: flex; align-items: baseline; justify-content: space-between; gap: 12px; margin-top: 12px; }
+.fs-page .comp-card__meta {order: 3; margin-top: 6px; }
+}
 .fs-page .comp__src {font-family: var(--f-mono); font-size: 10.5px; letter-spacing: .18em; text-transform: uppercase; color: var(--t-mute); margin-top: 20px; }
 .fs-page .reasons {background: var(--offwhite); }
 .fs-page .rcards {margin-top: clamp(28px,5cqi,48px); display: grid; gap: 14px; }
