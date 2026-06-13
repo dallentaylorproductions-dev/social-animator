@@ -70,6 +70,9 @@ export function AppointmentBrief({
           What I have already pulled together before we meet.
         </p>
 
+        {/* GUARDRAIL: exactly three artifacts - nearby sales, neighborhood
+            activity, launch strategy. Do NOT add a fourth/fifth: more tips this
+            from a concierge brief into a dashboard. */}
         {hasNearby && (
           <div className="sa-brief__art" data-testid="fs-sa-brief-nearby">
             <div className="sa-brief__art-head">
