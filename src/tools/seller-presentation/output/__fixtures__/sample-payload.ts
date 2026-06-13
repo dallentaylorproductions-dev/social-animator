@@ -550,6 +550,8 @@ export const STATE_A_FULL_PAYLOAD: PublicPayload = {
     ...FULL_PAYLOAD.whyPrice,
     publicRationale: "",
   },
+  signatureLine:
+    "Known for quiet, thorough preparation, so the number we land on is one you can stand behind.",
   valuationStatus: "preparing_for_walkthrough",
   appointmentAt: "2026-06-20T14:00",
 };

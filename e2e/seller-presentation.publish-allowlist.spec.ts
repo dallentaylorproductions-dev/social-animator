@@ -1085,6 +1085,9 @@ test.describe('toPublicPayload — white-label wordmark flag (F4)', () => {
     'whyUs',
     'agentTagline',
     'reviewsHeadline',
+    // Seller State A — the agent's quiet signature line (same brand-snapshot
+    // provenance as the tagline; rendered only by the State A page).
+    'signatureLine',
   ]);
 
   test('whiteLabel=true → suppressWordmark:true projects onto the payload', () => {

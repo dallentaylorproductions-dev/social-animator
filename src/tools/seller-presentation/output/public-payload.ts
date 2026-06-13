@@ -165,6 +165,15 @@ export interface BrandWhyUsInput {
   whyUs?: unknown;
   agentTagline?: string;
   reviewsHeadline?: string;
+  /**
+   * Seller State A — the agent's "quiet signature" line ("Known for X, so you
+   * can Y"). Agent-constant brand copy, same provenance as `agentTagline`:
+   * set once, snapshotted from BrandSettings at publish. v1 the agent provides
+   * it directly (the AI-from-reviews derivation is a later phase). Rendered ONLY
+   * by the State A page (under the agent in the hero; may echo near the
+   * valuation / meeting); State B ignores it, so an unset value is byte-identical.
+   */
+  signatureLine?: string;
 }
 
 /**
@@ -329,6 +338,14 @@ export interface PublicPayload {
   agentTagline?: string;
   /** B0b — optional headline for the reviews block (overrides the default lead when set). */
   reviewsHeadline?: string;
+  /**
+   * Seller State A — the agent's "quiet signature" line, snapshotted from brand
+   * Settings at publish (same projection as `agentTagline`). Rendered ONLY by the
+   * State A page; absent on a revealed / flag-off publish where it was never set,
+   * so an existing publish is byte-identical. The render threads it under the
+   * agent in the hero and may echo it near the valuation / meeting.
+   */
+  signatureLine?: string;
   /**
    * Optional "as of <Mon YYYY>" stamp for the reviews aggregate rating (e.g.
    * "Jun 2026"). Surfaced by the v2 review card for a Google source, where
@@ -882,6 +899,12 @@ export function toPublicPayload(
   const projectedReviewsHeadline = projectPublicWhyUsText(
     brandWhyUs.reviewsHeadline,
   );
+  // Seller State A — project the quiet signature line exactly like the tagline:
+  // trim-or-undefined, so an unset value drops the key (byte-identical) and the
+  // State A render flexes it out.
+  const projectedSignatureLine = projectPublicWhyUsText(
+    brandWhyUs.signatureLine,
+  );
 
   // SELLER_STATE_A — emit the state discriminator + appointment ONLY for a
   // State A publish (flag on AND an invitation status). A revealed / flag-off
@@ -947,6 +970,7 @@ export function toPublicPayload(
     whyUs: projectedWhyUs,
     agentTagline: projectedTagline,
     reviewsHeadline: projectedReviewsHeadline,
+    signatureLine: projectedSignatureLine,
 
     // Seller State A — spread last; `{}` for every revealed / flag-off publish.
     ...stateAFields,
@@ -1035,6 +1059,10 @@ export function clampPublicPayload(raw: unknown): PublicPayload {
     agentTagline: projectPublicWhyUsText(r.agentTagline),
     reviewsHeadline: projectPublicWhyUsText(r.reviewsHeadline),
     reviewsAsOf: projectPublicWhyUsText(r.reviewsAsOf),
+    // Seller State A — re-clamp the quiet signature at the read boundary (same
+    // trim-or-undefined the projector used). A hand-edited record with a
+    // non-string value drops the key; only the State A render reads it.
+    signatureLine: projectPublicWhyUsText(r.signatureLine),
 
     // Seller State A — coerce the discriminator at the trust boundary. An
     // absent / unknown / tampered value reads as `revealed` so the consumer
