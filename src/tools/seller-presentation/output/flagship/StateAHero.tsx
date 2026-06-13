@@ -42,11 +42,9 @@ export function StateAHero({
   return (
     <section className="sa-hero" data-testid="fs-hero">
       <div className="sa-hero__cover" data-testid="fs-sa-hero-cover">
-        {/* The located-dossier motif: a faint street grid + a marker for the
-            home. Always present, so a cover-less hero still reads as a located
-            file rather than a blank gradient. */}
-        <div className="sa-hero__grid" aria-hidden="true" />
-        {hero && (
+        {hero ? (
+          /* A real cover photo renders cleanly, full-bleed - no grid, no
+             marker over it. */
           <div
             className="sa-hero__photo"
             aria-hidden="true"
@@ -55,14 +53,12 @@ export function StateAHero({
               backgroundImage: `url("${hero.replace(/"/g, '\\"')}")`,
             }}
           />
+        ) : (
+          /* No cover photo: a calm dossier fallback (dark editorial gradient +
+             a very faint grid texture), so the hero never reads as a blank
+             gradient. No marker in either case. */
+          <div className="sa-hero__fallback" aria-hidden="true" />
         )}
-        {/* A subtle grid + vignette sits ON TOP of the photo too, so the
-            dossier motif reads over real imagery without hiding it. */}
-        <div className="sa-hero__mapover" aria-hidden="true" />
-        <div className="sa-hero__marker" aria-hidden="true">
-          <span className="sa-hero__marker-ring" />
-          <span className="sa-hero__marker-dot" />
-        </div>
         {family && (
           <div className="sa-hero__pers" data-testid="fs-sa-hero-pers">
             Prepared privately

@@ -22,20 +22,7 @@
   overflow: hidden;
   background: var(--ink-2);
 }
-/* The located-dossier motif: a faint street grid on the dark, with a couple of
-   heavier "avenue" lines so it reads as a map, not graph paper. Always present
-   (even cover-less), so the hero never falls back to a blank gradient. */
-.fs-page.state-a .sa-hero__grid {
-  position: absolute;
-  inset: 0;
-  z-index: 0;
-  background-color: #0e1a1f;
-  background-image:
-    repeating-linear-gradient(90deg, rgba(120, 150, 150, 0.16) 0 1.5px, transparent 1.5px 132px),
-    repeating-linear-gradient(0deg, rgba(120, 150, 150, 0.16) 0 1.5px, transparent 1.5px 132px),
-    repeating-linear-gradient(90deg, rgba(120, 150, 150, 0.07) 0 1px, transparent 1px 44px),
-    repeating-linear-gradient(0deg, rgba(120, 150, 150, 0.07) 0 1px, transparent 1px 44px);
-}
+/* Cover photo: clean + full-bleed, nothing layered over it. */
 .fs-page.state-a .sa-hero__photo {
   position: absolute;
   inset: 0;
@@ -43,44 +30,18 @@
   background-size: cover;
   background-position: center;
 }
-/* A subtle grid + vignette ON TOP of the photo so the dossier motif reads over
-   real imagery without hiding it. */
-.fs-page.state-a .sa-hero__mapover {
+/* No-photo fallback: a calm dark editorial gradient with a very faint grid
+   texture, so a cover-less hero reads as a prepared dossier rather than a blank
+   gradient. Never shown when a real photo is present; no marker in either case. */
+.fs-page.state-a .sa-hero__fallback {
   position: absolute;
   inset: 0;
-  z-index: 2;
-  pointer-events: none;
-  background:
-    repeating-linear-gradient(90deg, rgba(8, 15, 18, 0.14) 0 1px, transparent 1px 88px),
-    repeating-linear-gradient(0deg, rgba(8, 15, 18, 0.14) 0 1px, transparent 1px 88px),
-    radial-gradient(130% 100% at 32% 22%, transparent 38%, rgba(8, 15, 18, 0.58) 100%);
-}
-.fs-page.state-a .sa-hero__marker {
-  position: absolute;
-  z-index: 3;
-  left: 36%;
-  top: 47%;
-  width: 0;
-  height: 0;
-  pointer-events: none;
-}
-.fs-page.state-a .sa-hero__marker-ring {
-  position: absolute;
-  width: 46px;
-  height: 46px;
-  margin: -23px 0 0 -23px;
-  border-radius: 50%;
-  border: 1.5px solid var(--mint);
-  box-shadow: 0 0 0 7px color-mix(in oklab, var(--mint) 12%, transparent);
-}
-.fs-page.state-a .sa-hero__marker-dot {
-  position: absolute;
-  width: 9px;
-  height: 9px;
-  margin: -4.5px 0 0 -4.5px;
-  border-radius: 50%;
-  background: var(--mint);
-  box-shadow: 0 0 12px var(--mint);
+  z-index: 1;
+  background-color: #0e1a1f;
+  background-image:
+    repeating-linear-gradient(90deg, rgba(120, 150, 150, 0.06) 0 1px, transparent 1px 56px),
+    repeating-linear-gradient(0deg, rgba(120, 150, 150, 0.06) 0 1px, transparent 1px 56px),
+    radial-gradient(130% 100% at 30% 18%, var(--ink-3), var(--ink) 72%);
 }
 .fs-page.state-a .sa-hero__pers {
   position: absolute;

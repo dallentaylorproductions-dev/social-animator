@@ -32,7 +32,11 @@ export function AppointmentBrief({
   /** HandoutRecord.createdAt (ISO) - the truthful, republish-stable prepared date. */
   preparedAt?: string;
 }) {
-  const comps = payload.comps;
+  // Source the comps from whyPrice.comps (NOT the top-level payload.comps): the
+  // Street View aiming data the flagship CompCard renders - pano id, heading,
+  // hasStreetView - lives ONLY on whyPrice.comps. Reading payload.comps would
+  // give addresses with no pano, so the thumbnails would never resolve.
+  const comps = payload.whyPrice.comps;
   const hasNearby = comps.length > 0;
 
   const series = (payload.areaStats?.monthlySeries ?? [])
@@ -106,6 +110,7 @@ export function AppointmentBrief({
                             aria-hidden="true"
                             loading="lazy"
                             decoding="async"
+                            data-testid={`fs-sa-brief-sale-${i}-streetview`}
                           />
                         )
                       ) : null}

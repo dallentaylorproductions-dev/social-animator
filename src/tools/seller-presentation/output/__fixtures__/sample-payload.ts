@@ -550,6 +550,13 @@ export const STATE_A_FULL_PAYLOAD: PublicPayload = {
     ...FULL_PAYLOAD.whyPrice,
     publicRationale: "",
   },
+  // Give the walkthrough video a real poster (a committed sample asset) so the
+  // hero hello + the campaign-spread "Video tour" frame render a concrete image
+  // in the preview. State-A fixture only; FULL_PAYLOAD (State B) is untouched.
+  video: {
+    ...FULL_PAYLOAD.video,
+    posterUrl: "/sample-assets/living-room.webp",
+  },
   signatureLine:
     "Known for quiet, thorough preparation, so the number we land on is one you can stand behind.",
   valuationStatus: "preparing_for_walkthrough",
