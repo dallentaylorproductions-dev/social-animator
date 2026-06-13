@@ -14,7 +14,9 @@ import {
 import type { WorkflowInstance } from "@/skills/workflow-instance";
 import {
   EMPTY_DRAFT,
+  isInvitationStatus,
   type SellerPresentationDraft,
+  type ValuationStatus,
 } from "@/tools/seller-presentation/engine/types";
 import { DEFAULT_BRAND_THEME_ID, loadBrandSettings } from "@/lib/brand";
 import { planDraftMigration } from "@/lib/seller-presentation/draft-migration";
@@ -98,6 +100,40 @@ export const STEPS = [
 ] as const;
 
 export type StepId = (typeof STEPS)[number]["id"];
+
+/**
+ * Seller State A — the LEAN invitation stepper. The prepared invitation is a
+ * short, confident flow, so it shows only the steps that stage actually needs:
+ * the home, a light address-only "nearby sales" input, the area + video, and
+ * publish. The Strategy (recommended price) and Pitch steps are Full-presentation
+ * only — the invitation deliberately carries no price, and StateAPage renders
+ * nothing from `pitchPoints`. Labels are plainer here so the agent reads the
+ * purpose of each step at a glance. The StepIds are a strict subset of `STEPS`
+ * (same ids, so testids / step bodies / scroll-sync all keep working); only the
+ * displayed set + labels change.
+ */
+export const INVITATION_STEPS = [
+  { id: "property", label: "The home" },
+  { id: "comps", label: "Nearby sales" },
+  { id: "editorial", label: "Area & video" },
+  { id: "review", label: "Review & send" },
+] as const satisfies ReadonlyArray<{ id: StepId; label: string }>;
+
+/**
+ * The steps to show for the current page type. Full presentation (revealed /
+ * absent status, or the flag off) is ALWAYS the complete six-step `STEPS` —
+ * byte-identical to today. Only an invitation status WITH the flag on collapses
+ * to the lean `INVITATION_STEPS`. The single source of truth the wizard shell's
+ * stepper, Previous/Next nav, and step-clamp all read, so they never disagree
+ * about which steps exist for a given draft.
+ */
+export function visibleSteps(
+  stateAEnabled: boolean,
+  status: ValuationStatus | undefined,
+): ReadonlyArray<{ id: StepId; label: string }> {
+  if (stateAEnabled && isInvitationStatus(status)) return INVITATION_STEPS;
+  return STEPS;
+}
 
 const SKILL_ID = "seller-presentation";
 
