@@ -3,23 +3,29 @@
 import { useEffect } from "react";
 import type { WorkflowInstance } from "@/skills/workflow-instance";
 import {
+  isInvitationStatus,
   isStepPropertyComplete,
   type SellerPresentationDraft,
 } from "@/tools/seller-presentation/engine/types";
 import {
   STEPS,
+  visibleSteps,
   useSellerPresentationState,
   type DraftSaveState,
   type StepId,
 } from "@/tools/seller-presentation/hooks/useSellerPresentationState";
 import { StepProperty } from "@/tools/seller-presentation/components/StepProperty";
 import { StepComps } from "@/tools/seller-presentation/components/StepComps";
+import { StepNearbySales } from "@/tools/seller-presentation/components/StepNearbySales";
 import { StepStrategy } from "@/tools/seller-presentation/components/StepStrategy";
 import { StepPitch } from "@/tools/seller-presentation/components/StepPitch";
 import { StepEditorial } from "@/tools/seller-presentation/components/StepEditorial";
 import { StepReview } from "@/tools/seller-presentation/components/StepReview";
 import { StepErrorBoundary } from "@/components/StepErrorBoundary";
-import { SPEntitlementProvider } from "@/tools/seller-presentation/components/SPEntitlementContext";
+import {
+  SPEntitlementProvider,
+  useSPEntitlement,
+} from "@/tools/seller-presentation/components/SPEntitlementContext";
 import { WizardPreview } from "@/tools/seller-presentation/components/WizardPreview";
 import "./sep-wizard.css";
 
@@ -61,11 +67,7 @@ function isStepValid(
   return true;
 }
 
-export function SellerPresentationWizard({
-  ownerEmail = null,
-  libraryEnabled = false,
-  serverDraftsEnabled = false,
-}: {
+export function SellerPresentationWizard(props: {
   ownerEmail?: string | null;
   libraryEnabled?: boolean;
   /**
@@ -76,6 +78,27 @@ export function SellerPresentationWizard({
    */
   serverDraftsEnabled?: boolean;
 }) {
+  // The entitlement provider now wraps the whole body (not just the inner
+  // markup) so `WizardBody` can read the SELLER_STATE_A flag and collapse the
+  // stepper to the lean invitation set. SPEntitlementProvider renders no DOM of
+  // its own, so flag-off output is byte-identical to before.
+  return (
+    <SPEntitlementProvider>
+      <WizardBody {...props} />
+    </SPEntitlementProvider>
+  );
+}
+
+function WizardBody({
+  ownerEmail = null,
+  libraryEnabled = false,
+  serverDraftsEnabled = false,
+}: {
+  ownerEmail?: string | null;
+  libraryEnabled?: boolean;
+  serverDraftsEnabled?: boolean;
+}) {
+  const { sellerStateAEnabled } = useSPEntitlement();
   const {
     instance,
     currentStep,
@@ -86,6 +109,37 @@ export function SellerPresentationWizard({
     saveState,
   } = useSellerPresentationState(ownerEmail, serverDraftsEnabled);
   const setCurrentStep = setStep;
+
+  // Seller State A — the page type drives which steps exist. Full presentation
+  // (revealed / absent, or the flag off) is always the complete six-step flow,
+  // byte-identical to today; an invitation status with the flag on collapses to
+  // the lean set. Read off the live draft so toggling the page type on Step 1
+  // re-shapes the stepper immediately.
+  const stateAOn = sellerStateAEnabled === true;
+  const status = instance?.draft.valuationStatus;
+  const invitation = stateAOn && isInvitationStatus(status);
+  const steps = visibleSteps(stateAOn, status);
+
+  // If the visible set ever stops containing the current step (e.g. the agent
+  // switches a draft parked on Strategy back to an invitation, or a persisted
+  // draft loads onto a now-hidden step), fall back to the nearest still-visible
+  // step at or before it so the body never renders a hidden step. Runs after the
+  // step list settles; a no-op whenever the current step is already visible
+  // (the overwhelming common case, including every flag-off render).
+  useEffect(() => {
+    if (!instance) return;
+    if (steps.some((s) => s.id === currentStep)) return;
+    const fullIdx = STEPS.findIndex((s) => s.id === currentStep);
+    const fallback =
+      [...steps]
+        .reverse()
+        .find((s) => STEPS.findIndex((x) => x.id === s.id) <= fullIdx) ??
+      steps[0];
+    setStep(fallback.id);
+    // `steps` identity changes whenever the page type does; that plus
+    // currentStep is the full trigger set. setStep is stable plumbing.
+    // eslint-disable-next-line react-hooks/exhaustive-deps
+  }, [steps, currentStep, instance]);
 
   // A7c.9 — reset window scroll to the top on every step transition so
   // the new step opens with its first field in view. Without this, a
@@ -113,7 +167,6 @@ export function SellerPresentationWizard({
   }
 
   return (
-    <SPEntitlementProvider>
     <div className="sep-wizard" data-testid="seller-presentation-wizard">
     <div className="sep-shell">
     <div className="sep-container">
@@ -177,6 +230,7 @@ export function SellerPresentationWizard({
       </header>
 
       <StepRail
+        steps={steps}
         currentStep={currentStep}
         instance={instance}
         onNavigate={setCurrentStep}
@@ -198,9 +252,14 @@ export function SellerPresentationWizard({
           {currentStep === "property" && (
             <StepProperty draft={instance.draft} setDraft={setDraft} />
           )}
-          {currentStep === "comps" && (
-            <StepComps draft={instance.draft} setDraft={setDraft} />
-          )}
+          {currentStep === "comps" &&
+            (invitation ? (
+              // Invitation mode — the lean, address-only nearby-sales input.
+              // The full StepComps (pricing analysis) is Stage 2 only.
+              <StepNearbySales draft={instance.draft} setDraft={setDraft} />
+            ) : (
+              <StepComps draft={instance.draft} setDraft={setDraft} />
+            ))}
           {currentStep === "strategy" && (
             <StepStrategy draft={instance.draft} setDraft={setDraft} />
           )}
@@ -229,10 +288,10 @@ export function SellerPresentationWizard({
         <button
           type="button"
           onClick={() => {
-            const idx = STEPS.findIndex((s) => s.id === currentStep);
-            if (idx > 0) setCurrentStep(STEPS[idx - 1].id);
+            const idx = steps.findIndex((s) => s.id === currentStep);
+            if (idx > 0) setCurrentStep(steps[idx - 1].id);
           }}
-          disabled={currentStep === STEPS[0].id}
+          disabled={currentStep === steps[0].id}
           className="ghostbtn lg"
           data-testid="wizard-prev"
         >
@@ -242,11 +301,11 @@ export function SellerPresentationWizard({
           type="button"
           onClick={() => {
             if (!isStepValid(currentStep, instance)) return;
-            const idx = STEPS.findIndex((s) => s.id === currentStep);
-            if (idx < STEPS.length - 1) setCurrentStep(STEPS[idx + 1].id);
+            const idx = steps.findIndex((s) => s.id === currentStep);
+            if (idx < steps.length - 1) setCurrentStep(steps[idx + 1].id);
           }}
           disabled={
-            currentStep === STEPS[STEPS.length - 1].id ||
+            currentStep === steps[steps.length - 1].id ||
             !isStepValid(currentStep, instance)
           }
           className="mintbtn lg"
@@ -255,6 +314,42 @@ export function SellerPresentationWizard({
           Next →
         </button>
       </nav>
+
+      {/* Seller State A — the A→B "evolve the same link" path. On the
+          invitation's final step, a calm affordance turns this exact draft into
+          the full presentation (Stage 2): it flips the page type to revealed
+          (revealing the Strategy + Pitch steps + the full Comps step) and lands
+          the agent on Comps to start the real pricing work. Same slug, same
+          seller link; it just grows into the complete page after the
+          walkthrough. Invitation-only, so the full presentation is unchanged. */}
+      {invitation && currentStep === "review" && (
+        <section
+          className="sep-complete-full"
+          data-testid="wizard-complete-full"
+        >
+          <div className="sep-complete-full__copy">
+            <h3 className="sep-complete-full__title">
+              Already walked the home?
+            </h3>
+            <p className="sep-complete-full__sub">
+              Turn this same invitation into the full presentation, with your
+              recommended price and the comps behind it. Your seller&apos;s link
+              stays the same. It just grows into the complete page.
+            </p>
+          </div>
+          <button
+            type="button"
+            className="mintbtn lg"
+            onClick={() => {
+              setDraft((prev) => ({ ...prev, valuationStatus: "revealed" }));
+              setCurrentStep("comps");
+            }}
+            data-testid="wizard-complete-full-btn"
+          >
+            Complete the full presentation →
+          </button>
+        </section>
+      )}
 
       {currentStep === "review" && (
         <div className="review-foot">
@@ -275,7 +370,6 @@ export function SellerPresentationWizard({
     <WizardPreview draft={instance.draft} currentStep={currentStep} />
     </div>
     </div>
-    </SPEntitlementProvider>
   );
 }
 
@@ -327,27 +421,34 @@ function SaveStatus({ state }: { state: DraftSaveState }) {
  * clicks/keys; the active step carries `aria-current="step"`.
  */
 function StepRail({
+  steps,
   currentStep,
   instance,
   onNavigate,
 }: {
+  /** The visible step set — the lean invitation subset or the full six. */
+  steps: ReadonlyArray<{ id: StepId; label: string }>;
   currentStep: StepId;
   instance: WorkflowInstance<SellerPresentationDraft> | null;
   onNavigate: (id: StepId) => void;
 }) {
-  const currentIdx = STEPS.findIndex((s) => s.id === currentStep);
+  const currentIdx = steps.findIndex((s) => s.id === currentStep);
   // Highest index reachable via Next from the start: walk forward while each
   // step is valid. Steps at or below this index are clickable.
   let reachableMax = 0;
   while (
-    reachableMax < STEPS.length - 1 &&
-    isStepValid(STEPS[reachableMax].id, instance)
+    reachableMax < steps.length - 1 &&
+    isStepValid(steps[reachableMax].id, instance)
   ) {
     reachableMax += 1;
   }
+  // Only the lean invitation set (≠ the full six) gets the modifier, so the
+  // full presentation + every flag-off render keeps the original `.rail` markup
+  // byte-for-byte.
+  const lean = steps.length !== STEPS.length;
   return (
-    <ol className="rail" aria-label="Steps">
-      {STEPS.map((step, idx) => {
+    <ol className={`rail${lean ? " rail--lean" : ""}`} aria-label="Steps">
+      {steps.map((step, idx) => {
         const state =
           idx < currentIdx ? "done" : idx === currentIdx ? "active" : "todo";
         const reachable = idx <= reachableMax;

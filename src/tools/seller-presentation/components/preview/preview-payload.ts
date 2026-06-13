@@ -29,7 +29,10 @@ import {
   toPublicPayload,
   type PublicPayload,
 } from "../../output/public-payload";
-import { FULL_PAYLOAD } from "../../output/__fixtures__/sample-payload";
+import {
+  FULL_PAYLOAD,
+  STATE_A_FULL_PAYLOAD,
+} from "../../output/__fixtures__/sample-payload";
 
 /**
  * The three publish-input objects, built from BrandSettings exactly as
@@ -104,6 +107,29 @@ export function samplePayload(brand: BrandSettings): PublicPayload {
   return {
     ...FULL_PAYLOAD,
     brandColors: accent ? { accent } : undefined,
+  } as PublicPayload;
+}
+
+/**
+ * The State A counterpart to `samplePayload`: the fully-filled prepared-
+ * invitation fixture (NO subject price anywhere) in the agent's brand color.
+ * Used when the draft is still sparse but the agent has chosen the invitation
+ * page type, so the live preview shows the dossier the seller will receive
+ * (never the full presentation with a price) from the very first moment they
+ * pick that mode. Carries the agent's chosen appointment when one is set yet,
+ * falling back to the fixture's so the appointment-driven copy still renders.
+ */
+export function sampleStateAPayload(
+  brand: BrandSettings,
+  appointmentAt?: string,
+): PublicPayload {
+  const accent = brand.brandAccent;
+  return {
+    ...STATE_A_FULL_PAYLOAD,
+    brandColors: accent ? { accent } : undefined,
+    appointmentAt: appointmentAt?.trim()
+      ? appointmentAt
+      : STATE_A_FULL_PAYLOAD.appointmentAt,
   } as PublicPayload;
 }
 

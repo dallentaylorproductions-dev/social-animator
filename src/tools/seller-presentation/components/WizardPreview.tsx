@@ -8,10 +8,12 @@ import type { SellerPresentationDraft } from "../engine/types";
 import type { StepId } from "../hooks/useSellerPresentationState";
 import { FlagshipPage } from "../output/flagship/FlagshipPage";
 import { StateAPage } from "../output/flagship/StateAPage";
+import { isInvitationStatus } from "../engine/types";
 import {
   draftPreviewPayload,
   isDraftSparse,
   samplePayload,
+  sampleStateAPayload,
 } from "./preview/preview-payload";
 import "./wizard-preview.css";
 
@@ -355,19 +357,30 @@ export function WizardPreview({
   // hydration mismatch.
   if (!mounted) return null;
 
+  // The page type the agent has selected, read off the raw draft so it holds
+  // even while the draft is still sparse (the toggle sets the status before any
+  // address is typed). Drives BOTH which sample we fall back to and which
+  // template renders, so the preview matches the chosen stage from the first
+  // click — never a full presentation (with a price) while building an invitation.
+  const invitationMode =
+    sellerStateAEnabled === true && isInvitationStatus(debouncedDraft.valuationStatus);
+
   const sparse = isDraftSparse(debouncedDraft);
   const payload = sparse
-    ? samplePayload(brand)
+    ? invitationMode
+      ? sampleStateAPayload(brand, debouncedDraft.appointmentAt)
+      : samplePayload(brand)
     : draftPreviewPayload(
         debouncedDraft,
         brand,
         compPhotosEnabled === true,
         sellerStateAEnabled === true,
       );
-  // The real draft resolves to State A only when the flag is on AND the payload
-  // carries an invitation status (the sparse sample is always the full page).
+  // State A renders whenever the resolved payload carries an invitation status —
+  // true for the State A sample (sparse + invitation mode) AND for a real
+  // invitation draft (draftPreviewPayload bakes the status when the flag is on).
   const isStateA =
-    !sparse &&
+    sellerStateAEnabled === true &&
     payload.valuationStatus !== undefined &&
     payload.valuationStatus !== "revealed";
   const handout: HandoutRecord = {

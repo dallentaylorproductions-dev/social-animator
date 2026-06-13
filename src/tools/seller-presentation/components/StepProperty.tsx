@@ -131,13 +131,20 @@ export function StepProperty({ draft, setDraft }: StepPropertyProps) {
   const street = settings.address.trim();
   const hasLocation = Boolean(settings.city || settings.state || settings.zip);
 
+  // Seller State A — in the prepared invitation the page carries no price yet,
+  // so the shared List price field is hidden (it belongs to the full
+  // presentation's Strategy step). Flag-off / full presentation is unchanged.
+  const invitation =
+    sellerStateAEnabled === true && isInvitationStatus(draft.valuationStatus);
+
   return (
     <section className="home" data-testid="step-property">
       <div className="sec-head">
         <h2 className="sec-title">The home</h2>
         <p className="sec-sub">
-          A few basics, and we&apos;ll build a polished landing page for your
-          seller.
+          {invitation
+            ? "Just the basics and your appointment. We'll turn it into a polished invitation your seller opens before you meet."
+            : "A few basics, and we'll build a polished landing page for your seller."}
         </p>
         {/* The static example anchor is retired (capstone): the live preview
             panel shows the fully-filled sample in the agent's brand color until
@@ -239,23 +246,27 @@ export function StepProperty({ draft, setDraft }: StepPropertyProps) {
           )}
         </div>
 
-        {/* ---- List price (listing-profile primitive; shared) ---- */}
-        <div className="field-block">
-          <label className="field-label" htmlFor="sp-price">
-            List price <span className="opt">your starting estimate</span>
-          </label>
-          {/* CurrencyInput brings up the iOS numeric keypad + live
-              currency formatting — same pattern as the comps Sold-price
-              field. Bound to the shared listing-profile price. */}
-          <CurrencyInput
-            className="input lg"
-            value={settings.price}
-            onChange={(v) => update({ price: v })}
-            placeholder="$685,000"
-            aria-label="list-price"
-          />
-          <p className="hint">You&apos;ll refine this on the Strategy step.</p>
-        </div>
+        {/* ---- List price (listing-profile primitive; shared) ----
+            Hidden in the prepared invitation (no price before the walkthrough);
+            shown for the full presentation exactly as before. */}
+        {!invitation && (
+          <div className="field-block">
+            <label className="field-label" htmlFor="sp-price">
+              List price <span className="opt">your starting estimate</span>
+            </label>
+            {/* CurrencyInput brings up the iOS numeric keypad + live
+                currency formatting — same pattern as the comps Sold-price
+                field. Bound to the shared listing-profile price. */}
+            <CurrencyInput
+              className="input lg"
+              value={settings.price}
+              onChange={(v) => update({ price: v })}
+              placeholder="$685,000"
+              aria-label="list-price"
+            />
+            <p className="hint">You&apos;ll refine this on the Strategy step.</p>
+          </div>
+        )}
 
         {/* ---- Cover photo (Vercel Blob via ImageUploadField) ---- */}
         <div className="field-block">

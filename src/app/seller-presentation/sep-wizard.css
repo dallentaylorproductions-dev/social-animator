@@ -2855,3 +2855,91 @@
   gap: 10px;
   margin-top: 14px;
 }
+
+/* ============================================================================
+   Seller State A — lean invitation chrome (flag-gated; only rendered when the
+   wizard is in an invitation page type, so the full presentation + every
+   flag-off render keep their original markup byte-for-byte).
+   ========================================================================== */
+
+/* The lean stepper carries exactly four steps, so size the grid to four tracks
+   (the full six-step `.rail` is untouched). */
+.sep-wizard .rail.rail--lean {
+  grid-template-columns: repeat(4, 1fr);
+}
+
+/* Nearby sales — the address-only rows. Reuses the global `.input` field; the
+   row just lays the input next to its remove control. */
+.sep-wizard .sa-nearby {
+  gap: 10px;
+}
+.sep-wizard .sa-nearby__row {
+  display: flex;
+  align-items: center;
+  gap: 8px;
+}
+.sep-wizard .sa-nearby__row .input {
+  flex: 1 1 auto;
+}
+.sep-wizard .sa-nearby__remove {
+  flex: 0 0 auto;
+  width: 34px;
+  height: 34px;
+  display: inline-flex;
+  align-items: center;
+  justify-content: center;
+  border: 1px solid var(--border);
+  border-radius: 8px;
+  background: var(--panel);
+  color: var(--faint);
+  font-size: 13px;
+  cursor: pointer;
+  -webkit-tap-highlight-color: transparent;
+}
+.sep-wizard .sa-nearby__remove:hover {
+  color: var(--text);
+  border-color: var(--border-strong);
+}
+.sep-wizard .sa-nearby__remove:focus-visible {
+  outline: 2px solid var(--mint);
+  outline-offset: 2px;
+}
+
+/* "Complete the full presentation" — the A→B evolve affordance on the
+   invitation's final step. A calm panel, not an alarm. */
+.sep-wizard .sep-complete-full {
+  margin-top: 28px;
+  padding: 22px 22px 24px;
+  border: 1px solid var(--mint-line);
+  border-radius: 14px;
+  background: var(--mint-soft);
+  display: flex;
+  flex-direction: column;
+  gap: 16px;
+}
+.sep-wizard .sep-complete-full__title {
+  margin: 0 0 6px;
+  font-size: 16px;
+  font-weight: 600;
+  color: var(--text);
+}
+.sep-wizard .sep-complete-full__sub {
+  margin: 0;
+  font-size: 13.5px;
+  line-height: 1.55;
+  color: var(--muted, #b9b5ae);
+  max-width: 56ch;
+}
+.sep-wizard .sep-complete-full .mintbtn {
+  align-self: flex-start;
+}
+@media (min-width: 720px) {
+  .sep-wizard .sep-complete-full {
+    flex-direction: row;
+    align-items: center;
+    justify-content: space-between;
+  }
+  .sep-wizard .sep-complete-full .mintbtn {
+    flex: 0 0 auto;
+  }
+}
