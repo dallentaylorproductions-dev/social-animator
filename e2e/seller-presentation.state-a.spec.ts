@@ -211,6 +211,57 @@ test.describe("State A — publish gate relaxes for the invitation, unchanged fo
   });
 });
 
+test.describe("State A — quiet signature line projection + clamp", () => {
+  // signatureLine rides the brandWhyUs snapshot (6th positional arg), exactly
+  // like agentTagline: trim-or-undefined, omitted when unset (byte-identical).
+  function projectSig(signatureLine?: string, status = "preparing_for_walkthrough") {
+    return toPublicPayload(
+      invitationDraft({
+        valuationStatus: status as SellerPresentationDraft["valuationStatus"],
+      }),
+      AGENT,
+      {},
+      {},
+      false,
+      { signatureLine },
+      false,
+      true,
+    );
+  }
+
+  test("projects from brandWhyUs.signatureLine", () => {
+    expect(projectSig("Known for X, so you can Y.").signatureLine).toBe(
+      "Known for X, so you can Y.",
+    );
+  });
+
+  test("unset signatureLine drops the key (byte-identical publish)", () => {
+    const payload = toPublicPayload(invitationDraft(), AGENT);
+    expect(payload.signatureLine).toBeUndefined();
+    expect(JSON.stringify(payload)).not.toContain('"signatureLine":');
+  });
+
+  test("whitespace-only signatureLine drops to undefined", () => {
+    expect(projectSig("   ").signatureLine).toBeUndefined();
+  });
+
+  test("read clamp coerces a non-string signatureLine to undefined", () => {
+    expect(
+      clampPublicPayload({ signatureLine: 42 }).signatureLine,
+    ).toBeUndefined();
+    expect(clampPublicPayload({ signatureLine: "Hello." }).signatureLine).toBe(
+      "Hello.",
+    );
+  });
+
+  test("brand-constant: present even on a revealed publish (State A reads it, State B ignores it)", () => {
+    const payload = projectSig("Brand line.", "revealed");
+    expect(payload.signatureLine).toBe("Brand line.");
+    // ...without flipping the State A status machine (still a revealed publish).
+    expect(payload.valuationStatus).toBeUndefined();
+  });
+});
+
 test.describe("State A — SSR-safe appointment formatter", () => {
   test("formats the named, dated moment deterministically", () => {
     const f = formatAppointment("2026-06-20T14:00");

@@ -3,34 +3,36 @@ import type { HandoutRecord } from "@/lib/share-urls";
 import { clampPublicPayload, type PublicPayload } from "../public-payload";
 import { consumerRoleVars, deriveConsumerRoles } from "../consumer-roles";
 import { PresentationPageMotion } from "../motion";
+import { detectReviewsSource } from "../presentation-page";
 import { formatAppointment } from "../../engine/appointment";
 import { newsreader } from "./fonts";
-import { Hero } from "./Hero";
-import { AgentNote } from "./AgentNote";
-import { WhyUs } from "./WhyUs";
-import { Reviews } from "./Reviews";
-import { AreaStats } from "./AreaStats";
+import { StateAHero } from "./StateAHero";
+import { AppointmentBrief } from "./AppointmentBrief";
+import { CampaignSpread } from "./CampaignSpread";
 import { AgentBand } from "./AgentBand";
 import "./flagship.css";
 import "./state-a.css";
 
 /**
- * StateAPage — the Seller State A "prepared invitation" (Slice 1).
+ * StateAPage - the Seller State A "prepared invitation" (refined).
  *
- * The BEFORE-the-appointment state of the living seller page. It proves the
- * agent has already done the market prep: the home's value reads as being
- * PREPARED, never a price, never a lock. Rendered for any payload whose baked
- * `valuationStatus` is an invitation status (preparing_for_walkthrough /
- * ready_to_review); a `revealed` payload renders the existing presentation
- * untouched (see presentation-page.tsx dispatch). Slice 2 adds the reveal
- * transition; this slice builds only the State A visual.
+ * The BEFORE-the-appointment state of the living seller page, rebuilt to feel
+ * like a private dossier a serious agent already prepared (at least as premium
+ * as the revealed State B, but quieter and materially shorter). Governing
+ * principle: show preparation as EVIDENCE ARTIFACTS, not claims. Five sections:
  *
- * Composed almost entirely from the EXISTING flagship blocks (Hero / AgentNote
- * video / AreaStats / WhyUs / Reviews / AgentBand) inside the same `.fs-page`
- * shell, plus a few State A-only blocks. Governing principle: anticipation
- * through PREPARATION, not restriction. Every block + every proof item flexes
- * out cleanly when its backing data is absent (the page reads complete with few
- * or many). No price, no lock icon, no countdown anywhere.
+ *   1. Map-dossier hero (Signature A.1) - StateAHero.
+ *   2. Appointment Brief (Signature A.2, the flagship file) - AppointmentBrief.
+ *   3. Your valuation is being prepared (quiet, paced) - local, with the woven
+ *      credibility stat + the small testimonial strip as supporting trims.
+ *   4. How I'll get your home seen (Signature B, campaign spread) - CampaignSpread.
+ *   5. What happens at our meeting (calm close) - local MeetingClose + ConfirmTime.
+ *
+ * Rendered for any payload whose baked `valuationStatus` is an invitation status
+ * (a `revealed` payload renders the existing presentation untouched, see
+ * presentation-page.tsx dispatch). NO subject price, no recommended marker, no
+ * lock, no countdown anywhere. Every block + every artifact flexes out cleanly
+ * when its backing data is absent, so the page reads complete with few or many.
  */
 export function StateAPage({
   handout,
@@ -53,44 +55,20 @@ export function StateAPage({
       data-valuation-status={payload.valuationStatus}
     >
       <div className="fs-frame">
-        {/* 1 · Prepared for [family] · [address] — reuse the hero (no price). */}
-        <Hero payload={payload} />
-        {/* 2 · Your appointment is set for [moment]. */}
-        <AppointmentBlock appt={appt} />
-        {/* 3 · A personal welcome from me — reuse the video field with State A
-            copy (the welcome must not reference "this number"). */}
-        <AgentNote
-          payload={payload}
-          testId="fs-note"
-          eyebrow={
-            <>
-              <span className="num">01</span> · A Personal Welcome
-            </>
-          }
-          heading={
-            <>
-              Hello, <em>before we meet</em>.
-            </>
-          }
-          lede="A short hello and how I am already getting ready for our walkthrough, so the time we spend together is time well used."
-        />
-        {/* 4 · What I have already reviewed — proof of preparation. */}
-        <ProofReviewed payload={payload} />
-        {/* 5 · What we will confirm during the walkthrough — honest unknowns. */}
-        <WhatWeConfirm />
-        {/* 6 · Your neighborhood right now — reuse the area snapshot with NO
-            subject price overlay. Flexes out when there is no area data. */}
-        <AreaStats payload={payload} showRecommended={false} />
-        {/* 7 · Your valuation is being prepared (no price, no lock, no countdown). */}
-        <ValuationBeingPrepared payload={payload} appt={appt} />
-        {/* 8 · Why my team is equipped to help — reuse the why-us / track-record
-            chapter (supporting, not the headline). Flexes out when empty. */}
-        <WhyUs payload={payload} variant="seller" />
-        {/* 9 · What past sellers say — reuse reviews. Flexes out when empty. */}
-        <Reviews payload={payload} sourceLogos={reviewSourceLogos} />
-        {/* 10 · One action — confirm our time + the agent's direct line. */}
-        <ConfirmTime payload={payload} appt={appt} />
-        {/* Agent identity + legal disclaimer close. CTAs are suppressed (the one
+        {/* 1 · The private map-dossier hero (address + appointment + agent). */}
+        <StateAHero payload={payload} appt={appt} />
+        {/* 2 · The Appointment Brief - the flagship evidence file. */}
+        <AppointmentBrief payload={payload} preparedAt={handout.createdAt} />
+        {/* 3 · Your valuation is being prepared (quiet, paced) + the woven
+            credibility stat. NO price, no lock, no countdown. */}
+        <ValuationPrepared payload={payload} appt={appt} />
+        {/* Social proof, collapsed to a small strip (not the full band). */}
+        <TestimonialStrip payload={payload} sourceLogos={reviewSourceLogos} />
+        {/* 4 · How I'll get your home seen - the campaign spread (Signature B). */}
+        <CampaignSpread payload={payload} />
+        {/* 5 · What happens at our meeting - the calm close + the one action. */}
+        <MeetingClose payload={payload} appt={appt} />
+        {/* Agent identity + legal disclaimer close. CTAs suppressed (the one
             decided action is ConfirmTime above); the guarantee stays held. */}
         <AgentBand
           payload={payload}
@@ -106,159 +84,13 @@ export function StateAPage({
 type Appt = ReturnType<typeof formatAppointment>;
 
 /**
- * 2 · The named, dated appointment moment. The page's whole premise, so it is
- * required in an invitation publish — but flex out defensively if it is somehow
- * absent rather than render a blank "set for".
- */
-function AppointmentBlock({ appt }: { appt: Appt }) {
-  if (!appt) return null;
-  return (
-    <section className="section z-paper sa-appt" data-testid="fs-sa-appointment">
-      <div className="reveal">
-        <div className="eyebrow">
-          Your Appointment <span className="rule" aria-hidden="true" />
-        </div>
-        <h2 className="head">
-          We meet <em>{appt.weekday}</em>.
-        </h2>
-      </div>
-      <p className="sa-appt__when reveal" data-testid="fs-sa-appointment-when">
-        Your appointment is set for {appt.full}.
-      </p>
-    </section>
-  );
-}
-
-/**
- * 4 · "What I have already reviewed" — proof of preparation. Renders a check
- * item ONLY when its backing data is truthfully present on the page (the
- * honesty rule: no hollow checkmarks). The whole block flexes out when nothing
- * is backed yet.
- */
-function ProofReviewed({ payload }: { payload: PublicPayload }) {
-  const hasComps = payload.comps.length > 0;
-  const hasArea = !!payload.areaStats;
-  const hasMarketing =
-    (payload.whyUs?.marketingApproach?.length ?? 0) > 0 ||
-    (payload.whyUs?.differentiators?.length ?? 0) > 0;
-  const hasTrackRecord = (payload.whyUs?.performanceStats?.length ?? 0) > 0;
-  const hasReviews = (payload.reviews?.length ?? 0) > 0;
-
-  const items: Array<{ key: string; label: string; sub: string }> = [];
-  if (hasComps || hasArea) {
-    items.push({
-      key: "nearby-sales",
-      label: "Recent nearby sales",
-      sub: "Pulled the homes that recently sold around you.",
-    });
-  }
-  if (hasArea) {
-    items.push({
-      key: "neighborhood",
-      label: "Neighborhood context",
-      sub: "Looked at how your area is moving right now.",
-    });
-  }
-  if (hasMarketing) {
-    items.push({
-      key: "marketing",
-      label: "A marketing plan for your home",
-      sub: "Mapped out how I would bring buyers to your door.",
-    });
-  }
-  if (hasTrackRecord) {
-    items.push({
-      key: "track-record",
-      label: "My track record",
-      sub: "Gathered the numbers from my recent listings.",
-    });
-  }
-  if (hasReviews) {
-    items.push({
-      key: "reviews",
-      label: "What past sellers say",
-      sub: "Lined up references from families I have worked with.",
-    });
-  }
-
-  if (items.length === 0) return null;
-
-  return (
-    <section
-      className="section z-offwhite sa-proof"
-      data-testid="fs-sa-proof"
-    >
-      <div className="reveal">
-        <div className="eyebrow">
-          Already Underway <span className="rule" aria-hidden="true" />
-        </div>
-        <h2 className="head">
-          What I have <em>already reviewed</em>.
-        </h2>
-      </div>
-      <ul className="sa-proof__list">
-        {items.map((it) => (
-          <li
-            className="sa-proof__item reveal"
-            key={it.key}
-            data-testid={`fs-sa-proof-${it.key}`}
-          >
-            <span className="sa-proof__check" aria-hidden="true">
-              <CheckMark />
-            </span>
-            <span className="sa-proof__copy">
-              <span className="sa-proof__label">{it.label}</span>
-              <span className="sa-proof__sub">{it.sub}</span>
-            </span>
-          </li>
-        ))}
-      </ul>
-    </section>
-  );
-}
-
-/**
- * 5 · "What we will confirm during the walkthrough" — an honest short list of
- * what genuinely needs eyes on the home. Being upfront about what cannot be
- * known yet is itself the proof. No data dependency: the same honest list for
- * every home, so it always renders.
- */
-function WhatWeConfirm() {
-  const items = [
-    "The condition, room by room",
-    "Updates and improvements you have made",
-    "How the layout actually lives",
-    "Finishes and the little details photos miss",
-    "Your timeline and what matters most to you",
-  ];
-  return (
-    <section className="section z-paper sa-confirm" data-testid="fs-sa-confirm">
-      <div className="reveal">
-        <div className="eyebrow">
-          At The Walkthrough <span className="rule" aria-hidden="true" />
-        </div>
-        <h2 className="head">
-          What we will <em>confirm together</em>.
-        </h2>
-      </div>
-      <ul className="sa-confirm__list reveal">
-        {items.map((it, i) => (
-          <li className="sa-confirm__item" key={i}>
-            {it}
-          </li>
-        ))}
-      </ul>
-    </section>
-  );
-}
-
-/**
- * 7 · "Your valuation is being prepared." The honest value moment: no price, no
+ * 3 · "Your valuation is being prepared." The honest value moment: no price, no
  * lock, no countdown. Names the appointment day, explains why a real number
- * needs the home seen first, and (only when nearby sold data exists) gives the
- * neighborhood range as context. Small "Prepared estimate" label.
+ * needs the home seen first, gives the neighborhood range as context beneath the
+ * pending-walkthrough pill, and weaves ONE credibility figure (sale-to-list from
+ * the track record) as quiet money-proof. Each supporting line flexes out.
  */
-function ValuationBeingPrepared({
+function ValuationPrepared({
   payload,
   appt,
 }: {
@@ -267,6 +99,7 @@ function ValuationBeingPrepared({
 }) {
   const dayLabel = appt ? `${appt.weekday}, ${appt.date}` : null;
   const range = nearbySoldRange(payload);
+  const proof = credibilityStat(payload);
 
   return (
     <section className="section z-ink sa-val" data-testid="fs-sa-valuation">
@@ -280,34 +113,150 @@ function ValuationBeingPrepared({
         </h2>
       </div>
       <p className="sa-val__body reveal" data-testid="fs-sa-valuation-body">
-        A real number means seeing your home first. I will review the condition,
-        updates, layout, and recent sales, then show you the range I would
-        recommend and why.
-        {range && (
-          <>
-            {" "}
-            Nearby homes recently sold between {range.low} and {range.high}.
-          </>
-        )}
+        Before I recommend a range, I&apos;ll walk the home with you and confirm
+        the details buyers respond to. I don&apos;t guess with your money.
       </p>
-      <div className="sa-val__label reveal" data-testid="fs-sa-valuation-label">
-        Prepared estimate · pending walkthrough
+      <div className="sa-val__status reveal">
+        <div className="sa-val__label" data-testid="fs-sa-valuation-label">
+          Prepared estimate · pending walkthrough
+        </div>
+        {range && (
+          <p className="sa-val__context" data-testid="fs-sa-valuation-context">
+            Homes near you recently sold between {range.low} and {range.high}.
+          </p>
+        )}
+      </div>
+      {proof && (
+        <p className="sa-val__proof reveal" data-testid="fs-sa-valuation-proof">
+          <span className="sa-val__proof-v">{proof.value}</span>
+          <span className="sa-val__proof-k">{proof.label}</span>
+        </p>
+      )}
+    </section>
+  );
+}
+
+/**
+ * Supporting trim - social proof collapsed to a SMALL strip: one quote +
+ * ★★★★★ + the compliant source mark (e.g. "on Zillow®"). NOT the full reviews
+ * band. Flexes out entirely when there is no review to show.
+ */
+function TestimonialStrip({
+  payload,
+  sourceLogos,
+}: {
+  payload: PublicPayload;
+  sourceLogos: boolean;
+}) {
+  const review = payload.reviews?.[0];
+  if (!review?.body?.trim()) return null;
+
+  const source = payload.reviewsOutlink
+    ? detectReviewsSource(payload.reviewsOutlink.url)
+    : null;
+  // Match the flagship Reviews compliance: Zillow is a text-only mark.
+  const sourceNote =
+    sourceLogos && source === "Zillow"
+      ? "on Zillow®"
+      : source
+        ? `on ${source}`
+        : null;
+
+  const attribution = [
+    review.attributionStreet ? `Sold on ${review.attributionStreet}` : null,
+    review.attributionName,
+  ]
+    .filter(Boolean)
+    .join(" · ");
+
+  return (
+    <section
+      className="section z-offwhite sa-quote"
+      data-testid="fs-sa-testimonial"
+    >
+      <div className="sa-quote__inner reveal">
+        <span className="stars" aria-label="Five out of five stars" role="img">
+          ★★★★★
+        </span>
+        <p className="sa-quote__q">
+          <span className="mark" aria-hidden="true">
+            &ldquo;
+          </span>
+          {review.body}
+          <span className="mark" aria-hidden="true">
+            &rdquo;
+          </span>
+        </p>
+        <div className="sa-quote__attr">
+          {attribution || review.attributionName}
+          {sourceNote && (
+            <span className="sa-quote__src" data-testid="fs-sa-testimonial-src">
+              {" "}
+              {sourceNote}
+            </span>
+          )}
+        </div>
       </div>
     </section>
   );
 }
 
 /**
- * 10 · One action — "Confirm our time" + the agent's direct line. Not a form,
- * not a hard ask. Flexes out entirely when the agent has no reachable contact.
+ * 5 · What happens at our meeting - a calm close. Three FIXED meeting steps in
+ * the flagship stepper treatment (reusing the .flow/.fstep DNA), the advocacy
+ * "what I'll be looking for" line, then the one decided action (ConfirmTime).
  */
-function ConfirmTime({
-  payload,
-  appt,
-}: {
-  payload: PublicPayload;
-  appt: Appt;
-}) {
+function MeetingClose({ payload, appt }: { payload: PublicPayload; appt: Appt }) {
+  const steps = [
+    {
+      step: "Walk the home together",
+      detail: "We see what buyers will see and plan around it.",
+    },
+    {
+      step: "Show you the range, and the sales behind it",
+      detail: "The number I would recommend, grounded in what is selling nearby.",
+    },
+    {
+      step: "Map the launch plan",
+      detail: "How we bring buyers to your door in the first week.",
+    },
+  ];
+
+  return (
+    <>
+      <section className="section work z-mist sa-meet" data-testid="fs-sa-meeting">
+        <div className="reveal">
+          <div className="eyebrow">
+            At Our Meeting <span className="rule" aria-hidden="true" />
+          </div>
+          <h2 className="head">
+            What happens when we <em>walk it together</em>.
+          </h2>
+        </div>
+        <div className="flow" data-count={steps.length}>
+          {steps.map((s, i) => (
+            <div className="fstep reveal" key={i} data-testid={`fs-sa-step-${i}`}>
+              <div className="fstep__badge">{i + 1}</div>
+              <div className="fstep__title">{s.step}</div>
+              <p className="fstep__body">{s.detail}</p>
+            </div>
+          ))}
+        </div>
+        <p className="sa-meet__advocacy reveal" data-testid="fs-sa-advocacy">
+          As we walk, I&apos;ll be looking for the details buyers remember: the
+          updates, the light, the way it lives.
+        </p>
+      </section>
+      <ConfirmTime payload={payload} appt={appt} />
+    </>
+  );
+}
+
+/**
+ * One action - "Confirm our time" + the agent's direct line. Not a form, not a
+ * hard ask. Flexes out entirely when the agent has no reachable contact.
+ */
+function ConfirmTime({ payload, appt }: { payload: PublicPayload; appt: Appt }) {
   const a = payload.agent;
   const email = a.email?.trim();
   const phone = a.phone?.trim();
@@ -358,30 +307,34 @@ function ConfirmTime({
   );
 }
 
-function CheckMark() {
-  return (
-    <svg
-      viewBox="0 0 24 24"
-      width="14"
-      height="14"
-      fill="none"
-      stroke="currentColor"
-      strokeWidth="2.4"
-      strokeLinecap="round"
-      strokeLinejoin="round"
-      aria-hidden="true"
-    >
-      <path d="M20 6L9 17l-5-5" />
-    </svg>
+/**
+ * Derive ONE credibility figure from the agent track record - the sale-to-list
+ * (a percentage stat) as quiet money-proof near the valuation. Returns null when
+ * no such stat is backed, so the proof line flexes out. NOT the subject home's
+ * price: this is the agent's record across PAST listings.
+ */
+function credibilityStat(
+  payload: PublicPayload,
+): { value: string; label: string } | null {
+  const stats = payload.whyUs?.performanceStats ?? [];
+  const pct = stats.find((s) =>
+    /%/.test((s.yourValue ?? "") + (s.unit ?? "")),
   );
+  const stat = pct ?? stats[0];
+  if (!stat?.yourValue?.trim()) return null;
+  return {
+    value: stat.yourValue,
+    label: stat.label?.trim()
+      ? `${stat.label} across my recent listings`
+      : "across my recent listings",
+  };
 }
 
 /**
  * Derive the nearby-sold price RANGE (lowest and highest comp sold price) as
  * neighborhood context for the valuation block. This is NOT the subject home's
- * price — it is what OTHER homes nearby sold for, exactly the sentence the
- * locked design prescribes. Returns null when fewer than one parseable comp
- * price exists, so the sentence flexes out.
+ * price - it is what OTHER homes nearby sold for. Returns null when no parseable
+ * comp price exists, so the sentence flexes out.
  */
 function nearbySoldRange(
   payload: PublicPayload,
