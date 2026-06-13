@@ -1,13 +1,16 @@
 "use client";
 
-import { useEffect, useState } from "react";
+import { useEffect, useRef, useState } from "react";
 import { useListingProfile } from "@/lib/listing-profile";
 import { CurrencyInput } from "@/components/inputs/CurrencyInput";
 import { NumberInput } from "@/components/inputs/NumberInput";
 import { ImageUploadField } from "@/components/ImageUploadField";
 import { isInvitationStatus, type SellerPresentationDraft } from "../engine/types";
+import type { Comp } from "@/tools/seller-intelligence-report/engine/types";
 import { formatAppointment } from "../engine/appointment";
 import { useSPEntitlement } from "./SPEntitlementContext";
+import { resolveCompCoverage } from "@/lib/seller-presentation/street-view";
+import { normalizeAddressKey } from "@/lib/seller-presentation/rentcast-autofill";
 
 /**
  * Seller Presentation Step 1 — Property + personalization.
@@ -56,7 +59,7 @@ interface StepPropertyProps {
 
 export function StepProperty({ draft, setDraft }: StepPropertyProps) {
   const { settings, update, hydrated } = useListingProfile();
-  const { sellerStateAEnabled } = useSPEntitlement();
+  const { sellerStateAEnabled, compPhotosEnabled } = useSPEntitlement();
 
   // Mirror the shared Property primitive → draft so the shell's
   // gating reads from a single source. Effect deps intentionally
@@ -100,6 +103,21 @@ export function StepProperty({ draft, setDraft }: StepPropertyProps) {
     settings.heroPhoto,
   ]);
 
+  // SP-AUTOFILL (Phase 2) - "type the address once" build state. A ref to the
+  // latest draft so the async RentCast resolve below applies its writes against
+  // the CURRENT draft (not the stale closure from when blur fired); a ref to the
+  // last address we already pulled so a re-blur of the same address never
+  // re-bills RentCast; and a calm status for the loading microcopy.
+  const draftRef = useRef(draft);
+  useEffect(() => {
+    draftRef.current = draft;
+  }, [draft]);
+  const pulledAddrRef = useRef<string>("");
+  const [autofillStatus, setAutofillStatus] = useState<
+    "idle" | "pulling" | "done" | "error"
+  >("idle");
+  const [autofillCompCount, setAutofillCompCount] = useState(0);
+
   /**
    * Update city/state and maintain the legacy `cityState` string in
    * sync so OH Prep / Listing Flyer / SIR (which still read the
@@ -137,6 +155,128 @@ export function StepProperty({ draft, setDraft }: StepPropertyProps) {
   const invitation =
     sellerStateAEnabled === true && isInvitationStatus(draft.valuationStatus);
 
+  /**
+   * SP-AUTOFILL - the centerpiece: on address BLUR (invitation mode only) pull
+   * the subject property details + nearby recent sales for the address, so the
+   * agent types the address once and the invitation builds itself. Fires only
+   * when there's a street AND a locale signal (ZIP or city), and only ONCE per
+   * address (pulledAddrRef guard) so it never re-bills RentCast on a re-blur.
+   * Everything degrades cleanly: a non-ok response just lands the "fill by hand"
+   * microcopy; nothing here ever blocks the agent.
+   */
+  const runAutofill = async () => {
+    if (!invitation) return;
+    const streetVal = settings.address?.trim() ?? "";
+    const cityVal = settings.city?.trim() ?? "";
+    const stateVal = settings.state?.trim() ?? "";
+    const zipVal = settings.zip?.trim() ?? "";
+    if (!streetVal) return;
+    // Need a locale signal so RentCast can resolve the address (a bare street is
+    // ambiguous). Either a 5-digit ZIP or a city is enough.
+    if (!/\d{5}/.test(zipVal) && !cityVal) return;
+
+    const full = [streetVal, cityVal, [stateVal, zipVal].filter(Boolean).join(" ")]
+      .filter((s) => s.length > 0)
+      .join(", ");
+    const norm = normalizeAddressKey(full);
+    if (!norm || norm === pulledAddrRef.current) return;
+    pulledAddrRef.current = norm;
+    setAutofillStatus("pulling");
+
+    let data:
+      | {
+          ok: true;
+          property?: Partial<
+            Record<"bedrooms" | "baths" | "sqft" | "yearBuilt", string>
+          >;
+          comps?: Comp[];
+        }
+      | { ok: false }
+      | undefined;
+    try {
+      const res = await fetch("/api/seller-presentation/autofill", {
+        method: "POST",
+        headers: { "content-type": "application/json" },
+        body: JSON.stringify({ address: full }),
+      });
+      data = (await res.json()) as typeof data;
+    } catch {
+      setAutofillStatus("error");
+      return;
+    }
+    if (!data || data.ok !== true) {
+      setAutofillStatus("error");
+      return;
+    }
+
+    // 1) Property details -> the optional subject* fields, ONLY where the agent
+    //    has left the field empty (never clobber a value they typed).
+    const cur = draftRef.current;
+    const p = data.property ?? {};
+    const patch: Partial<SellerPresentationDraft> = {};
+    if (p.bedrooms && !cur.subjectBedrooms) patch.subjectBedrooms = p.bedrooms;
+    if (p.baths && !cur.subjectBaths) patch.subjectBaths = p.baths;
+    if (p.sqft && !cur.subjectSqft) patch.subjectSqft = p.sqft;
+    if (p.yearBuilt && !cur.subjectYearBuilt)
+      patch.subjectYearBuilt = p.yearBuilt;
+
+    // 2) Nearby sales -> draft.comps, ONLY when the agent has no MANUAL comps
+    //    (so a curated list is never clobbered). The auto-pulled comps carry
+    //    source "imported"; a manual add carries another source.
+    const pulledComps: Comp[] = Array.isArray(data.comps) ? data.comps : [];
+    const hasManual = cur.comps.some((c) => c.source !== "imported");
+    const seedComps = !hasManual && pulledComps.length > 0;
+    const nextComps = seedComps ? pulledComps : cur.comps;
+
+    // The committed draft after autofill. We merge Street View into THIS object
+    // (not a re-read of draftRef, which may not have flushed yet) so the second
+    // setDraft can never clobber the property patch we just applied.
+    const baseDraft: SellerPresentationDraft = {
+      ...cur,
+      ...patch,
+      comps: nextComps,
+    };
+    setDraft(baseDraft);
+    setAutofillCompCount(pulledComps.length);
+    setAutofillStatus("done");
+
+    // 3) Resolve Street View coverage for the seeded comps client-side so the
+    //    thumbnails land in the live preview. Compliance: hits only the FREE
+    //    Google metadata endpoint + persists ONLY the pano id + aiming data
+    //    (never image bytes), exactly like the full comps step. Gated on
+    //    COMP_PHOTOS; a comp already resolved or carrying a manual photo is
+    //    skipped, so this never loops or re-bills.
+    if (compPhotosEnabled === true && seedComps) {
+      const results = await Promise.all(
+        pulledComps.map(async (c) => ({
+          address: c.address,
+          cov: await resolveCompCoverage(c.address),
+        })),
+      );
+      setDraft({
+        ...baseDraft,
+        comps: baseDraft.comps.map((c) => {
+          if (c.photoUrl || c.hasStreetView !== undefined || !c.address?.trim())
+            return c;
+          const hit = results.find((r) => r.address === c.address);
+          if (!hit) return c;
+          return {
+            ...c,
+            streetViewPanoId: hit.cov.panoId,
+            hasStreetView: hit.cov.hasStreetView,
+            streetViewHeading: hit.cov.heading,
+            houseLat: hit.cov.houseLat,
+            houseLng: hit.cov.houseLng,
+          };
+        }),
+      });
+    }
+  };
+
+  const handleAddressBlur = () => {
+    void runAutofill();
+  };
+
   return (
     <section className="home" data-testid="step-property">
       <div className="sec-head">
@@ -168,6 +308,7 @@ export function StepProperty({ draft, setDraft }: StepPropertyProps) {
             className="input lg"
             value={settings.address}
             onChange={(e) => update({ address: e.target.value })}
+            onBlur={invitation ? handleAddressBlur : undefined}
             placeholder="1234 Test Drive NE"
             data-testid="step-property-address"
           />
@@ -184,6 +325,7 @@ export function StepProperty({ draft, setDraft }: StepPropertyProps) {
                 className="input sm"
                 value={settings.city ?? ""}
                 onChange={(e) => updateCityState({ city: e.target.value })}
+                onBlur={invitation ? handleAddressBlur : undefined}
                 placeholder="Tacoma"
                 data-testid="step-property-city"
               />
@@ -216,6 +358,7 @@ export function StepProperty({ draft, setDraft }: StepPropertyProps) {
                     zip: e.target.value.replace(/[^0-9-]/g, "").slice(0, 10),
                   })
                 }
+                onBlur={invitation ? handleAddressBlur : undefined}
                 placeholder="98402"
                 data-testid="step-property-zip"
               />
@@ -242,6 +385,36 @@ export function StepProperty({ draft, setDraft }: StepPropertyProps) {
             <p className="hint">
               Enter an address to save. A property id is assigned
               automatically.
+            </p>
+          )}
+
+          {/* SP-AUTOFILL - calm status while the address builds the invitation.
+              Honest copy only (the truthful-copy gate forbids over-claims): it
+              names what is happening plainly, with no hype. Invitation mode
+              only, so the full presentation + flag-off are untouched. */}
+          {invitation && autofillStatus === "pulling" && (
+            <p className="hint" data-testid="step-property-autofill-status">
+              <span className="dot-live" /> Looking up the property and recent
+              sales nearby…
+            </p>
+          )}
+          {invitation && autofillStatus === "done" && autofillCompCount > 0 && (
+            <p className="hint" data-testid="step-property-autofill-status">
+              Found {autofillCompCount} recent{" "}
+              {autofillCompCount === 1 ? "sale" : "sales"} nearby and filled in
+              the property details below. Review them on the next steps.
+            </p>
+          )}
+          {invitation && autofillStatus === "done" && autofillCompCount === 0 && (
+            <p className="hint" data-testid="step-property-autofill-status">
+              Filled in what was available for this address. Add nearby sales by
+              hand on the next step.
+            </p>
+          )}
+          {invitation && autofillStatus === "error" && (
+            <p className="hint" data-testid="step-property-autofill-status">
+              Could not look up this address automatically. You can fill in the
+              details by hand.
             </p>
           )}
         </div>

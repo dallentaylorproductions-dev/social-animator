@@ -423,7 +423,26 @@ function projectBrandColors(
  * private by default — only an edit to this function (and the
  * corresponding spec assertion) opens the gate.
  */
-function projectComp(comp: Comp, compPhotos: boolean): PublicComp {
+function projectComp(
+  comp: Comp,
+  compPhotos: boolean,
+  // SP-AUTOFILL (Phase 2): a prepared-invitation comp is "street name + thumb"
+  // only. When true, NO price/date/size leaves the boundary (soldPrice is forced
+  // to "" and soldDate/sqft/yearBuilt are omitted), so the State A page can never
+  // surface a comp price. Defaults to false so every revealed / flag-off publish
+  // is byte-identical to today.
+  invitation: boolean = false,
+): PublicComp {
+  if (invitation) {
+    return {
+      address: comp.address,
+      soldPrice: "",
+      // Photo fields (Street View pano + aiming) still pass through under the
+      // COMP_PHOTOS flag so the brief renders the thumbnail; only price/analysis
+      // is withheld for State A.
+      ...(compPhotos ? projectCompPhotoFields(comp) : {}),
+    };
+  }
   return {
     address: comp.address,
     soldPrice: comp.soldPrice,
@@ -864,14 +883,29 @@ export function toPublicPayload(
     : {};
   const priceRationale = draft.priceRationale;
 
+  // SELLER_STATE_A: is this a prepared-invitation publish? Computed up front so
+  // the comp projection can strip prices (below) AND the state discriminator can
+  // be emitted (further down) from the same condition.
+  const invitationPublish =
+    sellerStateA && isInvitationStatus(draft.valuationStatus);
+
   // Phase B2 — set-aside comps (counted === false) stay on the prep
   // draft for the agent's reference but never reach the seller page.
   // Default-to-counted: undefined/true comps are included. Filter
   // BEFORE projection so the `counted` authoring flag never even
   // reaches projectComp (which emits the allowlisted public shape).
+  //
+  // SP-AUTOFILL (Phase 2): in a prepared invitation the comps are nearby recent
+  // sales the agent reviewed, NOT a pricing analysis. The brief shows the Street
+  // View thumb + street name only, no price (a real number means seeing the home
+  // first). The full price/date/size ride the PRIVATE server draft (to seed
+  // Stage 2's pricing later) but are stripped here so no comp price can reach the
+  // State A page, including the `nearbySoldRange` neighborhood-context line,
+  // which reads `payload.comps[].soldPrice`. A revealed / flag-off publish is
+  // byte-identical (invitationPublish false means the full comp projection).
   const publicComps = draft.comps
     .filter((c) => c.counted !== false)
-    .map((c) => projectComp(c, compPhotos));
+    .map((c) => projectComp(c, compPhotos, invitationPublish));
   const publicCards = draft.pitchPoints
     .filter((p) => p.visibility === "public")
     .map(projectPitchCard)
@@ -957,7 +991,17 @@ export function toPublicPayload(
     pitchPublicCards: publicCards,
     reviews: projectedReviews && projectedReviews.length ? projectedReviews : undefined,
     reviewsOutlink: projectedOutlink,
-    areaStats: projectAreaStats(draft.areaStats, draft.comps),
+    // SP-AUTOFILL (Phase 2): in a prepared invitation the area snapshot is
+    // sourced from the agent's RentCast/manual area trend (draft.areaStats),
+    // never from the nearby-sales comps, so no comp-derived dollar figure (e.g.
+    // a derived medianSale) can reach the State A page. Today's invitation comps
+    // carry no price, so deriving from [] is byte-identical to today; it only
+    // forecloses the NEW price path the auto-pulled comps would otherwise open.
+    // Revealed / flag-off is unchanged (full comps drive the derivation as before).
+    areaStats: projectAreaStats(
+      draft.areaStats,
+      invitationPublish ? [] : draft.comps,
+    ),
     agent,
 
     // E.0 — brand colors validated + projected field-by-field. Undefined

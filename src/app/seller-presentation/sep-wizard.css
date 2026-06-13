@@ -2905,6 +2905,58 @@
   outline-offset: 2px;
 }
 
+/* SP-AUTOFILL (Phase 2) - the nearby-sales REVIEW list. Each auto-pulled (or
+   manually added) sale is a compact card: a Street View thumbnail + the street
+   name + a remove control. No price (the prepared invitation carries none). */
+.sep-wizard .sa-review {
+  display: flex;
+  flex-direction: column;
+  gap: 10px;
+  margin-bottom: 14px;
+}
+.sep-wizard .sa-review__card {
+  display: flex;
+  align-items: center;
+  gap: 12px;
+  padding: 8px;
+  border: 1px solid var(--border);
+  border-radius: 10px;
+  background: var(--panel);
+}
+.sep-wizard .sa-review__thumb {
+  flex: 0 0 auto;
+  width: 72px;
+  height: 54px;
+  border-radius: 7px;
+  overflow: hidden;
+  background: var(--panel-2, rgba(255, 255, 255, 0.04));
+}
+.sep-wizard .sa-review__thumb img {
+  width: 100%;
+  height: 100%;
+  object-fit: cover;
+  display: block;
+}
+.sep-wizard .sa-review__thumb-empty {
+  display: block;
+  width: 100%;
+  height: 100%;
+  background: linear-gradient(
+    135deg,
+    rgba(255, 255, 255, 0.05),
+    rgba(255, 255, 255, 0.02)
+  );
+}
+.sep-wizard .sa-review__addr {
+  flex: 1 1 auto;
+  min-width: 0;
+  font-size: 14px;
+  color: var(--text);
+  overflow: hidden;
+  text-overflow: ellipsis;
+  white-space: nowrap;
+}
+
 /* "Complete the full presentation" — the A→B evolve affordance on the
    invitation's final step. A calm panel, not an alarm. */
 .sep-wizard .sep-complete-full {
