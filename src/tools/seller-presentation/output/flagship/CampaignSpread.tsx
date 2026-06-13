@@ -73,7 +73,7 @@ export function CampaignSpread({ payload }: { payload: PublicPayload }) {
           <span className="rule" aria-hidden="true" />
         </div>
         <h2 className="head">
-          Produced, and <em>put in front of buyers</em>.
+          Produced beautifully. <em>Put in front of buyers</em>.
         </h2>
       </div>
 

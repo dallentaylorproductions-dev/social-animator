@@ -59,11 +59,14 @@ export function StateAPage({
         <StateAHero payload={payload} appt={appt} />
         {/* 2 · The Appointment Brief - the flagship evidence file. */}
         <AppointmentBrief payload={payload} preparedAt={handout.createdAt} />
-        {/* 3 · Your valuation is being prepared (quiet, paced) + the woven
-            credibility stat. NO price, no lock, no countdown. */}
+        {/* 3 · Your valuation is being prepared (quiet, paced). NO price, no
+            lock, no countdown, and NO stat - the value moment stays purely about
+            "your number is being prepared". */}
         <ValuationPrepared payload={payload} appt={appt} />
-        {/* Social proof, collapsed to a small strip (not the full band). */}
-        <TestimonialStrip payload={payload} sourceLogos={reviewSourceLogos} />
+        {/* Trust band: the one compact testimonial strip paired with the agent's
+            track-record stat (relocated out of the valuation block), so all
+            trust-proof lives in one small band. */}
+        <TrustStrip payload={payload} sourceLogos={reviewSourceLogos} />
         {/* 4 · How I'll get your home seen - the campaign spread (Signature B). */}
         <CampaignSpread payload={payload} />
         {/* 5 · What happens at our meeting - the calm close + the one action. */}
@@ -85,10 +88,11 @@ type Appt = ReturnType<typeof formatAppointment>;
 
 /**
  * 3 · "Your valuation is being prepared." The honest value moment: no price, no
- * lock, no countdown. Names the appointment day, explains why a real number
- * needs the home seen first, gives the neighborhood range as context beneath the
- * pending-walkthrough pill, and weaves ONE credibility figure (sale-to-list from
- * the track record) as quiet money-proof. Each supporting line flexes out.
+ * lock, no countdown, and no stat. Names the appointment day, explains why a real
+ * number needs the home seen first, and gives the neighborhood range as context
+ * beneath the pending-walkthrough pill. The credibility figure deliberately lives
+ * in the trust band below (not here), so this block can never read like part of
+ * the home's valuation or a guarantee. Each supporting line flexes out.
  */
 function ValuationPrepared({
   payload,
@@ -99,7 +103,6 @@ function ValuationPrepared({
 }) {
   const dayLabel = appt ? `${appt.weekday}, ${appt.date}` : null;
   const range = nearbySoldRange(payload);
-  const proof = credibilityStat(payload);
 
   return (
     <section className="section z-ink sa-val" data-testid="fs-sa-valuation">
@@ -126,22 +129,19 @@ function ValuationPrepared({
           </p>
         )}
       </div>
-      {proof && (
-        <p className="sa-val__proof reveal" data-testid="fs-sa-valuation-proof">
-          <span className="sa-val__proof-v">{proof.value}</span>
-          <span className="sa-val__proof-k">{proof.label}</span>
-        </p>
-      )}
     </section>
   );
 }
 
 /**
- * Supporting trim - social proof collapsed to a SMALL strip: one quote +
- * ★★★★★ + the compliant source mark (e.g. "on Zillow®"). NOT the full reviews
- * band. Flexes out entirely when there is no review to show.
+ * The trust band - ALL of State A's social proof collapsed into one small strip:
+ * a single short quote (★★★★★ + the compliant source mark, e.g. "on Zillow®")
+ * paired with the agent's track-record stat (the sale-to-list credibility figure
+ * relocated out of the valuation block). One quote is enough; this is a compact
+ * band, not a full reviews section. Each half flexes out independently, and the
+ * whole band flexes out when neither a review nor a stat is backed.
  */
-function TestimonialStrip({
+function TrustStrip({
   payload,
   sourceLogos,
 }: {
@@ -149,7 +149,9 @@ function TestimonialStrip({
   sourceLogos: boolean;
 }) {
   const review = payload.reviews?.[0];
-  if (!review?.body?.trim()) return null;
+  const hasQuote = !!review?.body?.trim();
+  const proof = credibilityStat(payload);
+  if (!hasQuote && !proof) return null;
 
   const source = payload.reviewsOutlink
     ? detectReviewsSource(payload.reviewsOutlink.url)
@@ -162,12 +164,16 @@ function TestimonialStrip({
         ? `on ${source}`
         : null;
 
-  const attribution = [
-    review.attributionStreet ? `Sold on ${review.attributionStreet}` : null,
-    review.attributionName,
-  ]
-    .filter(Boolean)
-    .join(" · ");
+  const attribution = hasQuote
+    ? [
+        review!.attributionStreet
+          ? `Sold on ${review!.attributionStreet}`
+          : null,
+        review!.attributionName,
+      ]
+        .filter(Boolean)
+        .join(" · ")
+    : "";
 
   return (
     <section
@@ -175,27 +181,44 @@ function TestimonialStrip({
       data-testid="fs-sa-testimonial"
     >
       <div className="sa-quote__inner reveal">
-        <span className="stars" aria-label="Five out of five stars" role="img">
-          ★★★★★
-        </span>
-        <p className="sa-quote__q">
-          <span className="mark" aria-hidden="true">
-            &ldquo;
-          </span>
-          {review.body}
-          <span className="mark" aria-hidden="true">
-            &rdquo;
-          </span>
-        </p>
-        <div className="sa-quote__attr">
-          {attribution || review.attributionName}
-          {sourceNote && (
-            <span className="sa-quote__src" data-testid="fs-sa-testimonial-src">
-              {" "}
-              {sourceNote}
+        {hasQuote && (
+          <div className="sa-quote__main">
+            <span
+              className="stars"
+              aria-label="Five out of five stars"
+              role="img"
+            >
+              ★★★★★
             </span>
-          )}
-        </div>
+            <p className="sa-quote__q">
+              <span className="mark" aria-hidden="true">
+                &ldquo;
+              </span>
+              {review!.body}
+              <span className="mark" aria-hidden="true">
+                &rdquo;
+              </span>
+            </p>
+            <div className="sa-quote__attr">
+              {attribution || review!.attributionName}
+              {sourceNote && (
+                <span
+                  className="sa-quote__src"
+                  data-testid="fs-sa-testimonial-src"
+                >
+                  {" "}
+                  {sourceNote}
+                </span>
+              )}
+            </div>
+          </div>
+        )}
+        {proof && (
+          <div className="sa-quote__cred" data-testid="fs-sa-credibility">
+            <span className="sa-quote__cred-v">{proof.value}</span>
+            <span className="sa-quote__cred-k">{proof.label}</span>
+          </div>
+        )}
       </div>
     </section>
   );
@@ -309,9 +332,11 @@ function ConfirmTime({ payload, appt }: { payload: PublicPayload; appt: Appt }) 
 
 /**
  * Derive ONE credibility figure from the agent track record - the sale-to-list
- * (a percentage stat) as quiet money-proof near the valuation. Returns null when
- * no such stat is backed, so the proof line flexes out. NOT the subject home's
- * price: this is the agent's record across PAST listings.
+ * (a percentage stat) as quiet money-proof in the trust band. Returns null when
+ * no such stat is backed, so the figure flexes out. NOT the subject home's
+ * price: the label frames it crisply as the agent's record across PAST listings
+ * ("[Agent]'s average sale-to-list across recent listings"), so it can never be
+ * mistaken for this home's valuation or a guarantee.
  */
 function credibilityStat(
   payload: PublicPayload,
@@ -322,12 +347,25 @@ function credibilityStat(
   );
   const stat = pct ?? stats[0];
   if (!stat?.yourValue?.trim()) return null;
-  return {
-    value: stat.yourValue,
-    label: stat.label?.trim()
-      ? `${stat.label} across my recent listings`
-      : "across my recent listings",
-  };
+  const metric = stat.label?.trim();
+  const first = payload.agent.name?.trim().split(/\s+/)[0];
+  // "Marisol's average sale-to-list across recent listings." First-name
+  // possessive + the metric lowercased so it reads as one natural phrase.
+  const phrase = metric
+    ? `${lowerFirst(metric)} across recent listings`
+    : "track record across recent listings";
+  const label = first ? `${first}'s ${phrase}` : capitalize(phrase);
+  return { value: stat.yourValue, label };
+}
+
+/** "Average sale-to-list" -> "average sale-to-list" (only the first letter). */
+function lowerFirst(s: string): string {
+  return s ? s[0].toLowerCase() + s.slice(1) : s;
+}
+
+/** "average …" -> "Average …" (only the first letter), for the no-name fallback. */
+function capitalize(s: string): string {
+  return s ? s[0].toUpperCase() + s.slice(1) : s;
 }
 
 /**

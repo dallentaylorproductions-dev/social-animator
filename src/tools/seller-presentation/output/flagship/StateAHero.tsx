@@ -28,6 +28,14 @@ export function StateAHero({
   appt: FormattedAppointment | null;
 }) {
   const { property, preparedFor } = payload;
+  // The hero cover is the agent's OWN material only: the uploaded/selected
+  // listing photo on `property.heroPhotoUrl` (sourced from the agent's listing
+  // profile, never a scrape). We deliberately do NOT import the Street View
+  // helpers here - auto-pulling a Street View of the SUBJECT home into the hero
+  // would read as surveillance before the agent has even walked the property.
+  // With no agent photo we fall to the calm dossier treatment below (gradient +
+  // faint grid), never the subject's address imagery. (The Appointment Brief's
+  // mini cards do use Street View, but of OTHER sold comps, which is fine.)
   const hero = property.heroPhotoUrl;
   const family = preparedFor?.trim();
   const addr = property.address || "Your home";
