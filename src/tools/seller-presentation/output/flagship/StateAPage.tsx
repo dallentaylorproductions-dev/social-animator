@@ -7,6 +7,7 @@ import { detectReviewsSource } from "../presentation-page";
 import { formatAppointment } from "../../engine/appointment";
 import { newsreader } from "./fonts";
 import { StateAHero } from "./StateAHero";
+import { StateAHello } from "./StateAHello";
 import { AppointmentBrief } from "./AppointmentBrief";
 import { CampaignSpread } from "./CampaignSpread";
 import { AgentBand } from "./AgentBand";
@@ -58,6 +59,9 @@ export function StateAPage({
       <div className="fs-frame">
         {/* 1 · The private map-dossier hero (address + appointment + agent). */}
         <StateAHero payload={payload} appt={appt} />
+        {/* 1b · The agent's hello video, its own centered moment below the hero
+            (relocated out of the hero so it no longer over-sizes the cover). */}
+        <StateAHello payload={payload} />
         {/* 2 · The Appointment Brief - the flagship evidence file. */}
         <AppointmentBrief payload={payload} preparedAt={handout.createdAt} />
         {/* 3 · Your valuation is being prepared (quiet, paced). NO price, no

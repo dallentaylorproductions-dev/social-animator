@@ -109,15 +109,16 @@ test.describe("State A - inline video uses the proven inlay fitment (cover + age
     ).toBe("cover");
   });
 
-  test("source: the hero video is object-fit: cover and carries the agent's focal/zoom framing", () => {
+  test("source: the hello video is object-fit: cover and carries the agent's focal/zoom framing", () => {
     const src = readFileSync(
       resolve(
         process.cwd(),
-        "src/tools/seller-presentation/output/flagship/StateAHero.tsx",
+        // The player now lives in its own section (StateAHello) below the hero.
+        "src/tools/seller-presentation/output/flagship/StateAHello.tsx",
       ),
       "utf8",
     );
-    // The inline style block on the hero <video> must mirror the revealed-page
+    // The inline style block on the hello <video> must mirror the revealed-page
     // inlay: cover + the agent's framing (object-position from focalX/Y, a
     // transform: scale() zoom), never the #77 forced contain workaround.
     expect(src).toMatch(/objectFit:\s*"cover"/);
@@ -232,44 +233,106 @@ test.describe("State A — hero video fullscreen letterbox (A7d.12 shape)", () =
   });
 });
 
-test.describe("State A - hero hello box is horizontally centered on phones", () => {
-  // A real-iPhone-width viewport: wide enough that the band content exceeds the
-  // 340px box, so a flush-left box would leave a visible right-hand gap (the bug).
-  // The narrower in-wizard preview masked it; here we prove the published render
-  // centers the box.
-  test.use({ viewport: { width: 430, height: 900 } });
+// The hello video now lives in its own centered section (StateAHello) below the
+// hero. It must center within that section's content box on BOTH desktop and
+// mobile (the box is a max-width: 340px block; a flush-left box would leave a
+// visible gap). Measured against the section's content area, with free space
+// asserted so "centered" is distinguishable from "flush-left".
+async function measureHelloCentering(page: import("@playwright/test").Page) {
+  return page.getByTestId("fs-sa-hero-video").evaluate((el) => {
+    const box = el.getBoundingClientRect();
+    // .sa-hello is the section; its inner content box (minus padding) is the
+    // centering reference.
+    const section = el.closest(".sa-hello") as HTMLElement;
+    const cs = getComputedStyle(section);
+    const sRect = section.getBoundingClientRect();
+    const padL = parseFloat(cs.paddingLeft) || 0;
+    const padR = parseFloat(cs.paddingRight) || 0;
+    const contentLeft = sRect.left + padL;
+    const contentWidth = sRect.width - padL - padR;
+    return {
+      boxCenter: box.left + box.width / 2,
+      colCenter: contentLeft + contentWidth / 2,
+      boxWidth: box.width,
+      colWidth: contentWidth,
+    };
+  });
+}
 
-  test("the hero video box is centered within its column (not offset left)", async ({
+test.describe("State A - hello video box is horizontally centered (desktop + mobile)", () => {
+  for (const vp of [
+    { name: "mobile", width: 430, height: 900 },
+    { name: "desktop", width: 1280, height: 1000 },
+  ]) {
+    test(`the relocated video box is centered in its section (${vp.name})`, async ({
+      page,
+    }) => {
+      await page.setViewportSize({ width: vp.width, height: vp.height });
+      await page.goto(STATE_A);
+      await expect(page.getByTestId("fs-sa-hello")).toBeVisible();
+
+      const { boxCenter, colCenter, boxWidth, colWidth } =
+        await measureHelloCentering(page);
+
+      // Meaningful only if there is free space beside the 340px box.
+      expect(
+        colWidth - boxWidth,
+        "expected free space beside the 340px box at this width",
+      ).toBeGreaterThan(8);
+      // Centered: the box's center sits on the section content center.
+      expect(Math.abs(boxCenter - colCenter)).toBeLessThanOrEqual(1.5);
+    });
+  }
+});
+
+test.describe("State A - compact hero (photo right-sized, mobile not full-screen)", () => {
+  test("desktop: the cover height is driven by the recognition band (decoupled from the video)", async ({
     page,
   }) => {
+    await page.setViewportSize({ width: 1280, height: 1000 });
     await page.goto(STATE_A);
-    const video = page.getByTestId("fs-sa-hero-video");
-    await expect(video).toBeVisible();
+    const cover = page.getByTestId("fs-sa-hero-cover");
+    await expect(cover).toBeVisible();
 
-    const { boxCenter, colCenter, boxWidth, colWidth } = await video.evaluate(
-      (el) => {
-        const box = el.getBoundingClientRect();
-        // .sa-hero__agent is the box's block container (no horizontal padding),
-        // so its content area is the centering reference.
-        const col = (el.closest(".sa-hero__agent") as HTMLElement) ?? el.parentElement!;
-        const colRect = col.getBoundingClientRect();
-        return {
-          boxCenter: box.left + box.width / 2,
-          colCenter: colRect.left + colRect.width / 2,
-          boxWidth: box.width,
-          colWidth: colRect.width,
-        };
-      },
-    );
-
-    // The test must be meaningful: there has to be free space (box narrower than
-    // the column) for "centered" to differ from "flush-left".
+    const { coverH, bandH } = await page.evaluate(() => {
+      const c = document
+        .querySelector(".fs-page.state-a .sa-hero__cover")!
+        .getBoundingClientRect();
+      const b = document
+        .querySelector(".fs-page.state-a .sa-hero__band")!
+        .getBoundingClientRect();
+      return { coverH: c.height, bandH: b.height };
+    });
+    // With the video pulled out, the cover height tracks the COMPACT recognition
+    // band (equal-height columns, no dead space) - it is no longer inflated by the
+    // tall video column. The two columns are the same height (full-bleed photo).
     expect(
-      colWidth - boxWidth,
-      "expected free space beside the 340px box at this width",
-    ).toBeGreaterThan(8);
-    // Centered: the box's center sits on the column's center (sub-pixel tolerance).
-    expect(Math.abs(boxCenter - colCenter)).toBeLessThanOrEqual(1.5);
+      Math.abs(coverH - bandH),
+      "cover and recognition band must be equal-height (no dead space)",
+    ).toBeLessThanOrEqual(2);
+    // And it is well below the old video-coupled height (the hero hello box alone
+    // added ~445px to that column before it was relocated).
+    expect(
+      coverH,
+      "cover must not be forced to the old oversized (video-coupled) height",
+    ).toBeLessThan(950);
+  });
+
+  test("mobile: the hero band is a compact, intentional height (not full-screen)", async ({
+    page,
+  }) => {
+    const vp = { width: 390, height: 844 };
+    await page.setViewportSize(vp);
+    await page.goto(STATE_A);
+    const hero = page.getByTestId("fs-hero");
+    await expect(hero).toBeVisible();
+
+    const h = await hero.evaluate((el) => el.getBoundingClientRect().height);
+    // The mobile hero must leave room for the hello section to begin on the first
+    // screen - it should not eat the whole viewport.
+    expect(h, "the mobile hero should not fill the whole first screen").toBeLessThan(
+      vp.height * 0.92,
+    );
   });
 });
 

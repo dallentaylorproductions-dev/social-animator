@@ -1,15 +1,6 @@
 import type { PublicPayload } from "../public-payload";
 import type { FormattedAppointment } from "../../engine/appointment";
-import {
-  effectivePosterUrl,
-  effectiveFraming,
-  withFirstFrameHint,
-} from "../../engine/types";
-import {
-  HERO_VIDEO_ARIA,
-  defaultWelcomeLine,
-  heroVideoLabel,
-} from "./state-a-copy";
+import { HERO_VIDEO_CUE, defaultWelcomeLine } from "./state-a-copy";
 
 /**
  * Seller State A · Signature A.1 - the private map-dossier hero.
@@ -22,10 +13,11 @@ import {
  * over a subtle CSS street-grid + a located home marker (the dossier motif);
  * with no image the grid + dark editorial gradient carry it (never a blank
  * gradient or clip-art roofline). Agent presence is a calm guide: headshot /
- * initials + name + an editable warm welcome line + the quiet signature line +
- * the agent's personal-message video folded in under an evergreen label ("A quick
- * hello from [Agent]", no duration assumed). Every optional piece flexes out; the
- * welcome / valuation / signature lines fall to strong defaults when unedited.
+ * initials + name + an editable warm welcome line + the quiet signature line + a
+ * short pointer to the hello video, which now lives in its OWN section directly
+ * below the hero (StateAHello) so it no longer inflates the recognition column and
+ * over-sizes the cover photo. Every optional piece flexes out; the welcome /
+ * valuation / signature lines fall to strong defaults when unedited.
  */
 export function StateAHero({
   payload,
@@ -105,8 +97,8 @@ export function StateAHero({
 
 /**
  * The calm guide: the agent's headshot / initials, name, an editable warm welcome
- * line (strong default when unedited), the quiet signature line, and the
- * personal-message video folded in as a short hello. Each piece flexes out
+ * line (strong default when unedited), the quiet signature line, and a short
+ * pointer to the hello video in the section just below. Each piece flexes out
  * independently - an agent with only a name still reads complete.
  */
 function HeroAgent({ payload }: { payload: PublicPayload }) {
@@ -165,60 +157,11 @@ function HeroAgent({ payload }: { payload: PublicPayload }) {
           {signature}
         </p>
       )}
-      {hasVideo && <HeroVideo payload={payload} />}
-    </div>
-  );
-}
-
-/**
- * The hero hello. Modeled on the proven revealed-page AgentNote inlay: it reuses
- * the EXACT poster-precedence + first-frame helpers (effectivePosterUrl /
- * withFirstFrameHint) so State A and the revealed page never drift on iOS
- * first-frame painting, AND the SAME tested fitment - `object-fit: cover` filling
- * the 4/5 frame, with the agent's inlay framing driving the crop: `object-position`
- * pans to their focal point (focalX/Y) and `transform: scale` zooms in
- * (effectiveFraming). So the agent's own framing control crops the hero, exactly
- * as it does the revealed-page inlay (the #77 forced `contain` workaround is gone).
- * When the seller takes the native fullscreen control that SAME <video> element
- * goes fullscreen, where the `:fullscreen` rule in state-a.css RESETS all three to
- * contain / center / none so the full uploaded frame shows letterboxed on a black
- * mat - framing is inlay-only, never a fullscreen blowout.
- */
-function HeroVideo({ payload }: { payload: PublicPayload }) {
-  const v = payload.video!;
-  const poster = effectivePosterUrl(v);
-  const framing = effectiveFraming(v);
-  // Evergreen, accurate label: names the agent's personal message with no
-  // duration assumed (the message can run 60 to 90 seconds) and never calls it a
-  // tour. One consistent label across the page.
-  const label = heroVideoLabel(payload.agent.name);
-
-  return (
-    <div
-      className="sa-hero__video reveal"
-      data-testid="fs-sa-hero-video"
-      {...(poster ? {} : { "data-no-poster": "true" })}
-    >
-      <video
-        className="sa-hero__video-player"
-        src={poster ? v.videoUrl : withFirstFrameHint(v.videoUrl)}
-        {...(poster ? { poster } : {})}
-        controls
-        playsInline
-        preload="metadata"
-        aria-label={v.title ?? HERO_VIDEO_ARIA}
-        style={{
-          // Same fitment as the revealed-page inlay: cover the frame and let the
-          // agent's framing drive the crop. The :fullscreen rule (state-a.css)
-          // resets all three to contain/center/none for the native fullscreen view.
-          objectFit: "cover",
-          objectPosition: `${framing.focalX}% ${framing.focalY}%`,
-          transform: `scale(${framing.zoom})`,
-        }}
-      />
-      <span className="sa-hero__video-cap" aria-hidden="true">
-        {label}
-      </span>
+      {hasVideo && (
+        <p className="sa-hero__hellocue" data-testid="fs-sa-hero-hellocue">
+          {HERO_VIDEO_CUE}
+        </p>
+      )}
     </div>
   );
 }

@@ -31,7 +31,7 @@ test.describe("State A — the prepared dossier renders (rich fixture)", () => {
     await expect(page.getByTestId("seller-presentation-public")).toHaveCount(0);
   });
 
-  test("1 · map-dossier hero — address, appointment chip, agent, signature, video", async ({
+  test("1 · map-dossier hero — address, appointment chip, agent, signature, hello cue", async ({
     page,
   }) => {
     await page.goto(STATE_A);
@@ -43,7 +43,7 @@ test.describe("State A — the prepared dossier renders (rich fixture)", () => {
     const chip = page.getByTestId("fs-sa-hero-appt");
     await expect(chip).toContainText("June 20");
     await expect(chip).toContainText("2:00 PM");
-    // Agent presence + the quiet signature line + the folded-in hello.
+    // Agent presence + the quiet signature line + a short pointer to the hello.
     await expect(page.getByTestId("fs-sa-hero-agent")).toContainText(
       "Marisol Reyes",
     );
@@ -55,12 +55,32 @@ test.describe("State A — the prepared dossier renders (rich fixture)", () => {
     await expect(page.getByTestId("fs-sa-hero-welcome")).toContainText(
       "I put this together",
     );
-    const video = page.getByTestId("fs-sa-hero-video");
-    await expect(video).toBeVisible();
-    // The hero hello label is evergreen + names the agent, never assuming a
-    // duration ("15-second") or calling the personal message a tour.
-    await expect(video).toContainText("A quick hello from Marisol");
-    await expect(video).not.toContainText("15-second");
+    // The hello video now lives in its OWN section below the hero; the hero only
+    // carries a short pointer to it (the cue), never the player itself.
+    await expect(page.getByTestId("fs-sa-hero-hellocue")).toContainText(
+      "A quick word, just below",
+    );
+    await expect(
+      page.getByTestId("fs-hero").getByTestId("fs-sa-hero-video"),
+      "the video must NOT live inside the hero anymore",
+    ).toHaveCount(0);
+  });
+
+  test("1b · hello video is its own centered section below the hero (relocated)", async ({
+    page,
+  }) => {
+    await page.goto(STATE_A);
+    const hello = page.getByTestId("fs-sa-hello");
+    await expect(hello).toBeVisible();
+    // Titled with the evergreen label (names the agent, no duration, not a tour).
+    await expect(hello).toContainText("A quick hello from Marisol");
+    await expect(hello).not.toContainText("15-second");
+    // The relocated player renders inside this section.
+    await expect(hello.getByTestId("fs-sa-hero-video")).toBeVisible();
+    await expect(
+      hello.locator(".sa-hero__video-player"),
+      "the same player element travels into the new section",
+    ).toHaveCount(1);
   });
 
   test("1b · hero cover is the agent's OWN photo — never the subject's Street View", async ({

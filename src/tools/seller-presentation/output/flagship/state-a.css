@@ -211,8 +211,31 @@
   max-width: 42ch;
   text-wrap: pretty;
 }
+/* Quiet pointer to the hello video in the section just below the hero. A small
+   directional line, never a button - the video has its own titled moment. */
+.fs-page.state-a .sa-hero__hellocue {
+  margin: 16px 0 0;
+  display: inline-flex;
+  align-items: center;
+  gap: 8px;
+  font-family: var(--f-mono);
+  font-size: 10.5px;
+  letter-spacing: 0.16em;
+  text-transform: uppercase;
+  color: var(--t-pap-mute);
+}
+.fs-page.state-a .sa-hero__hellocue::before {
+  content: "";
+  width: 5px;
+  height: 5px;
+  border-radius: 50%;
+  background: var(--mint);
+  flex: none;
+}
 .fs-page.state-a .sa-hero__video {
-  margin-top: clamp(20px, 3cqi, 26px);
+  /* Centered in its own hello section (StateAHello) below the hero - margin auto
+     centers it on desktop AND mobile; the hello section sets the top gap. */
+  margin: 0 auto;
   position: relative;
   /* Portrait-friendly box: hello videos are usually phone talking-heads. The
      player fills this with object-fit: cover (below) and the agent's framing
@@ -247,18 +270,23 @@
    unknown pseudo gets the whole rule discarded by the UA that doesn't know it. */
 .fs-page.state-a .sa-hero__video-player:fullscreen {object-fit: contain !important; object-position: center !important; transform: none !important; width: 100% !important; height: 100% !important; background: #000 !important; }
 .fs-page.state-a .sa-hero__video-player:-webkit-full-screen {object-fit: contain !important; object-position: center !important; transform: none !important; width: 100% !important; height: 100% !important; background: #000 !important; }
-.fs-page.state-a .sa-hero__video-cap {
-  position: absolute;
-  left: 12px;
-  top: 10px;
-  z-index: 2;
-  font-family: var(--f-mono);
-  font-size: 10px;
-  letter-spacing: 0.12em;
-  text-transform: uppercase;
+/* 1b · Hello video - its own centered moment below the hero (StateAHello) ---
+   The relocated player keeps the SAME dark context it had in the hero so its
+   paper-toned frame border + lift-dark shadow read identically; this section just
+   gives it room to breathe and a title, and centers it on desktop AND mobile. */
+.fs-page.state-a .sa-hello {
+  background: var(--ink);
+  text-align: center;
+}
+.fs-page.state-a .sa-hello__title {
+  margin: 0 0 clamp(20px, 3cqi, 28px);
+  font-family: var(--f-display);
+  font-weight: 400;
+  font-size: clamp(22px, 3.4cqi, 30px);
+  line-height: 1.15;
+  letter-spacing: -0.01em;
   color: var(--t-pap);
-  text-shadow: 0 1px 4px rgba(8, 15, 18, 0.8);
-  pointer-events: none;
+  text-wrap: balance;
 }
 
 /* 2 · Appointment Brief (the flagship file) -------------------------------- */
@@ -745,15 +773,6 @@
     padding-top: clamp(24px, 5cqi, 30px);
     padding-bottom: clamp(30px, 6cqi, 40px);
   }
-  /* Center the hero hello box on phones. It is a max-width: 340px block inside the
-     left-aligned agent column; once the phone band is wider than 340px (real
-     iPhones at 390-430px, unlike the narrower in-wizard preview) it would sit
-     flush-left with a gap on the right. margin-inline: auto centers it to match the
-     preview and desktop. Desktop (>= 720px) keeps its own 2-col band where the box
-     is width-capped by the narrower column, so it is untouched. */
-  .fs-page.state-a .sa-hero__video {
-    margin-inline: auto;
-  }
   /* Give the nearby-sold tiles more room inside the file so the Street View
      photos stay readable (not tiny) in the 2x2 grid. */
   .fs-page.state-a .sa-brief__file {
@@ -800,9 +819,14 @@
     grid-template-columns: 1.1fr 0.9fr;
     align-items: stretch;
   }
+  /* The cover height is driven by the COMPACT recognition band beside it (the
+     video lives in its own section now, so it no longer inflates that column and
+     over-sizes the photo). align-items: stretch keeps the two columns equal-height
+     with no dead space; the floor just stops a minimal-payload band from leaving
+     the photo too short. Right-sized, not the old oversized near-square. */
   .fs-page.state-a .sa-hero__cover {
     aspect-ratio: auto;
-    min-height: 560px;
+    min-height: 460px;
   }
   .fs-page.state-a .sa-hero__band {
     justify-content: center;
