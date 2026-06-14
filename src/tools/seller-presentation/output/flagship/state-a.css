@@ -10,6 +10,156 @@
  * meeting close. No price treatment, no lock, no countdown anywhere.
  */
 
+/* 0 · Proof-panel system (§3.6) -------------------------------------------
+   ONE primitive, two surface variants, used by Z2 (+6%), Z3 ($580K-$700K) and
+   Z4 (101.3%). Treatment is identical everywhere: a tonal fill + a 2px teal
+   keyline + a mono label + a Newsreader number. The teal TRACKS THE AGENT BRAND
+   (light = --teal-700, dark = --teal-500, the same ramp the sparkline + stars
+   use), so the panels re-hue per agent; the cream + dark fills are fixed
+   editorial neutrals. Each zone owns only its surrounding layout. */
+.fs-page.state-a {
+  --sa-proof-cream: #fbf8f2;   /* light panel fill (Z2) */
+  --sa-proof-inset: #f4eee3;   /* the Z4 stat-rail inset fill */
+  --sa-proof-dark: #12171a;    /* dark panel fill (Z3) */
+  /* The TRUE mint, immune to the brand-derived --mint (consumerRoleVars re-hues
+     --mint per agent, which read as a muted blue-grey). The single earned mint
+     moment — the Z1 caption status dot — must actually read as mint. */
+  --sa-mint: #4ef2d9;
+  --sa-proof-shadow-light: 0 1px 0 rgba(255, 255, 255, 0.7) inset, 0 22px 50px -30px rgba(60, 44, 27, 0.5);
+  --sa-proof-shadow-dark: 0 1px 0 rgba(255, 255, 255, 0.06) inset, 0 30px 48px -28px rgba(0, 0, 0, 0.5);
+}
+.fs-page.state-a .sa-proof {
+  border-radius: 18px;
+  border-left: 2px solid var(--sa-keyline);
+  padding: clamp(20px, 3.6cqi, 40px);
+  display: flex;
+  flex-direction: column;
+  gap: 12px;
+}
+.fs-page.state-a .sa-proof--light {
+  --sa-keyline: var(--teal-700);
+  background: var(--sa-proof-cream);
+  box-shadow: var(--sa-proof-shadow-light);
+}
+.fs-page.state-a .sa-proof--dark {
+  --sa-keyline: var(--teal-500);
+  background: var(--sa-proof-dark);
+  border-radius: 16px;
+  box-shadow: var(--sa-proof-shadow-dark);
+}
+.fs-page.state-a .sa-proof__label {
+  font-family: var(--f-mono);
+  font-size: 11px;
+  letter-spacing: 0.18em;
+  text-transform: uppercase;
+  line-height: 1.5;
+  color: var(--t-mute);
+}
+.fs-page.state-a .sa-proof--dark .sa-proof__label {
+  color: var(--t-pap-mute);
+}
+.fs-page.state-a .sa-proof__num {
+  font-family: var(--f-display);
+  font-weight: 500;
+  font-size: clamp(38px, 7cqi, 66px);
+  line-height: 0.9;
+  letter-spacing: -0.02em;
+  color: var(--teal-700);
+  font-variant-numeric: lining-nums tabular-nums;
+}
+.fs-page.state-a .sa-proof--dark .sa-proof__num {
+  color: var(--teal-500);
+}
+.fs-page.state-a .sa-proof__cap {
+  font-family: var(--f-mono);
+  font-size: 10px;
+  letter-spacing: 0.12em;
+  text-transform: uppercase;
+  color: var(--t-soft);
+}
+/* The Z3 dark range display: two abbreviated values flanking a filled-dot ->
+   open-dot connector (low to high). Smaller than a single proof number so both
+   ends + the track fit on one comfortable line. */
+.fs-page.state-a .sa-range {
+  display: inline-flex;
+  align-items: center;
+  gap: clamp(10px, 1.6cqi, 16px);
+  font-size: clamp(26px, 4.6cqi, 34px);
+  line-height: 1;
+}
+.fs-page.state-a .sa-range__track {
+  display: inline-flex;
+  align-items: center;
+  flex: 1 1 36px;
+  min-width: 28px;
+}
+.fs-page.state-a .sa-range__seg {
+  flex: 1;
+  height: 2px;
+  background: var(--teal-500);
+  border-radius: 2px;
+}
+.fs-page.state-a .sa-range__dot {
+  width: 8px;
+  height: 8px;
+  border-radius: 50%;
+  flex: none;
+}
+.fs-page.state-a .sa-range__dot--fill {
+  background: var(--teal-500);
+}
+.fs-page.state-a .sa-range__dot--open {
+  border: 2px solid var(--teal-500);
+}
+
+/* Motion (earned, once on view) — gated on the containing `.reveal.in` so the
+   proof numbers reveal + the sparkline draws as each section enters. The shared
+   PresentationPageMotion driver adds `.in` (and adds it immediately under
+   reduced motion). Reduced motion + no-JS land everything at its final state:
+   the number sits drawn, the sparkline renders already-drawn. No hover states. */
+.fs-page.state-a .sa-proof__num {
+  opacity: 0;
+  transform: translateY(8px);
+  transition: opacity 0.5s var(--ease), transform 0.5s var(--ease);
+  will-change: opacity, transform;
+}
+.fs-page.state-a .reveal.in .sa-proof__num {
+  opacity: 1;
+  transform: none;
+}
+/* The sparkline draws on view: undrawn until the brief's `.reveal` enters, then
+   the dash retracts over 1.6s. `--len` (the polyline length) is set inline. */
+.fs-page.state-a .sa-spark__line {
+  stroke-dasharray: var(--len, 200);
+  stroke-dashoffset: 0;
+}
+.fs-page.state-a .reveal:not(.in) .sa-spark__line {
+  stroke-dashoffset: var(--len, 200);
+}
+@keyframes saSparkDraw {
+  from {
+    stroke-dashoffset: var(--len, 200);
+  }
+  to {
+    stroke-dashoffset: 0;
+  }
+}
+.fs-page.state-a .reveal.in .sa-spark__line {
+  animation: saSparkDraw 1.6s var(--ease) 0.35s both;
+}
+@media (prefers-reduced-motion: reduce) {
+  .fs-page.state-a .sa-proof__num {
+    opacity: 1 !important;
+    transform: none !important;
+    transition: none !important;
+  }
+  .fs-page.state-a .sa-spark__line,
+  .fs-page.state-a .reveal:not(.in) .sa-spark__line {
+    stroke-dashoffset: 0 !important;
+    animation: none !important;
+  }
+}
+
 /* 1 · Map-dossier hero ----------------------------------------------------- */
 .fs-page.state-a .sa-hero {
   background: var(--ink);
@@ -233,17 +383,20 @@
   flex: none;
 }
 .fs-page.state-a .sa-hero__video {
-  /* Centered in its own hello section (StateAHello) below the hero - margin auto
-     centers it on desktop AND mobile; the hello section sets the top gap. */
+  /* The designed Z1 portrait frame: a 9:16 player (~182px wide) centered on the
+     pedestal, on desktop AND mobile (the hello section sets the top gap).
+     CONTENT-INDEPENDENT SIZE (the v1.5x fix): inside the pedestal flex column the
+     box is a centered flex child whose only content is the absolutely-positioned
+     player, so with `align-items: center` it shrank to content width 0 and the
+     `aspect-ratio` then gave height 0 (the 0x1px collapse). `flex: none` + an
+     explicit `width` + a `min-height` floor make a 0-collapse impossible whether
+     or not the video's intrinsic size has loaded. */
+  flex: none;
+  width: min(100%, 182px);
+  min-height: 300px;
   margin: 0 auto;
   position: relative;
-  /* Portrait-friendly box: hello videos are usually phone talking-heads. The
-     player fills this with object-fit: cover (below) and the agent's framing
-     crops to their focal point, mirroring the proven revealed-page inlay. 4/5
-     matches the revealed-page video's default aspect; the ink background only
-     shows behind the loading frame, never as a letterbox. */
-  aspect-ratio: 4 / 5;
-  max-width: 340px;
+  aspect-ratio: 9 / 16;
   border-radius: var(--r-md);
   overflow: hidden;
   border: 1px solid var(--line-pap);
@@ -255,10 +408,13 @@
   inset: 0;
   width: 100%;
   height: 100%;
-  /* Fill the frame and let the agent's inlay framing crop it, exactly as the
-     revealed-page inlay player does (object-fit/position/transform set inline so
-     the SSR markup is self-describing; this is the styling backstop). The
-     :fullscreen rules below reset to contain for the native fullscreen view. */
+  /* Belt-and-suspenders: even if a future layout changes the frame, the player
+     keeps a defined size (fills the framed box) and never reports height: 0. */
+  min-height: 100%;
+  /* Fill the frame and let the agent's inlay framing crop it (object-fit: cover +
+     the focal/zoom set inline), exactly as the proven #79 revealed-page inlay
+     player does, so any uploaded video (portrait OR landscape) fits the 9:16
+     frame. The :fullscreen rules below reset to contain for native fullscreen. */
   object-fit: cover;
   object-position: center;
   background: var(--ink-2);
@@ -276,7 +432,31 @@
    gives it room to breathe and a title, and centers it on desktop AND mobile. */
 .fs-page.state-a .sa-hello {
   background: var(--ink);
+}
+/* The welcome-video pedestal: a lifted dark slab. Centered on desktop (the
+   pedestal block itself is centered with a max width + auto margins below);
+   a left-aligned stack on mobile. */
+.fs-page.state-a .sa-hello__pedestal {
+  width: 100%;
+  max-width: 520px;
+  margin-inline: auto;
+  background: var(--ink-2);
+  border: 1px solid var(--line-pap);
+  border-radius: 22px;
+  box-shadow: var(--lift-dark);
+  padding: clamp(36px, 6cqi, 56px) clamp(28px, 5cqi, 48px);
+  display: flex;
+  flex-direction: column;
+  align-items: center;
   text-align: center;
+}
+.fs-page.state-a .sa-hello__eyebrow {
+  font-family: var(--f-mono);
+  font-size: 11px;
+  letter-spacing: 0.2em;
+  text-transform: uppercase;
+  color: var(--t-pap-mute);
+  margin-bottom: 14px;
 }
 .fs-page.state-a .sa-hello__title {
   margin: 0 0 clamp(20px, 3cqi, 28px);
@@ -287,6 +467,34 @@
   letter-spacing: -0.01em;
   color: var(--t-pap);
   text-wrap: balance;
+}
+/* The caption pill — always on the solid pedestal surface, never over the video.
+   Carries the single earned mint status dot + the optional runtime. */
+.fs-page.state-a .sa-hello__cap {
+  margin-top: clamp(18px, 2.6cqi, 24px);
+  display: inline-flex;
+  align-items: center;
+  gap: 9px;
+  padding: 8px 16px;
+  border: 1px solid var(--line-pap);
+  border-radius: 999px;
+  background: color-mix(in oklab, var(--t-pap) 5%, transparent);
+  font-family: var(--f-mono);
+  font-size: 10.5px;
+  letter-spacing: 0.16em;
+  text-transform: uppercase;
+  color: var(--t-pap-soft);
+}
+.fs-page.state-a .sa-hello__cap-dot {
+  flex: none;
+  width: 6px;
+  height: 6px;
+  border-radius: 50%;
+  background: var(--sa-mint);
+  box-shadow: 0 0 0 3px color-mix(in oklab, var(--sa-mint) 22%, transparent);
+}
+.fs-page.state-a .sa-hello__cap-rt {
+  color: var(--t-pap-mute);
 }
 
 /* 2 · Appointment Brief (the flagship file) -------------------------------- */
@@ -429,17 +637,28 @@
   font-size: clamp(15px, 2cqi, 18px);
   color: var(--t-soft);
 }
-.fs-page.state-a .sa-brief__activity {
+/* Z2 trend: a tonal panel (sparkline + axis + serif line) paired with the shared
+   light proof-panel. Mobile stacks; desktop is a ~2.4fr / 1fr split (720 query).
+   sa-trend--solo (no delta) collapses to one column, panel full-width. */
+.fs-page.state-a .sa-trend {
+  display: grid;
+  gap: 12px;
+  align-items: stretch;
+}
+.fs-page.state-a .sa-trend__panel {
+  background: var(--paper);
+  border: 1px solid var(--line);
+  border-radius: var(--r-md);
+  padding: clamp(18px, 2.8cqi, 28px);
   display: flex;
-  align-items: center;
-  gap: clamp(16px, 3cqi, 28px);
-  flex-wrap: wrap;
+  flex-direction: column;
+  gap: 14px;
+  justify-content: center;
 }
 .fs-page.state-a .sa-spark {
-  width: clamp(120px, 30cqi, 180px);
+  width: 100%;
   height: auto;
   display: block;
-  flex: none;
 }
 .fs-page.state-a .sa-spark__line {
   fill: none;
@@ -450,6 +669,15 @@
 }
 .fs-page.state-a .sa-spark__dot {
   fill: var(--teal-700);
+}
+.fs-page.state-a .sa-trend__axis {
+  display: flex;
+  justify-content: space-between;
+  font-family: var(--f-mono);
+  font-size: 9.5px;
+  letter-spacing: 0.14em;
+  text-transform: uppercase;
+  color: var(--t-mute);
 }
 .fs-page.state-a .sa-brief__activity-line {
   margin: 0;
@@ -506,20 +734,20 @@
 }
 .fs-page.state-a .sa-val__status {
   margin-top: clamp(28px, 4cqi, 40px);
-  padding: clamp(20px, 3cqi, 26px);
-  border: 1px solid var(--line-pap);
-  border-radius: var(--r-md);
-  background: color-mix(in oklab, var(--t-pap) 3%, transparent);
   display: flex;
   flex-direction: column;
-  gap: 14px;
+  gap: clamp(18px, 2.6cqi, 26px);
   align-items: flex-start;
 }
-/* Status chip: a quiet but finished "in preparation" marker. A calm teal status
-   dot with a soft halo + a faint glass fill and a touch brighter type lift it
-   from a plain bordered label into an intentional status chip, without ever
-   shouting (no price, no countdown - the valuation stays understated). */
-.fs-page.state-a .sa-val__label {
+/* Two tinted status chips. Both read as quiet glass pills on the dark band; the
+   prepared chip carries the calm teal status dot (soft halo) so it lands as an
+   intentional "in preparation" marker, never shouting (no price, no countdown). */
+.fs-page.state-a .sa-val__chips {
+  display: flex;
+  flex-wrap: wrap;
+  gap: 10px;
+}
+.fs-page.state-a .sa-val__chip {
   display: inline-flex;
   align-items: center;
   gap: 9px;
@@ -528,11 +756,14 @@
   letter-spacing: 0.16em;
   text-transform: uppercase;
   color: var(--t-pap-soft);
-  padding: 8px 14px 8px 12px;
+  padding: 8px 15px;
   border: 1px solid var(--line-pap);
   border-radius: 999px;
   background: color-mix(in oklab, var(--t-pap) 5%, transparent);
   box-shadow: inset 0 1px 0 rgba(239, 233, 220, 0.06);
+}
+.fs-page.state-a .sa-val__chip--status {
+  padding-left: 12px;
 }
 .fs-page.state-a .sa-val__dot {
   flex: none;
@@ -541,6 +772,11 @@
   border-radius: 50%;
   background: var(--teal-500);
   box-shadow: 0 0 0 3px color-mix(in oklab, var(--teal-500) 24%, transparent);
+}
+/* The dark range proof-panel: a contained block in the band (not full-bleed). */
+.fs-page.state-a .sa-val__status .sa-proof {
+  align-self: stretch;
+  max-width: 480px;
 }
 .fs-page.state-a .sa-val__context {
   margin: 0;
@@ -555,16 +791,40 @@
 .fs-page.state-a .sa-quote {
   background: var(--offwhite);
 }
-.fs-page.state-a .sa-quote__inner {
+/* Unified single-panel lockup: the quote + the stat rail live in ONE cream panel.
+   sa-quote__panel--solo (stat absent) centers the lone quote and drops the rail. */
+.fs-page.state-a .sa-quote__panel {
+  background: var(--sa-proof-cream);
+  border: 1px solid var(--line);
+  border-radius: 20px;
+  box-shadow: var(--lift-2);
+  padding: clamp(24px, 4cqi, 44px);
   display: flex;
   flex-wrap: wrap;
-  align-items: flex-start;
+  align-items: stretch;
   gap: clamp(20px, 4cqi, 40px);
+}
+.fs-page.state-a .sa-quote__panel--solo {
+  justify-content: center;
+}
+.fs-page.state-a .sa-quote__panel--solo .sa-quote__main {
+  text-align: center;
+  max-width: 60ch;
 }
 .fs-page.state-a .sa-quote__main {
   flex: 1 1 340px;
   min-width: 0;
   max-width: 54ch;
+}
+/* The 101.3% stat rail: the shared light proof-panel, re-toned to the cream-inset
+   surface and seated as an inset within the panel (no extra drop shadow; the 2px
+   teal keyline is the divider). */
+.fs-page.state-a .sa-quote__rail {
+  flex: 0 1 260px;
+  align-self: stretch;
+  justify-content: center;
+  background: var(--sa-proof-inset);
+  box-shadow: none;
 }
 .fs-page.state-a .sa-quote .stars {
   color: var(--teal-700);
@@ -591,35 +851,6 @@
 }
 .fs-page.state-a .sa-quote__src {
   color: var(--teal-700);
-}
-/* The relocated credibility stat: a quiet bordered chip clearly framed as the
-   agent's track record (label spells out "[Agent]'s average sale-to-list across
-   recent listings"), never the subject home's number. */
-.fs-page.state-a .sa-quote__cred {
-  flex: 0 1 220px;
-  align-self: center;
-  display: flex;
-  flex-direction: column;
-  gap: 8px;
-  padding: clamp(16px, 2.4cqi, 22px) clamp(18px, 2.6cqi, 24px);
-  border: 1px solid var(--line);
-  border-radius: var(--r-md);
-  background: var(--white);
-}
-.fs-page.state-a .sa-quote__cred-v {
-  font-family: var(--f-display);
-  font-size: clamp(30px, 5cqi, 44px);
-  line-height: 1;
-  color: var(--teal-700);
-  font-variant-numeric: lining-nums tabular-nums;
-}
-.fs-page.state-a .sa-quote__cred-k {
-  font-family: var(--f-mono);
-  font-size: 10px;
-  letter-spacing: 0.12em;
-  text-transform: uppercase;
-  line-height: 1.5;
-  color: var(--t-mute);
 }
 
 /* 4 · Campaign spread (Signature B) ---------------------------------------- */
@@ -781,13 +1012,17 @@
   .fs-page.state-a .sa-brief__sales {
     gap: 8px;
   }
-  /* The trust band stacks: quote first, then the credibility chip full-width
-     beneath it (not a cramped sliver beside the quote). */
-  .fs-page.state-a .sa-quote__cred {
+  /* The trust band lockup stacks: quote first, then the stat rail full-width
+     beneath it. The Z2 trend proof + the Z4 stat rail are stacked here, so their
+     2px teal keyline moves from a left border to a top border (per the spec). */
+  .fs-page.state-a .sa-quote__rail {
     flex: 1 1 100%;
-    flex-direction: row;
-    align-items: baseline;
-    gap: 12px;
+    align-self: stretch;
+  }
+  .fs-page.state-a .sa-trend .sa-proof,
+  .fs-page.state-a .sa-quote__rail {
+    border-left: 0;
+    border-top: 2px solid var(--sa-keyline);
   }
   /* Campaign spread on phones: a deliberate single-column stack instead of the
      desktop 2-up. The two image frames (the agent's listing photography + the
@@ -833,6 +1068,15 @@
   }
   .fs-page.state-a .sa-brief__sales {
     grid-template-columns: repeat(4, 1fr);
+  }
+  /* Z2 trend goes 2-col: the tonal sparkline panel + the +6% proof panel. The
+     solo (no-delta) case stays a single full-width column. */
+  .fs-page.state-a .sa-trend {
+    grid-template-columns: 2.4fr 1fr;
+    gap: 22px;
+  }
+  .fs-page.state-a .sa-trend--solo {
+    grid-template-columns: 1fr;
   }
   .fs-page.state-a .sa-spread__grid {
     grid-template-columns: 1.4fr 1fr;

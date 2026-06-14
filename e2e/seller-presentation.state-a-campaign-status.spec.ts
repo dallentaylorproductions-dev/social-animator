@@ -96,16 +96,21 @@ test.describe("State A - campaign spread keeps its side-by-side on desktop", () 
 });
 
 test.describe("State A - valuation status chip is upgraded but still quiet", () => {
-  test("the chip renders a status dot before the pending-walkthrough label", async ({
+  test("the chips render the prepared + pending labels with a status dot", async ({
     page,
   }) => {
     await page.goto(STATE_A);
+    // v1.5x: the single combined chip is split into two tinted chips.
     const label = page.getByTestId("fs-sa-valuation-label");
     await expect(label).toBeVisible();
+    await expect(label.locator(".sa-val__chip")).toHaveCount(2);
     await expect(label).toContainText("Prepared estimate");
-    await expect(label).toContainText("pending walkthrough");
-    // The intentional status marker.
+    await expect(label).toContainText("Pending walkthrough");
+    // The intentional status marker sits on the prepared chip (one dot, not two).
     await expect(label.locator(".sa-val__dot")).toHaveCount(1);
+    await expect(
+      label.locator(".sa-val__chip--status .sa-val__dot"),
+    ).toHaveCount(1);
   });
 
   test("the chip stays understated: no price and no countdown", async ({

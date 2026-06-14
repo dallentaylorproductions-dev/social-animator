@@ -11,7 +11,8 @@ import { StateAHello } from "./StateAHello";
 import { AppointmentBrief } from "./AppointmentBrief";
 import { CampaignSpread } from "./CampaignSpread";
 import { AgentBand } from "./AgentBand";
-import { defaultValuationMessage } from "./state-a-copy";
+import { ProofPanel } from "./ProofPanel";
+import { defaultValuationMessage, PROOF_RANGE_LABEL } from "./state-a-copy";
 import "./flagship.css";
 import "./state-a.css";
 
@@ -128,11 +129,36 @@ function ValuationPrepared({
       <p className="sa-val__body reveal" data-testid="fs-sa-valuation-body">
         {valuationMessage}
       </p>
+      {/* Two tinted status chips (the prepared chip carries the status dot), then
+          the shared dark proof-panel for the nearby-sold range, then the sentence.
+          FLEX-OUT: range absent -> the proof panel + sentence drop and the band
+          stays composed on the heading + chips alone. */}
       <div className="sa-val__status reveal">
-        <div className="sa-val__label" data-testid="fs-sa-valuation-label">
-          <span className="sa-val__dot" aria-hidden="true" />
-          Prepared estimate · pending walkthrough
+        <div className="sa-val__chips" data-testid="fs-sa-valuation-label">
+          <span className="sa-val__chip sa-val__chip--status">
+            <span className="sa-val__dot" aria-hidden="true" />
+            Prepared estimate
+          </span>
+          <span className="sa-val__chip">Pending walkthrough</span>
         </div>
+        {range && (
+          <ProofPanel
+            variant="dark"
+            label={PROOF_RANGE_LABEL}
+            testid="fs-sa-proof-z3"
+            numAriaLabel={`${range.lowAbbr} to ${range.highAbbr}`}
+          >
+            <span className="sa-range">
+              <span className="sa-range__v">{range.lowAbbr}</span>
+              <span className="sa-range__track" aria-hidden="true">
+                <span className="sa-range__dot sa-range__dot--fill" />
+                <span className="sa-range__seg" />
+                <span className="sa-range__dot sa-range__dot--open" />
+              </span>
+              <span className="sa-range__v">{range.highAbbr}</span>
+            </span>
+          </ProofPanel>
+        )}
         {range && (
           <p className="sa-val__context" data-testid="fs-sa-valuation-context">
             Homes near you recently sold between {range.low} and {range.high}.
@@ -190,7 +216,13 @@ function TrustStrip({
       className="section z-offwhite sa-quote"
       data-testid="fs-sa-testimonial"
     >
-      <div className="sa-quote__inner reveal">
+      {/* Unified single-panel lockup: quote on the left, the track-record stat as
+          a shared light proof-panel rail on the right. FLEX-OUT: stat absent ->
+          the quote centers into a complete panel and the rail is removed entirely
+          (sa-quote__panel--solo); quote absent -> the rail stands alone. */}
+      <div
+        className={`sa-quote__panel reveal${hasQuote && proof ? "" : " sa-quote__panel--solo"}`}
+      >
         {hasQuote && (
           <div className="sa-quote__main">
             <span
@@ -224,10 +256,14 @@ function TrustStrip({
           </div>
         )}
         {proof && (
-          <div className="sa-quote__cred" data-testid="fs-sa-credibility">
-            <span className="sa-quote__cred-v">{proof.value}</span>
-            <span className="sa-quote__cred-k">{proof.label}</span>
-          </div>
+          <ProofPanel
+            variant="light"
+            className="sa-quote__rail"
+            label={proof.label}
+            testid="fs-sa-credibility"
+          >
+            {proof.value}
+          </ProofPanel>
         )}
       </div>
     </section>
@@ -386,14 +422,21 @@ function capitalize(s: string): string {
  */
 function nearbySoldRange(
   payload: PublicPayload,
-): { low: string; high: string } | null {
+): { low: string; high: string; lowAbbr: string; highAbbr: string } | null {
   const prices = payload.comps
     .map((c) => parseDollars(c.soldPrice))
     .filter((n): n is number => n != null);
   if (prices.length === 0) return null;
   const lo = Math.min(...prices);
   const hi = Math.max(...prices);
-  return { low: formatDollars(lo), high: formatDollars(hi) };
+  // Full form ("$580,000") for the context sentence; abbreviated ("$580K") for
+  // the compact proof-panel range display.
+  return {
+    low: formatDollars(lo),
+    high: formatDollars(hi),
+    lowAbbr: formatDollarsAbbrev(lo),
+    highAbbr: formatDollarsAbbrev(hi),
+  };
 }
 
 /** "$695,000" / "$695k" / "695000" -> 695000. */
@@ -412,4 +455,13 @@ function parseDollars(raw: string | undefined): number | null {
 /** 695000 -> "$695,000" (whole-dollar, grouped). */
 function formatDollars(n: number): string {
   return `$${Math.round(n).toLocaleString("en-US")}`;
+}
+
+/** 580000 -> "$580K"; 1250000 -> "$1.25M" (compact range-display form). */
+function formatDollarsAbbrev(n: number): string {
+  if (n >= 1_000_000) {
+    const m = n / 1_000_000;
+    return `$${(Math.round(m * 100) / 100).toString()}M`;
+  }
+  return `$${Math.round(n / 1000)}K`;
 }

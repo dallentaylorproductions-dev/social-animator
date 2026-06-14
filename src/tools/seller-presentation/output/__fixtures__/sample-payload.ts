@@ -639,3 +639,40 @@ export const STATE_A_MINIMAL_PAYLOAD: PublicPayload = {
   valuationStatus: "preparing_for_walkthrough",
   appointmentAt: "2026-06-20T14:00",
 };
+
+/**
+ * Seller State A — Zone 1 flex-out: the rich invitation with NO hello video. The
+ * whole welcome-video section drops and the hero below stays intact (no empty
+ * band). Everything else matches STATE_A_FULL_PAYLOAD.
+ */
+export const STATE_A_NO_VIDEO_PAYLOAD: PublicPayload = {
+  ...STATE_A_FULL_PAYLOAD,
+  video: { ...STATE_A_FULL_PAYLOAD.video, videoUrl: "" },
+};
+
+/**
+ * Seller State A — Zone 2 flex-out: a trend SERIES with no agent-stamped YoY
+ * delta. The sparkline panel runs full-width and the `+6%` proof panel collapses
+ * (no orphaned slot); the activity line still narrates the trend from its series
+ * endpoints. Same rich invitation otherwise.
+ */
+export const STATE_A_TREND_ONLY_PAYLOAD: PublicPayload = {
+  ...STATE_A_FULL_PAYLOAD,
+  areaStats: {
+    ...STATE_A_FULL_PAYLOAD.areaStats,
+    medianSaleDeltaYoy: "",
+  } as PublicPayload["areaStats"],
+};
+
+/**
+ * Seller State A — Zone 4 flex-out: a testimonial quote but NO track-record stat.
+ * The quote centers into a complete panel and the 101.3% rail is removed entirely
+ * (no empty rail, no top-border stub). Same rich invitation otherwise.
+ */
+export const STATE_A_NO_STAT_PAYLOAD: PublicPayload = {
+  ...STATE_A_FULL_PAYLOAD,
+  whyUs: {
+    ...STATE_A_FULL_PAYLOAD.whyUs,
+    performanceStats: [],
+  } as PublicPayload["whyUs"],
+};

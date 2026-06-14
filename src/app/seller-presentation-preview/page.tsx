@@ -14,6 +14,9 @@ import {
   STATE_A_FULL_PAYLOAD,
   STATE_A_MINIMAL_PAYLOAD,
   STATE_A_MIXED_COVERAGE_PAYLOAD,
+  STATE_A_NO_STAT_PAYLOAD,
+  STATE_A_NO_VIDEO_PAYLOAD,
+  STATE_A_TREND_ONLY_PAYLOAD,
 } from "@/tools/seller-presentation/output/__fixtures__/sample-payload";
 import { EmbedBridge } from "./EmbedBridge";
 
@@ -134,6 +137,12 @@ export default async function SellerPresentationPreview({ searchParams }: PagePr
     // COMP_PHOTOS - some nearby sales have Street View coverage, some don't. The
     // brief must render only the photographed ones (no empty frame).
     "state-a-mixed-coverage",
+    // v1.5x zone-polish flex-out fixtures: Z1 no-video (welcome section drops),
+    // Z2 trend-only (sparkline full-width, +6% proof collapses), Z4 stat-absent
+    // (quote centers, 101.3% rail removed). Z3 range-absent reuses state-a-minimal.
+    "state-a-no-video",
+    "state-a-trend-only",
+    "state-a-no-stat",
   ] as const;
   type Variant = (typeof VARIANTS)[number];
   const variant = (VARIANTS as readonly string[]).includes(fixture ?? "")
@@ -178,7 +187,13 @@ export default async function SellerPresentationPreview({ searchParams }: PagePr
                           ? STATE_A_MINIMAL_PAYLOAD
                           : variant === "state-a-mixed-coverage"
                             ? STATE_A_MIXED_COVERAGE_PAYLOAD
-                            : FULL_PAYLOAD;
+                            : variant === "state-a-no-video"
+                              ? STATE_A_NO_VIDEO_PAYLOAD
+                              : variant === "state-a-trend-only"
+                                ? STATE_A_TREND_ONLY_PAYLOAD
+                                : variant === "state-a-no-stat"
+                                  ? STATE_A_NO_STAT_PAYLOAD
+                                  : FULL_PAYLOAD;
 
   // E.0 — optional brand-color override (drives the brand-colors e2e
   // regression spec + Dallen's browser smoke). Validated hex only; merged
