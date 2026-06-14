@@ -126,6 +126,7 @@ function ValuationPrepared({
       </p>
       <div className="sa-val__status reveal">
         <div className="sa-val__label" data-testid="fs-sa-valuation-label">
+          <span className="sa-val__dot" aria-hidden="true" />
           Prepared estimate · pending walkthrough
         </div>
         {range && (

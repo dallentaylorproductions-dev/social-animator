@@ -215,9 +215,10 @@
   margin-top: clamp(20px, 3cqi, 26px);
   position: relative;
   /* Portrait-friendly box: hello videos are usually phone talking-heads. The
-     player uses object-fit: contain (below), so this aspect just sets the frame;
-     the ink background mats any letterbox so it reads intentional, never cropped
-     mid-face. 4/5 matches the revealed-page video's default aspect. */
+     player fills this with object-fit: cover (below) and the agent's framing
+     crops to their focal point, mirroring the proven revealed-page inlay. 4/5
+     matches the revealed-page video's default aspect; the ink background only
+     shows behind the loading frame, never as a letterbox. */
   aspect-ratio: 4 / 5;
   max-width: 340px;
   border-radius: var(--r-md);
@@ -231,10 +232,11 @@
   inset: 0;
   width: 100%;
   height: 100%;
-  /* Show the WHOLE uploaded frame, letterboxed onto the ink mat — never a
-     cover-crop that chops the agent's head (object-fit/position set inline so the
-     SSR markup is self-describing; this is the styling backstop). */
-  object-fit: contain;
+  /* Fill the frame and let the agent's inlay framing crop it, exactly as the
+     revealed-page inlay player does (object-fit/position/transform set inline so
+     the SSR markup is self-describing; this is the styling backstop). The
+     :fullscreen rules below reset to contain for the native fullscreen view. */
+  object-fit: cover;
   object-position: center;
   background: var(--ink-2);
 }
@@ -485,17 +487,32 @@
   gap: 14px;
   align-items: flex-start;
 }
+/* Status chip: a quiet but finished "in preparation" marker. A calm teal status
+   dot with a soft halo + a faint glass fill and a touch brighter type lift it
+   from a plain bordered label into an intentional status chip, without ever
+   shouting (no price, no countdown - the valuation stays understated). */
 .fs-page.state-a .sa-val__label {
   display: inline-flex;
   align-items: center;
+  gap: 9px;
   font-family: var(--f-mono);
   font-size: 11px;
-  letter-spacing: 0.18em;
+  letter-spacing: 0.16em;
   text-transform: uppercase;
-  color: var(--t-pap-mute);
-  padding: 8px 13px;
+  color: var(--t-pap-soft);
+  padding: 8px 14px 8px 12px;
   border: 1px solid var(--line-pap);
   border-radius: 999px;
+  background: color-mix(in oklab, var(--t-pap) 5%, transparent);
+  box-shadow: inset 0 1px 0 rgba(239, 233, 220, 0.06);
+}
+.fs-page.state-a .sa-val__dot {
+  flex: none;
+  width: 6px;
+  height: 6px;
+  border-radius: 50%;
+  background: var(--teal-500);
+  box-shadow: 0 0 0 3px color-mix(in oklab, var(--teal-500) 24%, transparent);
 }
 .fs-page.state-a .sa-val__context {
   margin: 0;
@@ -744,10 +761,26 @@
     align-items: baseline;
     gap: 12px;
   }
-  /* Keep the campaign frames legible: the 2-up secondary frames stay tall
-     enough to read (photos + captions), never collapsing into thin slivers. */
+  /* Campaign spread on phones: a deliberate single-column stack instead of the
+     desktop 2-up. The two image frames (the agent's listing photography + the
+     video-tour poster) go full-width so the imagery reads at a legible size
+     rather than cramming into thin, misaligned half-frames; the text-only
+     capability items sit beneath as compact full-width chips. Reads as
+     considered as desktop, never scattered. */
+  .fs-page.state-a .sa-spread__rest {
+    grid-template-columns: 1fr;
+  }
   .fs-page.state-a .sa-frame {
-    min-height: 138px;
+    min-height: 104px;
+  }
+  .fs-page.state-a .sa-frame--lead {
+    min-height: 220px;
+  }
+  .fs-page.state-a .sa-frame.has-photo {
+    min-height: 208px;
+  }
+  .fs-page.state-a .sa-frame--lead.has-photo {
+    min-height: 240px;
   }
 }
 
