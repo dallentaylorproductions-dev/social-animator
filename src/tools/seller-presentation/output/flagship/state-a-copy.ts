@@ -35,6 +35,13 @@ export function heroVideoLabel(agentName: string | undefined): string {
 export const HERO_VIDEO_ARIA = "A short hello from your agent";
 
 /**
+ * Pointer line in the hero agent row to the hello video, which now lives in its
+ * own section directly below the hero. EVERGREEN: first person, no duration, never
+ * a tour. Keeps the hero compact while still cueing the personal message below.
+ */
+export const HERO_VIDEO_CUE = "A quick word, just below";
+
+/**
  * The exposure / reach line beneath the campaign frames. Seller-centered and
  * human: concrete about WHERE the home is seen, truthful, no abstract jargon, no
  * duration or listing assumption. First person to match "How I'll Get Your Home
