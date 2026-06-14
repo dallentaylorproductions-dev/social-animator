@@ -105,7 +105,12 @@ function SpreadFrame({ frame, lead = false }: { frame: Frame; lead?: boolean }) 
     >
       {frame.image && (
         <span
-          className="sa-frame__photo"
+          /* The video-tour poster is a frame from the agent's hello — bias the
+             cover-crop upward (.sa-frame__photo--face) so a talking-head poster
+             is never cut mid-face. The listing photo (a house) stays centered. */
+          className={`sa-frame__photo${
+            frame.key === "video" ? " sa-frame__photo--face" : ""
+          }`}
           aria-hidden="true"
           style={{
             backgroundImage: `url("${frame.image.replace(/"/g, '\\"')}")`,
