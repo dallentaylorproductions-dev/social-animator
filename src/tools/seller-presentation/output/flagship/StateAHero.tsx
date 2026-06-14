@@ -1,6 +1,10 @@
 import type { PublicPayload } from "../public-payload";
 import type { FormattedAppointment } from "../../engine/appointment";
-import { effectivePosterUrl, withFirstFrameHint } from "../../engine/types";
+import {
+  effectivePosterUrl,
+  effectiveFraming,
+  withFirstFrameHint,
+} from "../../engine/types";
 import {
   HERO_VIDEO_ARIA,
   defaultWelcomeLine,
@@ -167,21 +171,23 @@ function HeroAgent({ payload }: { payload: PublicPayload }) {
 }
 
 /**
- * The hero hello. Reuses the EXACT poster-precedence + first-frame helpers the
- * flagship AgentNote video uses (effectivePosterUrl / withFirstFrameHint), so
- * State A and the revealed page never drift on iOS first-frame painting.
- *
- * Framing note: unlike the revealed-page AgentNote inlay (which `cover`-crops to
- * the agent's chosen focal point), the dossier hero shows the FULL video frame
- * via `object-fit: contain` on a deliberate portrait-friendly box — a portrait
- * talking-head hello is never chopped mid-face, and any letterbox reads as an
- * intentional dark mat (the .sa-hero__video ink background), not an accident. So
- * the agent's cover-crop framing (focalX/Y/zoom) is intentionally NOT applied
- * here. Fullscreen uses the same contain treatment (see state-a.css).
+ * The hero hello. Modeled on the proven revealed-page AgentNote inlay: it reuses
+ * the EXACT poster-precedence + first-frame helpers (effectivePosterUrl /
+ * withFirstFrameHint) so State A and the revealed page never drift on iOS
+ * first-frame painting, AND the SAME tested fitment - `object-fit: cover` filling
+ * the 4/5 frame, with the agent's inlay framing driving the crop: `object-position`
+ * pans to their focal point (focalX/Y) and `transform: scale` zooms in
+ * (effectiveFraming). So the agent's own framing control crops the hero, exactly
+ * as it does the revealed-page inlay (the #77 forced `contain` workaround is gone).
+ * When the seller takes the native fullscreen control that SAME <video> element
+ * goes fullscreen, where the `:fullscreen` rule in state-a.css RESETS all three to
+ * contain / center / none so the full uploaded frame shows letterboxed on a black
+ * mat - framing is inlay-only, never a fullscreen blowout.
  */
 function HeroVideo({ payload }: { payload: PublicPayload }) {
   const v = payload.video!;
   const poster = effectivePosterUrl(v);
+  const framing = effectiveFraming(v);
   // Evergreen, accurate label: names the agent's personal message with no
   // duration assumed (the message can run 60 to 90 seconds) and never calls it a
   // tour. One consistent label across the page.
@@ -202,8 +208,12 @@ function HeroVideo({ payload }: { payload: PublicPayload }) {
         preload="metadata"
         aria-label={v.title ?? HERO_VIDEO_ARIA}
         style={{
-          objectFit: "contain",
-          objectPosition: "center",
+          // Same fitment as the revealed-page inlay: cover the frame and let the
+          // agent's framing drive the crop. The :fullscreen rule (state-a.css)
+          // resets all three to contain/center/none for the native fullscreen view.
+          objectFit: "cover",
+          objectPosition: `${framing.focalX}% ${framing.focalY}%`,
+          transform: `scale(${framing.zoom})`,
         }}
       />
       <span className="sa-hero__video-cap" aria-hidden="true">

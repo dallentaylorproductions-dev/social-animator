@@ -3,21 +3,23 @@ import { readFileSync } from "node:fs";
 import { resolve } from "node:path";
 
 /**
- * Seller State A — holistic video treatment + hero top inset (Dallen real smoke).
+ * Seller State A - hero video fitment + hero top inset (Dallen real smoke).
  *
- * Three pre-existing State A polish issues, fixed as ONE system:
+ * State A polish issues, locked as ONE system:
  *
- *   1. INLINE VIDEO FULL-FRAME — the hero personal-message player (labeled
- *      evergreen "A quick hello from [Agent]", no duration) used `object-fit:
- *      cover` + the agent's focal/zoom framing, which cropped a portrait
- *      talking-head mid-face. It now shows the WHOLE frame via `object-fit:
- *      contain` on a portrait-friendly (4/5) box, letterboxed onto the dossier ink
- *      mat. The campaign "A recent video tour" poster (a background-image, not a
- *      <video>) is a SET-ONCE capability sample (a property tour, distinct from
- *      the hero hello), so it stays centered like the listing photo.
+ *   1. INLINE VIDEO FITMENT - the hero personal-message player (labeled evergreen
+ *      "A quick hello from [Agent]", no duration) is modeled on the proven
+ *      revealed-page inlay: `object-fit: cover` filling the portrait-friendly
+ *      (4/5) box with the agent's OWN inlay framing driving the crop
+ *      (object-position pans to focalX/Y, transform scales by zoom). The #77
+ *      forced `contain` workaround is gone, so the agent's framing control crops
+ *      the hero exactly as it does the revealed-page inlay. The campaign "A recent
+ *      video tour" poster (a background-image, not a <video>) is a SET-ONCE
+ *      capability sample (a property tour, distinct from the hero hello), so it
+ *      stays centered like the listing photo.
  *
- *   2. FULLSCREEN LETTERBOX — taking the hero <video> to native fullscreen had no
- *      contain override, so a portrait clip blew out / cropped. Mirrors the
+ *   2. FULLSCREEN LETTERBOX - taking the hero <video> to native fullscreen resets
+ *      the inlay cover-crop so the full uploaded frame shows. Mirrors the
  *      revealed-page A7d.12 fix: a `:fullscreen` AND a SEPARATE
  *      `:-webkit-full-screen` rule (a comma-list with an unknown pseudo gets the
  *      whole rule discarded), each `object-fit: contain` on a black mat.
@@ -88,8 +90,8 @@ async function standalonePersRule(page: Page): Promise<{
   });
 }
 
-test.describe("State A — inline video shows the full frame (no mid-face crop)", () => {
-  test("the hero <video> is object-fit: contain (not cover), centered", async ({
+test.describe("State A - inline video uses the proven inlay fitment (cover + agent framing)", () => {
+  test("the hero <video> is object-fit: cover (the proven inlay fitment, not contain)", async ({
     page,
   }) => {
     await page.goto(STATE_A);
@@ -101,12 +103,13 @@ test.describe("State A — inline video shows the full frame (no mid-face crop)"
     const fit = await player.evaluate(
       (el) => getComputedStyle(el).objectFit,
     );
-    expect(fit, "the hero hello must show the full frame, never cover-crop").toBe(
-      "contain",
-    );
+    expect(
+      fit,
+      "the hero hello must fill the frame (cover) like the revealed-page inlay",
+    ).toBe("cover");
   });
 
-  test("source: the hero video is not object-fit: cover and carries no focal/zoom crop", () => {
+  test("source: the hero video is object-fit: cover and carries the agent's focal/zoom framing", () => {
     const src = readFileSync(
       resolve(
         process.cwd(),
@@ -114,13 +117,19 @@ test.describe("State A — inline video shows the full frame (no mid-face crop)"
       ),
       "utf8",
     );
-    // The inline style block on the hero <video> must be contain/center and must
-    // NOT reintroduce a cover-crop or the focal/zoom transform.
-    expect(src).toMatch(/objectFit:\s*"contain"/);
-    expect(src).not.toMatch(/objectFit:\s*"cover"/);
-    expect(src, "the cover-crop focal framing must not drive the hero").not.toMatch(
-      /transform:\s*`scale\(/,
-    );
+    // The inline style block on the hero <video> must mirror the revealed-page
+    // inlay: cover + the agent's framing (object-position from focalX/Y, a
+    // transform: scale() zoom), never the #77 forced contain workaround.
+    expect(src).toMatch(/objectFit:\s*"cover"/);
+    expect(src).not.toMatch(/objectFit:\s*"contain"/);
+    expect(
+      src,
+      "the agent's focal point must drive the hero crop",
+    ).toMatch(/objectPosition:\s*`\$\{framing\.focalX\}% \$\{framing\.focalY\}%`/);
+    expect(
+      src,
+      "the agent's zoom must drive the hero crop",
+    ).toMatch(/transform:\s*`scale\(\$\{framing\.zoom\}\)`/);
   });
 
   test("the campaign capability video poster is centered (a property tour, not the hero hello)", async ({
@@ -223,6 +232,47 @@ test.describe("State A — hero video fullscreen letterbox (A7d.12 shape)", () =
   });
 });
 
+test.describe("State A - hero hello box is horizontally centered on phones", () => {
+  // A real-iPhone-width viewport: wide enough that the band content exceeds the
+  // 340px box, so a flush-left box would leave a visible right-hand gap (the bug).
+  // The narrower in-wizard preview masked it; here we prove the published render
+  // centers the box.
+  test.use({ viewport: { width: 430, height: 900 } });
+
+  test("the hero video box is centered within its column (not offset left)", async ({
+    page,
+  }) => {
+    await page.goto(STATE_A);
+    const video = page.getByTestId("fs-sa-hero-video");
+    await expect(video).toBeVisible();
+
+    const { boxCenter, colCenter, boxWidth, colWidth } = await video.evaluate(
+      (el) => {
+        const box = el.getBoundingClientRect();
+        // .sa-hero__agent is the box's block container (no horizontal padding),
+        // so its content area is the centering reference.
+        const col = (el.closest(".sa-hero__agent") as HTMLElement) ?? el.parentElement!;
+        const colRect = col.getBoundingClientRect();
+        return {
+          boxCenter: box.left + box.width / 2,
+          colCenter: colRect.left + colRect.width / 2,
+          boxWidth: box.width,
+          colWidth: colRect.width,
+        };
+      },
+    );
+
+    // The test must be meaningful: there has to be free space (box narrower than
+    // the column) for "centered" to differ from "flush-left".
+    expect(
+      colWidth - boxWidth,
+      "expected free space beside the 340px box at this width",
+    ).toBeGreaterThan(8);
+    // Centered: the box's center sits on the column's center (sub-pixel tolerance).
+    expect(Math.abs(boxCenter - colCenter)).toBeLessThanOrEqual(1.5);
+  });
+});
+
 test.describe("State A — hero top inset (comfortable base + standalone safe-area)", () => {
   test.use({ viewport: MOBILE });
 
@@ -283,9 +333,9 @@ test.describe("State A video changes leave the full presentation byte-identical"
 
   test("the revealed-page AgentNote inlay still cover-crops with the agent's framing", () => {
     const src = readFileSync(AGENT_NOTE, "utf8");
-    // The revealed page keeps its deliberate cover + focal framing — only State A
-    // diverges to contain. A regression here would mean the contain change leaked
-    // into the shared revealed-page render.
+    // The revealed page keeps its deliberate cover + focal framing untouched. State
+    // A now mirrors that same fitment in its OWN element (.sa-hero__video-player),
+    // so this guard just confirms the shared revealed-page render never changed.
     expect(src).toMatch(/objectFit:\s*"cover"/);
   });
 
