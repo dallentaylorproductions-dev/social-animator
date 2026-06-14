@@ -33,13 +33,24 @@
 
 import type { Comp } from "@/tools/seller-intelligence-report/engine/types";
 
-/** Cap the auto-pulled nearby sales the brief shows. Mirrors StepNearbySales'
- *  MAX_NEARBY so the review step never receives more than it can render. */
+/** The FINAL count of nearby sales kept on the draft (and the brief's cap).
+ *  Mirrors StepNearbySales' MAX_NEARBY so the review step never receives more
+ *  than it can render, and keeps the comp set that flows to a later full
+ *  presentation at the same size it has always been (the photographed-first
+ *  selection below changes WHICH comps survive, never HOW MANY). */
 export const MAX_AUTOFILL_COMPS = 4;
 
-/** How many comparables to ask RentCast for. A little above MAX_AUTOFILL_COMPS
- *  so we can drop a malformed row and still fill the brief. */
-export const AVM_COMP_COUNT = 6;
+/** How many comparables to pull + cache per address. We pull a buffer well
+ *  above MAX_AUTOFILL_COMPS so the client can resolve Street View coverage for
+ *  the whole set and KEEP the ones that actually have a photo - a comp with no
+ *  resolvable photo would render an empty frame, so it should not take a slot
+ *  in the brief. RentCast returns up to 25 ranked by similarity, so asking for
+ *  more costs nothing extra (still one cached call per address). */
+export const MAX_COMP_CANDIDATES = 8;
+
+/** How many comparables to ask RentCast for - the candidate pool the client
+ *  selects the photographed comps from. */
+export const AVM_COMP_COUNT = MAX_COMP_CANDIDATES;
 
 /** Subject-property details autofilled into the draft's optional subject* fields.
  *  Every field is a STRING (the shape the StepProperty inputs read/write) and is
@@ -77,7 +88,11 @@ export function autofillCacheKey(
   kind: "prop" | "comps",
   normalizedAddress: string,
 ): string {
-  return `sp-autofill:v1:${kind}:${normalizedAddress}`;
+  // v2: the comps bundle now caches the larger candidate pool
+  // (MAX_COMP_CANDIDATES) the client selects photographed comps from, so a
+  // previously-cached v1 bundle (the old smaller pool) self-invalidates and is
+  // re-pulled once with the buffer it needs.
+  return `sp-autofill:v2:${kind}:${normalizedAddress}`;
 }
 
 /** A finite, positive number survives; 0 / negative / NaN / non-number does not. */
@@ -158,7 +173,7 @@ function firstDate(...candidates: unknown[]): string | undefined {
  */
 export function normalizeAvmComps(
   raw: unknown,
-  cap: number = MAX_AUTOFILL_COMPS,
+  cap: number = MAX_COMP_CANDIDATES,
 ): Comp[] {
   if (!raw || typeof raw !== "object") return [];
   const list = (raw as Record<string, unknown>).comparables;
@@ -196,4 +211,49 @@ export function normalizeAvmComps(
   }
 
   return comps;
+}
+
+/** The minimal photo-bearing shape shared by the draft `Comp` and the public
+ *  comp projection, so the selection below works on either side of the publish
+ *  boundary without coupling to the full type. */
+export interface CompPhotoLike {
+  photoUrl?: string;
+  hasStreetView?: boolean;
+  streetViewPanoId?: string;
+}
+
+/**
+ * Does this comp have a resolvable photo - the evidence the brief renders?
+ * True when the agent supplied a manual photo (takes precedence), OR when
+ * Street View coverage resolved to a usable pano. A comp whose coverage came
+ * back `false` (or is not yet resolved) has NO photo, so it would render an
+ * empty frame and must not take a slot in the seller-facing brief.
+ */
+export function compHasPhoto(comp: CompPhotoLike): boolean {
+  if (typeof comp.photoUrl === "string" && comp.photoUrl.trim()) return true;
+  return (
+    comp.hasStreetView === true &&
+    typeof comp.streetViewPanoId === "string" &&
+    comp.streetViewPanoId.trim().length > 0
+  );
+}
+
+/**
+ * From the resolved candidate pool, keep the comps that actually carry a photo
+ * FIRST (in their existing similarity rank), then backfill with no-coverage
+ * comps only if fewer than `cap` are photographed - so the draft still holds a
+ * sensible nearby-sales set the agent can review or hand a photo to, while the
+ * brief (which filters to photographed) never shows an empty frame. Stable:
+ * order within each group is preserved. Pure + defensive (a non-array collapses
+ * to []), so it's unit-testable and never throws.
+ */
+export function selectKeptComps(
+  comps: Comp[],
+  cap: number = MAX_AUTOFILL_COMPS,
+): Comp[] {
+  if (!Array.isArray(comps)) return [];
+  const photographed = comps.filter((c) => compHasPhoto(c));
+  if (photographed.length >= cap) return photographed.slice(0, cap);
+  const rest = comps.filter((c) => !compHasPhoto(c));
+  return [...photographed, ...rest].slice(0, cap);
 }

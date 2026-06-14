@@ -18,6 +18,8 @@ import { test, expect } from "@playwright/test";
 
 const STATE_A = "/seller-presentation-preview?fixture=state-a";
 const STATE_A_MIN = "/seller-presentation-preview?fixture=state-a-minimal";
+const STATE_A_MIXED =
+  "/seller-presentation-preview?fixture=state-a-mixed-coverage";
 
 test.describe("State A — the prepared dossier renders (rich fixture)", () => {
   test("dispatches to the State A template (not flagship, not v1)", async ({
@@ -206,5 +208,47 @@ test.describe("State A — flex-out (minimal invitation reads complete)", () => 
     await expect(page.getByTestId("fs-sa-credibility")).toHaveCount(0);
     // No signature line set on the minimal fixture → it flexes out of the hero.
     await expect(page.getByTestId("fs-sa-hero-signature")).toHaveCount(0);
+  });
+});
+
+test.describe("State A - the brief shows only photographed nearby sales (COMP_PHOTOS)", () => {
+  test("mixed coverage: only comps WITH a photo render, never a blank frame", async ({
+    page,
+  }) => {
+    await page.goto(STATE_A_MIXED);
+    await expect(page.getByTestId("seller-presentation-state-a")).toBeVisible();
+
+    const nearby = page.getByTestId("fs-sa-brief-nearby");
+    await expect(nearby).toBeVisible();
+
+    // The fixture interleaves two photographed comps with two no-coverage ones.
+    // Exactly the two photographed sales render (the no-coverage comps do not
+    // take a slot), and the photographed addresses are the ones shown.
+    await expect(page.getByTestId("fs-sa-brief-sale-0")).toBeVisible();
+    await expect(page.getByTestId("fs-sa-brief-sale-1")).toBeVisible();
+    await expect(page.getByTestId("fs-sa-brief-sale-2")).toHaveCount(0);
+    await expect(nearby).toContainText("4210 N 14th St");
+    await expect(nearby).toContainText("1722 N Oakes St");
+
+    // The no-coverage addresses never reach the seller-facing brief.
+    await expect(nearby).not.toContainText("Rural Route");
+    await expect(nearby).not.toContainText("Backcountry");
+
+    // Every rendered sale's photo slot is FILLED - a Street View image when the
+    // browser key is present, the neutral placeholder otherwise - never an empty
+    // frame. (The E2E env has no Google key, so this resolves to the
+    // placeholder; the union locator keeps the assertion key-agnostic.)
+    for (const i of [0, 1]) {
+      await expect(
+        page
+          .getByTestId(`fs-sa-brief-sale-${i}`)
+          .locator(".sa-sale__img, .sa-sale__photo img, .sa-photo-ph"),
+      ).toHaveCount(1);
+    }
+
+    // The caption counts only what is shown ("Two recent closings…").
+    await expect(nearby).toContainText(/two recent closings/i);
+    // Still no prices in the invitation brief.
+    await expect(nearby).not.toContainText("$");
   });
 });

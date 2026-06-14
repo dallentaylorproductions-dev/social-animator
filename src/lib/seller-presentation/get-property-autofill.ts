@@ -32,7 +32,7 @@ import { kv } from "@vercel/kv";
 import type { Comp } from "@/tools/seller-intelligence-report/engine/types";
 import {
   AVM_COMP_COUNT,
-  MAX_AUTOFILL_COMPS,
+  MAX_COMP_CANDIDATES,
   autofillCacheKey,
   normalizeAddressKey,
   normalizeAvmComps,
@@ -176,7 +176,7 @@ async function resolveComps(
   try {
     const cached = await store.get<Comp[]>(cacheKey);
     if (Array.isArray(cached) && cached.length > 0) {
-      return { value: cached.slice(0, MAX_AUTOFILL_COMPS), source: "cache" };
+      return { value: cached.slice(0, MAX_COMP_CANDIDATES), source: "cache" };
     }
   } catch {
     /* KV read failure is non-fatal - fall through to a live fetch. */
@@ -186,7 +186,9 @@ async function resolveComps(
   url.searchParams.set("address", address.trim());
   url.searchParams.set("compCount", String(AVM_COMP_COUNT));
   const raw = await fetchRentCast(url.toString(), apiKey, doFetch);
-  const value = normalizeAvmComps(raw);
+  // Cache the whole candidate pool (up to MAX_COMP_CANDIDATES); the client
+  // resolves Street View coverage across it and keeps the photographed comps.
+  const value = normalizeAvmComps(raw, MAX_COMP_CANDIDATES);
   if (value.length === 0) return { value: [], source: "none" };
 
   try {

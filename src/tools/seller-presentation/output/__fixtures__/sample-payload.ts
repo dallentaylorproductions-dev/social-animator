@@ -564,6 +564,46 @@ export const STATE_A_FULL_PAYLOAD: PublicPayload = {
 };
 
 /**
+ * Seller State A - mixed Street View coverage (COMP_PHOTOS). Same prepared
+ * invitation as STATE_A_FULL_PAYLOAD, but the nearby-sales set interleaves comps
+ * WITH resolved coverage and comps WITHOUT (hasStreetView: false, no pano) - the
+ * real-world shape when some addresses have no Street View. Proves the brief
+ * renders ONLY the photographed comps (no empty frame ever ships) regardless of
+ * the order they sit in the payload. The first + third have coverage; the second
+ * + fourth do not, so the brief shows exactly two sales.
+ */
+export const STATE_A_MIXED_COVERAGE_PAYLOAD: PublicPayload = {
+  ...STATE_A_FULL_PAYLOAD,
+  whyPrice: {
+    ...STATE_A_FULL_PAYLOAD.whyPrice,
+    comps: [
+      {
+        address: "4210 N 14th St",
+        soldPrice: "",
+        hasStreetView: true,
+        streetViewPanoId: "TYJpmYKWYPGef4qYTmb59Q",
+        streetViewHeading: 177.49,
+        houseLat: 47.262489,
+        houseLng: -122.493832,
+      },
+      // No Street View coverage - must NOT render a frame in the brief.
+      { address: "9000 Rural Route 1", soldPrice: "", hasStreetView: false },
+      {
+        address: "1722 N Oakes St",
+        soldPrice: "",
+        hasStreetView: true,
+        streetViewPanoId: "hMujcWLJiJ_n5Pb55cBs1A",
+        streetViewHeading: 266.46,
+        houseLat: 47.265773,
+        houseLng: -122.471965,
+      },
+      // Resolved, no coverage - also filtered out of the brief.
+      { address: "12 Backcountry Ln", soldPrice: "", hasStreetView: false },
+    ],
+  },
+};
+
+/**
  * Seller State A — the minimal invitation: only an address, the agent, the
  * status, and the appointment. NO comps, area, whyUs, or reviews, so every proof
  * item AND every optional block flexes out (no hollow checkmarks, no empty

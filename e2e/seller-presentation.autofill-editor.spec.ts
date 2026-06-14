@@ -129,6 +129,24 @@ test.describe("SP-AUTOFILL editor - the address builds the invitation", () => {
     await expect(list).not.toContainText("$685,000");
     await expect(list).not.toContainText("$640,000");
 
+    // No Street View coverage resolves in the test env (no browser key), so the
+    // cards show the neutral placeholder, never a blank frame.
+    await expect(
+      page.getByTestId("step-nearby-sales-placeholder-0"),
+    ).toBeVisible();
+
+    // The optional "add / replace photo" reach opens the camera-roll uploader so
+    // an agent can supply a photo for a comp that lacks Street View.
+    await page.getByTestId("step-nearby-sales-photo-toggle-0").click();
+    await expect(
+      page.getByTestId("step-nearby-sales-photo-0-upload"),
+    ).toBeVisible();
+    // Close the panel again before the trim flow below.
+    await page.getByTestId("step-nearby-sales-photo-toggle-0").click();
+    await expect(
+      page.getByTestId("step-nearby-sales-photo-0-upload"),
+    ).toHaveCount(0);
+
     // Remove one - it is a review/trim step.
     await page.getByTestId("step-nearby-sales-remove-0").click();
     await expect(page.getByTestId("step-nearby-sales-card-1")).toHaveCount(0);

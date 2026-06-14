@@ -10,7 +10,11 @@ import type { Comp } from "@/tools/seller-intelligence-report/engine/types";
 import { formatAppointment } from "../engine/appointment";
 import { useSPEntitlement } from "./SPEntitlementContext";
 import { resolveCompCoverage } from "@/lib/seller-presentation/street-view";
-import { normalizeAddressKey } from "@/lib/seller-presentation/rentcast-autofill";
+import {
+  normalizeAddressKey,
+  selectKeptComps,
+  MAX_AUTOFILL_COMPS,
+} from "@/lib/seller-presentation/rentcast-autofill";
 
 /**
  * Seller Presentation Step 1 — Property + personalization.
@@ -223,10 +227,22 @@ export function StepProperty({ draft, setDraft }: StepPropertyProps) {
     // 2) Nearby sales -> draft.comps, ONLY when the agent has no MANUAL comps
     //    (so a curated list is never clobbered). The auto-pulled comps carry
     //    source "imported"; a manual add carries another source.
+    //
+    //    The route returns a CANDIDATE POOL (up to MAX_COMP_CANDIDATES). When
+    //    comp photos are on we seed the WHOLE pool so the Street View resolve
+    //    below can keep the comps that actually have a photo; the pool is then
+    //    trimmed to MAX_AUTOFILL_COMPS once coverage is known (step 3). When
+    //    photos are off there is nothing to select on, so we trim to the final
+    //    cap up front - keeping the draft (and any later full presentation) at
+    //    the same comp count it has always been.
     const pulledComps: Comp[] = Array.isArray(data.comps) ? data.comps : [];
     const hasManual = cur.comps.some((c) => c.source !== "imported");
     const seedComps = !hasManual && pulledComps.length > 0;
-    const nextComps = seedComps ? pulledComps : cur.comps;
+    const seededComps =
+      compPhotosEnabled === true
+        ? pulledComps
+        : pulledComps.slice(0, MAX_AUTOFILL_COMPS);
+    const nextComps = seedComps ? seededComps : cur.comps;
 
     // The committed draft after autofill. We merge Street View into THIS object
     // (not a re-read of draftRef, which may not have flushed yet) so the second
@@ -237,7 +253,14 @@ export function StepProperty({ draft, setDraft }: StepPropertyProps) {
       comps: nextComps,
     };
     setDraft(baseDraft);
-    setAutofillCompCount(pulledComps.length);
+    // When photos are on the pool is trimmed to MAX_AUTOFILL_COMPS once coverage
+    // resolves (below), so show the final cap up front rather than the larger
+    // candidate count - it only ever settles DOWN from here, never up.
+    setAutofillCompCount(
+      compPhotosEnabled === true
+        ? Math.min(seededComps.length, MAX_AUTOFILL_COMPS)
+        : seededComps.length,
+    );
     setAutofillStatus("done");
 
     // 3) Resolve Street View coverage for the seeded comps client-side so the
@@ -246,30 +269,36 @@ export function StepProperty({ draft, setDraft }: StepPropertyProps) {
     //    (never image bytes), exactly like the full comps step. Gated on
     //    COMP_PHOTOS; a comp already resolved or carrying a manual photo is
     //    skipped, so this never loops or re-bills.
+    //
+    //    Then KEEP the photographed comps (selectKeptComps): a comp with no
+    //    resolvable photo would render an empty frame, so it should not take a
+    //    slot. This trims the candidate pool back to MAX_AUTOFILL_COMPS, so the
+    //    persisted draft - and any later full presentation built from it - holds
+    //    the same comp count it always has, just photographed-first.
     if (compPhotosEnabled === true && seedComps) {
       const results = await Promise.all(
-        pulledComps.map(async (c) => ({
+        seededComps.map(async (c) => ({
           address: c.address,
           cov: await resolveCompCoverage(c.address),
         })),
       );
-      setDraft({
-        ...baseDraft,
-        comps: baseDraft.comps.map((c) => {
-          if (c.photoUrl || c.hasStreetView !== undefined || !c.address?.trim())
-            return c;
-          const hit = results.find((r) => r.address === c.address);
-          if (!hit) return c;
-          return {
-            ...c,
-            streetViewPanoId: hit.cov.panoId,
-            hasStreetView: hit.cov.hasStreetView,
-            streetViewHeading: hit.cov.heading,
-            houseLat: hit.cov.houseLat,
-            houseLng: hit.cov.houseLng,
-          };
-        }),
+      const resolved = baseDraft.comps.map((c) => {
+        if (c.photoUrl || c.hasStreetView !== undefined || !c.address?.trim())
+          return c;
+        const hit = results.find((r) => r.address === c.address);
+        if (!hit) return c;
+        return {
+          ...c,
+          streetViewPanoId: hit.cov.panoId,
+          hasStreetView: hit.cov.hasStreetView,
+          streetViewHeading: hit.cov.heading,
+          houseLat: hit.cov.houseLat,
+          houseLng: hit.cov.houseLng,
+        };
       });
+      const kept = selectKeptComps(resolved, MAX_AUTOFILL_COMPS);
+      setDraft({ ...baseDraft, comps: kept });
+      setAutofillCompCount(kept.length);
     }
   };
 

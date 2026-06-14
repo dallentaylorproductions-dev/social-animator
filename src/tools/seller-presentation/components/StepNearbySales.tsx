@@ -4,6 +4,8 @@ import { useEffect, useRef, useState } from "react";
 import type { Comp } from "@/tools/seller-intelligence-report/engine/types";
 import type { SellerPresentationDraft } from "../engine/types";
 import { useSPEntitlement } from "./SPEntitlementContext";
+import { ImageUploadField } from "@/components/ImageUploadField";
+import { CompPhotoPlaceholder } from "../output/flagship/CompPhotoPlaceholder";
 import {
   resolveCompCoverage,
   streetViewStaticUrl,
@@ -58,6 +60,10 @@ export function StepNearbySales({ draft, setDraft }: StepNearbySalesProps) {
   const comps = draft.comps;
   const canAdd = comps.length < MAX_NEARBY;
   const [pendingAddress, setPendingAddress] = useState("");
+  // Which comp's "add / replace photo" panel is open (one at a time keeps the
+  // review focused, not a wall of dropzones). Indexed; reset when the matching
+  // card is removed so the panel never lands on the wrong card.
+  const [openPhotoIdx, setOpenPhotoIdx] = useState<number | null>(null);
 
   // Latest-draft ref so the async Street View resolve applies against the
   // current comps, not the stale closure from when it was queued (same posture
@@ -123,7 +129,22 @@ export function StepNearbySales({ draft, setDraft }: StepNearbySalesProps) {
   }, [comps, compPhotosEnabled, setDraft]);
 
   const removeAt = (index: number) => {
+    if (openPhotoIdx === index) setOpenPhotoIdx(null);
     setDraft({ ...draft, comps: comps.filter((_, i) => i !== index) });
+  };
+
+  // An agent-supplied photo (Vercel Blob) for a comp that lacks Street View
+  // coverage - or that the agent simply prefers a different shot of. It takes
+  // precedence over Street View at render and counts as "photographed", so the
+  // comp earns its slot in the brief. Empty string clears it (back to Street
+  // View or the placeholder).
+  const setPhotoAt = (index: number, url: string) => {
+    setDraft({
+      ...draft,
+      comps: comps.map((c, i) =>
+        i === index ? { ...c, photoUrl: url || undefined } : c,
+      ),
+    });
   };
 
   const addManual = () => {
@@ -159,37 +180,71 @@ export function StepNearbySales({ draft, setDraft }: StepNearbySalesProps) {
                   })
                 : null;
             const photo = c.photoUrl?.trim() || sv;
+            const photoOpen = openPhotoIdx === index;
             return (
               <div
                 className="sa-review__card"
                 key={index}
                 data-testid={`step-nearby-sales-card-${index}`}
               >
-                <div className="sa-review__thumb">
-                  {photo ? (
-                    // eslint-disable-next-line @next/next/no-img-element -- fetched fresh from Google in the agent's browser, never proxied or stored (same compliance path as the flagship comp card)
-                    <img
-                      src={photo}
-                      alt=""
-                      aria-hidden="true"
-                      loading="lazy"
-                      decoding="async"
-                      data-testid={`step-nearby-sales-thumb-${index}`}
-                    />
-                  ) : (
-                    <span className="sa-review__thumb-empty" aria-hidden="true" />
+                <div className="sa-review__main">
+                  <div className="sa-review__thumb">
+                    {photo ? (
+                      // eslint-disable-next-line @next/next/no-img-element -- fetched fresh from Google in the agent's browser, never proxied or stored (same compliance path as the flagship comp card)
+                      <img
+                        src={photo}
+                        alt=""
+                        aria-hidden="true"
+                        loading="lazy"
+                        decoding="async"
+                        data-testid={`step-nearby-sales-thumb-${index}`}
+                      />
+                    ) : (
+                      <CompPhotoPlaceholder
+                        testId={`step-nearby-sales-placeholder-${index}`}
+                      />
+                    )}
+                  </div>
+                  <div className="sa-review__addr">{c.address || "Nearby"}</div>
+                  {compPhotosEnabled === true && (
+                    <button
+                      type="button"
+                      className="sa-review__photo-toggle"
+                      onClick={() =>
+                        setOpenPhotoIdx(photoOpen ? null : index)
+                      }
+                      aria-expanded={photoOpen}
+                      data-testid={`step-nearby-sales-photo-toggle-${index}`}
+                    >
+                      {photoOpen ? "Done" : photo ? "Replace photo" : "Add photo"}
+                    </button>
                   )}
+                  <button
+                    type="button"
+                    className="sa-nearby__remove"
+                    onClick={() => removeAt(index)}
+                    aria-label={`Remove nearby sale ${index + 1}`}
+                    data-testid={`step-nearby-sales-remove-${index}`}
+                  >
+                    ✕
+                  </button>
                 </div>
-                <div className="sa-review__addr">{c.address || "Nearby"}</div>
-                <button
-                  type="button"
-                  className="sa-nearby__remove"
-                  onClick={() => removeAt(index)}
-                  aria-label={`Remove nearby sale ${index + 1}`}
-                  data-testid={`step-nearby-sales-remove-${index}`}
-                >
-                  ✕
-                </button>
+                {compPhotosEnabled === true && photoOpen && (
+                  <div className="sa-review__photo">
+                    <ImageUploadField
+                      label="Photo for this sale"
+                      value={c.photoUrl ?? ""}
+                      onChange={(url) => setPhotoAt(index, url)}
+                      previewAspect="aspect-[4/3]"
+                      folder="seller-presentation/comps"
+                      testIdPrefix={`step-nearby-sales-photo-${index}`}
+                      disablePasteUrl
+                      emptyTitle="Choose a photo"
+                      emptySubtext="Use your own photo of this home for the invitation."
+                      helpText="Your photo replaces the default street photo for this sale."
+                    />
+                  </div>
+                )}
               </div>
             );
           })}

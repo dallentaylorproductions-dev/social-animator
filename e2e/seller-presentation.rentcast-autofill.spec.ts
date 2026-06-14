@@ -25,8 +25,12 @@ import {
   autofillCacheKey,
   normalizePropertyRecord,
   normalizeAvmComps,
+  compHasPhoto,
+  selectKeptComps,
   MAX_AUTOFILL_COMPS,
+  MAX_COMP_CANDIDATES,
 } from "../src/lib/seller-presentation/rentcast-autofill";
+import type { Comp } from "../src/tools/seller-intelligence-report/engine/types";
 import {
   getAddressAutofill,
   type AutofillKv,
@@ -125,13 +129,13 @@ test.describe("SP-AUTOFILL - address key + cache key", () => {
     expect(normalizeAddressKey(42)).toBe("");
   });
 
-  test("autofillCacheKey is per-kind + versioned", () => {
+  test("autofillCacheKey is per-kind + versioned (v2: larger candidate pool)", () => {
     const k = normalizeAddressKey("742 N Cedar St, Tacoma");
     expect(autofillCacheKey("prop", k)).toBe(
-      "sp-autofill:v1:prop:742 n cedar st tacoma",
+      "sp-autofill:v2:prop:742 n cedar st tacoma",
     );
     expect(autofillCacheKey("comps", k)).toBe(
-      "sp-autofill:v1:comps:742 n cedar st tacoma",
+      "sp-autofill:v2:comps:742 n cedar st tacoma",
     );
   });
 });
@@ -175,14 +179,19 @@ test.describe("SP-AUTOFILL - normalizePropertyRecord", () => {
 /* --------------------------------------------------------- comps normalizer */
 
 test.describe("SP-AUTOFILL - normalizeAvmComps", () => {
-  test("fixture -> ranked Comp[], capped, price-formatted, source imported", () => {
+  test("fixture -> ranked Comp[] candidate pool, price-formatted, source imported", () => {
     const comps = normalizeAvmComps(AVM_FIXTURE);
-    expect(comps).toHaveLength(MAX_AUTOFILL_COMPS); // 4
+    // Default cap is the candidate pool (MAX_COMP_CANDIDATES); the fixture has
+    // five rows with both an address and a price, so all five survive (the two
+    // with no address / no price are dropped). The client later resolves Street
+    // View coverage across the pool and KEEPS the photographed ones.
+    expect(comps).toHaveLength(5);
     expect(comps.map((c) => c.address)).toEqual([
       "742 N Cedar St, Tacoma, WA 98406",
       "1120 S Ainsworth Ave, Tacoma, WA 98405",
       "915 N Steele St",
       "Fourth kept comp",
+      "Fifth comp beyond the cap",
     ]);
     expect(comps[0]).toEqual({
       address: "742 N Cedar St, Tacoma, WA 98406",
@@ -210,6 +219,9 @@ test.describe("SP-AUTOFILL - normalizeAvmComps", () => {
 
   test("custom cap is honored", () => {
     expect(normalizeAvmComps(AVM_FIXTURE, 2)).toHaveLength(2);
+    // The candidate-pool cap is well above the final kept count, so the buffer
+    // exists for photographed-first selection.
+    expect(MAX_COMP_CANDIDATES).toBeGreaterThan(MAX_AUTOFILL_COMPS);
   });
 
   test("malformed / empty -> [], never throws", () => {
@@ -217,6 +229,98 @@ test.describe("SP-AUTOFILL - normalizeAvmComps", () => {
     expect(normalizeAvmComps({})).toEqual([]);
     expect(normalizeAvmComps({ comparables: "nope" })).toEqual([]);
     expect(normalizeAvmComps({ comparables: [] })).toEqual([]);
+  });
+});
+
+/* ----------------------------------------- photographed-comp selection (brief) */
+
+test.describe("SP-AUTOFILL - compHasPhoto + selectKeptComps", () => {
+  const withStreetView = (address: string): Comp => ({
+    address,
+    soldPrice: "",
+    source: "imported",
+    hasStreetView: true,
+    streetViewPanoId: `pano-${address}`,
+  });
+  const noCoverage = (address: string): Comp => ({
+    address,
+    soldPrice: "",
+    source: "imported",
+    hasStreetView: false,
+  });
+  const manualPhoto = (address: string): Comp => ({
+    address,
+    soldPrice: "",
+    source: "imported",
+    photoUrl: "https://blob.example/photo.jpg",
+  });
+
+  test("compHasPhoto: true for resolved Street View OR a manual photo", () => {
+    expect(compHasPhoto(withStreetView("A"))).toBe(true);
+    expect(compHasPhoto(manualPhoto("B"))).toBe(true);
+    // A manual photo wins even if coverage came back false.
+    expect(
+      compHasPhoto({ ...noCoverage("C"), photoUrl: "https://blob/x.jpg" }),
+    ).toBe(true);
+  });
+
+  test("compHasPhoto: false for no-coverage, unresolved, or pano-less", () => {
+    expect(compHasPhoto(noCoverage("A"))).toBe(false); // resolved, no coverage
+    expect(compHasPhoto({ address: "B", soldPrice: "" })).toBe(false); // unresolved
+    // hasStreetView true but no usable pano id is not a renderable photo.
+    expect(
+      compHasPhoto({ address: "C", soldPrice: "", hasStreetView: true }),
+    ).toBe(false);
+    expect(compHasPhoto({ address: "D", soldPrice: "", photoUrl: "   " })).toBe(
+      false,
+    );
+  });
+
+  test("selectKeptComps: photographed first, no-coverage backfills, capped", () => {
+    const pool: Comp[] = [
+      noCoverage("no-1"),
+      withStreetView("sv-1"),
+      noCoverage("no-2"),
+      withStreetView("sv-2"),
+      manualPhoto("man-1"),
+      noCoverage("no-3"),
+    ];
+    const kept = selectKeptComps(pool, MAX_AUTOFILL_COMPS);
+    expect(kept).toHaveLength(MAX_AUTOFILL_COMPS); // 4
+    // The three photographed comps come first (in their original rank), then
+    // one no-coverage comp backfills to reach the cap.
+    expect(kept.map((c) => c.address)).toEqual([
+      "sv-1",
+      "sv-2",
+      "man-1",
+      "no-1",
+    ]);
+  });
+
+  test("selectKeptComps: when >= cap are photographed, no-coverage never shows", () => {
+    const pool: Comp[] = [
+      withStreetView("sv-1"),
+      withStreetView("sv-2"),
+      withStreetView("sv-3"),
+      withStreetView("sv-4"),
+      withStreetView("sv-5"),
+      noCoverage("no-1"),
+    ];
+    const kept = selectKeptComps(pool, MAX_AUTOFILL_COMPS);
+    expect(kept).toHaveLength(MAX_AUTOFILL_COMPS);
+    expect(kept.every((c) => compHasPhoto(c))).toBe(true);
+  });
+
+  test("selectKeptComps: fewer than cap photographed -> shows what is available", () => {
+    const pool: Comp[] = [withStreetView("sv-1"), noCoverage("no-1")];
+    const kept = selectKeptComps(pool, MAX_AUTOFILL_COMPS);
+    // Both kept (the photographed one + one backfill), never padded past the
+    // pool, and never throws on a short / non-array input.
+    expect(kept.map((c) => c.address)).toEqual(["sv-1", "no-1"]);
+    expect(selectKeptComps([], MAX_AUTOFILL_COMPS)).toEqual([]);
+    expect(
+      selectKeptComps(null as unknown as Comp[], MAX_AUTOFILL_COMPS),
+    ).toEqual([]);
   });
 });
 
@@ -257,7 +361,9 @@ test.describe("SP-AUTOFILL - getAddressAutofill (cache + fetch + fallback)", () 
     expect(res.ok).toBe(true);
     if (res.ok) {
       expect(res.property.bedrooms).toBe("3");
-      expect(res.comps).toHaveLength(MAX_AUTOFILL_COMPS);
+      // The candidate pool (all five valid fixture comps) is returned + cached;
+      // the client trims to MAX_AUTOFILL_COMPS after resolving coverage.
+      expect(res.comps).toHaveLength(5);
       expect(res.source).toEqual({ property: "live", comps: "live" });
     }
     expect(calls()).toBe(2); // one per endpoint
@@ -276,7 +382,8 @@ test.describe("SP-AUTOFILL - getAddressAutofill (cache + fetch + fallback)", () 
     expect(res.ok).toBe(true);
     if (res.ok) {
       expect(res.property.bedrooms).toBe("5");
-      expect(res.comps).toHaveLength(MAX_AUTOFILL_COMPS);
+      // Cached candidate pool returned as-is (sliced to MAX_COMP_CANDIDATES).
+      expect(res.comps).toHaveLength(5);
       expect(res.source).toEqual({ property: "cache", comps: "cache" });
     }
     expect(calls()).toBe(0);
