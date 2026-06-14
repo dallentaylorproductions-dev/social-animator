@@ -107,6 +107,33 @@ const UX1_TOUCHED_COPY: Array<{ file: string; phrase: string }> = [
     file: 'src/tools/seller-presentation/components/BrandKitForm.tsx',
     phrase: 'resetLabel="Default"',
   },
+  // Seller State A — evergreen fixed labels + strong defaults. Each must stay
+  // present (no silent regression to the old assumptive copy: a duration, "the
+  // listing", "magazine-grade", or the blunt valuation line) and carry no em-dash.
+  {
+    file: 'src/tools/seller-presentation/output/flagship/state-a-copy.ts',
+    phrase: 'A quick hello from',
+  },
+  {
+    file: 'src/tools/seller-presentation/output/flagship/state-a-copy.ts',
+    phrase: 'Your home in front of buyers wherever they are already looking',
+  },
+  {
+    file: 'src/tools/seller-presentation/output/flagship/state-a-copy.ts',
+    phrase: 'Photography that sells',
+  },
+  {
+    file: 'src/tools/seller-presentation/output/flagship/state-a-copy.ts',
+    phrase: 'A recent video tour',
+  },
+  {
+    file: 'src/tools/seller-presentation/output/flagship/state-a-copy.ts',
+    phrase: 'grounded in your home, not a guess',
+  },
+  {
+    file: 'src/tools/seller-presentation/output/flagship/state-a-copy.ts',
+    phrase: 'I put this together ahead of our visit',
+  },
 ];
 
 test.describe('UX-1 touched copy', () => {

@@ -193,6 +193,14 @@
   text-transform: uppercase;
   color: var(--t-pap-mute);
 }
+.fs-page.state-a .sa-hero__welcome {
+  margin: 14px 0 0;
+  font-size: clamp(13px, 1.7cqi, 15px);
+  line-height: 1.55;
+  color: var(--t-pap-soft);
+  max-width: 46ch;
+  text-wrap: pretty;
+}
 .fs-page.state-a .sa-hero__sig {
   margin: 16px 0 0;
   font-family: var(--f-display);
@@ -602,13 +610,10 @@
   inset: 0;
   z-index: 0;
   background-size: cover;
+  /* Both capability frames are property imagery (listing photography + a recent
+     video-tour poster), so both stay centered. The per-invitation talking-head
+     hello lives in the hero, not this spread, so no face-bias crop is needed. */
   background-position: center;
-}
-/* The video-tour poster is a frame from the agent's hello: bias the cover-crop
-   upward so a talking-head poster reads as a deliberate face-safe thumbnail,
-   never cut mid-face. 30% matches the default video framing's focal bias. */
-.fs-page.state-a .sa-frame__photo--face {
-  background-position: center 30%;
 }
 .fs-page.state-a .sa-frame.has-photo::after {
   content: "";

@@ -7,13 +7,14 @@ import { resolve } from "node:path";
  *
  * Three pre-existing State A polish issues, fixed as ONE system:
  *
- *   1. INLINE VIDEO FULL-FRAME — the hero "Watch a 15-second hello" player used
- *      `object-fit: cover` + the agent's focal/zoom framing, which cropped a
- *      portrait talking-head mid-face. It now shows the WHOLE frame via
- *      `object-fit: contain` on a portrait-friendly (4/5) box, letterboxed onto
- *      the dossier ink mat. The campaign "Video tour" poster (a background-image,
- *      not a <video>) biases its cover-crop upward (.sa-frame__photo--face) so a
- *      talking-head poster is never cut mid-face.
+ *   1. INLINE VIDEO FULL-FRAME — the hero personal-message player (labeled
+ *      evergreen "A quick hello from [Agent]", no duration) used `object-fit:
+ *      cover` + the agent's focal/zoom framing, which cropped a portrait
+ *      talking-head mid-face. It now shows the WHOLE frame via `object-fit:
+ *      contain` on a portrait-friendly (4/5) box, letterboxed onto the dossier ink
+ *      mat. The campaign "A recent video tour" poster (a background-image, not a
+ *      <video>) is a SET-ONCE capability sample (a property tour, distinct from
+ *      the hero hello), so it stays centered like the listing photo.
  *
  *   2. FULLSCREEN LETTERBOX — taking the hero <video> to native fullscreen had no
  *      contain override, so a portrait clip blew out / cropped. Mirrors the
@@ -122,25 +123,24 @@ test.describe("State A — inline video shows the full frame (no mid-face crop)"
     );
   });
 
-  test("the campaign 'Video tour' poster biases its crop upward (face-safe)", async ({
+  test("the campaign capability video poster is centered (a property tour, not the hero hello)", async ({
     page,
   }) => {
     await page.goto(STATE_A);
     const frame = page.getByTestId("fs-sa-spread-video");
     await expect(frame).toBeVisible();
 
-    const photo = frame.locator(".sa-frame__photo--face");
-    await expect(
-      photo,
-      "the video-tour poster must carry the face-safe modifier",
-    ).toHaveCount(1);
+    // The campaign video is the SET-ONCE capability sample (a recent video tour),
+    // distinct from the per-invitation hero hello. It is property imagery, so it
+    // carries NO face-safe modifier and stays centered like the listing photo.
+    const photo = frame.locator(".sa-frame__photo");
+    await expect(photo).toHaveCount(1);
+    await expect(frame.locator(".sa-frame__photo--face")).toHaveCount(0);
 
     const pos = await photo.evaluate(
       (el) => getComputedStyle(el).backgroundPosition,
     );
-    // center 30% → "50% 30%". The vertical bias must be above center so a
-    // talking-head poster is never cut mid-face.
-    expect(pos).toBe("50% 30%");
+    expect(pos).toBe("50% 50%");
   });
 });
 

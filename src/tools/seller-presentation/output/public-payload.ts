@@ -174,6 +174,20 @@ export interface BrandWhyUsInput {
    * valuation / meeting); State B ignores it, so an unset value is byte-identical.
    */
   signatureLine?: string;
+  /**
+   * Seller State A — the editable valuation voice line and personal welcome line,
+   * plus the set-once CAPABILITY sample assets (the agent's best listing photo +
+   * a recent video tour) for the campaign frames. All agent-constant, same
+   * provenance as `signatureLine`. Snapshotted ONLY into a State A publish (the
+   * projector gates them), so a State B / full / flag-off publish is byte-identical
+   * whether set or not. Each is optional: unset voice lines fall to a strong
+   * render default; unset capability samples flex their frame out.
+   */
+  valuationMessage?: string;
+  welcomeLine?: string;
+  sampleListingPhotoUrl?: string;
+  sampleVideoUrl?: string;
+  sampleVideoPosterUrl?: string;
 }
 
 /**
@@ -346,6 +360,21 @@ export interface PublicPayload {
    * agent in the hero and may echo it near the valuation / meeting.
    */
   signatureLine?: string;
+  /**
+   * Seller State A — the editable valuation voice line + personal welcome line,
+   * and the set-once capability sample assets (listing photo + recent video tour,
+   * with the video's auto-captured poster) for the campaign frames. Emitted ONLY
+   * in a State A publish (gated like `valuationStatus`); absent on a revealed /
+   * full / flag-off publish, so those stay byte-identical. The render falls to a
+   * strong default for the voice lines when unset and flexes each capability
+   * frame out when its sample is absent. The capability video is a DISTINCT asset
+   * from the per-invitation hero `video` (the agent's personal message).
+   */
+  valuationMessage?: string;
+  welcomeLine?: string;
+  sampleListingPhotoUrl?: string;
+  sampleVideoUrl?: string;
+  sampleVideoPosterUrl?: string;
   /**
    * Optional "as of <Mon YYYY>" stamp for the reviews aggregate rating (e.g.
    * "Jun 2026"). Surfaced by the v2 review card for a Google source, where
@@ -933,11 +962,26 @@ export function toPublicPayload(
   const projectedReviewsHeadline = projectPublicWhyUsText(
     brandWhyUs.reviewsHeadline,
   );
-  // Seller State A — project the quiet signature line exactly like the tagline:
-  // trim-or-undefined, so an unset value drops the key (byte-identical) and the
-  // State A render flexes it out.
+  // Seller State A — project the quiet signature, the editable voice lines, and
+  // the set-once capability sample assets exactly like the tagline: trim-or-
+  // undefined, so an unset value drops the key. These are spread into the State A
+  // gate below (NOT the main return), so a revealed / full / flag-off publish
+  // never carries them and stays byte-identical whether set or not.
   const projectedSignatureLine = projectPublicWhyUsText(
     brandWhyUs.signatureLine,
+  );
+  const projectedValuationMessage = projectPublicWhyUsText(
+    brandWhyUs.valuationMessage,
+  );
+  const projectedWelcomeLine = projectPublicWhyUsText(brandWhyUs.welcomeLine);
+  const projectedSampleListingPhotoUrl = projectPublicWhyUsText(
+    brandWhyUs.sampleListingPhotoUrl,
+  );
+  const projectedSampleVideoUrl = projectPublicWhyUsText(
+    brandWhyUs.sampleVideoUrl,
+  );
+  const projectedSampleVideoPosterUrl = projectPublicWhyUsText(
+    brandWhyUs.sampleVideoPosterUrl,
   );
 
   // SELLER_STATE_A — emit the state discriminator + appointment ONLY for a
@@ -949,6 +993,16 @@ export function toPublicPayload(
       ? {
           valuationStatus: draft.valuationStatus,
           appointmentAt: clampAppointmentAt(draft.appointmentAt),
+          // Seller State A copy + capability assets — emitted ONLY here, so a
+          // revealed / full / flag-off publish carries none of these keys and is
+          // byte-identical. Undefined values drop out via JSON.stringify, so an
+          // agent who set nothing still publishes a clean, minimal payload.
+          signatureLine: projectedSignatureLine,
+          valuationMessage: projectedValuationMessage,
+          welcomeLine: projectedWelcomeLine,
+          sampleListingPhotoUrl: projectedSampleListingPhotoUrl,
+          sampleVideoUrl: projectedSampleVideoUrl,
+          sampleVideoPosterUrl: projectedSampleVideoPosterUrl,
         }
       : {};
 
@@ -1014,9 +1068,10 @@ export function toPublicPayload(
     whyUs: projectedWhyUs,
     agentTagline: projectedTagline,
     reviewsHeadline: projectedReviewsHeadline,
-    signatureLine: projectedSignatureLine,
 
     // Seller State A — spread last; `{}` for every revealed / flag-off publish.
+    // Carries the state discriminator + appointment AND the State A copy/asset
+    // fields (signature, valuation/welcome voice lines, capability samples).
     ...stateAFields,
   };
 }
@@ -1103,21 +1158,46 @@ export function clampPublicPayload(raw: unknown): PublicPayload {
     agentTagline: projectPublicWhyUsText(r.agentTagline),
     reviewsHeadline: projectPublicWhyUsText(r.reviewsHeadline),
     reviewsAsOf: projectPublicWhyUsText(r.reviewsAsOf),
-    // Seller State A — re-clamp the quiet signature at the read boundary (same
-    // trim-or-undefined the projector used). A hand-edited record with a
-    // non-string value drops the key; only the State A render reads it.
-    signatureLine: projectPublicWhyUsText(r.signatureLine),
 
     // Seller State A — coerce the discriminator at the trust boundary. An
     // absent / unknown / tampered value reads as `revealed` so the consumer
     // dispatch resolves to the existing full presentation (every pre-State-A
-    // slug lands here, byte-identical). `appointmentAt` survives only as a real
-    // datetime-local moment AND only alongside an invitation status (a stray
-    // appointment on a revealed record is dropped, never rendered).
-    valuationStatus: clampValuationStatus(r.valuationStatus),
-    appointmentAt: isInvitationStatus(clampValuationStatus(r.valuationStatus))
-      ? clampAppointmentAt(r.appointmentAt)
-      : undefined,
+    // slug lands here, byte-identical). The State A copy/asset fields + the
+    // appointment survive ONLY alongside an invitation status (a stray field on a
+    // revealed record is dropped, never rendered), each re-clamped with the same
+    // trim-or-undefined the projector used.
+    ...clampStateAFields(r),
+  };
+}
+
+/**
+ * Seller State A — read-boundary clamp for the prepared-invitation fields. The
+ * status is coerced first; the appointment + every State A copy/asset field
+ * survive ONLY alongside an invitation status, so a hand-edited revealed record
+ * can never surface an orphan appointment, signature, voice line, or capability
+ * sample. Each scalar uses the same trim-or-undefined the projector applied.
+ */
+function clampStateAFields(r: Record<string, unknown>): {
+  valuationStatus: ValuationStatus;
+  appointmentAt?: string;
+  signatureLine?: string;
+  valuationMessage?: string;
+  welcomeLine?: string;
+  sampleListingPhotoUrl?: string;
+  sampleVideoUrl?: string;
+  sampleVideoPosterUrl?: string;
+} {
+  const valuationStatus = clampValuationStatus(r.valuationStatus);
+  if (!isInvitationStatus(valuationStatus)) return { valuationStatus };
+  return {
+    valuationStatus,
+    appointmentAt: clampAppointmentAt(r.appointmentAt),
+    signatureLine: projectPublicWhyUsText(r.signatureLine),
+    valuationMessage: projectPublicWhyUsText(r.valuationMessage),
+    welcomeLine: projectPublicWhyUsText(r.welcomeLine),
+    sampleListingPhotoUrl: projectPublicWhyUsText(r.sampleListingPhotoUrl),
+    sampleVideoUrl: projectPublicWhyUsText(r.sampleVideoUrl),
+    sampleVideoPosterUrl: projectPublicWhyUsText(r.sampleVideoPosterUrl),
   };
 }
 

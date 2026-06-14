@@ -1,20 +1,30 @@
 import type { PublicPayload } from "../public-payload";
-import { effectivePosterUrl } from "../../engine/types";
+import {
+  CAPABILITY_PHOTO_LABEL,
+  CAPABILITY_PHOTO_SUB,
+  CAPABILITY_VIDEO_LABEL,
+  CAPABILITY_VIDEO_SUB,
+  EXPOSURE_LINE,
+} from "./state-a-copy";
 
 /**
  * Seller State A · Signature B - "How I'll get your home seen" (campaign spread).
  *
- * The one net-new visual: a premium, editorial composition of the PRODUCED
- * assets that go in front of buyers, photo-forward, matching the State B DNA.
- * Shows OUTPUT, not strategy, and never an abstract dot field / node graph /
- * logo row / tech-stack map. A slim reach line beneath says WHERE the home is
- * seen without a utilitarian lane wall.
+ * The one net-new visual: a premium, editorial composition of the agent's
+ * CAPABILITY, photo-forward, matching the State B DNA. Shows OUTPUT, not strategy,
+ * and never an abstract dot field / node graph / logo row / tech-stack map. A slim
+ * reach line beneath says WHERE the home is seen without a utilitarian lane wall.
  *
- * Honest by construction: frames are built ONLY from assets the payload actually
- * carries - the listing photo (`heroPhotoUrl`), the walkthrough video (its
- * poster when one exists), and the agent's authored marketing-plan items
- * (`whyUs.marketingApproach`). Nothing is fabricated; the whole section flexes
- * out when no produced asset backs it.
+ * Honest by construction: BEFORE the walkthrough this home has no listing photo
+ * and no tour yet, so the frames must NOT imply them. They are built from the
+ * agent's SET-ONCE capability samples (their best listing photography +  a recent
+ * video tour, sourced from Settings and reused across every invitation) plus the
+ * agent's authored marketing-plan items (`whyUs.marketingApproach`). The
+ * capability video is a DISTINCT asset from the per-invitation hero personal
+ * message (`payload.video`), which fixes the "same video, two labels" problem.
+ * Nothing is fabricated; each frame flexes out when its sample is unset, and the
+ * whole section flexes out when nothing backs it (the written promise still reads
+ * complete via the marketing items + reach line when a sample is missing).
  */
 type Frame = {
   key: string;
@@ -27,24 +37,30 @@ type Frame = {
 export function CampaignSpread({ payload }: { payload: PublicPayload }) {
   const frames: Frame[] = [];
 
-  const listing = payload.property.heroPhotoUrl?.trim();
-  if (listing) {
+  // Set-once capability PHOTO: the agent's best listing photography (NOT this
+  // home, which is not shot yet). Relabeled honestly as a capability, never "The
+  // listing" / "magazine-grade".
+  const samplePhoto = payload.sampleListingPhotoUrl?.trim();
+  if (samplePhoto) {
     frames.push({
-      key: "listing",
-      label: "The listing",
-      sub: "Magazine-grade photography",
-      image: listing,
+      key: "photo",
+      label: CAPABILITY_PHOTO_LABEL,
+      sub: CAPABILITY_PHOTO_SUB,
+      image: samplePhoto,
       kind: "photo",
     });
   }
 
-  const v = payload.video;
-  if (v?.videoUrl) {
-    const poster = effectivePosterUrl(v);
+  // Set-once capability VIDEO: a recent video tour the agent produced, DISTINCT
+  // from the per-invitation hero personal message (payload.video). Its poster (an
+  // auto-captured first frame) backs the frame when present.
+  const sampleVideo = payload.sampleVideoUrl?.trim();
+  if (sampleVideo) {
+    const poster = payload.sampleVideoPosterUrl?.trim();
     frames.push({
       key: "video",
-      label: "Video tour",
-      sub: v.runtime?.trim() || "A walk through the home",
+      label: CAPABILITY_VIDEO_LABEL,
+      sub: CAPABILITY_VIDEO_SUB,
       image: poster,
       kind: poster ? "photo" : "asset",
     });
@@ -89,7 +105,7 @@ export function CampaignSpread({ payload }: { payload: PublicPayload }) {
       </div>
 
       <p className="sa-spread__reach reveal" data-testid="fs-sa-spread-reach">
-        Seen across search portals, a local buyer network, and social discovery.
+        {EXPOSURE_LINE}
       </p>
     </section>
   );
@@ -105,12 +121,11 @@ function SpreadFrame({ frame, lead = false }: { frame: Frame; lead?: boolean }) 
     >
       {frame.image && (
         <span
-          /* The video-tour poster is a frame from the agent's hello — bias the
-             cover-crop upward (.sa-frame__photo--face) so a talking-head poster
-             is never cut mid-face. The listing photo (a house) stays centered. */
-          className={`sa-frame__photo${
-            frame.key === "video" ? " sa-frame__photo--face" : ""
-          }`}
+          /* Both capability frames are property imagery (the agent's listing
+             photography + a recent video-tour poster), so both stay centered.
+             No face-bias crop is applied here: the per-invitation talking-head
+             hello lives in the hero, not this spread. */
+          className="sa-frame__photo"
           aria-hidden="true"
           style={{
             backgroundImage: `url("${frame.image.replace(/"/g, '\\"')}")`,

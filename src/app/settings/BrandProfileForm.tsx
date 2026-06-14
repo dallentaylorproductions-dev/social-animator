@@ -12,6 +12,8 @@ import { PhoneInput } from "@/components/inputs";
 import { HeadshotField } from "./HeadshotField";
 import { defaultWhyUs } from "@/lib/whyus";
 import { WhyUsSection } from "./WhyUsSection";
+import { PreparedInvitationFields } from "./PreparedInvitationFields";
+import { SPEntitlementProvider } from "@/tools/seller-presentation/components/SPEntitlementContext";
 
 /**
  * Soft cap on the curated reviews list. Six rows is enough to cover the
@@ -322,6 +324,27 @@ export function BrandProfileForm() {
         whyUs={s.whyUs ?? defaultWhyUs()}
         onChange={(next) => update("whyUs", next)}
       />
+
+      {/* Seller State A — the prepared-invitation voice lines + set-once
+          capability samples. Gated behind the SELLER_STATE_A entitlement (the
+          provider fetches /api/entitlements/me); the section returns null until
+          the flag is on, so nothing new surfaces for agents without it. All
+          fields are additive + optional. */}
+      <SPEntitlementProvider>
+        <PreparedInvitationFields
+          signatureLine={s.signatureLine}
+          valuationMessage={s.valuationMessage}
+          welcomeLine={s.welcomeLine}
+          sampleListingPhotoUrl={s.sampleListingPhotoUrl}
+          sampleVideoUrl={s.sampleVideoUrl}
+          sampleVideoPosterUrl={s.sampleVideoPosterUrl}
+          onChange={(patch) => {
+            const next = { ...s, ...patch };
+            setS(next);
+            saveBrandSettings(next);
+          }}
+        />
+      </SPEntitlementProvider>
 
       <p className="text-[11px] text-neutral-600 leading-relaxed pt-4 border-t border-neutral-900">
         Saved automatically. Stored in your browser only.

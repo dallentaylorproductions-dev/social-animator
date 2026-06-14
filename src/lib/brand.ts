@@ -69,6 +69,39 @@ export interface BrandSettings {
    */
   reviewsHeadline?: string;
   /**
+   * Seller State A — the agent's "quiet signature" line, set once in Settings.
+   * Flows through `brandWhyUs.signatureLine` to the publish payload and is
+   * rendered ONLY by the State A hero (State B / full presentation ignores it).
+   * Optional; unset → the hero flexes the signature out. The Settings input was
+   * deferred in the State A refinement PR and is wired here.
+   */
+  signatureLine?: string;
+  /**
+   * Seller State A — the editable VALUATION message (the "your number is being
+   * prepared" voice line). Agent-constant, set once. Optional: unset → the State
+   * A page renders a strong universal default; set → the agent's own words. Only
+   * the State A page reads it; State B / full / flag-off are unaffected.
+   */
+  valuationMessage?: string;
+  /**
+   * Seller State A — the editable personal WELCOME line shown near the agent in
+   * the hero. Agent-constant, set once. Optional: unset → a warm default renders;
+   * set → the agent's own words. State A only.
+   */
+  welcomeLine?: string;
+  /**
+   * Seller State A — set-once CAPABILITY sample assets for the "How I'll get your
+   * home seen" campaign frames. These show the agent's CAPABILITY (their best
+   * listing photography + a recent video tour), NOT this not-yet-shot home, and
+   * are reused across every invitation. Hosted Vercel Blob URLs (camera-roll →
+   * /api/upload-image|upload-video). All optional; each frame flexes out when its
+   * sample is unset. `sampleVideoPosterUrl` is the auto-captured first frame so
+   * the video frame can render a concrete poster.
+   */
+  sampleListingPhotoUrl?: string;
+  sampleVideoUrl?: string;
+  sampleVideoPosterUrl?: string;
+  /**
    * B0a — "Why us" agent-constant content group (differentiators, marketing
    * approach, performance stats, how-we-work, guarantee). Set once in
    * Settings; flows into every Seller Presentation in B0b. `undefined` means
@@ -386,6 +419,39 @@ export function loadBrandSettings(): BrandSettings {
         typeof parsed.reviewsHeadline === "string" &&
         parsed.reviewsHeadline.length > 0
           ? parsed.reviewsHeadline
+          : undefined,
+      // Seller State A — editable voice lines + set-once capability samples. All
+      // optional; a non-string / empty value drops to undefined ("use the strong
+      // default" / "flex the frame out"), so an agent who sets nothing publishes
+      // a byte-identical State B / flag-off page.
+      signatureLine:
+        typeof parsed.signatureLine === "string" &&
+        parsed.signatureLine.length > 0
+          ? parsed.signatureLine
+          : undefined,
+      valuationMessage:
+        typeof parsed.valuationMessage === "string" &&
+        parsed.valuationMessage.length > 0
+          ? parsed.valuationMessage
+          : undefined,
+      welcomeLine:
+        typeof parsed.welcomeLine === "string" && parsed.welcomeLine.length > 0
+          ? parsed.welcomeLine
+          : undefined,
+      sampleListingPhotoUrl:
+        typeof parsed.sampleListingPhotoUrl === "string" &&
+        parsed.sampleListingPhotoUrl.length > 0
+          ? parsed.sampleListingPhotoUrl
+          : undefined,
+      sampleVideoUrl:
+        typeof parsed.sampleVideoUrl === "string" &&
+        parsed.sampleVideoUrl.length > 0
+          ? parsed.sampleVideoUrl
+          : undefined,
+      sampleVideoPosterUrl:
+        typeof parsed.sampleVideoPosterUrl === "string" &&
+        parsed.sampleVideoPosterUrl.length > 0
+          ? parsed.sampleVideoPosterUrl
           : undefined,
       // B0a — clamp the "Why us" group to its declared shape + soft caps on
       // load; undefined means "never configured" (form seeds from defaults).

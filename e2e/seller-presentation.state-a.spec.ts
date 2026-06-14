@@ -212,8 +212,10 @@ test.describe("State A — publish gate relaxes for the invitation, unchanged fo
 });
 
 test.describe("State A — quiet signature line projection + clamp", () => {
-  // signatureLine rides the brandWhyUs snapshot (6th positional arg), exactly
-  // like agentTagline: trim-or-undefined, omitted when unset (byte-identical).
+  // signatureLine rides the brandWhyUs snapshot (6th positional arg), trim-or-
+  // undefined like agentTagline. It is now a STATE-A-GATED field: emitted/read
+  // ONLY alongside an invitation status, so a revealed / full / flag-off publish
+  // carries no signatureLine key and is byte-identical even when the agent set one.
   function projectSig(signatureLine?: string, status = "preparing_for_walkthrough") {
     return toPublicPayload(
       invitationDraft({
@@ -245,20 +247,129 @@ test.describe("State A — quiet signature line projection + clamp", () => {
     expect(projectSig("   ").signatureLine).toBeUndefined();
   });
 
-  test("read clamp coerces a non-string signatureLine to undefined", () => {
+  test("read clamp coerces a non-string signatureLine to undefined (within State A)", () => {
     expect(
-      clampPublicPayload({ signatureLine: 42 }).signatureLine,
+      clampPublicPayload({
+        valuationStatus: "preparing_for_walkthrough",
+        signatureLine: 42,
+      }).signatureLine,
     ).toBeUndefined();
-    expect(clampPublicPayload({ signatureLine: "Hello." }).signatureLine).toBe(
-      "Hello.",
-    );
+    expect(
+      clampPublicPayload({
+        valuationStatus: "preparing_for_walkthrough",
+        signatureLine: "Hello.",
+      }).signatureLine,
+    ).toBe("Hello.");
   });
 
-  test("brand-constant: present even on a revealed publish (State A reads it, State B ignores it)", () => {
+  test("State-A-gated: a revealed publish drops signatureLine (State B byte-identical)", () => {
     const payload = projectSig("Brand line.", "revealed");
-    expect(payload.signatureLine).toBe("Brand line.");
-    // ...without flipping the State A status machine (still a revealed publish).
+    expect(payload.signatureLine).toBeUndefined();
+    expect(JSON.stringify(payload)).not.toContain('"signatureLine":');
+    // ...and the State A status machine stays revealed (a full presentation).
     expect(payload.valuationStatus).toBeUndefined();
+  });
+
+  test("read clamp drops a stray signatureLine on a revealed record", () => {
+    expect(
+      clampPublicPayload({
+        valuationStatus: "revealed",
+        signatureLine: "Brand line.",
+      }).signatureLine,
+    ).toBeUndefined();
+  });
+});
+
+test.describe("State A — editable voice lines + set-once capability samples", () => {
+  // All ride the brandWhyUs snapshot (6th positional arg) and are STATE-A-GATED:
+  // emitted/read ONLY alongside an invitation status, so a revealed / full /
+  // flag-off publish carries none of them and is byte-identical even when set.
+  const CONTENT = {
+    valuationMessage: "My own valuation voice.",
+    welcomeLine: "My own welcome.",
+    sampleListingPhotoUrl: "https://blob.example.com/photo.webp",
+    sampleVideoUrl: "https://blob.example.com/tour.mp4",
+    sampleVideoPosterUrl: "https://blob.example.com/tour-poster.webp",
+  };
+
+  function project(
+    brandWhyUs: Record<string, unknown>,
+    status = "preparing_for_walkthrough",
+    sellerStateA = true,
+  ) {
+    return toPublicPayload(
+      invitationDraft({
+        valuationStatus: status as SellerPresentationDraft["valuationStatus"],
+      }),
+      AGENT,
+      {},
+      {},
+      false,
+      brandWhyUs,
+      false,
+      sellerStateA,
+    );
+  }
+
+  test("invitation publish carries every editable line + capability sample", () => {
+    const p = project(CONTENT);
+    expect(p.valuationMessage).toBe(CONTENT.valuationMessage);
+    expect(p.welcomeLine).toBe(CONTENT.welcomeLine);
+    expect(p.sampleListingPhotoUrl).toBe(CONTENT.sampleListingPhotoUrl);
+    expect(p.sampleVideoUrl).toBe(CONTENT.sampleVideoUrl);
+    expect(p.sampleVideoPosterUrl).toBe(CONTENT.sampleVideoPosterUrl);
+  });
+
+  test("the capability video is DISTINCT from the hero personal-message video", () => {
+    // The hero video rides the DRAFT (payload.video); the capability video rides
+    // the brand snapshot (sampleVideoUrl). They never collapse into one asset.
+    const p = project(CONTENT);
+    expect(p.sampleVideoUrl).toBe(CONTENT.sampleVideoUrl);
+    // This invitation draft carries no draft.video, so the hero video is absent
+    // while the capability video is present — proof they are separate channels.
+    expect(p.video).toBeUndefined();
+  });
+
+  test("a revealed publish drops every State A content field (State B byte-identical)", () => {
+    const p = project(CONTENT, "revealed");
+    const json = JSON.stringify(p);
+    for (const key of Object.keys(CONTENT)) {
+      expect(json).not.toContain(`"${key}":`);
+    }
+  });
+
+  test("flag OFF drops every State A content field (byte-identical)", () => {
+    const p = project(CONTENT, "preparing_for_walkthrough", false);
+    const json = JSON.stringify(p);
+    for (const key of Object.keys(CONTENT)) {
+      expect(json).not.toContain(`"${key}":`);
+    }
+  });
+
+  test("unset content fields drop their keys (strong defaults render at the page)", () => {
+    const p = project({});
+    const json = JSON.stringify(p);
+    for (const key of Object.keys(CONTENT)) {
+      expect(json).not.toContain(`"${key}":`);
+    }
+  });
+
+  test("read clamp gates the content fields on an invitation status", () => {
+    // Invitation status → fields survive, non-strings coerce to undefined.
+    const inv = clampPublicPayload({
+      valuationStatus: "preparing_for_walkthrough",
+      ...CONTENT,
+      sampleVideoPosterUrl: 7,
+    });
+    expect(inv.valuationMessage).toBe(CONTENT.valuationMessage);
+    expect(inv.sampleVideoUrl).toBe(CONTENT.sampleVideoUrl);
+    expect(inv.sampleVideoPosterUrl).toBeUndefined();
+
+    // Revealed status → a hand-edited record's stray content fields are dropped.
+    const rev = clampPublicPayload({ valuationStatus: "revealed", ...CONTENT });
+    expect(rev.valuationMessage).toBeUndefined();
+    expect(rev.sampleListingPhotoUrl).toBeUndefined();
+    expect(rev.sampleVideoUrl).toBeUndefined();
   });
 });
 
