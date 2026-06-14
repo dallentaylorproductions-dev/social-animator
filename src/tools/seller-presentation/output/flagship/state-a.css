@@ -745,6 +745,15 @@
     padding-top: clamp(24px, 5cqi, 30px);
     padding-bottom: clamp(30px, 6cqi, 40px);
   }
+  /* Center the hero hello box on phones. It is a max-width: 340px block inside the
+     left-aligned agent column; once the phone band is wider than 340px (real
+     iPhones at 390-430px, unlike the narrower in-wizard preview) it would sit
+     flush-left with a gap on the right. margin-inline: auto centers it to match the
+     preview and desktop. Desktop (>= 720px) keeps its own 2-col band where the box
+     is width-capped by the narrower column, so it is untouched. */
+  .fs-page.state-a .sa-hero__video {
+    margin-inline: auto;
+  }
   /* Give the nearby-sold tiles more room inside the file so the Street View
      photos stay readable (not tiny) in the 2x2 grid. */
   .fs-page.state-a .sa-brief__file {

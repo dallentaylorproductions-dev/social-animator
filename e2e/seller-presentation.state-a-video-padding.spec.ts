@@ -232,6 +232,47 @@ test.describe("State A — hero video fullscreen letterbox (A7d.12 shape)", () =
   });
 });
 
+test.describe("State A - hero hello box is horizontally centered on phones", () => {
+  // A real-iPhone-width viewport: wide enough that the band content exceeds the
+  // 340px box, so a flush-left box would leave a visible right-hand gap (the bug).
+  // The narrower in-wizard preview masked it; here we prove the published render
+  // centers the box.
+  test.use({ viewport: { width: 430, height: 900 } });
+
+  test("the hero video box is centered within its column (not offset left)", async ({
+    page,
+  }) => {
+    await page.goto(STATE_A);
+    const video = page.getByTestId("fs-sa-hero-video");
+    await expect(video).toBeVisible();
+
+    const { boxCenter, colCenter, boxWidth, colWidth } = await video.evaluate(
+      (el) => {
+        const box = el.getBoundingClientRect();
+        // .sa-hero__agent is the box's block container (no horizontal padding),
+        // so its content area is the centering reference.
+        const col = (el.closest(".sa-hero__agent") as HTMLElement) ?? el.parentElement!;
+        const colRect = col.getBoundingClientRect();
+        return {
+          boxCenter: box.left + box.width / 2,
+          colCenter: colRect.left + colRect.width / 2,
+          boxWidth: box.width,
+          colWidth: colRect.width,
+        };
+      },
+    );
+
+    // The test must be meaningful: there has to be free space (box narrower than
+    // the column) for "centered" to differ from "flush-left".
+    expect(
+      colWidth - boxWidth,
+      "expected free space beside the 340px box at this width",
+    ).toBeGreaterThan(8);
+    // Centered: the box's center sits on the column's center (sub-pixel tolerance).
+    expect(Math.abs(boxCenter - colCenter)).toBeLessThanOrEqual(1.5);
+  });
+});
+
 test.describe("State A — hero top inset (comfortable base + standalone safe-area)", () => {
   test.use({ viewport: MOBILE });
 
