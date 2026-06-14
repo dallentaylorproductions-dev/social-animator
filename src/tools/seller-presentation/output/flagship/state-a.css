@@ -21,6 +21,10 @@
   --sa-proof-cream: #fbf8f2;   /* light panel fill (Z2) */
   --sa-proof-inset: #f4eee3;   /* the Z4 stat-rail inset fill */
   --sa-proof-dark: #12171a;    /* dark panel fill (Z3) */
+  /* The TRUE mint, immune to the brand-derived --mint (consumerRoleVars re-hues
+     --mint per agent, which read as a muted blue-grey). The single earned mint
+     moment — the Z1 caption status dot — must actually read as mint. */
+  --sa-mint: #4ef2d9;
   --sa-proof-shadow-light: 0 1px 0 rgba(255, 255, 255, 0.7) inset, 0 22px 50px -30px rgba(60, 44, 27, 0.5);
   --sa-proof-shadow-dark: 0 1px 0 rgba(255, 255, 255, 0.06) inset, 0 30px 48px -28px rgba(0, 0, 0, 0.5);
 }
@@ -379,17 +383,20 @@
   flex: none;
 }
 .fs-page.state-a .sa-hero__video {
-  /* Centered in its own hello section (StateAHello) below the hero - margin auto
-     centers it on desktop AND mobile; the hello section sets the top gap. */
+  /* The designed Z1 portrait frame: a 9:16 player (~182px wide) centered on the
+     pedestal, on desktop AND mobile (the hello section sets the top gap).
+     CONTENT-INDEPENDENT SIZE (the v1.5x fix): inside the pedestal flex column the
+     box is a centered flex child whose only content is the absolutely-positioned
+     player, so with `align-items: center` it shrank to content width 0 and the
+     `aspect-ratio` then gave height 0 (the 0x1px collapse). `flex: none` + an
+     explicit `width` + a `min-height` floor make a 0-collapse impossible whether
+     or not the video's intrinsic size has loaded. */
+  flex: none;
+  width: min(100%, 182px);
+  min-height: 300px;
   margin: 0 auto;
   position: relative;
-  /* Portrait-friendly box: hello videos are usually phone talking-heads. The
-     player fills this with object-fit: cover (below) and the agent's framing
-     crops to their focal point, mirroring the proven revealed-page inlay. 4/5
-     matches the revealed-page video's default aspect; the ink background only
-     shows behind the loading frame, never as a letterbox. */
-  aspect-ratio: 4 / 5;
-  max-width: 340px;
+  aspect-ratio: 9 / 16;
   border-radius: var(--r-md);
   overflow: hidden;
   border: 1px solid var(--line-pap);
@@ -401,10 +408,13 @@
   inset: 0;
   width: 100%;
   height: 100%;
-  /* Fill the frame and let the agent's inlay framing crop it, exactly as the
-     revealed-page inlay player does (object-fit/position/transform set inline so
-     the SSR markup is self-describing; this is the styling backstop). The
-     :fullscreen rules below reset to contain for the native fullscreen view. */
+  /* Belt-and-suspenders: even if a future layout changes the frame, the player
+     keeps a defined size (fills the framed box) and never reports height: 0. */
+  min-height: 100%;
+  /* Fill the frame and let the agent's inlay framing crop it (object-fit: cover +
+     the focal/zoom set inline), exactly as the proven #79 revealed-page inlay
+     player does, so any uploaded video (portrait OR landscape) fits the 9:16
+     frame. The :fullscreen rules below reset to contain for native fullscreen. */
   object-fit: cover;
   object-position: center;
   background: var(--ink-2);
@@ -434,7 +444,7 @@
   border: 1px solid var(--line-pap);
   border-radius: 22px;
   box-shadow: var(--lift-dark);
-  padding: clamp(28px, 5cqi, 48px) clamp(22px, 4cqi, 44px);
+  padding: clamp(36px, 6cqi, 56px) clamp(28px, 5cqi, 48px);
   display: flex;
   flex-direction: column;
   align-items: center;
@@ -480,8 +490,8 @@
   width: 6px;
   height: 6px;
   border-radius: 50%;
-  background: var(--mint);
-  box-shadow: 0 0 0 3px color-mix(in oklab, var(--mint) 22%, transparent);
+  background: var(--sa-mint);
+  box-shadow: 0 0 0 3px color-mix(in oklab, var(--sa-mint) 22%, transparent);
 }
 .fs-page.state-a .sa-hello__cap-rt {
   color: var(--t-pap-mute);

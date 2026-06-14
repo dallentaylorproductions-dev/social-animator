@@ -64,7 +64,19 @@ test.describe("State A zones — structure + values (rich fixture)", () => {
     await expect(hello).toContainText("A quick hello from Marisol");
     // The relocated player is preserved verbatim inside the pedestal.
     await expect(hello.getByTestId("fs-sa-hero-video")).toBeVisible();
-    await expect(hello.locator(".sa-hero__video-player")).toHaveCount(1);
+    const player = hello.locator(".sa-hero__video-player");
+    await expect(player).toHaveCount(1);
+    // REGRESSION GUARD (the v1.5x defect): the player must render at a real,
+    // non-zero size in the pedestal — never the 0x1px collapse. The video-padding
+    // suite asserted object-fit + centering but never the rendered box size.
+    const box = await player.boundingBox();
+    expect(box, "player must have a rendered box").not.toBeNull();
+    expect(box!.width, "player width must be non-zero").toBeGreaterThan(100);
+    expect(box!.height, "player height must be non-zero").toBeGreaterThan(150);
+    // Resting frame before play: the chosen poster/thumbnail is wired (play-on-tap,
+    // never a black/empty box).
+    const poster = await player.getAttribute("poster");
+    expect(poster, "the player shows the chosen poster before play").toBeTruthy();
     // Caption pill on the solid surface (never over the video): prompt + runtime.
     const cap = page.getByTestId("fs-sa-hello-cap");
     await expect(cap).toContainText("Press play");
@@ -163,19 +175,22 @@ test.describe("State A zones — structure + values (rich fixture)", () => {
     }
   });
 
-  test("mint is used ONLY as the Z1 caption status dot", async ({ page }) => {
+  test("the Z1 caption dot is TRUE mint (not the brand-derived blue-grey)", async ({
+    page,
+  }) => {
     await page.goto(STATE_A);
-    const mint = await resolveVar(page, "--mint");
-    const teal700 = await resolveVar(page, "--teal-700");
-    expect(mint, "mint + teal must be distinguishable").not.toBe(teal700);
-    // The Z1 caption dot is the (brand-derived) mint.
+    const TRUE_MINT = "rgb(78, 242, 217)"; // --sa-mint #4EF2D9
     const dot = page.locator(".sa-hello__cap-dot");
-    expect(await cssOf(dot, "background-color")).toBe(mint);
+    // The single earned mint moment must actually read as mint.
+    expect(await cssOf(dot, "background-color")).toBe(TRUE_MINT);
+    // It is the reserved literal mint, NOT --mint (which consumerRoleVars re-hues
+    // per agent to a muted tone) — that re-hued tone is what made it look wrong.
+    expect(await resolveVar(page, "--mint")).not.toBe(TRUE_MINT);
     // No proof panel (Z2/Z3/Z4) uses mint as a fill or keyline.
     for (const id of ["fs-sa-proof-z2", "fs-sa-proof-z3", "fs-sa-credibility"]) {
       const proof = page.getByTestId(id);
-      expect(await cssOf(proof, "background-color"), id).not.toBe(mint);
-      expect(await cssOf(proof, "border-left-color"), id).not.toBe(mint);
+      expect(await cssOf(proof, "background-color"), id).not.toBe(TRUE_MINT);
+      expect(await cssOf(proof, "border-left-color"), id).not.toBe(TRUE_MINT);
     }
   });
 });
