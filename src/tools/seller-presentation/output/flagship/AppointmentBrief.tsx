@@ -1,3 +1,4 @@
+import type { CSSProperties } from "react";
 import type { PublicPayload } from "../public-payload";
 import {
   streetViewStaticUrl,
@@ -7,6 +8,11 @@ import {
 } from "@/lib/seller-presentation/street-view";
 import { compHasPhoto } from "@/lib/seller-presentation/rentcast-autofill";
 import { CompPhotoPlaceholder } from "./CompPhotoPlaceholder";
+import { ProofPanel } from "./ProofPanel";
+import {
+  PROOF_NEIGHBORHOOD_CAPTION,
+  PROOF_NEIGHBORHOOD_LABEL,
+} from "./state-a-copy";
 
 /**
  * Seller State A · Signature A.2 - the Appointment Brief (the flagship moment).
@@ -51,11 +57,24 @@ export function AppointmentBrief({
     .slice(0, 4);
   const hasNearby = comps.length > 0;
 
-  const series = (payload.areaStats?.monthlySeries ?? [])
-    .map((m) => parseNum(m.medianPrice))
-    .filter((n): n is number => n != null);
+  // Keep the month label paired with each parseable price, so the sparkline's
+  // axis endpoints stay aligned with the points it actually draws.
+  const points = (payload.areaStats?.monthlySeries ?? [])
+    .map((m) => ({ month: m.month?.trim() || "", price: parseNum(m.medianPrice) }))
+    .filter((p): p is { month: string; price: number } => p.price != null);
+  const series = points.map((p) => p.price);
   const hasSpark = series.length >= 2;
+  const axisStart = hasSpark ? points[0].month : "";
+  const axisEnd = hasSpark ? points[points.length - 1].month : "";
   const activityLine = neighborhoodActivityLine(payload, series);
+  // The coordinated `+6%` proof number: the agent-stamped trailing-12-month YoY
+  // delta (the same source the activity line prefers), formatted as a number.
+  // Present only when that explicit delta exists; otherwise the proof panel
+  // collapses and the trend panel runs full-width (the activity line keeps its
+  // endpoint fallback, so a series-only neighborhood still narrates its trend).
+  const delta = trendDeltaPercent(payload);
+  const deltaLabel =
+    delta != null ? `${delta >= 0 ? "+" : "-"}${Math.round(Math.abs(delta))}%` : null;
   const hasActivity = hasSpark || !!activityLine;
 
   const hasLaunch = (payload.whyUs?.marketingApproach?.length ?? 0) > 0;
@@ -157,10 +176,33 @@ export function AppointmentBrief({
             <div className="sa-brief__art-head">
               <span className="sa-brief__art-k">Neighborhood activity</span>
             </div>
-            <div className="sa-brief__activity">
-              {hasSpark && <Sparkline series={series} />}
-              {activityLine && (
-                <p className="sa-brief__activity-line">{activityLine}</p>
+            {/* Trend panel + the coordinated +6% proof pair. The tonal panel holds
+                the full-width sparkline, its month axis, and the calm serif line;
+                the shared light proof-panel carries the signed delta as a number.
+                FLEX-OUT: no delta -> the proof panel collapses and the trend panel
+                runs full-width (sa-trend--solo), no orphaned "+6%" slot. */}
+            <div className={`sa-trend${deltaLabel ? "" : " sa-trend--solo"}`}>
+              <div className="sa-trend__panel">
+                {hasSpark && <Sparkline series={series} />}
+                {hasSpark && (axisStart || axisEnd) && (
+                  <div className="sa-trend__axis" aria-hidden="true">
+                    <span>{axisStart}</span>
+                    <span>{axisEnd}</span>
+                  </div>
+                )}
+                {activityLine && (
+                  <p className="sa-brief__activity-line">{activityLine}</p>
+                )}
+              </div>
+              {deltaLabel && (
+                <ProofPanel
+                  variant="light"
+                  label={PROOF_NEIGHBORHOOD_LABEL}
+                  caption={PROOF_NEIGHBORHOOD_CAPTION}
+                  testid="fs-sa-proof-z2"
+                >
+                  {deltaLabel}
+                </ProofPanel>
               )}
             </div>
           </div>
@@ -190,18 +232,30 @@ export function AppointmentBrief({
   );
 }
 
-/** Compact, axis-less sparkline of the area median trend (editorial, not a chart widget). */
+/**
+ * Compact, axis-less sparkline of the area median trend (editorial, not a chart
+ * widget). The line draws on once when the brief scrolls into view, gated on the
+ * `.reveal.in` ancestor (state-a.css); the approximate polyline length is passed
+ * as `--len` so the dash animation knows how far to travel. Reduced motion lands
+ * it already-drawn.
+ */
 function Sparkline({ series }: { series: number[] }) {
-  const W = 132,
-    H = 38,
-    pad = 3;
+  const W = 240,
+    H = 64,
+    pad = 4;
   const min = Math.min(...series);
   const max = Math.max(...series);
   const span = max - min || 1;
   const x = (i: number) =>
     pad + (i / (series.length - 1)) * (W - pad * 2);
   const y = (v: number) => pad + (1 - (v - min) / span) * (H - pad * 2);
-  const pts = series.map((v, i) => `${x(i).toFixed(1)},${y(v).toFixed(1)}`);
+  const coords = series.map((v, i) => ({ px: x(i), py: y(v) }));
+  const pts = coords.map((c) => `${c.px.toFixed(1)},${c.py.toFixed(1)}`);
+  // Sum the segment lengths for the draw-on dash offset (SSR-stable, no DOM).
+  let len = 0;
+  for (let i = 1; i < coords.length; i++) {
+    len += Math.hypot(coords[i].px - coords[i - 1].px, coords[i].py - coords[i - 1].py);
+  }
   const lastI = series.length - 1;
   return (
     <svg
@@ -211,12 +265,16 @@ function Sparkline({ series }: { series: number[] }) {
       aria-label="Neighborhood price trend"
       data-testid="fs-sa-brief-spark"
     >
-      <polyline className="sa-spark__line" points={pts.join(" ")} />
+      <polyline
+        className="sa-spark__line"
+        points={pts.join(" ")}
+        style={{ "--len": Math.ceil(len) } as CSSProperties}
+      />
       <circle
         className="sa-spark__dot"
         cx={x(lastI)}
         cy={y(series[lastI])}
-        r="2.6"
+        r="3"
       />
     </svg>
   );
@@ -242,6 +300,17 @@ function neighborhoodActivityLine(
   const whole = Math.round(Math.abs(pct));
   if (whole === 0) return "Holding steady over the past year.";
   return `${pct >= 0 ? "Up" : "Down"} about ${whole}% this year.`;
+}
+
+/**
+ * The signed trend delta for the coordinated `+6%` proof number — the agent-
+ * stamped YoY delta (the SAME value the activity sentence prefers, so the pair
+ * reads "+6%" / "Up about 6%" in lockstep). Returns null when no explicit delta
+ * is stamped, so the proof panel flexes out and the trend panel runs full-width
+ * (the activity line still narrates the trend from its endpoint fallback).
+ */
+function trendDeltaPercent(payload: PublicPayload): number | null {
+  return parsePercent(payload.areaStats?.medianSaleDeltaYoy);
 }
 
 /** "+6.2% vs prior year" / "-3%" -> 6.2 / -3 (first signed percentage); else null. */

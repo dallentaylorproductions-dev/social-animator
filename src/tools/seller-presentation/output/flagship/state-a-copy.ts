@@ -35,6 +35,34 @@ export function heroVideoLabel(agentName: string | undefined): string {
 export const HERO_VIDEO_ARIA = "A short hello from your agent";
 
 /**
+ * The welcome-video (Z1) pedestal eyebrow — a quiet mono label that sets the
+ * moment above the hello heading. EVERGREEN, no duration / tour assumption;
+ * pairs as the before-the-visit counterpart to the "At Our Meeting" section.
+ */
+export const HELLO_EYEBROW = "Before We Meet";
+
+/**
+ * The Z1 caption pill prompt, shown on a solid surface beneath the player (never
+ * over the video) next to the runtime + the single earned mint status dot.
+ */
+export const HELLO_CAPTION = "Press play";
+
+/**
+ * Z2 proof-panel (the `+6%` neighborhood delta) — the mono label + the muted
+ * sub-line. EVERGREEN framing of the agent-stamped trailing-12-month trend; the
+ * number itself is data-driven (the area YoY delta).
+ */
+export const PROOF_NEIGHBORHOOD_LABEL = "Neighborhood · trailing 12 mo";
+export const PROOF_NEIGHBORHOOD_CAPTION = "vs. last year";
+
+/**
+ * Z3 proof-panel (the `$580K – $700K` comps range) — the mono label above the
+ * range. Frames it as nearby comparable sales (matching the context sentence
+ * below it), never the subject home's number.
+ */
+export const PROOF_RANGE_LABEL = "Recently sold nearby";
+
+/**
  * Pointer line in the hero agent row to the hello video, which now lives in its
  * own section directly below the hero. EVERGREEN: first person, no duration, never
  * a tour. Keeps the hero compact while still cueing the personal message below.
