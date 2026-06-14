@@ -50,7 +50,17 @@ test.describe("State A — the prepared dossier renders (rich fixture)", () => {
     await expect(page.getByTestId("fs-sa-hero-signature")).toContainText(
       "Known for",
     );
-    await expect(page.getByTestId("fs-sa-hero-video")).toBeVisible();
+    // The editable welcome line renders its strong default (the fixture leaves it
+    // unset), so an agent who edits nothing still gets a warm greeting.
+    await expect(page.getByTestId("fs-sa-hero-welcome")).toContainText(
+      "I put this together",
+    );
+    const video = page.getByTestId("fs-sa-hero-video");
+    await expect(video).toBeVisible();
+    // The hero hello label is evergreen + names the agent, never assuming a
+    // duration ("15-second") or calling the personal message a tour.
+    await expect(video).toContainText("A quick hello from Marisol");
+    await expect(video).not.toContainText("15-second");
   });
 
   test("1b · hero cover is the agent's OWN photo — never the subject's Street View", async ({
@@ -128,17 +138,29 @@ test.describe("State A — the prepared dossier renders (rich fixture)", () => {
     await expect(cred).toContainText("recent listings");
   });
 
-  test("4 · campaign spread — produced assets + reach line", async ({ page }) => {
+  test("4 · campaign spread — capability samples + seller-centered reach line", async ({
+    page,
+  }) => {
     await page.goto(STATE_A);
     const spread = page.getByTestId("fs-sa-spread");
     await expect(spread).toBeVisible();
     // The sharpened two-beat headline (no awkward comma).
     await expect(spread).toContainText("Produced beautifully.");
     await expect(spread).toContainText("Put in front of buyers");
-    // The listing photo leads; marketing-plan assets follow.
-    await expect(page.getByTestId("fs-sa-spread-listing")).toBeVisible();
+    // The frames are the agent's SET-ONCE capability samples, relabeled honestly
+    // (never "The listing" / "magazine-grade") so they don't imply this not-yet-
+    // shot home. The capability photo leads; the capability video follows.
+    const photo = page.getByTestId("fs-sa-spread-photo");
+    await expect(photo).toBeVisible();
+    await expect(photo).toContainText("Photography that sells");
+    await expect(spread).not.toContainText("The listing");
+    await expect(spread).not.toContainText("Magazine-grade");
+    const video = page.getByTestId("fs-sa-spread-video");
+    await expect(video).toBeVisible();
+    await expect(video).toContainText("A recent video tour");
+    // The reach line is seller-centered and concrete (no abstract jargon).
     await expect(page.getByTestId("fs-sa-spread-reach")).toContainText(
-      "Seen across search portals",
+      "Your home in front of buyers",
     );
   });
 

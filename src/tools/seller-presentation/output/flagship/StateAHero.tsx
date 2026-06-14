@@ -1,6 +1,11 @@
 import type { PublicPayload } from "../public-payload";
 import type { FormattedAppointment } from "../../engine/appointment";
 import { effectivePosterUrl, withFirstFrameHint } from "../../engine/types";
+import {
+  HERO_VIDEO_ARIA,
+  defaultWelcomeLine,
+  heroVideoLabel,
+} from "./state-a-copy";
 
 /**
  * Seller State A · Signature A.1 - the private map-dossier hero.
@@ -13,8 +18,10 @@ import { effectivePosterUrl, withFirstFrameHint } from "../../engine/types";
  * over a subtle CSS street-grid + a located home marker (the dossier motif);
  * with no image the grid + dark editorial gradient carry it (never a blank
  * gradient or clip-art roofline). Agent presence is a calm guide: headshot /
- * initials + name + the quiet signature line + the existing walkthrough video
- * folded in as "Watch a 15-second hello." Every optional piece flexes out.
+ * initials + name + an editable warm welcome line + the quiet signature line +
+ * the agent's personal-message video folded in under an evergreen label ("A quick
+ * hello from [Agent]", no duration assumed). Every optional piece flexes out; the
+ * welcome / valuation / signature lines fall to strong defaults when unedited.
  */
 export function StateAHero({
   payload,
@@ -93,9 +100,10 @@ export function StateAHero({
 }
 
 /**
- * The calm guide: the agent's headshot / initials, name, the quiet signature
- * line, and the walkthrough video folded in as a short hello. Each piece flexes
- * out independently - an agent with only a name still reads complete.
+ * The calm guide: the agent's headshot / initials, name, an editable warm welcome
+ * line (strong default when unedited), the quiet signature line, and the
+ * personal-message video folded in as a short hello. Each piece flexes out
+ * independently - an agent with only a name still reads complete.
  */
 function HeroAgent({ payload }: { payload: PublicPayload }) {
   const a = payload.agent;
@@ -104,6 +112,11 @@ function HeroAgent({ payload }: { payload: PublicPayload }) {
   const v = payload.video;
   const hasVideo = !!v?.videoUrl;
   if (!name && !signature && !hasVideo) return null;
+
+  // Editable welcome line with a strong default, so an agent who edits nothing
+  // still gets a warm, premium greeting. Rendered only once the agent block is
+  // present (above), so it never floats with no agent attached.
+  const welcome = payload.welcomeLine?.trim() || defaultWelcomeLine();
 
   const monogram = name
     ? name
@@ -140,6 +153,9 @@ function HeroAgent({ payload }: { payload: PublicPayload }) {
           </span>
         </div>
       )}
+      <p className="sa-hero__welcome" data-testid="fs-sa-hero-welcome">
+        {welcome}
+      </p>
       {signature && (
         <p className="sa-hero__sig" data-testid="fs-sa-hero-signature">
           {signature}
@@ -166,6 +182,10 @@ function HeroAgent({ payload }: { payload: PublicPayload }) {
 function HeroVideo({ payload }: { payload: PublicPayload }) {
   const v = payload.video!;
   const poster = effectivePosterUrl(v);
+  // Evergreen, accurate label: names the agent's personal message with no
+  // duration assumed (the message can run 60 to 90 seconds) and never calls it a
+  // tour. One consistent label across the page.
+  const label = heroVideoLabel(payload.agent.name);
 
   return (
     <div
@@ -180,14 +200,14 @@ function HeroVideo({ payload }: { payload: PublicPayload }) {
         controls
         playsInline
         preload="metadata"
-        aria-label={v.title ?? "A short hello from your agent"}
+        aria-label={v.title ?? HERO_VIDEO_ARIA}
         style={{
           objectFit: "contain",
           objectPosition: "center",
         }}
       />
       <span className="sa-hero__video-cap" aria-hidden="true">
-        Watch a 15-second hello
+        {label}
       </span>
     </div>
   );

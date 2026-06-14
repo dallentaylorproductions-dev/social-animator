@@ -550,15 +550,23 @@ export const STATE_A_FULL_PAYLOAD: PublicPayload = {
     ...FULL_PAYLOAD.whyPrice,
     publicRationale: "",
   },
-  // Give the walkthrough video a real poster (a committed sample asset) so the
-  // hero hello + the campaign-spread "Video tour" frame render a concrete image
-  // in the preview. State-A fixture only; FULL_PAYLOAD (State B) is untouched.
+  // Give the hero personal-message video a real poster (a committed sample asset)
+  // so the hero hello renders a concrete image in the preview. State-A fixture
+  // only; FULL_PAYLOAD (State B) is untouched.
   video: {
     ...FULL_PAYLOAD.video,
     posterUrl: "/sample-assets/living-room.webp",
   },
   signatureLine:
     "Known for quiet, thorough preparation, so the number we land on is one you can stand behind.",
+  // Set-once CAPABILITY samples for the campaign frames — the agent's best listing
+  // photography + a recent video tour, DISTINCT from the hero personal message
+  // above. Committed sample assets back a concrete preview. valuationMessage /
+  // welcomeLine are intentionally LEFT UNSET so the render exercises the strong
+  // defaults.
+  sampleListingPhotoUrl: "/sample-assets/exterior.webp",
+  sampleVideoUrl: "https://example.com/marisol-tour.mp4",
+  sampleVideoPosterUrl: "/sample-assets/living-room.webp",
   valuationStatus: "preparing_for_walkthrough",
   appointmentAt: "2026-06-20T14:00",
 };

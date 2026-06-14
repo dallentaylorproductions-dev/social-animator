@@ -71,10 +71,20 @@ export function brandToPublishInputs(brand: BrandSettings) {
   };
   // B0b — the agent-constant "Why us" marketing layer + tagline + reviews
   // headline. Same provenance/path as the others; the projector clamps it.
+  // Seller State A — the quiet signature, the editable valuation + welcome voice
+  // lines, and the set-once capability sample assets ride the same brandWhyUs
+  // channel; `toPublicPayload` emits them ONLY in a State A publish (gated), so a
+  // State B / full / flag-off publish stays byte-identical even when these are set.
   const brandWhyUs = {
     whyUs: brand.whyUs,
     agentTagline: brand.agentTagline,
     reviewsHeadline: brand.reviewsHeadline,
+    signatureLine: brand.signatureLine,
+    valuationMessage: brand.valuationMessage,
+    welcomeLine: brand.welcomeLine,
+    sampleListingPhotoUrl: brand.sampleListingPhotoUrl,
+    sampleVideoUrl: brand.sampleVideoUrl,
+    sampleVideoPosterUrl: brand.sampleVideoPosterUrl,
   };
   return { agentContact, brandReviews, brandColors, brandWhyUs };
 }

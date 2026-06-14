@@ -10,6 +10,7 @@ import { StateAHero } from "./StateAHero";
 import { AppointmentBrief } from "./AppointmentBrief";
 import { CampaignSpread } from "./CampaignSpread";
 import { AgentBand } from "./AgentBand";
+import { defaultValuationMessage } from "./state-a-copy";
 import "./flagship.css";
 import "./state-a.css";
 
@@ -103,6 +104,11 @@ function ValuationPrepared({
 }) {
   const dayLabel = appt ? `${appt.weekday}, ${appt.date}` : null;
   const range = nearbySoldRange(payload);
+  // Editable valuation voice line with a strong, universally-comfortable default
+  // (set once in Settings). The default keeps the substance without the blunt
+  // "I don't guess with your money"; an agent can rewrite it in their own voice.
+  const valuationMessage =
+    payload.valuationMessage?.trim() || defaultValuationMessage();
 
   return (
     <section className="section z-ink sa-val" data-testid="fs-sa-valuation">
@@ -116,8 +122,7 @@ function ValuationPrepared({
         </h2>
       </div>
       <p className="sa-val__body reveal" data-testid="fs-sa-valuation-body">
-        Before I recommend a range, I&apos;ll walk the home with you and confirm
-        the details buyers respond to. I don&apos;t guess with your money.
+        {valuationMessage}
       </p>
       <div className="sa-val__status reveal">
         <div className="sa-val__label" data-testid="fs-sa-valuation-label">
