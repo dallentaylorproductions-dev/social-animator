@@ -104,3 +104,21 @@ export const CAPABILITY_PHOTO_LABEL = "Photography that sells";
 export const CAPABILITY_PHOTO_SUB = "How I shoot every listing";
 export const CAPABILITY_VIDEO_LABEL = "A recent video tour";
 export const CAPABILITY_VIDEO_SUB = "From a recent listing of mine";
+
+/**
+ * Zone 5 listings coverflow ("Put in front of buyers"). Evergreen, source-
+ * agnostic, no em-dash. The per-card label is a plain "Views" (never a named
+ * portal — the honesty gate: no specific-portal claim on a number we don't
+ * control). The aggregate line is summed from the agent's OWN real per-card
+ * numbers at render, so it is never a hollow claim.
+ */
+export const COVERFLOW_EYEBROW = "Recent listings, real reach";
+export const COVERFLOW_VIEWS_LABEL = "Views";
+
+/**
+ * Suffix of the aggregate line beneath the fan. The renderer prepends the summed
+ * total (the agent's OWN real per-card view counts, grouped with thousands
+ * separators) as the teal lead, so the number is the one earned accent. Renders
+ * only when enough cards carry a number, so it is never a hollow claim.
+ */
+export const COVERFLOW_AGGREGATE_SUFFIX = "buyer views across recent listings";

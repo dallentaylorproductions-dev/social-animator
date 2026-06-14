@@ -31,6 +31,7 @@ import {
   toPublicPayload,
   clampPublicPayload,
   clampPublicWhyUs,
+  RECENT_LISTINGS_CAP,
   type AgentBranding,
   type BrandReviewsInput,
   type BrandWhyUsInput,
@@ -1088,6 +1089,9 @@ test.describe('toPublicPayload — white-label wordmark flag (F4)', () => {
     // Seller State A — the agent's quiet signature line (same brand-snapshot
     // provenance as the tagline; rendered only by the State A page).
     'signatureLine',
+    // Seller State A · Zone 5 — the recent-listings coverflow (gated behind the
+    // coverflow flag AND an invitation status; absent on this revealed maxedDraft).
+    'recentListings',
   ]);
 
   test('whiteLabel=true → suppressWordmark:true projects onto the payload', () => {
@@ -1379,5 +1383,212 @@ test.describe('toPublicPayload — whyUs projection (B0b data-out allowlist)', (
     expect(clampPublicWhyUs(undefined)).toBeUndefined();
     expect(clampPublicWhyUs('nope')).toBeUndefined();
     expect(clampPublicWhyUs({})).toBeUndefined();
+  });
+});
+
+// ===========================================================================
+// Seller State A · Zone 5 — recent-listings coverflow projection + clamp.
+//
+// The exposure proof rides the same allowlist rails as every other State A
+// field: field-by-field projection (no spread), gated behind BOTH the
+// SELLER_LISTINGS_COVERFLOW flag AND an invitation status, view counts clamped
+// to non-negative integers, the array hard-capped, and re-clamped on read. This
+// block proves a tampered settings record can't smuggle a private key, an
+// unbounded list, or a fabricated/fractional/negative count into the page.
+// ===========================================================================
+
+const L = {
+  addr: 'PUBLIC_SENTINEL_LISTING_ADDR',
+  city: 'PUBLIC_SENTINEL_LISTING_CITY',
+  pano: 'PUBLIC_SENTINEL_LISTING_PANO',
+  rogueNested: 'PRIVATE_SENTINEL_LISTING_ROGUE_NESTED',
+  rogueTop: 'PRIVATE_SENTINEL_LISTING_ROGUE_TOP',
+};
+
+// An invitation-status draft so the State A gate opens (a revealed draft would
+// drop every State A field, recentListings included).
+function invitationDraft(): SellerPresentationDraft {
+  return {
+    ...maxedDraft(),
+    valuationStatus: 'preparing_for_walkthrough',
+  } as SellerPresentationDraft;
+}
+
+// A maximally-populated, partly-tampered recentListings record. The projector
+// reads field-by-field, so only the allowlisted fields on renderable rows survive.
+const FIXTURE_RECENT_LISTINGS = [
+  // Renderable row with a clean integer count + a rogue nested key (must drop).
+  {
+    address: L.addr,
+    city: L.city,
+    viewCount: 41184,
+    photoUrl: 'https://example.com/listing.webp',
+    secretLeadEmail: L.rogueNested,
+  },
+  // Fractional + negative counts must clamp away (no bogus number reaches the band).
+  { address: '2 Frac Ave', viewCount: 1234.9 },
+  { address: '3 Neg Ave', viewCount: -50 },
+  // Street View fallback row (pano persisted, no image bytes).
+  { address: '4 Pano Pl', hasStreetView: true, streetViewPanoId: L.pano },
+  // No address → un-renderable, drops.
+  { city: 'Nowhere', viewCount: 9 },
+];
+
+test.describe('toPublicPayload — recentListings coverflow (Zone 5 allowlist)', () => {
+  test('renderable listings project field-by-field; counts clamp to integers', () => {
+    const payload = toPublicPayload(
+      invitationDraft(),
+      FIXTURE_AGENT_CONTACT,
+      FIXTURE_BRAND_REVIEWS,
+      {},
+      false,
+      { recentListings: FIXTURE_RECENT_LISTINGS } as unknown as BrandWhyUsInput,
+      false, // compPhotos
+      true, // sellerStateA
+      true, // listingsCoverflow
+    );
+
+    const listings = payload.recentListings;
+    expect(listings).toBeDefined();
+    // The address-less row drops; four renderable rows survive.
+    expect(listings).toHaveLength(4);
+
+    // Row 0: allowlisted fields verbatim, integer count, NO rogue nested key.
+    expect(listings?.[0]).toEqual({
+      address: L.addr,
+      city: L.city,
+      viewCount: 41184,
+      photoUrl: 'https://example.com/listing.webp',
+    });
+
+    // Fractional count floors to an integer; negative count drops entirely.
+    expect(listings?.[1]).toEqual({ address: '2 Frac Ave', viewCount: 1234 });
+    expect(listings?.[2]).toEqual({ address: '3 Neg Ave' });
+    expect(listings?.[2]?.viewCount).toBeUndefined();
+
+    // Street View fallback: pano + coverage flag survive (no image bytes).
+    expect(listings?.[3]).toEqual({
+      address: '4 Pano Pl',
+      hasStreetView: true,
+      streetViewPanoId: L.pano,
+    });
+
+    // Every count is an integer.
+    for (const l of listings ?? []) {
+      if (typeof l.viewCount === 'number') {
+        expect(Number.isInteger(l.viewCount)).toBe(true);
+      }
+    }
+  });
+
+  test('tampered listings: rogue nested / top-level keys DROP (no spread)', () => {
+    const payload = toPublicPayload(
+      invitationDraft(),
+      FIXTURE_AGENT_CONTACT,
+      FIXTURE_BRAND_REVIEWS,
+      {},
+      false,
+      {
+        recentListings: [
+          { address: L.addr, viewCount: 100, rogueGroup: L.rogueTop },
+          ...FIXTURE_RECENT_LISTINGS,
+        ],
+      } as unknown as BrandWhyUsInput,
+      false,
+      true,
+      true,
+    );
+    const serialized = JSON.stringify(payload);
+
+    // Non-allowlisted value sentinels absent.
+    expect(serialized).not.toContain(L.rogueNested);
+    expect(serialized).not.toContain(L.rogueTop);
+    // Non-allowlisted key NAMES absent (field-by-field projection, no spread).
+    expect(serialized).not.toContain('"secretLeadEmail":');
+    expect(serialized).not.toContain('"rogueGroup":');
+    // Positive control: the allowlisted sentinels DID survive.
+    expect(serialized).toContain(L.addr);
+    expect(serialized).toContain(L.pano);
+  });
+
+  test('array is hard-capped at RECENT_LISTINGS_CAP', () => {
+    const many = Array.from({ length: 20 }, (_, i) => ({
+      address: `${i} Cap St`,
+      viewCount: i,
+    }));
+    const payload = toPublicPayload(
+      invitationDraft(),
+      FIXTURE_AGENT_CONTACT,
+      FIXTURE_BRAND_REVIEWS,
+      {},
+      false,
+      { recentListings: many } as unknown as BrandWhyUsInput,
+      false,
+      true,
+      true,
+    );
+    expect(payload.recentListings?.length).toBe(RECENT_LISTINGS_CAP);
+  });
+
+  test('gated: flag OFF → no recentListings key (byte-identical)', () => {
+    const payload = toPublicPayload(
+      invitationDraft(),
+      FIXTURE_AGENT_CONTACT,
+      FIXTURE_BRAND_REVIEWS,
+      {},
+      false,
+      { recentListings: FIXTURE_RECENT_LISTINGS } as unknown as BrandWhyUsInput,
+      false,
+      true, // sellerStateA on
+      false, // listingsCoverflow OFF
+    );
+    expect(payload.recentListings).toBeUndefined();
+    expect(JSON.stringify(payload)).not.toContain('"recentListings":');
+    expect(JSON.stringify(payload)).not.toContain(L.addr);
+  });
+
+  test('gated: revealed status → no recentListings even with the flag on', () => {
+    // maxedDraft() is revealed (no invitation status), so the State A gate is shut.
+    const payload = toPublicPayload(
+      maxedDraft(),
+      FIXTURE_AGENT_CONTACT,
+      FIXTURE_BRAND_REVIEWS,
+      {},
+      false,
+      { recentListings: FIXTURE_RECENT_LISTINGS } as unknown as BrandWhyUsInput,
+      false,
+      true,
+      true,
+    );
+    expect(payload.recentListings).toBeUndefined();
+    expect(JSON.stringify(payload)).not.toContain('"recentListings":');
+  });
+
+  test('read clamp: a hand-edited KV record re-runs the same allowlist', () => {
+    // A tampered stored record glues a private key onto a listing and rides a
+    // fractional count + an over-cap list. The read clamp must drop them exactly
+    // as the write projector does — and only alongside an invitation status.
+    const clamped = clampPublicPayload({
+      templateVersion: 2,
+      propertyAddress: '1 Main',
+      valuationStatus: 'preparing_for_walkthrough',
+      recentListings: [
+        { address: L.addr, viewCount: 7.7, secretLeadEmail: L.rogueNested },
+        ...Array.from({ length: 20 }, (_, i) => ({ address: `${i} KV`, viewCount: i })),
+      ],
+    });
+    const serialized = JSON.stringify(clamped);
+    expect(serialized).not.toContain(L.rogueNested);
+    expect(serialized).not.toContain('"secretLeadEmail":');
+    expect(clamped.recentListings?.length).toBe(RECENT_LISTINGS_CAP);
+    expect(clamped.recentListings?.[0]).toEqual({ address: L.addr, viewCount: 7 });
+
+    // A recentListings array on a REVEALED record is dropped entirely.
+    const revealed = clampPublicPayload({
+      templateVersion: 2,
+      propertyAddress: '1 Main',
+      recentListings: [{ address: L.addr, viewCount: 5 }],
+    });
+    expect(revealed.recentListings).toBeUndefined();
   });
 });

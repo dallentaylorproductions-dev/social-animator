@@ -934,6 +934,131 @@
   color: var(--t-soft);
 }
 
+/* 4b · Zone 5 listings coverflow ("Put in front of buyers") ---------------
+   The exposure proof: the agent's recent listings, flexing in beneath the
+   capability cards. MOBILE-FIRST (base = the near-flat peek-swipe carousel,
+   the primary surface); the 3D fan is layered on at the desktop breakpoint.
+   The view NUMBER is the hero (white, on the solid dark band); teal is reserved
+   for the center keyline + the aggregate total. Legibility never rides on the
+   raw photo (the band is solid). No autoplay; the entrance reuses `.reveal`. */
+.fs-page.state-a .sa-cf {
+  margin-top: clamp(28px, 5cqi, 44px);
+  padding-top: 4px;
+  border-top: 1px solid var(--line);
+}
+.fs-page.state-a .sa-cf__eyebrow {
+  font-family: var(--f-mono);
+  font-size: 10.5px;
+  letter-spacing: 0.2em;
+  text-transform: uppercase;
+  color: var(--t-mute);
+  margin: 22px 0 0;
+}
+/* Base: horizontal scroll-snap peek carousel. `.sa-cf__track` collapses (display:
+   contents) so the cards become the scroll container's flex items. */
+.fs-page.state-a .sa-cf__fan {
+  margin-top: 14px;
+  display: flex;
+  gap: 14px;
+  overflow-x: auto;
+  scroll-snap-type: x mandatory;
+  -webkit-overflow-scrolling: touch;
+  padding: 14px 4px 18px;
+  scrollbar-width: none;
+}
+.fs-page.state-a .sa-cf__fan::-webkit-scrollbar {
+  display: none;
+}
+.fs-page.state-a .sa-cf__track {
+  display: contents;
+}
+.fs-page.state-a .sa-cf__card {
+  position: relative;
+  flex: 0 0 78%;
+  max-width: 300px;
+  aspect-ratio: 3 / 4;
+  border-radius: var(--r-md);
+  overflow: hidden;
+  background: var(--sa-proof-cream);
+  scroll-snap-align: center;
+  box-shadow: var(--lift-1);
+}
+.fs-page.state-a .sa-cf__photo {
+  position: absolute;
+  inset: 0;
+  z-index: 0;
+  background-size: cover;
+  background-position: center;
+}
+/* The center card earns the one teal keyline (all surfaces). */
+.fs-page.state-a .sa-cf__card--center::after {
+  content: "";
+  position: absolute;
+  inset: 0;
+  z-index: 2;
+  border-radius: var(--r-md);
+  border: 2px solid var(--teal-700);
+  pointer-events: none;
+}
+.fs-page.state-a .sa-cf__band {
+  position: absolute;
+  left: 0;
+  right: 0;
+  bottom: 0;
+  z-index: 1;
+  background: var(--sa-proof-dark);
+  color: var(--t-pap);
+  padding: 13px 15px 14px;
+  display: flex;
+  flex-direction: column;
+  gap: 5px;
+}
+.fs-page.state-a .sa-cf__views {
+  display: flex;
+  align-items: baseline;
+  gap: 8px;
+}
+/* THE HERO — big Newsreader number, WHITE, tabular so 5–6 digits sit cleanly. */
+.fs-page.state-a .sa-cf__num {
+  font-family: var(--f-display);
+  font-size: clamp(30px, 9cqi, 38px);
+  line-height: 0.92;
+  letter-spacing: -0.01em;
+  color: var(--white);
+  font-variant-numeric: tabular-nums;
+}
+.fs-page.state-a .sa-cf__vlabel {
+  font-family: var(--f-mono);
+  font-size: 10px;
+  letter-spacing: 0.2em;
+  text-transform: uppercase;
+  color: var(--t-pap-mute);
+}
+.fs-page.state-a .sa-cf__addr {
+  font-family: var(--f-display);
+  font-size: 14.5px;
+  line-height: 1.15;
+  color: var(--white);
+}
+.fs-page.state-a .sa-cf__city {
+  font-family: var(--f-mono);
+  font-size: 9px;
+  letter-spacing: 0.14em;
+  text-transform: uppercase;
+  color: var(--t-pap-mute);
+}
+/* Aggregate — summed from the real per-card numbers; total is the teal accent. */
+.fs-page.state-a .sa-cf__agg {
+  margin: 16px 0 0;
+  font-family: var(--f-display);
+  font-size: clamp(16px, 2.4cqi, 20px);
+  color: var(--t-soft);
+}
+.fs-page.state-a .sa-cf__aggnum {
+  color: var(--teal-700);
+  font-weight: 500;
+}
+
 /* 5 · Meeting close (reuses .work/.flow/.fstep) + advocacy line ------------ */
 .fs-page.state-a .sa-meet__advocacy {
   margin: clamp(26px, 3.6cqi, 40px) 0 0;
@@ -1081,5 +1206,123 @@
   .fs-page.state-a .sa-spread__grid {
     grid-template-columns: 1.4fr 1fr;
     align-items: stretch;
+  }
+
+  /* Zone 5 — the restrained 3D coverflow. The peek-swipe base is replaced by a
+     perspective stage with absolutely-positioned cards; the bend + depth recede
+     saturation outward (restrained cinematic, not dark drama). */
+  .fs-page.state-a .sa-cf__eyebrow,
+  .fs-page.state-a .sa-cf__agg {
+    text-align: center;
+  }
+  .fs-page.state-a .sa-cf__fan {
+    display: block;
+    overflow: visible;
+    padding: 0;
+    margin-top: 16px;
+    position: relative;
+    height: 460px;
+    perspective: 1700px;
+    perspective-origin: 50% 42%;
+  }
+  .fs-page.state-a .sa-cf__track {
+    display: block;
+    position: absolute;
+    inset: 0;
+    transform-style: preserve-3d;
+  }
+  .fs-page.state-a .sa-cf__card {
+    position: absolute;
+    left: 50%;
+    top: 50%;
+    width: 296px;
+    height: 392px;
+    max-width: none;
+    aspect-ratio: auto;
+    flex: none;
+    margin-left: -148px;
+    margin-top: -196px;
+    scroll-snap-align: none;
+    box-shadow: none;
+    transform-origin: 50% 50%;
+    transition: transform 0.55s var(--ease), opacity 0.55s var(--ease),
+      filter 0.55s var(--ease);
+    will-change: transform;
+  }
+  .fs-page.state-a .sa-cf__card[data-pos="center"] {
+    transform: translateZ(70px) rotateY(0deg) scale(1);
+    z-index: 6;
+    box-shadow: var(--sa-proof-shadow-light);
+    filter: saturate(1.04);
+  }
+  .fs-page.state-a .sa-cf__card[data-pos="in-left"] {
+    transform: translateX(-44%) rotateY(23deg) scale(0.92);
+    z-index: 5;
+    opacity: 0.82;
+  }
+  .fs-page.state-a .sa-cf__card[data-pos="in-right"] {
+    transform: translateX(44%) rotateY(-23deg) scale(0.92);
+    z-index: 5;
+    opacity: 0.82;
+  }
+  .fs-page.state-a .sa-cf__card[data-pos="out-left"] {
+    transform: translateX(-82%) translateZ(-50px) rotateY(36deg) scale(0.82);
+    z-index: 4;
+    opacity: 0.4;
+    filter: saturate(0.55) brightness(0.98);
+  }
+  .fs-page.state-a .sa-cf__card[data-pos="out-right"] {
+    transform: translateX(82%) translateZ(-50px) rotateY(-36deg) scale(0.82);
+    z-index: 4;
+    opacity: 0.4;
+    filter: saturate(0.55) brightness(0.98);
+  }
+  /* 2 listings → a tightened gentle pair, no faked peeks. */
+  .fs-page.state-a .sa-cf__fan--pair .sa-cf__card[data-pos="in-left"] {
+    transform: translateX(-30%) rotateY(16deg) scale(0.95);
+    opacity: 1;
+  }
+  .fs-page.state-a .sa-cf__fan--pair .sa-cf__card[data-pos="in-right"] {
+    transform: translateX(30%) rotateY(-16deg) scale(0.95);
+    opacity: 1;
+  }
+  /* 1 listing → centered, upright, keeps the keyline. */
+  .fs-page.state-a .sa-cf__fan--single .sa-cf__card[data-pos="center"] {
+    transform: translateZ(40px) rotateY(0deg) scale(1);
+  }
+  .fs-page.state-a .sa-cf__num {
+    font-size: 40px;
+  }
+}
+
+/* Zone 5 — reduced-motion: collapse the 3D fan to a flat, static peek row (no
+   perspective, no transitions). The mobile base is already near-flat, so this
+   applies cleanly at every width. */
+@media (prefers-reduced-motion: reduce) {
+  .fs-page.state-a .sa-cf__fan {
+    perspective: none;
+    height: auto;
+    display: flex;
+    flex-wrap: wrap;
+    justify-content: center;
+    gap: 14px;
+    overflow: visible;
+    padding: 14px 0 0;
+  }
+  .fs-page.state-a .sa-cf__track {
+    display: contents;
+  }
+  .fs-page.state-a .sa-cf__card {
+    position: static;
+    margin: 0;
+    width: 200px;
+    height: 264px;
+    max-width: none;
+    aspect-ratio: auto;
+    flex: 0 0 200px;
+    transform: none !important;
+    opacity: 1 !important;
+    filter: none !important;
+    transition: none !important;
   }
 }

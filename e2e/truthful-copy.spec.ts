@@ -134,6 +134,15 @@ const UX1_TOUCHED_COPY: Array<{ file: string; phrase: string }> = [
     file: 'src/tools/seller-presentation/output/flagship/state-a-copy.ts',
     phrase: 'I put this together ahead of our visit',
   },
+  // Zone 5 listings coverflow — evergreen, source-agnostic, no em-dash.
+  {
+    file: 'src/tools/seller-presentation/output/flagship/state-a-copy.ts',
+    phrase: 'Recent listings, real reach',
+  },
+  {
+    file: 'src/tools/seller-presentation/output/flagship/state-a-copy.ts',
+    phrase: 'buyer views across recent listings',
+  },
 ];
 
 test.describe('UX-1 touched copy', () => {

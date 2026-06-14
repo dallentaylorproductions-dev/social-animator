@@ -676,3 +676,94 @@ export const STATE_A_NO_STAT_PAYLOAD: PublicPayload = {
     performanceStats: [],
   } as PublicPayload["whyUs"],
 };
+
+/**
+ * Seller State A · Zone 5 — the listings coverflow, FULL fan. Same prepared
+ * invitation as STATE_A_FULL_PAYLOAD, plus five recent listings flexing the
+ * coverflow in beneath the capability cards. Exercises every honesty branch at
+ * once: portal-scale view counts (the number is the hero), a with/without-number
+ * MIX (418 Linden carries no count → that visible card shows address only, no
+ * empty slot), and the summed aggregate. The two outer peeks carry numbers that
+ * the band hides but the aggregate counts, so 32,246 + 41,184 + 37,610 + 28,560
+ * = 139,600 "buyer views" — never authored, always summed from real per-card
+ * numbers. The empty / capability-cards-only state is STATE_A_FULL_PAYLOAD
+ * itself (no recentListings), so no separate fixture is needed for it.
+ */
+export const STATE_A_COVERFLOW_PAYLOAD: PublicPayload = {
+  ...STATE_A_FULL_PAYLOAD,
+  recentListings: [
+    // out-left peek (no band shown) — its count feeds the aggregate.
+    {
+      address: "902 Marsh Ln",
+      city: "Eastgate",
+      photoUrl: "/sample-assets/backyard.webp",
+      viewCount: 32246,
+    },
+    // in-left (visible) — intentionally NO viewCount: the with/without mix.
+    {
+      address: "418 Linden Ave",
+      city: "Glen Park",
+      photoUrl: "/sample-assets/exterior.webp",
+    },
+    // center (visible, keyline) — the hero number.
+    {
+      address: "1240 Hawthorne St",
+      city: "Maple Heights",
+      photoUrl: "/sample-assets/living-room.webp",
+      viewCount: 41184,
+    },
+    // in-right (visible) — with a number.
+    {
+      address: "77 Cedar Court",
+      city: "Westbrook",
+      photoUrl: "/sample-assets/kitchen.webp",
+      viewCount: 37610,
+    },
+    // out-right peek (no band shown) — its count feeds the aggregate.
+    {
+      address: "5530 Brook Hollow",
+      city: "Riverton",
+      photoUrl: "/sample-assets/bedroom.webp",
+      viewCount: 28560,
+    },
+  ],
+};
+
+/**
+ * Seller State A · Zone 5 — the 2-listing state (a gentle pair, no faked peeks).
+ * Both carry a number, so the aggregate (41,184 + 37,610 = 78,794) renders.
+ */
+export const STATE_A_COVERFLOW_PAIR_PAYLOAD: PublicPayload = {
+  ...STATE_A_FULL_PAYLOAD,
+  recentListings: [
+    {
+      address: "1240 Hawthorne St",
+      city: "Maple Heights",
+      photoUrl: "/sample-assets/living-room.webp",
+      viewCount: 41184,
+    },
+    {
+      address: "77 Cedar Court",
+      city: "Westbrook",
+      photoUrl: "/sample-assets/kitchen.webp",
+      viewCount: 37610,
+    },
+  ],
+};
+
+/**
+ * Seller State A · Zone 5 — the single-listing state: one card, centered and
+ * upright, keeping the keyline. Only ONE card carries a number, so the aggregate
+ * is BELOW the ≥2 gate and hides cleanly (no hollow one-listing total).
+ */
+export const STATE_A_COVERFLOW_SINGLE_PAYLOAD: PublicPayload = {
+  ...STATE_A_FULL_PAYLOAD,
+  recentListings: [
+    {
+      address: "1240 Hawthorne St",
+      city: "Maple Heights",
+      photoUrl: "/sample-assets/living-room.webp",
+      viewCount: 41184,
+    },
+  ],
+};

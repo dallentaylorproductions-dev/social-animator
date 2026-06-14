@@ -11,6 +11,9 @@ import {
   POSTER_NONE_PAYLOAD,
   POSTER_OVERRIDE_WINS_PAYLOAD,
   POSTER_SCRUB_OVER_AUTO_PAYLOAD,
+  STATE_A_COVERFLOW_PAYLOAD,
+  STATE_A_COVERFLOW_PAIR_PAYLOAD,
+  STATE_A_COVERFLOW_SINGLE_PAYLOAD,
   STATE_A_FULL_PAYLOAD,
   STATE_A_MINIMAL_PAYLOAD,
   STATE_A_MIXED_COVERAGE_PAYLOAD,
@@ -143,6 +146,13 @@ export default async function SellerPresentationPreview({ searchParams }: PagePr
     "state-a-no-video",
     "state-a-trend-only",
     "state-a-no-stat",
+    // Zone 5 listings coverflow (exposure proof). `state-a-coverflow` = the full
+    // fan (5 listings, portal-scale numbers, with/without mix, aggregate);
+    // `-pair` = the 2-listing gentle pair; `-single` = one centered card with the
+    // aggregate hidden. The capability-cards-only (empty) state is `state-a`.
+    "state-a-coverflow",
+    "state-a-coverflow-pair",
+    "state-a-coverflow-single",
   ] as const;
   type Variant = (typeof VARIANTS)[number];
   const variant = (VARIANTS as readonly string[]).includes(fixture ?? "")
@@ -193,7 +203,13 @@ export default async function SellerPresentationPreview({ searchParams }: PagePr
                                 ? STATE_A_TREND_ONLY_PAYLOAD
                                 : variant === "state-a-no-stat"
                                   ? STATE_A_NO_STAT_PAYLOAD
-                                  : FULL_PAYLOAD;
+                                  : variant === "state-a-coverflow"
+                                    ? STATE_A_COVERFLOW_PAYLOAD
+                                    : variant === "state-a-coverflow-pair"
+                                      ? STATE_A_COVERFLOW_PAIR_PAYLOAD
+                                      : variant === "state-a-coverflow-single"
+                                        ? STATE_A_COVERFLOW_SINGLE_PAYLOAD
+                                        : FULL_PAYLOAD;
 
   // E.0 — optional brand-color override (drives the brand-colors e2e
   // regression spec + Dallen's browser smoke). Validated hex only; merged
