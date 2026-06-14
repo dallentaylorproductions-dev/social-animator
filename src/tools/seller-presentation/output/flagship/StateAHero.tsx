@@ -1,10 +1,6 @@
 import type { PublicPayload } from "../public-payload";
 import type { FormattedAppointment } from "../../engine/appointment";
-import {
-  effectivePosterUrl,
-  effectiveFraming,
-  withFirstFrameHint,
-} from "../../engine/types";
+import { effectivePosterUrl, withFirstFrameHint } from "../../engine/types";
 
 /**
  * Seller State A · Signature A.1 - the private map-dossier hero.
@@ -155,15 +151,21 @@ function HeroAgent({ payload }: { payload: PublicPayload }) {
 }
 
 /**
- * The hero hello. Reuses the EXACT poster-precedence + framing + first-frame
- * helpers the flagship AgentNote video uses (effectivePosterUrl /
- * effectiveFraming / withFirstFrameHint), so State A and the revealed page never
- * drift on iOS first-frame painting or the agent's "use this frame" pick.
+ * The hero hello. Reuses the EXACT poster-precedence + first-frame helpers the
+ * flagship AgentNote video uses (effectivePosterUrl / withFirstFrameHint), so
+ * State A and the revealed page never drift on iOS first-frame painting.
+ *
+ * Framing note: unlike the revealed-page AgentNote inlay (which `cover`-crops to
+ * the agent's chosen focal point), the dossier hero shows the FULL video frame
+ * via `object-fit: contain` on a deliberate portrait-friendly box — a portrait
+ * talking-head hello is never chopped mid-face, and any letterbox reads as an
+ * intentional dark mat (the .sa-hero__video ink background), not an accident. So
+ * the agent's cover-crop framing (focalX/Y/zoom) is intentionally NOT applied
+ * here. Fullscreen uses the same contain treatment (see state-a.css).
  */
 function HeroVideo({ payload }: { payload: PublicPayload }) {
   const v = payload.video!;
   const poster = effectivePosterUrl(v);
-  const framing = effectiveFraming(v);
 
   return (
     <div
@@ -180,9 +182,8 @@ function HeroVideo({ payload }: { payload: PublicPayload }) {
         preload="metadata"
         aria-label={v.title ?? "A short hello from your agent"}
         style={{
-          objectFit: "cover",
-          objectPosition: `${framing.focalX}% ${framing.focalY}%`,
-          transform: `scale(${framing.zoom})`,
+          objectFit: "contain",
+          objectPosition: "center",
         }}
       />
       <span className="sa-hero__video-cap" aria-hidden="true">

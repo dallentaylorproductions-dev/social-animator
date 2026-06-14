@@ -46,7 +46,10 @@
 .fs-page.state-a .sa-hero__pers {
   position: absolute;
   z-index: 4;
-  top: 16px;
+  /* A comfortable inset so the line breathes off the frame's top edge instead of
+     reading jammed against it (Dallen smoke). The scrim ::before below tracks
+     this base; the standalone block tracks it under a phone notch. */
+  top: 22px;
   left: 0;
   right: 0;
   text-align: center;
@@ -66,11 +69,27 @@
   position: absolute;
   left: 0;
   right: 0;
-  top: -16px;
-  height: 70px;
+  /* Anchored to the cover's top edge (top: -base reaches y=0) and stretched 54px
+     past the line, so it reads as ONE blended darkening behind the text. */
+  top: -22px;
+  height: 76px;
   z-index: -1;
   pointer-events: none;
   background: linear-gradient(to bottom, rgba(8, 15, 18, 0.55), rgba(8, 15, 18, 0));
+}
+/* Standalone (installed-PWA) top safe-area, mirroring the flagship hero's
+   .hero__pers notch handling. On a published /h/<slug> opened as a PWA the cover
+   is full-bleed under the iOS status bar; without this the line sits under the
+   notch. Drop it by the inset amount ITSELF, floored at the 22px base via max()
+   (no v1-style double-add over-push), and re-anchor the scrim to the cover top.
+   The photo stays full-bleed (never inset) — only the text line moves. The
+   in-wizard live preview (.fs-static) and Brand-kit settings embed (.sep-embed)
+   render the same .fs-page OFF the device notch, so reset them to the base. */
+@media (display-mode: standalone) {
+  .fs-page.state-a .sa-hero__pers {--notch: max(22px, env(safe-area-inset-top, 0px)); top: var(--notch); }
+  .fs-page.state-a .sa-hero__pers::before {top: calc(-1 * var(--notch)); height: calc(var(--notch) + 54px); }
+  .fs-static .fs-page.state-a .sa-hero__pers, .sep-embed .fs-page.state-a .sa-hero__pers {--notch: 22px; top: 22px; }
+  .fs-static .fs-page.state-a .sa-hero__pers::before, .sep-embed .fs-page.state-a .sa-hero__pers::before {top: -22px; height: 76px; }
 }
 .fs-page.state-a .sa-hero__pers-dot {
   width: 4px;
@@ -187,7 +206,11 @@
 .fs-page.state-a .sa-hero__video {
   margin-top: clamp(20px, 3cqi, 26px);
   position: relative;
-  aspect-ratio: 16 / 10;
+  /* Portrait-friendly box: hello videos are usually phone talking-heads. The
+     player uses object-fit: contain (below), so this aspect just sets the frame;
+     the ink background mats any letterbox so it reads intentional, never cropped
+     mid-face. 4/5 matches the revealed-page video's default aspect. */
+  aspect-ratio: 4 / 5;
   max-width: 340px;
   border-radius: var(--r-md);
   overflow: hidden;
@@ -200,8 +223,20 @@
   inset: 0;
   width: 100%;
   height: 100%;
+  /* Show the WHOLE uploaded frame, letterboxed onto the ink mat — never a
+     cover-crop that chops the agent's head (object-fit/position set inline so the
+     SSR markup is self-describing; this is the styling backstop). */
+  object-fit: contain;
+  object-position: center;
   background: var(--ink-2);
 }
+/* When the seller takes the native fullscreen control, that SAME <video>
+   element goes fullscreen. Mirror the revealed-page A7d.12 fix: reset to a
+   centered contain on a black mat so the whole portrait video shows letterboxed,
+   never blown out. The WebKit alias is a SEPARATE rule — a comma-list with an
+   unknown pseudo gets the whole rule discarded by the UA that doesn't know it. */
+.fs-page.state-a .sa-hero__video-player:fullscreen {object-fit: contain !important; object-position: center !important; transform: none !important; width: 100% !important; height: 100% !important; background: #000 !important; }
+.fs-page.state-a .sa-hero__video-player:-webkit-full-screen {object-fit: contain !important; object-position: center !important; transform: none !important; width: 100% !important; height: 100% !important; background: #000 !important; }
 .fs-page.state-a .sa-hero__video-cap {
   position: absolute;
   left: 12px;
@@ -568,6 +603,12 @@
   z-index: 0;
   background-size: cover;
   background-position: center;
+}
+/* The video-tour poster is a frame from the agent's hello: bias the cover-crop
+   upward so a talking-head poster reads as a deliberate face-safe thumbnail,
+   never cut mid-face. 30% matches the default video framing's focal bias. */
+.fs-page.state-a .sa-frame__photo--face {
+  background-position: center 30%;
 }
 .fs-page.state-a .sa-frame.has-photo::after {
   content: "";
