@@ -1,0 +1,431 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+<meta charset="utf-8" />
+<meta name="viewport" content="width=device-width, initial-scale=1" />
+<title>State A · Zone 5 — Listings Coverflow (hi-fi prototype)</title>
+<link rel="preconnect" href="https://fonts.googleapis.com" />
+<link rel="preconnect" href="https://fonts.gstatic.com" crossorigin />
+<link href="https://fonts.googleapis.com/css2?family=IBM+Plex+Mono:wght@400;500&family=Newsreader:ital,wght@0,400;0,500;1,400;1,500&display=swap" rel="stylesheet" />
+<style>
+  /* =====================================================================
+     STATE A · ZONE 5 — LISTINGS COVERFLOW
+     Build-ready hi-fi prototype. Tokens lifted verbatim from the shipped
+     State A polish (flagship.css / state-a.css). Standalone — not wired
+     into the page; Cowork finalizes, then it becomes the engineering packet.
+
+     v2 — applied review: portal-scale numbers, view-number as the hero,
+     shipped brand tokens (not the handoff's stale hexes), shipped capability
+     copy + shipped reach line, one source-agnostic "Views" label.
+     ===================================================================== */
+  :root {
+    /* --- Surfaces (SHIPPED values win; handoff hexes were stale) --- */
+    --cream-zone:  #F8F3E8;  /* --offwhite, the shipped section bg (z-offwhite) */
+    --card-cream:  #fbf8f2;  /* --sa-proof-cream, card surface */
+    --cream-inset: #f4eee3;  /* --sa-proof-inset */
+    --band-dark:   #12171a;  /* --sa-proof-dark, card base dark band */
+
+    /* --- Accent --- teal keyline, the one earned accent. SHIPPED brand
+       tokens, bound (not hard-coded) so the keyline + view number re-hue per
+       agent exactly like the proof panels / sparkline / stars. */
+    --teal-700: #06647D;                                          /* light surfaces */
+    --teal-500: color-mix(in oklab, var(--teal-700), #ffffff 24%); /* dark surfaces */
+
+    /* --- Ink + text (flagship.css) --- */
+    --t-ink:      #1B2A2E;
+    --t-soft:     #4C5D61;
+    --t-mute:     #74858A;
+    --t-pap:      #EFE9DC;   /* paper text on dark band */
+    --t-pap-mute: #7C8D90;
+    --line:       rgba(20,36,40,.13);
+
+    /* --- Type (two families only) --- */
+    --f-display: "Newsreader", Georgia, serif;
+    --f-mono: "IBM Plex Mono", ui-monospace, monospace;
+
+    --radius-card: 16px;
+    --card-shadow: 0 1px 0 rgba(255,255,255,.6) inset,
+                   0 28px 52px -26px rgba(60,44,27,.55);
+  }
+
+  * { box-sizing: border-box; }
+  html, body { margin: 0; }
+  body {
+    background: #2a2d31;
+    color: var(--t-ink);
+    font-family: var(--f-mono);
+    -webkit-font-smoothing: antialiased;
+  }
+
+  /* ---- prototype gallery chrome (not part of the design) ---- */
+  .gallery { padding: 40px clamp(16px, 4vw, 64px) 120px; }
+  .gallery > header { max-width: 920px; margin: 0 auto 8px; color: #e9e4d8; }
+  .gallery > header h1 { font-family: var(--f-display); font-weight: 400; font-size: 30px; letter-spacing: -.01em; margin: 0 0 6px; }
+  .gallery > header p { font-size: 12px; letter-spacing: .04em; line-height: 1.6; color: #b9b3a6; max-width: 720px; margin: 0; }
+  .stage-label { max-width: 1080px; margin: 56px auto 14px; display: flex; align-items: baseline; gap: 14px; color: #cfc9bc; }
+  .stage-label .n { font-family: var(--f-mono); font-size: 11px; letter-spacing: .22em; color: var(--teal-500); text-transform: uppercase; }
+  .stage-label .t { font-family: var(--f-display); font-size: 19px; }
+  .stage-label .d { font-size: 11px; letter-spacing: .03em; color: #9a9488; margin-left: auto; max-width: 360px; text-align: right; line-height: 1.5; }
+
+  /* ---- a "stage" = one cream section panel at real proportions ---- */
+  .stage { max-width: 1080px; margin: 0 auto; background: var(--cream-zone); border-radius: 14px; overflow: hidden; box-shadow: 0 30px 70px -40px rgba(0,0,0,.6); }
+  .stage--phone { max-width: 412px; }
+
+  /* =====================================================================
+     SECTION SHELL (matches CampaignSpread header system)
+     ===================================================================== */
+  .section { padding: clamp(46px, 9cqi, 96px) clamp(22px, 6cqi, 72px); position: relative; container-type: inline-size; }
+  .eyebrow { font-family: var(--f-mono); font-size: 11.5px; letter-spacing: .2em; text-transform: uppercase; color: var(--t-mute); font-weight: 500; display: flex; align-items: center; gap: 10px; }
+  .eyebrow .rule { flex: 1; height: 1px; background: var(--line); }
+  h2.head { font-family: var(--f-display); font-weight: 400; font-size: clamp(30px, 6.2cqi, 50px); line-height: 1.05; letter-spacing: -.015em; color: var(--t-ink); margin: 22px 0 0; text-wrap: balance; }
+  h2.head em { font-style: italic; }
+
+  /* ---- capability cards (the existing 'Produced beautifully' half) ---- */
+  .cap-grid { display: grid; grid-template-columns: 1.4fr 1fr; gap: 18px; margin-top: 40px; }
+  .cap-rest { display: grid; gap: 18px; }
+  .cap-frame { background: var(--card-cream); border-radius: var(--radius-card); padding: 22px; min-height: 150px; display: flex; flex-direction: column; justify-content: flex-end; position: relative; overflow: hidden; box-shadow: 0 1px 0 rgba(255,255,255,.6) inset, 0 18px 40px -30px rgba(60,44,27,.5); }
+  .cap-frame--lead { min-height: 320px; }
+  .cap-frame--photo { color: var(--t-pap); }
+  .cap-frame__photo { position: absolute; inset: 0; background-size: cover; background-position: center; }
+  .cap-frame--photo::after { content:""; position:absolute; inset:0; background: linear-gradient(180deg, transparent 40%, rgba(8,12,14,.78)); }
+  .cap-frame__cap { position: relative; z-index: 1; }
+  .cap-frame__label { font-family: var(--f-display); font-size: 19px; display: block; }
+  .cap-frame--photo .cap-frame__label { color: #fff; }
+  .cap-frame__sub { font-family: var(--f-mono); font-size: 10.5px; letter-spacing: .12em; text-transform: uppercase; color: var(--t-mute); margin-top: 8px; display: block; }
+  .cap-frame--photo .cap-frame__sub { color: rgba(255,255,255,.82); }
+
+  .reach { font-family: var(--f-display); font-style: italic; font-size: clamp(17px,2.6cqi,21px); color: var(--t-soft); margin: 36px 0 0; max-width: 52ch; line-height: 1.4; }
+
+  /* =====================================================================
+     COVERFLOW — the new Zone 5 fan
+     ===================================================================== */
+  .coverflow { margin-top: 48px; padding-top: 8px; border-top: 1px solid var(--line); }
+  .coverflow__eyebrow { font-family: var(--f-mono); font-size: 10.5px; letter-spacing: .2em; text-transform: uppercase; color: var(--t-mute); margin: 28px 0 0; text-align: center; }
+
+  .fan { position: relative; height: 460px; margin: 18px 0 0; perspective: 1700px; perspective-origin: 50% 42%; }
+  .fan__track { position: absolute; inset: 0; transform-style: preserve-3d; display: flex; align-items: center; justify-content: center; }
+
+  /* card */
+  .lcard {
+    --w: 296px; --h: 392px;
+    position: absolute; width: var(--w); height: var(--h);
+    left: 50%; top: 50%; margin-left: calc(var(--w) / -2); margin-top: calc(var(--h) / -2);
+    border-radius: var(--radius-card); overflow: hidden; background: var(--card-cream);
+    transform-origin: 50% 50%;
+    transition: transform .55s cubic-bezier(.22,.61,.36,1), opacity .55s ease, filter .55s ease;
+    will-change: transform;
+  }
+  .lcard__photo { position: absolute; inset: 0; background-size: cover; background-position: center; }
+
+  /* band — legibility never rides on the photo; the band is solid, not a gradient */
+  .lcard__band { position: absolute; left: 0; right: 0; bottom: 0; background: var(--band-dark); color: var(--t-pap); padding: 14px 16px 15px; display: flex; flex-direction: column; gap: 6px; }
+
+  /* THE NUMBER IS THE HERO (Beacon-scale) — big Newsreader, WHITE on the dark
+     band; "Views" is the small mono label. Teal is RESERVED for the card keyline
+     + the single aggregate line, so the accent stays earned (one per card). */
+  .lcard__views { display: flex; align-items: baseline; gap: 8px; }
+  .lcard__num { font-family: var(--f-display); font-size: 40px; line-height: .92; letter-spacing: -.01em; color: #fff; font-variant-numeric: tabular-nums; }
+  .lcard__vlabel { font-family: var(--f-mono); font-size: 10px; letter-spacing: .2em; text-transform: uppercase; color: var(--t-pap-mute); }
+  .lcard__addr { font-family: var(--f-display); font-size: 14.5px; line-height: 1.15; color: #fff; margin-top: 1px; }
+  .lcard__city { font-family: var(--f-mono); font-size: 9px; letter-spacing: .14em; text-transform: uppercase; color: var(--t-pap-mute); }
+
+  /* --- positions in the fan --- */
+  .lcard[data-pos="center"]   { transform: translateZ(70px) rotateY(0deg)   scale(1);    z-index: 6; }
+  .lcard[data-pos="in-left"]  { transform: translateX(-44%) translateZ(0)   rotateY(23deg)  scale(.92); z-index: 5; opacity: .82; }
+  .lcard[data-pos="in-right"] { transform: translateX(44%)  translateZ(0)   rotateY(-23deg) scale(.92); z-index: 5; opacity: .82; }
+  .lcard[data-pos="out-left"] { transform: translateX(-82%) translateZ(-50px) rotateY(36deg)  scale(.82); z-index: 4; opacity: .4; filter: saturate(.55) brightness(.98); }
+  .lcard[data-pos="out-right"]{ transform: translateX(82%)  translateZ(-50px) rotateY(-36deg) scale(.82); z-index: 4; opacity: .4; filter: saturate(.55) brightness(.98); }
+
+  .lcard[data-pos="center"] { box-shadow: var(--card-shadow); filter: saturate(1.04); }
+  .lcard[data-pos="center"]::after { content: ""; position: absolute; inset: 0; border-radius: var(--radius-card); border: 2px solid var(--teal-700); pointer-events: none; }
+  .lcard[data-pos="out-left"] .lcard__band, .lcard[data-pos="out-right"] .lcard__band { display: none; }
+
+  .lcard__play { position: absolute; left: 50%; top: 44%; transform: translate(-50%,-50%); width: 58px; height: 58px; border-radius: 50%; display: grid; place-items: center; background: rgba(8,12,14,.42); backdrop-filter: blur(2px); border: 1.5px solid rgba(255,255,255,.85); }
+  .lcard__play::before { content:""; border-left: 16px solid #fff; border-top: 10px solid transparent; border-bottom: 10px solid transparent; margin-left: 4px; }
+
+  .aggregate { text-align: center; margin: 26px 0 0; font-family: var(--f-display); font-size: clamp(16px,2.4cqi,20px); color: var(--t-soft); }
+  .aggregate b { color: var(--teal-700); font-weight: 500; font-style: normal; }
+  .aggregate--absent { display: none; }
+
+  /* small-count fan (1–2 listings) — fewer cards, no faked peeks */
+  .fan--count2 .lcard[data-pos="in-left"]  { transform: translateX(-30%) rotateY(16deg)  scale(.95); opacity: 1; }
+  .fan--count2 .lcard[data-pos="in-right"] { transform: translateX(30%)  rotateY(-16deg) scale(.95); opacity: 1; }
+
+  /* flat card detail row */
+  .detail-row { display: flex; gap: 34px; justify-content: center; flex-wrap: wrap; margin-top: 20px; }
+  .detail-cell { text-align: center; }
+  .detail-cell > .cap { font-family: var(--f-mono); font-size: 10px; letter-spacing: .18em; text-transform: uppercase; color: var(--t-mute); margin: 14px 0 0; }
+  .lcard--flat { position: static; margin: 0; transform: none !important; box-shadow: var(--card-shadow); }
+  .lcard--flat.keyline::after { content:""; position:absolute; inset:0; border-radius: var(--radius-card); border: 2px solid var(--teal-700); pointer-events:none; }
+
+  /* =====================================================================
+     MOBILE — near-flat peeking swipe carousel (primary surface)
+     ===================================================================== */
+  .swipe { margin-top: 26px; display: flex; gap: 14px; overflow-x: auto; scroll-snap-type: x mandatory; -webkit-overflow-scrolling: touch; padding: 18px max(16px, calc(50% - 132px)) 24px; scrollbar-width: none; }
+  .swipe::-webkit-scrollbar { display: none; }
+  .swipe .lcard { position: static; margin: 0; flex: 0 0 264px; height: 348px; scroll-snap-align: center; transform: none; opacity: 1; transition: transform .4s ease, opacity .4s ease; }
+  .swipe .lcard:not(.is-active) { transform: scale(.95) rotateY(5deg); opacity: .82; transform-origin: left center; }
+  .swipe .lcard.is-active { box-shadow: var(--card-shadow); }
+  .swipe .lcard.is-active::after { content:""; position:absolute; inset:0; border-radius: var(--radius-card); border: 2px solid var(--teal-700); pointer-events:none; }
+  .swipe .lcard__num { font-size: 36px; }
+  .dots { display: flex; gap: 7px; justify-content: center; margin-top: 4px; }
+  .dots i { width: 6px; height: 6px; border-radius: 50%; background: var(--line); }
+  .dots i.on { background: var(--teal-700); width: 18px; border-radius: 99px; }
+
+  .note { max-width: 1080px; margin: 12px auto 0; color: #9a9488; font-size: 11px; line-height: 1.6; letter-spacing: .02em; }
+  .note b { color: #cfc9bc; font-weight: 500; }
+
+  /* =====================================================================
+     MOTION — calm settle on view. No autoplay.
+     ===================================================================== */
+  @keyframes settle { from { opacity: 0; transform: translateZ(-30px) scale(.96); } }
+  .fan--enter .lcard { animation: settle .6s cubic-bezier(.22,.61,.36,1) both; }
+  .fan--enter .lcard[data-pos="in-left"], .fan--enter .lcard[data-pos="in-right"] { animation-delay: .06s; }
+  .fan--enter .lcard[data-pos="out-left"], .fan--enter .lcard[data-pos="out-right"] { animation-delay: .12s; }
+
+  @media (prefers-reduced-motion: reduce) {
+    .lcard { transition: none; }
+    .fan--enter .lcard { animation: none; }
+    .fan { perspective: none; height: auto; }
+    .fan__track { position: static; flex-wrap: wrap; gap: 14px; }
+    .lcard { position: static; margin: 0; transform: none !important; opacity: 1 !important; filter: none !important; width: 220px; height: 290px; }
+    .lcard[data-pos="out-left"] .lcard__band, .lcard[data-pos="out-right"] .lcard__band { display: flex; }
+    .lcard__num { font-size: 32px; }
+  }
+</style>
+</head>
+<body>
+<div class="gallery">
+  <header>
+    <h1>State A · Zone 5 — Listings Coverflow</h1>
+    <p>Build-ready hi-fi of the “Put in front of buyers” exposure proof. A restrained 3D coverflow of the agent’s recent listings, flexing in beneath the capability cards. The view count is the hero of each card. Tokens + capability copy are shipped State A; mint is reserved; teal is the one earned accent. Photos are placeholders.</p>
+  </header>
+
+  <!-- ============ 1. DESKTOP — full composition, in situ ============ -->
+  <div class="stage-label">
+    <span class="n">01 · desktop</span>
+    <span class="t">Full section, in situ</span>
+    <span class="d">Capability cards (“Produced beautifully”) + coverflow flexed in (“Put in front of buyers”). Portal-scale numbers, aggregate present.</span>
+  </div>
+  <div class="stage">
+    <div class="section">
+      <div class="eyebrow">How I’ll Get Your Home Seen <span class="rule"></span></div>
+      <h2 class="head">Produced beautifully. <em>Put in front of buyers</em>.</h2>
+
+      <div class="cap-grid">
+        <div class="cap-frame cap-frame--lead cap-frame--photo">
+          <span class="cap-frame__photo" style="background-image:url('https://picsum.photos/seed/cap-lead/700/520')"></span>
+          <div class="cap-frame__cap"><span class="cap-frame__label">Photography that sells</span><span class="cap-frame__sub">How I shoot every listing</span></div>
+        </div>
+        <div class="cap-rest">
+          <div class="cap-frame cap-frame--photo">
+            <span class="cap-frame__photo" style="background-image:url('https://picsum.photos/seed/cap-vid/420/300')"></span>
+            <div class="cap-frame__cap"><span class="cap-frame__label">A recent video tour</span><span class="cap-frame__sub">From a recent listing of mine</span></div>
+          </div>
+          <div class="cap-frame">
+            <div class="cap-frame__cap"><span class="cap-frame__label" style="color:var(--t-ink)">{ Agent marketing item }</span><span class="cap-frame__sub">Authored in Settings · up to 3</span></div>
+          </div>
+        </div>
+      </div>
+
+      <!-- the new coverflow -->
+      <div class="coverflow">
+        <p class="coverflow__eyebrow">Recent listings, real reach</p>
+        <div class="fan fan--enter">
+          <div class="fan__track">
+            <div class="lcard" data-pos="out-left"><span class="lcard__photo" style="background-image:url('https://picsum.photos/seed/l5/600/780')"></span></div>
+            <div class="lcard" data-pos="in-left">
+              <span class="lcard__photo" style="background-image:url('https://picsum.photos/seed/l2/600/780')"></span>
+              <!-- without a number: address only, no empty slot -->
+              <div class="lcard__band"><div class="lcard__addr">418 Linden Ave</div><div class="lcard__city">Glen Park</div></div>
+            </div>
+            <div class="lcard" data-pos="center">
+              <span class="lcard__photo" style="background-image:url('https://picsum.photos/seed/l1/600/780')"></span>
+              <div class="lcard__band">
+                <div class="lcard__views"><span class="lcard__num">41,184</span><span class="lcard__vlabel">Views</span></div>
+                <div class="lcard__addr">1240 Hawthorne St</div>
+                <div class="lcard__city">Maple Heights</div>
+              </div>
+            </div>
+            <div class="lcard" data-pos="in-right">
+              <span class="lcard__photo" style="background-image:url('https://picsum.photos/seed/l3/600/780')"></span>
+              <div class="lcard__band"><div class="lcard__views"><span class="lcard__num">37,610</span><span class="lcard__vlabel">Views</span></div><div class="lcard__addr">77 Cedar Court</div><div class="lcard__city">Westbrook</div></div>
+            </div>
+            <div class="lcard" data-pos="out-right"><span class="lcard__photo" style="background-image:url('https://picsum.photos/seed/l4/600/780')"></span></div>
+          </div>
+        </div>
+        <p class="aggregate"><b>139,600 buyer views</b> across recent listings</p>
+      </div>
+
+      <p class="reach">Your home in front of buyers wherever they are already looking: the major search sites, my own buyer list, and the feeds they scroll.</p>
+    </div>
+  </div>
+
+  <!-- ============ 2. DESKTOP — card detail, both ways ============ -->
+  <div class="stage-label">
+    <span class="n">02 · desktop</span>
+    <span class="t">Card — with &amp; without view count</span>
+    <span class="d">The number is the hero (portal-scale). Optional, never fabricated. When absent: address + city only, no empty slot.</span>
+  </div>
+  <div class="stage">
+    <div class="section">
+      <div class="detail-row">
+        <div class="detail-cell">
+          <div class="lcard lcard--flat keyline" style="width:264px;height:348px">
+            <span class="lcard__photo" style="background-image:url('https://picsum.photos/seed/l1/600/780')"></span>
+            <div class="lcard__band">
+              <div class="lcard__views"><span class="lcard__num">41,184</span><span class="lcard__vlabel">Views</span></div>
+              <div class="lcard__addr">1240 Hawthorne St</div>
+              <div class="lcard__city">Maple Heights</div>
+            </div>
+          </div>
+          <p class="cap">with view count</p>
+        </div>
+        <div class="detail-cell">
+          <div class="lcard lcard--flat" style="width:264px;height:348px">
+            <span class="lcard__photo" style="background-image:url('https://picsum.photos/seed/l2/600/780')"></span>
+            <div class="lcard__band">
+              <div class="lcard__addr">418 Linden Ave</div>
+              <div class="lcard__city">Glen Park</div>
+            </div>
+          </div>
+          <p class="cap">without view count</p>
+        </div>
+      </div>
+    </div>
+  </div>
+
+  <!-- ============ 3. DESKTOP — small-count states ============ -->
+  <div class="stage-label">
+    <span class="n">03 · desktop</span>
+    <span class="t">1–2 listing states</span>
+    <span class="d">No faked empty peeks. One card centered &amp; upright; two cards form a gentle pair. Aggregate hides when too few numbers.</span>
+  </div>
+  <div class="stage">
+    <div class="section">
+      <p class="coverflow__eyebrow">Two recent listings</p>
+      <div class="fan fan--count2" style="height:400px">
+        <div class="fan__track">
+          <div class="lcard" data-pos="in-left">
+            <span class="lcard__photo" style="background-image:url('https://picsum.photos/seed/l2/600/780')"></span>
+            <div class="lcard__band"><div class="lcard__addr">418 Linden Ave</div><div class="lcard__city">Glen Park</div></div>
+          </div>
+          <div class="lcard" data-pos="in-right">
+            <span class="lcard__photo" style="background-image:url('https://picsum.photos/seed/l1/600/780')"></span>
+            <div class="lcard__band"><div class="lcard__views"><span class="lcard__num">41,184</span><span class="lcard__vlabel">Views</span></div><div class="lcard__addr">1240 Hawthorne St</div><div class="lcard__city">Maple Heights</div></div>
+          </div>
+        </div>
+      </div>
+      <div style="text-align:center;margin-top:8px"><span class="cap" style="font-family:var(--f-mono);font-size:10px;letter-spacing:.18em;text-transform:uppercase;color:var(--t-mute)">single-listing variant below</span></div>
+      <div class="detail-row" style="margin-top:18px">
+        <div class="detail-cell">
+          <div class="lcard lcard--flat keyline" style="width:280px;height:368px">
+            <span class="lcard__photo" style="background-image:url('https://picsum.photos/seed/l3/600/780')"></span>
+            <div class="lcard__band"><div class="lcard__views"><span class="lcard__num">32,246</span><span class="lcard__vlabel">Views</span></div><div class="lcard__addr">77 Cedar Court</div><div class="lcard__city">Westbrook</div></div>
+          </div>
+          <p class="cap">one listing — centered, upright, earns the keyline</p>
+        </div>
+      </div>
+    </div>
+  </div>
+
+  <!-- ============ 4. DESKTOP — default, capability cards only ============ -->
+  <div class="stage-label">
+    <span class="n">04 · desktop</span>
+    <span class="t">Default — no listings entered</span>
+    <span class="d">Zero agent input. Reads complete on the capability cards + reach line alone. Coverflow simply isn’t there.</span>
+  </div>
+  <div class="stage">
+    <div class="section">
+      <div class="eyebrow">How I’ll Get Your Home Seen <span class="rule"></span></div>
+      <h2 class="head">Produced beautifully. <em>Put in front of buyers</em>.</h2>
+      <div class="cap-grid">
+        <div class="cap-frame cap-frame--lead cap-frame--photo">
+          <span class="cap-frame__photo" style="background-image:url('https://picsum.photos/seed/cap-lead/700/520')"></span>
+          <div class="cap-frame__cap"><span class="cap-frame__label">Photography that sells</span><span class="cap-frame__sub">How I shoot every listing</span></div>
+        </div>
+        <div class="cap-rest">
+          <div class="cap-frame cap-frame--photo">
+            <span class="cap-frame__photo" style="background-image:url('https://picsum.photos/seed/cap-vid/420/300')"></span>
+            <div class="cap-frame__cap"><span class="cap-frame__label">A recent video tour</span><span class="cap-frame__sub">From a recent listing of mine</span></div>
+          </div>
+          <div class="cap-frame">
+            <div class="cap-frame__cap"><span class="cap-frame__label" style="color:var(--t-ink)">{ Agent marketing item }</span><span class="cap-frame__sub">Authored in Settings · up to 3</span></div>
+          </div>
+        </div>
+      </div>
+      <p class="reach">Your home in front of buyers wherever they are already looking: the major search sites, my own buyer list, and the feeds they scroll.</p>
+    </div>
+  </div>
+
+  <!-- ============ 5. DESKTOP — optional video slot ============ -->
+  <div class="stage-label">
+    <span class="n">05 · desktop</span>
+    <span class="t">Optional tour-video slot</span>
+    <span class="d">An agent with a tour video can occupy one card slot. Same band; play affordance; no autoplay.</span>
+  </div>
+  <div class="stage">
+    <div class="section">
+      <p class="coverflow__eyebrow">Recent listings, real reach</p>
+      <div class="fan">
+        <div class="fan__track">
+          <div class="lcard" data-pos="out-left"><span class="lcard__photo" style="background-image:url('https://picsum.photos/seed/l5/600/780')"></span></div>
+          <div class="lcard" data-pos="in-left">
+            <span class="lcard__photo" style="background-image:url('https://picsum.photos/seed/l2/600/780')"></span>
+            <div class="lcard__band"><div class="lcard__addr">418 Linden Ave</div><div class="lcard__city">Glen Park</div></div>
+          </div>
+          <div class="lcard" data-pos="center">
+            <span class="lcard__photo" style="background-image:url('https://picsum.photos/seed/vid1/600/780')"></span>
+            <span class="lcard__play"></span>
+            <div class="lcard__band">
+              <div class="lcard__addr">Tour · 1240 Hawthorne St</div>
+              <div class="lcard__city">Maple Heights · 1:48 walkthrough</div>
+            </div>
+          </div>
+          <div class="lcard" data-pos="in-right">
+            <span class="lcard__photo" style="background-image:url('https://picsum.photos/seed/l3/600/780')"></span>
+            <div class="lcard__band"><div class="lcard__views"><span class="lcard__num">37,610</span><span class="lcard__vlabel">Views</span></div><div class="lcard__addr">77 Cedar Court</div><div class="lcard__city">Westbrook</div></div>
+          </div>
+          <div class="lcard" data-pos="out-right"><span class="lcard__photo" style="background-image:url('https://picsum.photos/seed/l4/600/780')"></span></div>
+        </div>
+      </div>
+      <p class="aggregate"><b>139,600 buyer views</b> across recent listings</p>
+    </div>
+  </div>
+
+  <!-- ============ 6. MOBILE — peek-swipe carousel ============ -->
+  <div class="stage-label">
+    <span class="n">06 · mobile</span>
+    <span class="t">Peek-swipe carousel</span>
+    <span class="d">Not the fan shrunk. One card + a peek of the next, minimal tilt, scroll-snap. Number still the hero. Touch only.</span>
+  </div>
+  <div class="stage stage--phone">
+    <div class="section" style="padding:40px 0 44px">
+      <div style="padding:0 22px">
+        <div class="eyebrow">How I’ll Get Your Home Seen <span class="rule"></span></div>
+        <h2 class="head" style="font-size:30px">Produced beautifully. <em>Put in front of buyers</em>.</h2>
+        <p class="coverflow__eyebrow" style="text-align:left;margin-top:26px">Recent listings, real reach</p>
+      </div>
+      <div class="swipe">
+        <div class="lcard is-active">
+          <span class="lcard__photo" style="background-image:url('https://picsum.photos/seed/l1/600/780')"></span>
+          <div class="lcard__band"><div class="lcard__views"><span class="lcard__num">41,184</span><span class="lcard__vlabel">Views</span></div><div class="lcard__addr">1240 Hawthorne St</div><div class="lcard__city">Maple Heights</div></div>
+        </div>
+        <div class="lcard">
+          <span class="lcard__photo" style="background-image:url('https://picsum.photos/seed/l3/600/780')"></span>
+          <div class="lcard__band"><div class="lcard__views"><span class="lcard__num">32,246</span><span class="lcard__vlabel">Views</span></div><div class="lcard__addr">77 Cedar Court</div><div class="lcard__city">Westbrook</div></div>
+        </div>
+        <div class="lcard">
+          <span class="lcard__photo" style="background-image:url('https://picsum.photos/seed/l2/600/780')"></span>
+          <div class="lcard__band"><div class="lcard__addr">418 Linden Ave</div><div class="lcard__city">Glen Park</div></div>
+        </div>
+      </div>
+      <div class="dots"><i class="on"></i><i></i><i></i></div>
+      <p class="aggregate" style="padding:0 22px"><b>139,600 buyer views</b> across recent listings</p>
+    </div>
+  </div>
+
+  <p class="note"><b>Reduced motion / prefers-reduced-motion:</b> the fan collapses to a flat static peek row (no perspective, no settle animation, all bands visible). Resize the window narrow, or toggle OS reduce-motion, to preview the degraded states live.</p>
+</div>
+</body>
+</html>

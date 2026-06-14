@@ -188,6 +188,18 @@ export interface BrandWhyUsInput {
   sampleListingPhotoUrl?: string;
   sampleVideoUrl?: string;
   sampleVideoPosterUrl?: string;
+  /**
+   * Seller State A · Zone 5 — the agent's recent listings for the exposure
+   * coverflow ("Put in front of buyers"). Agent-entered once at onboarding (the
+   * INPUT UI is the deferred next slice), same provenance as the capability
+   * samples above. Wire-permissive (`unknown`): the projector reads every nested
+   * field explicitly (`projectRecentListings`), clamps the view count to a
+   * non-negative integer, caps the array, and drops un-renderable rows, so a
+   * tampered settings record can never smuggle an unbounded list or a private
+   * key downstream. Projected ONLY behind the SELLER_LISTINGS_COVERFLOW flag AND
+   * a State A invitation publish, so a flag-off / revealed publish is byte-identical.
+   */
+  recentListings?: unknown;
 }
 
 /**
@@ -296,6 +308,44 @@ export interface PublicWhyPrice {
   comps: PublicComp[];
 }
 
+/**
+ * Seller State A · Zone 5 — the public projection of ONE recent listing for the
+ * exposure coverflow. A card = the agent's OWN recent listing: a cover photo
+ * (hosted upload OR Street View fallback — the SAME pattern as the comp thumbs,
+ * never image bytes in the payload), street address + city, and an OPTIONAL view
+ * count. The honesty rule: the view count is NEVER fabricated — when absent the
+ * card shows photo + address only (no empty slot); the aggregate "buyer views"
+ * line is summed from the real per-card numbers at render, never authored.
+ *
+ * Public-safe BY CONSTRUCTION: `projectRecentListing` enumerates every field
+ * (no spread), trims strings, clamps `viewCount` to a non-negative integer, and
+ * re-clamps the Street View aiming exactly like a comp. A listing with no
+ * address is dropped (nothing to label honestly).
+ */
+export interface PublicRecentListing {
+  address: string;
+  city?: string;
+  /** Non-negative INTEGER. Absent ⇒ the card renders photo + address, no number. */
+  viewCount?: number;
+  /**
+   * Optional source label. Source-AGNOSTIC by policy: the render shows a plain
+   * "Views" label and never a named portal (the honesty gate — no "Zillow views"
+   * claim on a number we don't control). Carried for the deferred input, but the
+   * card label stays "Views" unless a generic agent label is supplied.
+   */
+  sourceLabel?: string;
+  /** Hosted cover photo (agent upload). Takes precedence over Street View at render. */
+  photoUrl?: string;
+  /** Street View fallback — the pano id is the ONLY Google datum persisted (no bytes). */
+  streetViewPanoId?: string;
+  hasStreetView?: boolean;
+  /** Derived compass bearing (0–360), pano → house, aimed at the home. */
+  streetViewHeading?: number;
+}
+
+/** Seller State A · Zone 5 — coverflow card cap (full fan is 4–5; extra rows drop). */
+export const RECENT_LISTINGS_CAP = 5;
+
 export interface PublicPayload {
   /**
    * Flagship-rollout discriminator (F1). Absent on every already-published
@@ -375,6 +425,15 @@ export interface PublicPayload {
   sampleListingPhotoUrl?: string;
   sampleVideoUrl?: string;
   sampleVideoPosterUrl?: string;
+  /**
+   * Seller State A · Zone 5 — the agent's recent listings for the exposure
+   * coverflow. Emitted ONLY in a State A invitation publish AND behind the
+   * SELLER_LISTINGS_COVERFLOW flag (gated like `valuationStatus`); absent on a
+   * revealed / full / flag-off publish, so those stay byte-identical. The render
+   * (CampaignSpread) flexes the coverflow in beneath the capability cards when
+   * present and renders capability-cards-only when absent.
+   */
+  recentListings?: PublicRecentListing[];
   /**
    * Optional "as of <Mon YYYY>" stamp for the reviews aggregate rating (e.g.
    * "Jun 2026"). Surfaced by the v2 review card for a Google source, where
@@ -565,6 +624,78 @@ function clampLng(value: unknown): number | undefined {
     value <= 180
     ? value
     : undefined;
+}
+
+/**
+ * Seller State A · Zone 5 — clamp a view count to a NON-NEGATIVE INTEGER
+ * (defense-at-boundary). A fabricated / tampered / fractional / negative value
+ * collapses to undefined, so the card renders photo + address with no number
+ * rather than a bogus count. Used at BOTH the write and the read boundary.
+ */
+function clampViewCount(value: unknown): number | undefined {
+  return typeof value === "number" && Number.isFinite(value) && value >= 0
+    ? Math.floor(value)
+    : undefined;
+}
+
+/**
+ * Seller State A · Zone 5 — project ONE recent listing field-by-field (never a
+ * spread). A listing needs an address to render; the view count is optional and
+ * clamped to a non-negative integer; the photo is a hosted URL OR a Street View
+ * pano (re-clamped exactly like a comp thumb — pano id + coverage flag + aimed
+ * heading only, never image bytes). Used at BOTH boundaries (write + read), so
+ * a tampered KV record drops the same rogue keys the publish projector does.
+ */
+function projectRecentListing(item: unknown): PublicRecentListing | null {
+  if (!item || typeof item !== "object") return null;
+  const r = item as Record<string, unknown>;
+  const address = typeof r.address === "string" ? r.address.trim() : "";
+  if (!address) return null;
+  const out: PublicRecentListing = { address };
+  const city =
+    typeof r.city === "string" && r.city.trim() ? r.city.trim() : undefined;
+  if (city) out.city = city;
+  const viewCount = clampViewCount(r.viewCount);
+  if (viewCount !== undefined) out.viewCount = viewCount;
+  const sourceLabel =
+    typeof r.sourceLabel === "string" && r.sourceLabel.trim()
+      ? r.sourceLabel.trim()
+      : undefined;
+  if (sourceLabel) out.sourceLabel = sourceLabel;
+  // Photo: hosted upload takes precedence; Street View pano is the fallback.
+  const photoUrl =
+    typeof r.photoUrl === "string" && r.photoUrl.trim()
+      ? r.photoUrl.trim()
+      : undefined;
+  if (photoUrl) out.photoUrl = photoUrl;
+  const pano =
+    typeof r.streetViewPanoId === "string" && r.streetViewPanoId.trim()
+      ? r.streetViewPanoId.trim()
+      : undefined;
+  if (pano) out.streetViewPanoId = pano;
+  if (typeof r.hasStreetView === "boolean") out.hasStreetView = r.hasStreetView;
+  const heading = clampHeading(r.streetViewHeading);
+  if (heading !== undefined) out.streetViewHeading = heading;
+  return out;
+}
+
+/**
+ * Seller State A · Zone 5 — project the recent-listings array, hard-capping at
+ * RECENT_LISTINGS_CAP and dropping un-renderable rows. Returns undefined when
+ * nothing survives, so the payload carries no empty `recentListings` husk and
+ * the coverflow flexes out cleanly. Used at BOTH boundaries.
+ */
+function projectRecentListings(
+  raw: unknown,
+): PublicRecentListing[] | undefined {
+  if (!Array.isArray(raw)) return undefined;
+  const out: PublicRecentListing[] = [];
+  for (const item of raw) {
+    if (out.length >= RECENT_LISTINGS_CAP) break;
+    const projected = projectRecentListing(item);
+    if (projected) out.push(projected);
+  }
+  return out.length ? out : undefined;
 }
 
 /**
@@ -895,6 +1026,11 @@ export function toPublicPayload(
   // false (or the draft is `revealed`/absent), NO valuationStatus/appointmentAt
   // keys are emitted and the page is the full presentation exactly as today.
   sellerStateA: boolean = false,
+  // SELLER_LISTINGS_COVERFLOW — Zone 5 kill switch. OFF by default so every
+  // existing call site (and every flag-off publish) stays byte-identical: when
+  // false, NO `recentListings` key is emitted and CampaignSpread renders the
+  // capability cards alone. Only ever emits in a State A invitation publish.
+  listingsCoverflow: boolean = false,
 ): PublicPayload {
   const propertyAddress = draft.propertyAddress ?? "";
   const recommendedPrice = draft.recommendedPrice ?? "";
@@ -983,6 +1119,12 @@ export function toPublicPayload(
   const projectedSampleVideoPosterUrl = projectPublicWhyUsText(
     brandWhyUs.sampleVideoPosterUrl,
   );
+  // Seller State A · Zone 5 — project the recent listings ONLY behind the
+  // coverflow flag (the State A invitation gate is applied below, with the other
+  // State A fields). Field-by-field, capped, view counts clamped to integers.
+  const projectedRecentListings = listingsCoverflow
+    ? projectRecentListings(brandWhyUs.recentListings)
+    : undefined;
 
   // SELLER_STATE_A — emit the state discriminator + appointment ONLY for a
   // State A publish (flag on AND an invitation status). A revealed / flag-off
@@ -1003,6 +1145,10 @@ export function toPublicPayload(
           sampleListingPhotoUrl: projectedSampleListingPhotoUrl,
           sampleVideoUrl: projectedSampleVideoUrl,
           sampleVideoPosterUrl: projectedSampleVideoPosterUrl,
+          // Zone 5 coverflow — already flag-gated above (undefined when the
+          // coverflow flag is off OR no listings survived), so it drops out via
+          // JSON.stringify and a State-A-but-flag-off publish stays byte-identical.
+          recentListings: projectedRecentListings,
         }
       : {};
 
@@ -1186,6 +1332,7 @@ function clampStateAFields(r: Record<string, unknown>): {
   sampleListingPhotoUrl?: string;
   sampleVideoUrl?: string;
   sampleVideoPosterUrl?: string;
+  recentListings?: PublicRecentListing[];
 } {
   const valuationStatus = clampValuationStatus(r.valuationStatus);
   if (!isInvitationStatus(valuationStatus)) return { valuationStatus };
@@ -1198,6 +1345,11 @@ function clampStateAFields(r: Record<string, unknown>): {
     sampleListingPhotoUrl: projectPublicWhyUsText(r.sampleListingPhotoUrl),
     sampleVideoUrl: projectPublicWhyUsText(r.sampleVideoUrl),
     sampleVideoPosterUrl: projectPublicWhyUsText(r.sampleVideoPosterUrl),
+    // Zone 5 coverflow — re-run the SAME field-by-field projection on read, so a
+    // hand-edited KV record can't smuggle an unbounded list, a fabricated /
+    // non-integer view count, or a private key into the renderer. Survives ONLY
+    // alongside an invitation status (a stray array on a revealed record drops).
+    recentListings: projectRecentListings(r.recentListings),
   };
 }
 

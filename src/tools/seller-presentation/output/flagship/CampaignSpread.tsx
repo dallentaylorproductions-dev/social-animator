@@ -1,9 +1,17 @@
-import type { PublicPayload } from "../public-payload";
+import type { PublicPayload, PublicRecentListing } from "../public-payload";
+import {
+  streetViewStaticUrl,
+  STREET_VIEW_FOV,
+  STREET_VIEW_PITCH,
+} from "@/lib/seller-presentation/street-view";
 import {
   CAPABILITY_PHOTO_LABEL,
   CAPABILITY_PHOTO_SUB,
   CAPABILITY_VIDEO_LABEL,
   CAPABILITY_VIDEO_SUB,
+  COVERFLOW_AGGREGATE_SUFFIX,
+  COVERFLOW_EYEBROW,
+  COVERFLOW_VIEWS_LABEL,
   EXPOSURE_LINE,
 } from "./state-a-copy";
 
@@ -77,7 +85,17 @@ export function CampaignSpread({ payload }: { payload: PublicPayload }) {
     });
   });
 
-  if (frames.length === 0) return null;
+  // Zone 5 — the agent's recent listings (the exposure coverflow). Already
+  // flag-gated + clamped at the payload boundary: absent on a flag-off / revealed
+  // / no-data publish, so `listings` is empty and the section renders exactly as
+  // it ships today (capability cards only). The coverflow is a flex-IN addition
+  // beneath the cards, never required for the section to read.
+  const listings = payload.recentListings ?? [];
+
+  // Byte-identical guarantee: with no listings, the guard is unchanged from
+  // today (no frames → no section). Listings render the section even in the
+  // unlikely case the capability frames are all unset.
+  if (frames.length === 0 && listings.length === 0) return null;
 
   const [lead, ...rest] = frames;
 
@@ -93,21 +111,161 @@ export function CampaignSpread({ payload }: { payload: PublicPayload }) {
         </h2>
       </div>
 
-      <div className="sa-spread__grid reveal">
-        <SpreadFrame frame={lead} lead />
-        {rest.length > 0 && (
-          <div className="sa-spread__rest">
-            {rest.map((f) => (
-              <SpreadFrame key={f.key} frame={f} />
-            ))}
-          </div>
-        )}
-      </div>
+      {frames.length > 0 && (
+        <div className="sa-spread__grid reveal">
+          <SpreadFrame frame={lead} lead />
+          {rest.length > 0 && (
+            <div className="sa-spread__rest">
+              {rest.map((f) => (
+                <SpreadFrame key={f.key} frame={f} />
+              ))}
+            </div>
+          )}
+        </div>
+      )}
+
+      {listings.length > 0 && <ListingsCoverflow listings={listings} />}
 
       <p className="sa-spread__reach reveal" data-testid="fs-sa-spread-reach">
         {EXPOSURE_LINE}
       </p>
     </section>
+  );
+}
+
+/**
+ * Zone 5 position in the fan. Center is forward + upright (earns the teal
+ * keyline); the inner pair bends back ~23°; the outer pair are quiet ~36° peeks
+ * with NO band (they only signal "there's more"). Mapped from the listing index
+ * so the arrangement degrades honestly: 1 listing is centered alone, 2 form a
+ * gentle pair (no faked peeks), 3–5 fan out symmetrically.
+ */
+type CoverflowPos = "center" | "in-left" | "in-right" | "out-left" | "out-right";
+
+function coverflowPositions(n: number): CoverflowPos[] {
+  if (n <= 1) return ["center"];
+  if (n === 2) return ["in-left", "in-right"];
+  const center = Math.floor(n / 2);
+  return Array.from({ length: n }, (_, i): CoverflowPos => {
+    const off = i - center;
+    if (off === 0) return "center";
+    if (off === -1) return "in-left";
+    if (off === 1) return "in-right";
+    return off < 0 ? "out-left" : "out-right";
+  });
+}
+
+/**
+ * Zone 5 listings coverflow — the literal proof of reach beneath the capability
+ * cards. CSS-first: the 3D bend (desktop) and the near-flat peek-swipe (mobile)
+ * live entirely in state-a.css; this component only arranges the cards + computes
+ * the honest aggregate. The view number is the hero (white, on the solid dark
+ * band); legibility never rides on the raw photo.
+ */
+function ListingsCoverflow({ listings }: { listings: PublicRecentListing[] }) {
+  const positions = coverflowPositions(listings.length);
+
+  // The aggregate is SUMMED from the real per-card view counts — never authored,
+  // so it can't be a hollow claim. It renders only when enough cards (≥2) carry
+  // a number, matching the honesty gate.
+  const numbered = listings.filter(
+    (l): l is PublicRecentListing & { viewCount: number } =>
+      typeof l.viewCount === "number",
+  );
+  const showAggregate = numbered.length >= 2;
+  const aggregateTotal = numbered
+    .reduce((sum, l) => sum + l.viewCount, 0)
+    .toLocaleString("en-US");
+
+  const fanClass =
+    listings.length === 1
+      ? " sa-cf__fan--single"
+      : listings.length === 2
+        ? " sa-cf__fan--pair"
+        : "";
+
+  return (
+    <div className="sa-cf reveal" data-testid="fs-sa-cf">
+      <p className="sa-cf__eyebrow">{COVERFLOW_EYEBROW}</p>
+      <div className={`sa-cf__fan${fanClass}`}>
+        <div className="sa-cf__track">
+          {listings.map((listing, i) => (
+            <ListingCard
+              key={i}
+              listing={listing}
+              pos={positions[i]}
+              index={i}
+            />
+          ))}
+        </div>
+      </div>
+      {showAggregate && (
+        <p className="sa-cf__agg" data-testid="fs-sa-cf-aggregate">
+          <strong className="sa-cf__aggnum">{aggregateTotal}</strong>{" "}
+          {COVERFLOW_AGGREGATE_SUFFIX}
+        </p>
+      )}
+    </div>
+  );
+}
+
+function ListingCard({
+  listing,
+  pos,
+  index,
+}: {
+  listing: PublicRecentListing;
+  pos: CoverflowPos;
+  index: number;
+}) {
+  // Outer peeks carry no band/label at all — they only signal "there's more".
+  const isPeek = pos === "out-left" || pos === "out-right";
+
+  // Photo: hosted upload wins; else the Street View fallback, requested fresh
+  // from Google at view time (same pattern as the comp thumbs — no bytes stored).
+  const sv = listing.hasStreetView
+    ? streetViewStaticUrl(listing.streetViewPanoId, {
+        heading: listing.streetViewHeading,
+        fov: STREET_VIEW_FOV,
+        pitch: STREET_VIEW_PITCH,
+      })
+    : null;
+  const photo = listing.photoUrl?.trim() || sv || undefined;
+
+  // The number is the hero. Optional + never fabricated: when absent the card
+  // shows photo + address only, with no empty slot. `sourceLabel` is plumbed for
+  // the deferred input but the visible label stays the source-agnostic "Views"
+  // (the honesty gate — no named-portal claim on a number we don't control).
+  const hasViews = typeof listing.viewCount === "number";
+
+  return (
+    <div
+      className={`sa-cf__card${pos === "center" ? " sa-cf__card--center" : ""}`}
+      data-pos={pos}
+      data-testid={`fs-sa-cf-card-${index}`}
+    >
+      {photo && (
+        <span
+          className="sa-cf__photo"
+          aria-hidden="true"
+          style={{ backgroundImage: `url("${photo.replace(/"/g, '\\"')}")` }}
+        />
+      )}
+      {!isPeek && (
+        <div className="sa-cf__band">
+          {hasViews && (
+            <div className="sa-cf__views" data-testid={`fs-sa-cf-views-${index}`}>
+              <span className="sa-cf__num">
+                {listing.viewCount!.toLocaleString("en-US")}
+              </span>
+              <span className="sa-cf__vlabel">{COVERFLOW_VIEWS_LABEL}</span>
+            </div>
+          )}
+          <div className="sa-cf__addr">{listing.address}</div>
+          {listing.city && <div className="sa-cf__city">{listing.city}</div>}
+        </div>
+      )}
+    </div>
   );
 }
 

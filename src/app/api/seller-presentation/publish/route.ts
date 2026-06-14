@@ -5,6 +5,7 @@ import { loadAgentProfile } from "@/lib/entitlements/load-agent-profile";
 import { resolveEntitlements } from "@/lib/entitlements/resolver";
 import { isCompPhotosEnabled } from "@/lib/seller-presentation/street-view";
 import { isSellerStateAEnabled } from "@/lib/seller-presentation/state-a";
+import { isSellerListingsCoverflowEnabled } from "@/lib/seller-presentation/listings-coverflow";
 import {
   clampDraft,
   describeMissingRequiredInputs,
@@ -198,6 +199,10 @@ export async function POST(req: Request) {
     // reach KV (byte-identical). The draft was already status-stripped above
     // when the flag is off, so this only ever emits in a State A publish.
     sellerStateA,
+    // SELLER_LISTINGS_COVERFLOW kill switch. OFF => no `recentListings` key
+    // reaches KV (byte-identical); the Zone 5 coverflow flexes out. Merges dark
+    // until the agent-facing Settings input ships (the deferred next slice).
+    isSellerListingsCoverflowEnabled(),
   );
 
   const data = publicPayload as unknown as Record<string, unknown>;
