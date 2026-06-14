@@ -5,6 +5,8 @@ import {
   STREET_VIEW_FOV,
   STREET_VIEW_PITCH,
 } from "@/lib/seller-presentation/street-view";
+import { compHasPhoto } from "@/lib/seller-presentation/rentcast-autofill";
+import { CompPhotoPlaceholder } from "./CompPhotoPlaceholder";
 
 /**
  * Seller State A · Signature A.2 - the Appointment Brief (the flagship moment).
@@ -36,7 +38,17 @@ export function AppointmentBrief({
   // Street View aiming data the flagship CompCard renders - pano id, heading,
   // hasStreetView - lives ONLY on whyPrice.comps. Reading payload.comps would
   // give addresses with no pano, so the thumbnails would never resolve.
-  const comps = payload.whyPrice.comps;
+  //
+  // THE PHOTO IS THE EVIDENCE: render only comps that actually have a photo
+  // (agent upload or resolved Street View). A comp with no photo would be an
+  // empty frame - which reads as unfinished - so it does not earn a slot in the
+  // seller-facing brief. The set was already photographed-first at authoring
+  // time; this filter is the render-time guarantee that no blank ever ships,
+  // and it flexes gracefully (shows what is available) when fewer than four
+  // resolved.
+  const comps = payload.whyPrice.comps
+    .filter((c) => compHasPhoto(c))
+    .slice(0, 4);
   const hasNearby = comps.length > 0;
 
   const series = (payload.areaStats?.monthlySeries ?? [])
@@ -79,7 +91,7 @@ export function AppointmentBrief({
               <span className="sa-brief__art-k">Nearby sales reviewed</span>
             </div>
             <div className="sa-brief__sales">
-              {comps.slice(0, 4).map((c, i) => {
+              {comps.map((c, i) => {
                 const sv = c.hasStreetView
                   ? streetViewStaticUrl(c.streetViewPanoId, {
                       size: STREET_VIEW_IMG_SIZE,
@@ -116,7 +128,13 @@ export function AppointmentBrief({
                             data-testid={`fs-sa-brief-sale-${i}-streetview`}
                           />
                         )
-                      ) : null}
+                      ) : (
+                        // Defensive: the set is filtered to photographed comps,
+                        // so this only fires if a pano resolved but its image
+                        // URL can't be built (e.g. missing browser key). Never a
+                        // blank box.
+                        <CompPhotoPlaceholder />
+                      )}
                       <span className="sa-sale__tag" aria-hidden="true">
                         Sold
                       </span>

@@ -13,6 +13,7 @@ import {
   POSTER_SCRUB_OVER_AUTO_PAYLOAD,
   STATE_A_FULL_PAYLOAD,
   STATE_A_MINIMAL_PAYLOAD,
+  STATE_A_MIXED_COVERAGE_PAYLOAD,
 } from "@/tools/seller-presentation/output/__fixtures__/sample-payload";
 import { EmbedBridge } from "./EmbedBridge";
 
@@ -130,6 +131,9 @@ export default async function SellerPresentationPreview({ searchParams }: PagePr
     // `?template` needed) - the same way a v2 stamp routes to the flagship.
     "state-a",
     "state-a-minimal",
+    // COMP_PHOTOS - some nearby sales have Street View coverage, some don't. The
+    // brief must render only the photographed ones (no empty frame).
+    "state-a-mixed-coverage",
   ] as const;
   type Variant = (typeof VARIANTS)[number];
   const variant = (VARIANTS as readonly string[]).includes(fixture ?? "")
@@ -172,7 +176,9 @@ export default async function SellerPresentationPreview({ searchParams }: PagePr
                         ? STATE_A_FULL_PAYLOAD
                         : variant === "state-a-minimal"
                           ? STATE_A_MINIMAL_PAYLOAD
-                          : FULL_PAYLOAD;
+                          : variant === "state-a-mixed-coverage"
+                            ? STATE_A_MIXED_COVERAGE_PAYLOAD
+                            : FULL_PAYLOAD;
 
   // E.0 — optional brand-color override (drives the brand-colors e2e
   // regression spec + Dallen's browser smoke). Validated hex only; merged

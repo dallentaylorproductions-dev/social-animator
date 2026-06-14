@@ -131,10 +131,14 @@ test.describe("Seller State A editor — lean invitation flow", () => {
     await expect(page.getByTestId("step-nearby-sales")).toBeVisible();
     await expect(page.getByTestId("step-comps")).toHaveCount(0);
 
-    // Address-only: one input, no sold-price field.
-    await page
-      .getByTestId("step-nearby-sales-address-0")
-      .fill("742 N Cedar St");
+    // Phase 2: the nearby-sales step is a REVIEW step. With no autofill mocked
+    // here the auto-pull no-ops, so the manual-add fallback seeds a sale by hand
+    // (address only, no sold-price field). The full comps step is not rendered.
+    await page.getByTestId("step-nearby-sales-add").fill("742 N Cedar St");
+    await page.getByTestId("step-nearby-sales-add").blur();
+    await expect(page.getByTestId("step-nearby-sales-card-0")).toContainText(
+      "742 N Cedar St",
+    );
     await expect(page.getByLabel("comp-add-sold-price")).toHaveCount(0);
 
     // Next → Area & video, Next → Review & send.
