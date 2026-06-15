@@ -7,6 +7,8 @@ import {
   defaultValuationMessage,
   defaultWelcomeLine,
 } from "@/tools/seller-presentation/output/flagship/state-a-copy";
+import { RecentListingsEditor } from "./RecentListingsEditor";
+import type { SettingsRecentListing } from "@/lib/seller-presentation/recent-listings";
 
 /**
  * Settings — Seller Presentation "prepared invitation" (State A) content.
@@ -33,6 +35,7 @@ export function PreparedInvitationFields({
   sampleListingPhotoUrl,
   sampleVideoUrl,
   sampleVideoPosterUrl,
+  recentListings,
   onChange,
 }: {
   signatureLine?: string;
@@ -41,6 +44,7 @@ export function PreparedInvitationFields({
   sampleListingPhotoUrl?: string;
   sampleVideoUrl?: string;
   sampleVideoPosterUrl?: string;
+  recentListings?: SettingsRecentListing[];
   /** Merge + persist a patch onto BrandSettings (atomic for multi-field clears). */
   onChange: (patch: {
     signatureLine?: string;
@@ -49,6 +53,7 @@ export function PreparedInvitationFields({
     sampleListingPhotoUrl?: string;
     sampleVideoUrl?: string;
     sampleVideoPosterUrl?: string;
+    recentListings?: SettingsRecentListing[];
   }) => void;
 }) {
   const { sellerStateAEnabled } = useSPEntitlement();
@@ -134,6 +139,17 @@ export function PreparedInvitationFields({
           }
         />
       </div>
+
+      {/* Seller State A · Zone 5 — the agent's recent listings (the exposure
+          coverflow source). Lean + optional; an agent who adds nothing gets the
+          capability-cards-only section. Persists with an empty array cleared to
+          undefined so "no listings" stays a single state. */}
+      <RecentListingsEditor
+        listings={recentListings ?? []}
+        onChange={(next) =>
+          onChange({ recentListings: next.length ? next : undefined })
+        }
+      />
     </div>
   );
 }

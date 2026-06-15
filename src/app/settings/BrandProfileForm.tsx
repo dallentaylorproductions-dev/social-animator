@@ -338,6 +338,7 @@ export function BrandProfileForm() {
           sampleListingPhotoUrl={s.sampleListingPhotoUrl}
           sampleVideoUrl={s.sampleVideoUrl}
           sampleVideoPosterUrl={s.sampleVideoPosterUrl}
+          recentListings={s.recentListings}
           onChange={(patch) => {
             const next = { ...s, ...patch };
             setS(next);

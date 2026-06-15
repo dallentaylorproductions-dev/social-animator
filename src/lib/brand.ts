@@ -4,6 +4,10 @@ import { useEffect, useState } from "react";
 import { drawImageContain } from "@/engine/draw";
 import type { Review } from "@/tools/seller-presentation/engine/types";
 import { type WhyUs, clampWhyUs } from "@/lib/whyus";
+import {
+  type SettingsRecentListing,
+  clampStoredRecentListings,
+} from "@/lib/seller-presentation/recent-listings";
 
 export interface BrandSettings {
   logoDataUrl: string | null;
@@ -101,6 +105,20 @@ export interface BrandSettings {
   sampleListingPhotoUrl?: string;
   sampleVideoUrl?: string;
   sampleVideoPosterUrl?: string;
+  /**
+   * Seller State A · Zone 5 — the agent's OWN recent listings for the exposure
+   * coverflow ("Recent listings, real reach"). Set-once, agent-constant; same
+   * provenance + path as the capability samples above. Each carries a photo
+   * (camera-roll upload OR a Street View pano resolved from the address — never
+   * image bytes), a street address + city, and an OPTIONAL agent-entered view
+   * count (the public-portal number, never scraped, never fabricated). Capped at
+   * RECENT_LISTINGS_CAP. Rides `brandWhyUs.recentListings` to the publish
+   * projector, which is the public-safe boundary (field-by-field, clamped,
+   * capped); projected ONLY behind the SELLER_LISTINGS_COVERFLOW flag AND a State
+   * A invitation, so a flag-off / revealed / State B publish is byte-identical.
+   * The Settings input is gated behind the SELLER_STATE_A entitlement.
+   */
+  recentListings?: SettingsRecentListing[];
   /**
    * B0a — "Why us" agent-constant content group (differentiators, marketing
    * approach, performance stats, how-we-work, guarantee). Set once in
@@ -453,6 +471,11 @@ export function loadBrandSettings(): BrandSettings {
         parsed.sampleVideoPosterUrl.length > 0
           ? parsed.sampleVideoPosterUrl
           : undefined,
+      // Seller State A · Zone 5 — clamp the recent listings to their declared
+      // shape + cap on load; undefined means "none". Empty-address rows survive
+      // (an in-progress row the agent hasn't filled in yet); the publish
+      // projector drops them. A tampered record can't smuggle nested junk here.
+      recentListings: clampStoredRecentListings(parsed.recentListings),
       // B0a — clamp the "Why us" group to its declared shape + soft caps on
       // load; undefined means "never configured" (form seeds from defaults).
       whyUs: clampWhyUs(parsed.whyUs),
