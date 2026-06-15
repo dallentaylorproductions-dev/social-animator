@@ -6,7 +6,14 @@ import {
   loadBrandSettings,
   saveBrandSettings,
   extractPhoneDigits,
+  BRAND_SETTINGS_EVENT,
+  BRAND_AUTOSAVE_DEBOUNCE_MS,
+  BRAND_RETRY_BASE_DELAY_MS,
+  BRAND_MAX_RETRIES,
+  planBrandServerWrite,
 } from "@/lib/brand";
+import { useServerBrandSettingsEnabled } from "@/lib/brand-settings-flag";
+import { putServerBrandSettings } from "@/lib/brand-settings-client";
 import type { Review } from "@/tools/seller-presentation/engine/types";
 import { PhoneInput } from "@/components/inputs";
 import { HeadshotField } from "./HeadshotField";
@@ -30,23 +37,151 @@ const MAX_REVIEWS = 6;
 export function BrandProfileForm() {
   const [s, setS] = useState<BrandSettings | null>(null);
   const fileRef = useRef<HTMLInputElement>(null);
+  // Flips true the instant the agent touches any field, so the async
+  // server-fetch resolve below can never stomp an edit already in progress.
+  const editedRef = useRef(false);
+
+  // SERVER_BRAND_SETTINGS — flag delivered via the root-layout context. When
+  // ON, a form edit is debounced-autosaved to the server (below) so it actually
+  // syncs cross-device; when OFF, every write stays pure-localStorage,
+  // byte-identical to today.
+  const serverEnabled = useServerBrandSettingsEnabled();
+  // Debounced server-autosave plumbing (mirrors useBrandSettings): coalesce
+  // rapid edits into one PUT, with a bounded retry/backoff on transient
+  // failures. Only ever populated on the flag-on path.
+  const flushTimerRef = useRef<number | null>(null);
+  const pendingRef = useRef<{ settings: BrandSettings; updatedAt: string } | null>(
+    null,
+  );
+  const retryCountRef = useRef(0);
 
   // Load settings client-side on mount. SSR-safe.
   useEffect(() => {
     setS(loadBrandSettings());
   }, []);
 
+  // SERVER_BRAND_SETTINGS cold-start render fix. This form seeds its state
+  // ONCE on mount from localStorage (the SSR-safe hydration pattern). On a
+  // fresh device with the feature ON, the server fetch — fired by the
+  // `useBrandSettings` hook mounted alongside this form on /settings
+  // (PrelistingPublish) — resolves ~1-2s later, writes the fetched settings to
+  // localStorage and emits BRAND_SETTINGS_EVENT. The hook already updates its
+  // OWN React state on resolve, but this form is a separate component that
+  // never heard the event, so it stayed blank until a navigation remounted it.
+  // Subscribing here re-reads the now-populated cache so the saved settings
+  // render with NO second navigation.
+  //
+  // Byte-identical when the feature is OFF: saveBrandSettings is the only
+  // same-tab emitter of BRAND_SETTINGS_EVENT, and with the feature off the
+  // only caller reached on /settings is this form's own edits — which set
+  // `editedRef` first, so `adopt` is a no-op. No cross-tab `storage` listener
+  // is added, so multi-tab behavior is unchanged too. The event therefore only
+  // does anything here on the server-fetch path (feature on), as specified.
+  //
+  // Never clobbers an in-progress edit: once the agent touches any field
+  // (`editedRef`), the resolve is ignored — a fresh local edit wins over the
+  // older server copy. This is the last-write-wins spirit of the #85 store; no
+  // timestamp compare is needed because "the agent is editing right now" is
+  // unambiguously newer than any settings the fetch could have started with.
+  useEffect(() => {
+    const adopt = () => {
+      if (editedRef.current) return;
+      setS(loadBrandSettings());
+    };
+    window.addEventListener(BRAND_SETTINGS_EVENT, adopt);
+    return () => window.removeEventListener(BRAND_SETTINGS_EVENT, adopt);
+  }, []);
+
+  // Flush any pending debounced server write when the form unmounts (mirrors
+  // useBrandSettings + the draft store), so an edit made right before navigating
+  // away still reaches the server. Best-effort — the local cache already holds
+  // it. No-op when the flag is off (pendingRef is only ever set on the flag-on
+  // path), so this stays byte-identical when the feature is off.
+  useEffect(() => {
+    return () => {
+      if (flushTimerRef.current !== null) {
+        window.clearTimeout(flushTimerRef.current);
+      }
+      const pending = pendingRef.current;
+      if (pending) {
+        void putServerBrandSettings(pending.settings, pending.updatedAt);
+      }
+    };
+  }, []);
+
   if (!s) {
     return <div className="text-sm text-neutral-500">Loading…</div>;
+  }
+
+  // Single persistence path for every field mutation. Marks the form dirty
+  // (so the cold-start resolve never clobbers it), updates React state, writes
+  // through to localStorage, and — when the feature is ON — debounced-autosaves
+  // to the server so the edit syncs cross-device. Flag-off is byte-identical to
+  // the prior inline setS + saveBrandSettings pairs (no server write).
+  const persist = (next: BrandSettings) => {
+    editedRef.current = true;
+    setS(next);
+    saveBrandSettings(next);
+
+    const plan = planBrandServerWrite({
+      serverEnabled,
+      settings: next,
+      nowIso: new Date().toISOString(),
+    });
+    if (!plan.shouldWrite) return;
+    // Coalesce rapid edits into a single PUT. The owner is stamped SERVER-side
+    // from the session (never trusted from the client); the route reconciles
+    // last-write-wins by updatedAt, so a stale push can never clobber a fresher
+    // edit made on another device. We deliberately do NOT stamp ownerEmail into
+    // the local blob: the one-time localStorage→server migration only claims an
+    // already-owned blob, so leaving it unstamped keeps this direct PUT the sole
+    // writer and avoids a migration double-write on the same edit.
+    pendingRef.current = { settings: plan.settings, updatedAt: plan.updatedAt };
+    if (flushTimerRef.current !== null) {
+      window.clearTimeout(flushTimerRef.current);
+    }
+    flushTimerRef.current = window.setTimeout(
+      flushServerBrand,
+      BRAND_AUTOSAVE_DEBOUNCE_MS,
+    );
+  };
+
+  // Push the latest pending edit to the server with a bounded retry/backoff on
+  // transient (5xx / network) failures, mirroring useBrandSettings. The edit is
+  // always safe in the local cache, so out-of-retries (or a 4xx) just drops the
+  // pending push and the next edit starts a clean retry budget.
+  function flushServerBrand(): void {
+    const pending = pendingRef.current;
+    if (!pending) return;
+    void putServerBrandSettings(pending.settings, pending.updatedAt).then(
+      (res) => {
+        if (res.ok) {
+          retryCountRef.current = 0;
+          pendingRef.current = null;
+          return;
+        }
+        if (res.retryable && retryCountRef.current < BRAND_MAX_RETRIES) {
+          retryCountRef.current += 1;
+          if (flushTimerRef.current !== null) {
+            window.clearTimeout(flushTimerRef.current);
+          }
+          flushTimerRef.current = window.setTimeout(
+            flushServerBrand,
+            BRAND_RETRY_BASE_DELAY_MS * retryCountRef.current,
+          );
+          return;
+        }
+        retryCountRef.current = 0;
+        pendingRef.current = null;
+      },
+    );
   }
 
   const update = <K extends keyof BrandSettings>(
     key: K,
     value: BrandSettings[K]
   ) => {
-    const next = { ...s, [key]: value };
-    setS(next);
-    saveBrandSettings(next);
+    persist({ ...s, [key]: value });
   };
 
   const handleLogoFile = (file: File) => {
@@ -229,8 +364,7 @@ export function BrandProfileForm() {
               agentHeadshotFocalY: undefined,
               agentHeadshotScale: undefined,
             };
-            setS(next);
-            saveBrandSettings(next);
+            persist(next);
           }}
           onCropChange={({ focalX, focalY, scale }) => {
             // A centered, un-zoomed crop (the editor's "Reset to centered")
@@ -245,8 +379,7 @@ export function BrandProfileForm() {
               agentHeadshotFocalY: centered ? undefined : focalY,
               agentHeadshotScale: centered ? undefined : scale,
             };
-            setS(next);
-            saveBrandSettings(next);
+            persist(next);
           }}
         />
 
@@ -340,9 +473,7 @@ export function BrandProfileForm() {
           sampleVideoPosterUrl={s.sampleVideoPosterUrl}
           recentListings={s.recentListings}
           onChange={(patch) => {
-            const next = { ...s, ...patch };
-            setS(next);
-            saveBrandSettings(next);
+            persist({ ...s, ...patch });
           }}
         />
       </SPEntitlementProvider>

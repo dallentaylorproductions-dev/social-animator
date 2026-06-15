@@ -578,10 +578,46 @@ export function saveBrandSettings(settings: BrandSettings): void {
 
 // SERVER_BRAND_SETTINGS debounced-autosave tuning (mirrors the draft store's
 // useSellerPresentationState): coalesce rapid edits, then a bounded backoff on
-// transient failures before falling back to the local cache.
-const BRAND_AUTOSAVE_DEBOUNCE_MS = 1500;
-const BRAND_RETRY_BASE_DELAY_MS = 2000;
-const BRAND_MAX_RETRIES = 4;
+// transient failures before falling back to the local cache. Exported so the
+// Settings form's autosave (BrandProfileForm) shares the SAME tuning as this
+// hook rather than re-declaring magic numbers that could drift.
+export const BRAND_AUTOSAVE_DEBOUNCE_MS = 1500;
+export const BRAND_RETRY_BASE_DELAY_MS = 2000;
+export const BRAND_MAX_RETRIES = 4;
+
+/**
+ * Pure gate for the Settings form's server autosave (BrandProfileForm).
+ *
+ * #85 wired server persistence into THIS hook's `update()`, but the /settings
+ * form does not call it — it persists through `saveBrandSettings` (localStorage
+ * + BRAND_SETTINGS_EVENT only), so before this a normal brand edit never
+ * reached the server and cross-device sync silently didn't work. The form now
+ * routes its writes through this decision:
+ *   - feature ON  → queue a server PUT of the edited settings (the owner is
+ *                   stamped SERVER-side from the session, never the client; the
+ *                   route reconciles last-write-wins by `updatedAt`).
+ *   - feature OFF → no server write; localStorage only, byte-identical to today.
+ *
+ * PURE (no fetch / no clock) so the gate + payload are unit-testable node-context
+ * with nothing mocked, mirroring `planBrandMigration`. The caller passes the
+ * timestamp in.
+ */
+export type BrandServerWritePlan =
+  | { shouldWrite: false }
+  | { shouldWrite: true; settings: BrandSettings; updatedAt: string };
+
+export function planBrandServerWrite(input: {
+  serverEnabled: boolean;
+  settings: BrandSettings;
+  nowIso: string;
+}): BrandServerWritePlan {
+  if (!input.serverEnabled) return { shouldWrite: false };
+  return {
+    shouldWrite: true,
+    settings: input.settings,
+    updatedAt: input.nowIso,
+  };
+}
 
 /**
  * Hook: loads brand settings + materializes the logo as an HTMLImageElement
