@@ -6,6 +6,7 @@ import {
   loadBrandSettings,
   saveBrandSettings,
   extractPhoneDigits,
+  BRAND_SETTINGS_EVENT,
 } from "@/lib/brand";
 import type { Review } from "@/tools/seller-presentation/engine/types";
 import { PhoneInput } from "@/components/inputs";
@@ -30,23 +31,66 @@ const MAX_REVIEWS = 6;
 export function BrandProfileForm() {
   const [s, setS] = useState<BrandSettings | null>(null);
   const fileRef = useRef<HTMLInputElement>(null);
+  // Flips true the instant the agent touches any field, so the async
+  // server-fetch resolve below can never stomp an edit already in progress.
+  const editedRef = useRef(false);
 
   // Load settings client-side on mount. SSR-safe.
   useEffect(() => {
     setS(loadBrandSettings());
   }, []);
 
+  // SERVER_BRAND_SETTINGS cold-start render fix. This form seeds its state
+  // ONCE on mount from localStorage (the SSR-safe hydration pattern). On a
+  // fresh device with the feature ON, the server fetch — fired by the
+  // `useBrandSettings` hook mounted alongside this form on /settings
+  // (PrelistingPublish) — resolves ~1-2s later, writes the fetched settings to
+  // localStorage and emits BRAND_SETTINGS_EVENT. The hook already updates its
+  // OWN React state on resolve, but this form is a separate component that
+  // never heard the event, so it stayed blank until a navigation remounted it.
+  // Subscribing here re-reads the now-populated cache so the saved settings
+  // render with NO second navigation.
+  //
+  // Byte-identical when the feature is OFF: saveBrandSettings is the only
+  // same-tab emitter of BRAND_SETTINGS_EVENT, and with the feature off the
+  // only caller reached on /settings is this form's own edits — which set
+  // `editedRef` first, so `adopt` is a no-op. No cross-tab `storage` listener
+  // is added, so multi-tab behavior is unchanged too. The event therefore only
+  // does anything here on the server-fetch path (feature on), as specified.
+  //
+  // Never clobbers an in-progress edit: once the agent touches any field
+  // (`editedRef`), the resolve is ignored — a fresh local edit wins over the
+  // older server copy. This is the last-write-wins spirit of the #85 store; no
+  // timestamp compare is needed because "the agent is editing right now" is
+  // unambiguously newer than any settings the fetch could have started with.
+  useEffect(() => {
+    const adopt = () => {
+      if (editedRef.current) return;
+      setS(loadBrandSettings());
+    };
+    window.addEventListener(BRAND_SETTINGS_EVENT, adopt);
+    return () => window.removeEventListener(BRAND_SETTINGS_EVENT, adopt);
+  }, []);
+
   if (!s) {
     return <div className="text-sm text-neutral-500">Loading…</div>;
   }
+
+  // Single persistence path for every field mutation. Marks the form dirty
+  // (so the cold-start resolve never clobbers it), updates React state, and
+  // writes through to localStorage — byte-identical to the prior inline
+  // setS + saveBrandSettings pairs.
+  const persist = (next: BrandSettings) => {
+    editedRef.current = true;
+    setS(next);
+    saveBrandSettings(next);
+  };
 
   const update = <K extends keyof BrandSettings>(
     key: K,
     value: BrandSettings[K]
   ) => {
-    const next = { ...s, [key]: value };
-    setS(next);
-    saveBrandSettings(next);
+    persist({ ...s, [key]: value });
   };
 
   const handleLogoFile = (file: File) => {
@@ -229,8 +273,7 @@ export function BrandProfileForm() {
               agentHeadshotFocalY: undefined,
               agentHeadshotScale: undefined,
             };
-            setS(next);
-            saveBrandSettings(next);
+            persist(next);
           }}
           onCropChange={({ focalX, focalY, scale }) => {
             // A centered, un-zoomed crop (the editor's "Reset to centered")
@@ -245,8 +288,7 @@ export function BrandProfileForm() {
               agentHeadshotFocalY: centered ? undefined : focalY,
               agentHeadshotScale: centered ? undefined : scale,
             };
-            setS(next);
-            saveBrandSettings(next);
+            persist(next);
           }}
         />
 
@@ -340,9 +382,7 @@ export function BrandProfileForm() {
           sampleVideoPosterUrl={s.sampleVideoPosterUrl}
           recentListings={s.recentListings}
           onChange={(patch) => {
-            const next = { ...s, ...patch };
-            setS(next);
-            saveBrandSettings(next);
+            persist({ ...s, ...patch });
           }}
         />
       </SPEntitlementProvider>
