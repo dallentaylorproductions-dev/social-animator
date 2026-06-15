@@ -20,6 +20,7 @@
  */
 
 import type { BrandSettings } from "@/lib/brand";
+import { recentListingsToPublishInput } from "@/lib/seller-presentation/recent-listings";
 import {
   clampDraft,
   type SellerPresentationDraft,
@@ -85,6 +86,12 @@ export function brandToPublishInputs(brand: BrandSettings) {
     sampleListingPhotoUrl: brand.sampleListingPhotoUrl,
     sampleVideoUrl: brand.sampleVideoUrl,
     sampleVideoPosterUrl: brand.sampleVideoPosterUrl,
+    // Seller State A · Zone 5 — the agent's recent listings (the exposure
+    // coverflow). The view count is stored as a formatted string in Settings;
+    // the mapper parses it to an integer here so the projector's number gate
+    // accepts it. The projector stays the public-safe boundary (field-by-field,
+    // clamp, cap) and only emits it behind the coverflow flag + a State A invite.
+    recentListings: recentListingsToPublishInput(brand.recentListings),
   };
   return { agentContact, brandReviews, brandColors, brandWhyUs };
 }
