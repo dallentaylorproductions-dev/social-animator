@@ -7,7 +7,13 @@ import {
   saveBrandSettings,
   extractPhoneDigits,
   BRAND_SETTINGS_EVENT,
+  BRAND_AUTOSAVE_DEBOUNCE_MS,
+  BRAND_RETRY_BASE_DELAY_MS,
+  BRAND_MAX_RETRIES,
+  planBrandServerWrite,
 } from "@/lib/brand";
+import { useServerBrandSettingsEnabled } from "@/lib/brand-settings-flag";
+import { putServerBrandSettings } from "@/lib/brand-settings-client";
 import type { Review } from "@/tools/seller-presentation/engine/types";
 import { PhoneInput } from "@/components/inputs";
 import { HeadshotField } from "./HeadshotField";
@@ -34,6 +40,20 @@ export function BrandProfileForm() {
   // Flips true the instant the agent touches any field, so the async
   // server-fetch resolve below can never stomp an edit already in progress.
   const editedRef = useRef(false);
+
+  // SERVER_BRAND_SETTINGS — flag delivered via the root-layout context. When
+  // ON, a form edit is debounced-autosaved to the server (below) so it actually
+  // syncs cross-device; when OFF, every write stays pure-localStorage,
+  // byte-identical to today.
+  const serverEnabled = useServerBrandSettingsEnabled();
+  // Debounced server-autosave plumbing (mirrors useBrandSettings): coalesce
+  // rapid edits into one PUT, with a bounded retry/backoff on transient
+  // failures. Only ever populated on the flag-on path.
+  const flushTimerRef = useRef<number | null>(null);
+  const pendingRef = useRef<{ settings: BrandSettings; updatedAt: string } | null>(
+    null,
+  );
+  const retryCountRef = useRef(0);
 
   // Load settings client-side on mount. SSR-safe.
   useEffect(() => {
@@ -72,19 +92,90 @@ export function BrandProfileForm() {
     return () => window.removeEventListener(BRAND_SETTINGS_EVENT, adopt);
   }, []);
 
+  // Flush any pending debounced server write when the form unmounts (mirrors
+  // useBrandSettings + the draft store), so an edit made right before navigating
+  // away still reaches the server. Best-effort — the local cache already holds
+  // it. No-op when the flag is off (pendingRef is only ever set on the flag-on
+  // path), so this stays byte-identical when the feature is off.
+  useEffect(() => {
+    return () => {
+      if (flushTimerRef.current !== null) {
+        window.clearTimeout(flushTimerRef.current);
+      }
+      const pending = pendingRef.current;
+      if (pending) {
+        void putServerBrandSettings(pending.settings, pending.updatedAt);
+      }
+    };
+  }, []);
+
   if (!s) {
     return <div className="text-sm text-neutral-500">Loading…</div>;
   }
 
   // Single persistence path for every field mutation. Marks the form dirty
-  // (so the cold-start resolve never clobbers it), updates React state, and
-  // writes through to localStorage — byte-identical to the prior inline
-  // setS + saveBrandSettings pairs.
+  // (so the cold-start resolve never clobbers it), updates React state, writes
+  // through to localStorage, and — when the feature is ON — debounced-autosaves
+  // to the server so the edit syncs cross-device. Flag-off is byte-identical to
+  // the prior inline setS + saveBrandSettings pairs (no server write).
   const persist = (next: BrandSettings) => {
     editedRef.current = true;
     setS(next);
     saveBrandSettings(next);
+
+    const plan = planBrandServerWrite({
+      serverEnabled,
+      settings: next,
+      nowIso: new Date().toISOString(),
+    });
+    if (!plan.shouldWrite) return;
+    // Coalesce rapid edits into a single PUT. The owner is stamped SERVER-side
+    // from the session (never trusted from the client); the route reconciles
+    // last-write-wins by updatedAt, so a stale push can never clobber a fresher
+    // edit made on another device. We deliberately do NOT stamp ownerEmail into
+    // the local blob: the one-time localStorage→server migration only claims an
+    // already-owned blob, so leaving it unstamped keeps this direct PUT the sole
+    // writer and avoids a migration double-write on the same edit.
+    pendingRef.current = { settings: plan.settings, updatedAt: plan.updatedAt };
+    if (flushTimerRef.current !== null) {
+      window.clearTimeout(flushTimerRef.current);
+    }
+    flushTimerRef.current = window.setTimeout(
+      flushServerBrand,
+      BRAND_AUTOSAVE_DEBOUNCE_MS,
+    );
   };
+
+  // Push the latest pending edit to the server with a bounded retry/backoff on
+  // transient (5xx / network) failures, mirroring useBrandSettings. The edit is
+  // always safe in the local cache, so out-of-retries (or a 4xx) just drops the
+  // pending push and the next edit starts a clean retry budget.
+  function flushServerBrand(): void {
+    const pending = pendingRef.current;
+    if (!pending) return;
+    void putServerBrandSettings(pending.settings, pending.updatedAt).then(
+      (res) => {
+        if (res.ok) {
+          retryCountRef.current = 0;
+          pendingRef.current = null;
+          return;
+        }
+        if (res.retryable && retryCountRef.current < BRAND_MAX_RETRIES) {
+          retryCountRef.current += 1;
+          if (flushTimerRef.current !== null) {
+            window.clearTimeout(flushTimerRef.current);
+          }
+          flushTimerRef.current = window.setTimeout(
+            flushServerBrand,
+            BRAND_RETRY_BASE_DELAY_MS * retryCountRef.current,
+          );
+          return;
+        }
+        retryCountRef.current = 0;
+        pendingRef.current = null;
+      },
+    );
+  }
 
   const update = <K extends keyof BrandSettings>(
     key: K,
