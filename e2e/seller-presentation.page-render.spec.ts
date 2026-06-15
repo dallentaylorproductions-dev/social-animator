@@ -50,7 +50,8 @@ test.describe('Seller Presentation — A7b premium page render', () => {
     const price = page.getByTestId('sep-price-panel');
     await expect(price).toBeVisible();
     await expect(price).toContainText('$');
-    await expect(price).toContainText('675');
+    // #69 rebuilt FULL_PAYLOAD: recommendedList midpoint is now $630,000.
+    await expect(price).toContainText('630');
 
     // Video block (optional, populated in full fixture).
     await expect(page.getByTestId('sep-video')).toBeVisible();

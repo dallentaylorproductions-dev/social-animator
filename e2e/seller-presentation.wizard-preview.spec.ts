@@ -38,8 +38,9 @@ test.describe("Wizard live preview — desktop dock", () => {
     // the v1 terracotta.
     // The price figure is the deep-teal (--teal-900) mix of the brand signature —
     // present + brand-derived (NOT the v1 terracotta). The blue brand token rides
-    // the root's --teal-700.
-    const color = await read(dock.locator(".price__single").first(), "color");
+    // the root's --teal-700. The sample is a price RANGE (#69), so the figure is
+    // the range leg `.val` — same `--teal-900` rule as `.price__single`.
+    const color = await read(dock.locator(".price__leg .val").first(), "color");
     expect(color).toBeTruthy();
     expect(color).not.toBe(TERRACOTTA);
     const rootTeal = await read(

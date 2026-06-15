@@ -307,9 +307,11 @@ test.describe("Flagship — signature sweep (role distribution; body stays ink)"
     for (const accent of SIGS) {
       await page.goto(`${FLAGSHIP}&brandAccent=${accent}`);
       // The earned moments — price figure + the §02 count digit — carry the
-      // deep teal (--teal-900, a signature mix), so they re-hue together.
+      // deep teal (--teal-900, a signature mix), so they re-hue together. The
+      // FULL_PAYLOAD sample is a price RANGE (#69), so the figure is the range
+      // leg `.val` — same `--teal-900` rule as `.price__single` (flagship.css).
       const priceBig = await read(
-        page.locator(".fs-page .price__single").first(),
+        page.locator(".fs-page .price__leg .val").first(),
         "color",
       );
       const countDigit = await read(page.getByTestId("fs-count-digit"), "color");

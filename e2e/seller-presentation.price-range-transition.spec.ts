@@ -89,14 +89,32 @@ test.describe("UX-2a-followup — price single→range transition (no crash)", (
     await reachStrategyWithSinglePrice(page);
 
     const screen = page.getByTestId("wizard-preview-screen");
+
+    // The single price was typed AFTER the preview first mounted. The count-up
+    // island queries `[data-price-countup]` exactly once on mount (motion.ts,
+    // empty-deps effect, no MutationObserver), and on first mount the sparse-draft
+    // SAMPLE is a price RANGE — so there is no count-up node to observe, and a
+    // price typed later is never picked up. Reload so the island remounts WITH the
+    // now-persisted single price and observes its count-up node; the wizard
+    // restores the draft + Strategy step from its localStorage cache.
+    await expect(screen.locator("[data-price-countup]")).toHaveAttribute(
+      "data-price-final",
+      "650000",
+    );
+    await page.waitForTimeout(300); // let the localStorage instance persist settle
+    await page.reload();
+    await expect(page.getByTestId("step-strategy")).toBeVisible();
+
     const priceNode = screen.locator("[data-price-countup]");
 
     // Bring fs-price into view so the IntersectionObserver fires the count-up,
     // then wait for the driver to (a) flag the node counted and (b) finish its
     // ~1s climb — by which point it has rewritten `[data-price-digits]` and
     // detached React's fibers from those nodes. THIS is the desynced state the
-    // toggle used to crash on.
-    await page.getByLabel("recommended-price").focus();
+    // toggle used to crash on. Scroll the price node itself into view (the
+    // preview docks in its own scroll container, so the price isn't on-screen at
+    // mount and the observer wouldn't otherwise fire).
+    await priceNode.scrollIntoViewIfNeeded();
     await expect(priceNode).toHaveAttribute("data-price-counted", "1", {
       timeout: 5000,
     });
