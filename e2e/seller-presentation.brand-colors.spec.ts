@@ -104,7 +104,8 @@ test.describe('Seller Presentation — brand colors (E.1)', () => {
     expect(await cyanCount(page)).toBe(0);
 
     await expect(page.getByTestId('sep-hero')).toBeVisible();
-    await expect(page.getByTestId('sep-price-panel')).toContainText('675');
+    // FULL_PAYLOAD's recommendedList midpoint (#69 sample rebuild: $675,000 → $630,000).
+    await expect(page.getByTestId('sep-price-panel')).toContainText('$630,000');
     await expect(page.getByTestId('sep-why-price')).toBeVisible();
     await expect(page.getByTestId('sep-pitch')).toBeVisible();
   });

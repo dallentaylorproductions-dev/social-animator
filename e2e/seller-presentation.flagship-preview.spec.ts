@@ -64,9 +64,11 @@ test.describe("F3 — Brand-kit live preview shows the flagship rhythm", () => {
     expect(rootSig.trim()).toBe(roles.signature);
 
     // The price figure is the deep teal (a signature mix) — present + non-empty,
-    // proving the ramp painted from the brand-tracked token.
+    // proving the ramp painted from the brand-tracked token. The FULL_PAYLOAD
+    // sample is a price RANGE (#69), so read the range leg `.val` — same
+    // `--teal-900` rule as `.price__single` (flagship.css).
     const priceBig = await read(
-      page.locator(".fs-page .price__single").first(),
+      page.locator(".fs-page .price__leg .val").first(),
       "color",
     );
     expect(priceBig).toMatch(/oklab|rgb|#/);

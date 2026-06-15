@@ -70,7 +70,11 @@ test.describe("D1-FIX — price card (order + containment)", () => {
     page,
   }) => {
     await page.setViewportSize({ width: 360, height: 780 });
-    await page.goto(FLAGSHIP);
+    // The default `full` sample is now a price RANGE (#69), which renders
+    // `.price__range` (no `.price__single`). This test is specifically about the
+    // SINGLE-price overflow path, so render the `minimal` fixture — a single
+    // `$685,000` with one comp (so the "Based on … nearby" meta row still shows).
+    await page.goto("/seller-presentation-preview?fixture=minimal&template=flagship");
     const price = page.getByTestId("fs-price");
 
     // Meta row carries BOTH the label and the based-on subline, above the number.
