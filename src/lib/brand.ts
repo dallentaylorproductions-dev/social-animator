@@ -1,6 +1,6 @@
 "use client";
 
-import { useEffect, useState } from "react";
+import { useEffect, useRef, useState } from "react";
 import { drawImageContain } from "@/engine/draw";
 import type { Review } from "@/tools/seller-presentation/engine/types";
 import { type WhyUs, clampWhyUs } from "@/lib/whyus";
@@ -8,6 +8,12 @@ import {
   type SettingsRecentListing,
   clampStoredRecentListings,
 } from "@/lib/seller-presentation/recent-listings";
+import { useServerBrandSettingsEnabled } from "@/lib/brand-settings-flag";
+import {
+  fetchServerBrandSettings,
+  putServerBrandSettings,
+} from "@/lib/brand-settings-client";
+import { planBrandMigration } from "@/lib/brand-settings-migration";
 
 export interface BrandSettings {
   logoDataUrl: string | null;
@@ -161,6 +167,19 @@ export interface BrandSettings {
    * a built layout today (Phase E); Studio/Warm are Coming soon.
    */
   defaultThemeId?: string;
+  /**
+   * Server-persistence plumbing (SERVER_BRAND_SETTINGS) — NOT brand content.
+   * The lowercased owner email stamped into the localStorage blob the first
+   * time settings are saved while signed in with the feature on. It scopes the
+   * one-time localStorage→server migration to ONLY-already-owned settings,
+   * mirroring `WorkflowInstance.ownerEmail` in the draft store: legacy no-owner
+   * settings (and any left by another agent on a shared browser) are never
+   * swept into this account at load — the hard privacy gate. Never read by the
+   * publish serializer (`brandToPublishInputs` enumerates fields and never
+   * spreads), so it cannot reach a public page. Undefined when the feature is
+   * off, so the flag-off localStorage blob stays byte-identical.
+   */
+  ownerEmail?: string;
 }
 
 /**
@@ -490,6 +509,13 @@ export function loadBrandSettings(): BrandSettings {
         parsed.defaultThemeId.length > 0
           ? parsed.defaultThemeId
           : undefined,
+      // Server-persistence plumbing — preserve the owner stamp so the
+      // migration planner can scope to only-already-owned settings. Undefined
+      // for a flag-off / never-signed-in blob (byte-identical to today).
+      ownerEmail:
+        typeof parsed.ownerEmail === "string" && parsed.ownerEmail.length > 0
+          ? parsed.ownerEmail
+          : undefined,
     };
   } catch {
     return DEFAULT_BRAND;
@@ -550,6 +576,13 @@ export function saveBrandSettings(settings: BrandSettings): void {
   }
 }
 
+// SERVER_BRAND_SETTINGS debounced-autosave tuning (mirrors the draft store's
+// useSellerPresentationState): coalesce rapid edits, then a bounded backoff on
+// transient failures before falling back to the local cache.
+const BRAND_AUTOSAVE_DEBOUNCE_MS = 1500;
+const BRAND_RETRY_BASE_DELAY_MS = 2000;
+const BRAND_MAX_RETRIES = 4;
+
 /**
  * Hook: loads brand settings + materializes the logo as an HTMLImageElement
  * (since canvas drawing needs an image element, not a data URL string).
@@ -564,6 +597,24 @@ export function useBrandSettings() {
   // render is identity across environments.
   const [settings, setSettings] = useState<BrandSettings>(DEFAULT_BRAND);
   const [logoImg, setLogoImg] = useState<HTMLImageElement | null>(null);
+
+  // SERVER_BRAND_SETTINGS — server-backed, owner-scoped persistence (mirrors
+  // the SP-KEYSTONE draft store). The flag arrives via the root-layout context.
+  // When OFF, every path below short-circuits to the localStorage-only behavior
+  // this hook has always had (byte-identical). When ON, the server is the
+  // source of truth: load from it (server wins), migrate an owned local blob up
+  // once, and debounced-autosave every edit through it (flush on unmount).
+  const serverEnabled = useServerBrandSettingsEnabled();
+  // The authenticated owner email, learned from the load route. Needed to stamp
+  // ownership into the local cache (so the migration is only-already-owned) and
+  // to gate the migration push. Null until the load resolves / when anon.
+  const emailRef = useRef<string | null>(null);
+  // Debounced server autosave plumbing (mirrors useSellerPresentationState).
+  const flushTimerRef = useRef<number | null>(null);
+  const pendingRef = useRef<{ settings: BrandSettings; updatedAt: string } | null>(
+    null,
+  );
+  const retryCountRef = useRef(0);
 
   useEffect(() => {
     setSettings(loadBrandSettings());
@@ -583,6 +634,67 @@ export function useBrandSettings() {
     };
   }, []);
 
+  // Server resolve (flag-on only): load the owner's settings; the server copy
+  // wins (cached to localStorage so it survives offline). If the server has
+  // none yet, migrate an ALREADY-OWNED local blob up exactly once — never
+  // clobbering server data, never claiming another agent's localStorage.
+  useEffect(() => {
+    if (!serverEnabled) return;
+    let cancelled = false;
+    void (async () => {
+      const result = await fetchServerBrandSettings();
+      if (cancelled || !result) {
+        // null = offline / 503 (flag race) / anon / 5xx — keep the local cache.
+        return;
+      }
+      emailRef.current = result.email;
+      if (result.record) {
+        // Server wins. Merge over DEFAULT_BRAND so a partial/older record can
+        // never drop a required field; cache it locally for the next offline load.
+        const serverSettings = { ...DEFAULT_BRAND, ...result.record.settings };
+        setSettings(serverSettings);
+        saveBrandSettings(serverSettings);
+        return;
+      }
+      // Server has nothing yet — claim the local blob only if this agent owns it.
+      const local = loadBrandSettings();
+      const plan = planBrandMigration({
+        localSettings: local,
+        serverPresent: false,
+        sessionEmail: result.email,
+      });
+      if (!plan.shouldPush) return;
+      const owned: BrandSettings = {
+        ...local,
+        ownerEmail: result.email.toLowerCase(),
+      };
+      const res = await putServerBrandSettings(owned, new Date().toISOString());
+      if (!cancelled && res.ok && res.record) {
+        const merged = { ...DEFAULT_BRAND, ...res.record.settings };
+        setSettings(merged);
+        saveBrandSettings(merged);
+      }
+    })();
+    return () => {
+      cancelled = true;
+    };
+  }, [serverEnabled]);
+
+  // Flush any pending debounced edit when the component unmounts (mirrors the
+  // draft store's flush-on-unmount), so an edit made right before navigating
+  // away is not lost. Best-effort; the local cache already holds it.
+  useEffect(() => {
+    return () => {
+      if (flushTimerRef.current !== null) {
+        window.clearTimeout(flushTimerRef.current);
+      }
+      const pending = pendingRef.current;
+      if (pending) {
+        void putServerBrandSettings(pending.settings, pending.updatedAt);
+      }
+    };
+  }, []);
+
   useEffect(() => {
     if (!settings.logoDataUrl) {
       setLogoImg(null);
@@ -595,9 +707,56 @@ export function useBrandSettings() {
   }, [settings.logoDataUrl]);
 
   const update = (next: BrandSettings) => {
-    setSettings(next);
-    saveBrandSettings(next);
+    if (!serverEnabled) {
+      // Flag-off: today's localStorage-only path, byte-identical.
+      setSettings(next);
+      saveBrandSettings(next);
+      return;
+    }
+    // Flag-on: stamp ownership (so the migration stays only-already-owned),
+    // write the optimistic local cache, then debounced-autosave to the server.
+    const email = emailRef.current;
+    const stamped: BrandSettings = email
+      ? { ...next, ownerEmail: email.toLowerCase() }
+      : next;
+    setSettings(stamped);
+    saveBrandSettings(stamped);
+    pendingRef.current = { settings: stamped, updatedAt: new Date().toISOString() };
+    if (flushTimerRef.current !== null) {
+      window.clearTimeout(flushTimerRef.current);
+    }
+    flushTimerRef.current = window.setTimeout(flushServerBrand, BRAND_AUTOSAVE_DEBOUNCE_MS);
   };
+
+  // Push the latest pending edit to the server with a bounded retry/backoff on
+  // transient (5xx / network) failures. Last-write-wins is enforced server-side
+  // by updatedAt, so a stale push can never clobber a fresher edit elsewhere.
+  function flushServerBrand(): void {
+    const pending = pendingRef.current;
+    if (!pending) return;
+    void putServerBrandSettings(pending.settings, pending.updatedAt).then((res) => {
+      if (res.ok) {
+        retryCountRef.current = 0;
+        pendingRef.current = null;
+        return;
+      }
+      if (res.retryable && retryCountRef.current < BRAND_MAX_RETRIES) {
+        retryCountRef.current += 1;
+        if (flushTimerRef.current !== null) {
+          window.clearTimeout(flushTimerRef.current);
+        }
+        flushTimerRef.current = window.setTimeout(
+          flushServerBrand,
+          BRAND_RETRY_BASE_DELAY_MS * retryCountRef.current,
+        );
+        return;
+      }
+      // Out of retries (or a 4xx). The edit is safe in the local cache; drop
+      // the pending push so a later edit starts a clean retry budget.
+      retryCountRef.current = 0;
+      pendingRef.current = null;
+    });
+  }
 
   return { settings, logoImg, update };
 }

@@ -10,6 +10,7 @@ import {
 import "./globals.css";
 import { SerwistProvider } from "@serwist/turbopack/react";
 import { PerfToast } from "@/components/PerfToast";
+import { BrandSettingsFlagProvider } from "@/lib/brand-settings-flag";
 
 const geistSans = Geist({
   variable: "--font-geist-sans",
@@ -94,6 +95,13 @@ export default function RootLayout({
 }: Readonly<{
   children: React.ReactNode;
 }>) {
+  // Server-only flag for server-backed brand settings (mirrors how the SP page
+  // reads SERVER_DRAFTS_ENABLED). Read here and threaded as a single boolean
+  // into a thin client context so the cross-page `useBrandSettings` hook can
+  // learn it without prop-drilling. No auth() runs here, so static/public pages
+  // are not deopted; off ⇒ the hook stays pure-localStorage (byte-identical).
+  const serverBrandSettingsEnabled =
+    process.env.SERVER_BRAND_SETTINGS_ENABLED === "true";
   return (
     <html lang="en">
       <body
@@ -118,7 +126,9 @@ export default function RootLayout({
           cacheOnNavigation={false}
           reloadOnOnline={false}
         >
-          {children}
+          <BrandSettingsFlagProvider enabled={serverBrandSettingsEnabled}>
+            {children}
+          </BrandSettingsFlagProvider>
         </SerwistProvider>
         {/* H-7.14: gated behind ?perf=1 — renders null otherwise so the
          *  overhead in the common path is one URLSearchParams check at
