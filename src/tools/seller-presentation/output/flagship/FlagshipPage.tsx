@@ -3,6 +3,7 @@ import type { HandoutRecord } from "@/lib/share-urls";
 import { clampPublicPayload } from "../public-payload";
 import { consumerRoleVars, deriveConsumerRoles } from "../consumer-roles";
 import { PresentationPageMotion } from "../motion";
+import { viewSignalSlugFor } from "@/lib/seller-presentation/viewed-signal";
 import { newsreader } from "./fonts";
 import { Hero } from "./Hero";
 import { Price } from "./Price";
@@ -124,7 +125,7 @@ export function FlagshipPage({
           showGuarantee
         />
       </div>
-      <PresentationPageMotion />
+      <PresentationPageMotion viewSignalSlug={viewSignalSlugFor(handout)} />
     </div>
   );
 }

@@ -56,8 +56,16 @@ export interface ServerPageSummary {
   /** Address line; may be empty if the payload somehow lacks one. */
   propertyLine: string;
   sellerLine?: string;
-  /** Reserved — view counts are not tracked yet, so this is omitted today. */
+  /**
+   * Viewed signal (Phase 1) — repeat-open count. Populated by the pages route
+   * from `views:<slug>` ONLY when VIEWED_SIGNAL_ENABLED is on; omitted (and the
+   * chip stays silent) when the flag is off, so flag-off is byte-identical.
+   */
   viewCount?: number;
+  /** Viewed signal (Phase 1) — ISO 8601 of the most recent open, iff opened. */
+  lastViewedAt?: string;
+  /** Viewed signal (Phase 1) — a retained open occurred after the reveal. */
+  returnedAfterReveal?: boolean;
 }
 
 /** A merged card the library renders. */
@@ -86,6 +94,10 @@ export interface PageCard {
    */
   archivedAt?: string;
   viewCount?: number;
+  /** Viewed signal (Phase 1) — ISO 8601 of the most recent open, iff opened. */
+  lastViewedAt?: string;
+  /** Viewed signal (Phase 1) — a retained open occurred after the reveal. */
+  returnedAfterReveal?: boolean;
 }
 
 export function publicUrlForSlug(slug: string): string {
@@ -237,6 +249,8 @@ export function mergePages(input: MergeInput): PageCard[] {
         // "archived at" signal for an instance-backed published page.
         archivedAt: status === "archived" ? serverPage.updatedAt : undefined,
         viewCount: serverPage.viewCount,
+        lastViewedAt: serverPage.lastViewedAt,
+        returnedAfterReveal: serverPage.returnedAfterReveal,
       });
       continue;
     }
@@ -270,6 +284,8 @@ export function mergePages(input: MergeInput): PageCard[] {
       updatedAt: page.updatedAt,
       archivedAt: page.archived ? page.updatedAt : undefined,
       viewCount: page.viewCount,
+      lastViewedAt: page.lastViewedAt,
+      returnedAfterReveal: page.returnedAfterReveal,
     });
   }
 
@@ -631,11 +647,38 @@ export function isCrossDeviceOnly(card: PageCard): boolean {
 }
 
 /**
+ * Viewed signal (Phase 1) — the calm engagement label for a live card, or
+ * undefined when the page has not been opened (or the flag is off, so no view
+ * fields are populated). PURE; the chip and the meta line both read it so the
+ * voice never drifts. Operations-partner tone, no hype:
+ *   - returned after the reveal → "Returned" (the strongest buying signal)
+ *   - otherwise opened          → "Opened · 2h ago" (recency via relativeTimeAgo)
+ * The repeat-open count is rendered separately (the meta line appends "N views").
+ *
+ * The route always populates `lastViewedAt` / `returnedAfterReveal` alongside
+ * `viewCount` (deriveViewSignal sets all three together), so a `viewCount`
+ * WITHOUT a `lastViewedAt` — a legacy / unreachable shape — yields no label and
+ * the meta line falls back to the pre-phase "N views" exactly.
+ */
+export function viewSignalLabel(card: PageCard, nowMs: number): string | undefined {
+  if (typeof card.viewCount !== "number" || card.viewCount < 1) return undefined;
+  if (card.returnedAfterReveal) return "Returned";
+  if (card.lastViewedAt) {
+    return `Opened · ${relativeTimeAgo(card.lastViewedAt, nowMs)}`;
+  }
+  return undefined;
+}
+
+/**
  * The row's secondary meta line (the status chip is rendered separately):
  *   - Draft     → "Started X ago"
  *   - Archived  → "Archived X ago" (by archivedAt, falling back to updatedAt)
- *   - Live / edits-pending → "seller · N views", whichever parts exist; with
- *     neither (no seller, views not yet tracked) → "Live X ago".
+ *   - Live / edits-pending → "seller · Opened 2h ago · N views", whichever parts
+ *     exist; with none (no seller, page not yet opened) → "Live X ago".
+ *
+ * The viewed-signal parts (Opened / Returned, then the count) only appear when
+ * the pages route populated them under VIEWED_SIGNAL_ENABLED, so a flag-off card
+ * (no view fields) is byte-identical to before this phase.
  */
 export function listMetaLine(card: PageCard, nowMs: number): string {
   if (card.status === "draft") {
@@ -646,6 +689,8 @@ export function listMetaLine(card: PageCard, nowMs: number): string {
   }
   const parts: string[] = [];
   if (card.sellerLine) parts.push(card.sellerLine);
+  const engagement = viewSignalLabel(card, nowMs);
+  if (engagement) parts.push(engagement);
   if (typeof card.viewCount === "number") {
     parts.push(`${card.viewCount} ${card.viewCount === 1 ? "view" : "views"}`);
   }

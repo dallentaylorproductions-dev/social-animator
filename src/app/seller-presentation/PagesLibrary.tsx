@@ -45,6 +45,7 @@ import {
   isAtOrOverLiveCap,
   isCrossDeviceOnly,
   listMetaLine,
+  viewSignalLabel,
   LONG_PRESS_MS,
   mergePages,
   movedBeyond,
@@ -1434,6 +1435,7 @@ function ExplainNote({
 
 function PageCardView({
   card,
+  nowMs,
   serverDraftsEnabled,
   busy,
   copied,
@@ -1548,7 +1550,14 @@ function PageCardView({
         <h3 className="lib-card-title">{card.propertyLine}</h3>
         {card.sellerLine && <p className="lib-card-sub">{card.sellerLine}</p>}
         {typeof card.viewCount === "number" && (
-          <p className="lib-card-views">{card.viewCount} views</p>
+          <p className="lib-card-views" data-returned={card.returnedAfterReveal ? "true" : undefined}>
+            {[
+              viewSignalLabel(card, nowMs),
+              `${card.viewCount} ${card.viewCount === 1 ? "view" : "views"}`,
+            ]
+              .filter(Boolean)
+              .join(" · ")}
+          </p>
         )}
 
         {isPending && (

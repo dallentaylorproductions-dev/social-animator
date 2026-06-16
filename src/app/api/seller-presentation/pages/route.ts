@@ -10,6 +10,8 @@ import {
   SELLER_PRESENTATION_HANDOUT_TYPE,
   type ServerPageSummary,
 } from "@/lib/seller-presentation/pages-library";
+import { isViewedSignalEnabled } from "@/lib/seller-presentation/viewed-signal";
+import { deriveViewSignal, getViews } from "@/lib/seller-presentation/views-store";
 
 /**
  * GET /api/seller-presentation/pages (SP-LIB).
@@ -58,11 +60,30 @@ export async function GET() {
 
   try {
     const records = await listOwnerHandoutRecords(email);
-    const pages: ServerPageSummary[] = records
+    const base: ServerPageSummary[] = records
       .filter(
         (r) => r.type === SELLER_PRESENTATION_HANDOUT_TYPE && !r.revoked,
       )
       .map(projectHandoutSummary);
+
+    // Viewed signal (Phase 1): enrich each owner-scoped summary with its
+    // `views:<slug>` record ONLY when the flag is on. Reads are batched
+    // (like listOwnerHandoutRecords) and an un-opened page is returned
+    // unchanged, so a flag-off response is byte-identical to today.
+    const pages: ServerPageSummary[] = isViewedSignalEnabled()
+      ? await Promise.all(
+          base.map(async (page) => {
+            const signal = deriveViewSignal(await getViews(page.slug));
+            if (!signal.opened) return page;
+            return {
+              ...page,
+              viewCount: signal.count,
+              lastViewedAt: signal.lastViewedAt,
+              returnedAfterReveal: signal.returnedAfterReveal,
+            };
+          }),
+        )
+      : base;
 
     const ent = resolveEntitlements(await loadAgentProfile(email));
     const cap = maxLivePagesCap(ent.accessMode);

@@ -219,7 +219,74 @@ function wireWaveformPlay(root: Document): Array<() => void> {
   return teardowns;
 }
 
-export function PresentationPageMotion() {
+// ---- Viewed signal (Phase 1): one beacon per session on open --------------
+/** sessionStorage key for the opaque per-session view token. */
+const VIEW_SID_KEY = "sa-view-sid";
+
+/**
+ * A stable opaque token for THIS browser session, minted once and reused across
+ * in-session refreshes (sessionStorage), so the server can de-dupe a refresh
+ * from a genuine later return (a new tab is a new session -> a new token). No
+ * identity, never persisted past the session. Returns null when sessionStorage
+ * is unavailable (private-mode edge), in which case the beacon is skipped.
+ */
+function sessionViewToken(): string | null {
+  try {
+    const store = window.sessionStorage;
+    const existing = store.getItem(VIEW_SID_KEY);
+    if (existing) return existing;
+    const token =
+      typeof crypto !== "undefined" && typeof crypto.randomUUID === "function"
+        ? crypto.randomUUID()
+        : `${Date.now().toString(36)}-${Math.random().toString(36).slice(2)}`;
+    store.setItem(VIEW_SID_KEY, token);
+    return token;
+  } catch {
+    return null;
+  }
+}
+
+export function PresentationPageMotion({
+  viewSignalSlug,
+}: {
+  /**
+   * Viewed signal (Phase 1). When set (the page is a live /h/<slug> AND the
+   * VIEWED_SIGNAL_ENABLED flag is on, resolved server-side by the render arm),
+   * fire ONE fire-and-forget open beacon per session. Undefined (flag-off, or a
+   * non-public render like the wizard preview) fires nothing - byte-identical.
+   */
+  viewSignalSlug?: string;
+} = {}) {
+  // Open beacon - isolated effect so it is independent of the motion wiring and
+  // a no-op whenever `viewSignalSlug` is absent.
+  useEffect(() => {
+    if (!viewSignalSlug) return;
+    const sid = sessionViewToken();
+    if (!sid) return;
+    const url = `/api/h/${encodeURIComponent(viewSignalSlug)}/view`;
+    const payload = JSON.stringify({ sid });
+    try {
+      if (
+        typeof navigator !== "undefined" &&
+        typeof navigator.sendBeacon === "function"
+      ) {
+        navigator.sendBeacon(
+          url,
+          new Blob([payload], { type: "application/json" }),
+        );
+      } else {
+        void fetch(url, {
+          method: "POST",
+          body: payload,
+          headers: { "Content-Type": "application/json" },
+          keepalive: true,
+        }).catch(() => {});
+      }
+    } catch {
+      // Best-effort: a capture failure never affects the seller's page.
+    }
+  }, [viewSignalSlug]);
+
   useEffect(() => {
     const root = document;
     const targets = root.querySelectorAll<HTMLElement>(
