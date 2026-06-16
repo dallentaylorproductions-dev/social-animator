@@ -64,6 +64,14 @@ export default async function SellerPresentationPage({
   // no separate public flag. Only the library uses it; the wizard is untouched.
   const reorderEnabled = process.env.PAGES_REORDER_ENABLED === "true";
 
+  // Pages Library v2 — the seller-activity cockpit (pinned "Worth a follow-up"
+  // group, de-duplicated card signal, calm usage line). OFF by default; ships
+  // DARK so it can be verified on preview before agents see it. A re-projection
+  // of data we already have — read server-side and threaded down as a prop
+  // (mirroring reorderEnabled) so the client needs no separate public flag. Only
+  // the library uses it; the wizard is untouched.
+  const libraryV2Enabled = process.env.PAGES_LIBRARY_V2 === "true";
+
   const sp = await searchParams;
   const idParam = sp?.id;
   const hasId =
@@ -86,6 +94,7 @@ export default async function SellerPresentationPage({
       ownerEmail={ownerEmail}
       serverDraftsEnabled={serverDraftsEnabled}
       reorderEnabled={reorderEnabled}
+      libraryV2Enabled={libraryV2Enabled}
     />
   );
 }

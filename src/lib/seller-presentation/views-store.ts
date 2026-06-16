@@ -307,6 +307,12 @@ export interface FollowUpNudge {
    * strongest buying signal), then watched-video, then read-to-end.
    */
   reasons: string[];
+  /**
+   * ISO 8601 UTC of the MOST-RECENT qualifying (meaningful + recent + not-yet-
+   * cleared) session. Drives the V2 cockpit's "Worth a follow-up" group sort
+   * (most-recent meaningful engagement first). Undefined unless `worthFollowUp`.
+   */
+  lastMeaningfulAt?: string;
 }
 
 /**
@@ -341,14 +347,22 @@ export function deriveFollowUpNudge(
   let returned = false;
   let video = false;
   let reached = false;
+  // Newest qualifying session's timestamp — the recency key the V2 cockpit
+  // sorts the follow-up group by. recent[] is newest-LAST but not guaranteed
+  // sorted, so take the max rather than the last element.
+  let lastMeaningfulAt: string | undefined;
   for (const e of views.recent) {
     const atMs = Date.parse(e.at);
     if (Number.isNaN(atMs)) continue;
     if (atMs < cutoff) continue; // aged out of the recency window
     if (!Number.isNaN(followedUpMs) && atMs <= followedUpMs) continue; // already cleared
+    const meaningful = e.afterReveal || !!e.videoPlayed || !!e.reachedEnd;
     if (e.afterReveal) returned = true;
     if (e.videoPlayed) video = true;
     if (e.reachedEnd) reached = true;
+    if (meaningful && (!lastMeaningfulAt || e.at > lastMeaningfulAt)) {
+      lastMeaningfulAt = e.at;
+    }
   }
 
   if (!returned && !video && !reached) return NONE;
@@ -356,7 +370,7 @@ export function deriveFollowUpNudge(
   if (returned) reasons.push("Returned after the reveal");
   if (video) reasons.push("Watched your video");
   if (reached) reasons.push("Read to the end");
-  return { worthFollowUp: true, reasons };
+  return { worthFollowUp: true, reasons, lastMeaningfulAt };
 }
 
 /** Read a page's views record (or null if none recorded). */

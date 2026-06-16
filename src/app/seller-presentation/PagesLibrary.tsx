@@ -41,12 +41,16 @@ import {
   applyManualOrder,
   buildDuplicateDraft,
   bulkActionValidity,
+  cardSignal,
   countWorthFollowUp,
   filterByTab,
   followUpMarkerLabel,
+  followUpSubline,
   isAtOrOverLiveCap,
   isCrossDeviceOnly,
   listMetaLine,
+  splitFollowUp,
+  usageMeterLabel,
   viewSignalLabel,
   viewEngagementFacts,
   LONG_PRESS_MS,
@@ -158,6 +162,7 @@ export function PagesLibrary({
   ownerEmail,
   serverDraftsEnabled = false,
   reorderEnabled = false,
+  libraryV2Enabled = false,
 }: {
   ownerEmail: string | null;
   /**
@@ -174,6 +179,15 @@ export function PagesLibrary({
    * today's library: no drag handle, fixed most-recent-first sort.
    */
   reorderEnabled?: boolean;
+  /**
+   * PAGES_LIBRARY_V2 — when true the Active tab becomes the seller-activity
+   * cockpit: a pinned "Worth a follow-up" group (recency-sorted) above an
+   * "Active pages" section (existing order preserved), de-duplicated card signal
+   * lines, a calm non-alarming usage line, and an "all caught up" state. Default
+   * false ⇒ byte-identical to today's library (single most-recent-first list,
+   * the "N of M live" meter, the at-limit banner).
+   */
+  libraryV2Enabled?: boolean;
 }) {
   // SP-KEYSTONE — the server's draft instances for this agent (the DRAFT slice
   // when the flag is on). null = not loaded / the fetch failed ⇒ fall back to
@@ -450,6 +464,16 @@ export function PagesLibrary({
   // 0 (and the count hides) on a flag-off list, since no card carries
   // `worthFollowUp` unless the nudge flag populated it server-side.
   const followUpCount = useMemo(() => countWorthFollowUp(cards), [cards]);
+  // V2 — does the agent have any live page at all? Gates the calm "all caught
+  // up" affordance so it reads intentional (it only makes sense once there is a
+  // page a seller could engage with), never on a drafts-only library.
+  const hasLivePage = useMemo(
+    () =>
+      cards.some(
+        (c) => c.status === "live" || c.status === "live-edits-pending",
+      ),
+    [cards],
+  );
   const visibleCards = useMemo(() => filterByTab(cards, tab), [cards, tab]);
   // SP-LIB-5 — the Active tab renders in the agent's manual order (Cards + List
   // both). For Archived (and whenever reorder is off) this is exactly today's
@@ -887,6 +911,7 @@ export function PagesLibrary({
   function rowProps(card: PageCard): PageItemProps {
     return {
       card,
+      libraryV2: libraryV2Enabled,
       nowMs,
       serverDraftsEnabled,
       busy: busyKey === card.key || bulkBusy,
@@ -907,6 +932,97 @@ export function PagesLibrary({
       onDelete: () => requestDelete(card),
       onMarkFollowedUp: () => markFollowedUp(card),
     };
+  }
+
+  // One render path for a set of cards — the draggable Active List (SP-LIB-5),
+  // the plain List, or the Cards grid. Pulled out of the render chain so the V2
+  // cockpit can render its two sections (the pinned follow-up group + the rest)
+  // through the exact same primitive, and the flag-off path stays byte-identical
+  // (`renderItems(orderedCards, canReorder)` is the prior inline chain verbatim).
+  function renderItems(items: PageCard[], draggable: boolean) {
+    if (draggable) {
+      // SP-LIB-5 — the draggable Active List. framer-motion's Reorder gives the
+      // fluid lift / flow / spring settle; drag is HANDLE-only (dragListener=false
+      // + per-row dragControls), so tap-to-open and long-press-select on the row
+      // are untouched. The order of `values` IS the render order; onReorder hands
+      // back the new key order.
+      return (
+        <Reorder.Group
+          as="div"
+          axis="y"
+          values={items.map((c) => c.key)}
+          onReorder={handleReorder}
+          className="lib-list"
+          data-testid="lib-list"
+        >
+          {items.map((card) => (
+            <PageRowView key={card.key} {...rowProps(card)} reorderable />
+          ))}
+        </Reorder.Group>
+      );
+    }
+    if (viewMode === "list") {
+      return (
+        <div className="lib-list" data-testid="lib-list">
+          {items.map((card) => (
+            <PageRowView key={card.key} {...rowProps(card)} />
+          ))}
+        </div>
+      );
+    }
+    return (
+      <div className="lib-grid" data-testid="lib-grid">
+        {items.map((card) => (
+          <PageCardView key={card.key} {...rowProps(card)} />
+        ))}
+      </div>
+    );
+  }
+
+  // The Active-tab body. V2 splits it into the pinned "Worth a follow-up" group
+  // (recency-sorted) above an "Active pages" section (existing order preserved);
+  // a card never appears in both. When the group is empty the cockpit shows no
+  // top section (optionally a calm "all caught up" affordance) and the rest
+  // renders exactly as today — including the draggable reorder. Drag is reserved
+  // for the ungrouped case this pass (a grouped cockpit isn't draggable yet), so
+  // handleReorder always operates on the full Active set.
+  function renderActiveBody() {
+    if (!libraryV2Enabled) return renderItems(orderedCards, canReorder);
+
+    const { followUp, rest } = splitFollowUp(orderedCards);
+    const hasGroup = followUp.length > 0;
+    return (
+      <>
+        {hasGroup && (
+          <section className="lib-section" data-testid="lib-followup-group">
+            <div className="lib-section-head">
+              <h2 className="lib-section-title">Worth a follow-up</h2>
+              <p className="lib-section-sub">{followUpSubline(followUp.length)}</p>
+            </div>
+            {renderItems(followUp, false)}
+          </section>
+        )}
+
+        {!hasGroup && hasLivePage && (
+          <div className="lib-caughtup" role="status" data-testid="lib-caughtup">
+            <p className="lib-caughtup-title">All caught up</p>
+            <p className="lib-caughtup-sub">
+              When a seller meaningfully engages with their page, they will
+              appear here.
+            </p>
+          </div>
+        )}
+
+        <section className="lib-section" data-testid="lib-active-section">
+          {hasGroup && (
+            <div className="lib-section-head">
+              <h2 className="lib-section-title">Active pages</h2>
+            </div>
+          )}
+          {renderItems(rest, !hasGroup && canReorder)}
+        </section>
+      </>
+    );
   }
 
   return (
@@ -937,16 +1053,29 @@ export function PagesLibrary({
                   {followUpCount} worth a follow-up
                 </span>
               )}
-              {cap > 0 && (
-                <span
-                  className="lib-meter"
-                  data-at-limit={atLimit ? "true" : undefined}
-                  data-testid="lib-usage-meter"
-                  title="Only live pages count toward your limit. Drafts and archived pages are free."
-                >
-                  {liveCount} of {cap} live
-                </span>
-              )}
+              {cap > 0 &&
+                (libraryV2Enabled ? (
+                  // V2 — a quiet, separate usage line. The cap is shown, not
+                  // enforced (pre-billing), so an over-cap agent never sees an
+                  // alarming "68 of 25"; it reads "N live pages · plan limit M"
+                  // in the same muted voice, no alert color.
+                  <span
+                    className="lib-meter"
+                    data-testid="lib-usage-meter"
+                    title="Only live pages count toward your limit. Drafts and archived pages are free."
+                  >
+                    {usageMeterLabel(liveCount, cap)}
+                  </span>
+                ) : (
+                  <span
+                    className="lib-meter"
+                    data-at-limit={atLimit ? "true" : undefined}
+                    data-testid="lib-usage-meter"
+                    title="Only live pages count toward your limit. Drafts and archived pages are free."
+                  >
+                    {liveCount} of {cap} live
+                  </span>
+                ))}
               <button
                 type="button"
                 className="lib-newbtn"
@@ -959,7 +1088,7 @@ export function PagesLibrary({
           </div>
         </header>
 
-        {atLimit && (
+        {atLimit && !libraryV2Enabled && (
           <div className="lib-banner" role="status" data-testid="lib-at-limit">
             All {cap} pages are live. Archive a closed listing to free a slot,
             or add room when you are ready. You can still create and publish in
@@ -1061,36 +1190,13 @@ export function PagesLibrary({
           <EmptyState onCreate={newPage} />
         ) : visibleCards.length === 0 ? (
           <TabEmpty tab={tab} />
-        ) : canReorder ? (
-          // SP-LIB-5 — the draggable Active List. framer-motion's Reorder gives
-          // the fluid lift / flow / spring settle; drag is HANDLE-only
-          // (dragListener=false + per-row dragControls), so tap-to-open and
-          // long-press-select on the row are untouched. The order of `values`
-          // IS the render order; onReorder hands back the new key order.
-          <Reorder.Group
-            as="div"
-            axis="y"
-            values={orderedCards.map((c) => c.key)}
-            onReorder={handleReorder}
-            className="lib-list"
-            data-testid="lib-list"
-          >
-            {orderedCards.map((card) => (
-              <PageRowView key={card.key} {...rowProps(card)} reorderable />
-            ))}
-          </Reorder.Group>
-        ) : viewMode === "list" ? (
-          <div className="lib-list" data-testid="lib-list">
-            {orderedCards.map((card) => (
-              <PageRowView key={card.key} {...rowProps(card)} />
-            ))}
-          </div>
+        ) : tab === "active" ? (
+          renderActiveBody()
         ) : (
-          <div className="lib-grid" data-testid="lib-grid">
-            {orderedCards.map((card) => (
-              <PageCardView key={card.key} {...rowProps(card)} />
-            ))}
-          </div>
+          // Archived tab: its own most-recently-archived-first sort, never
+          // grouped and never reorderable (canReorder is Active-only), so this
+          // is exactly today's List / Cards render.
+          renderItems(orderedCards, canReorder)
         )}
       </div>
 
@@ -1251,6 +1357,12 @@ function ConfirmDialog({
  */
 interface PageItemProps {
   card: PageCard;
+  /**
+   * PAGES_LIBRARY_V2 — render the de-duplicated cockpit signal lines (the nudge
+   * marker absorbs the engagement facts on a follow-up card; one fact otherwise).
+   * Default off ⇒ the three independent Phase 1/2/3 lines, byte-identical.
+   */
+  libraryV2: boolean;
   /** Client snapshot of Date.now() for relative-time meta (List rows only). */
   nowMs: number;
   /** SP-KEYSTONE — server drafts on ⇒ the cross-device note copy is honest. */
@@ -1485,6 +1597,7 @@ function ExplainNote({
 
 function PageCardView({
   card,
+  libraryV2,
   nowMs,
   serverDraftsEnabled,
   busy,
@@ -1600,41 +1713,74 @@ function PageCardView({
       <div className="lib-body">
         <h3 className="lib-card-title">{card.propertyLine}</h3>
         {card.sellerLine && <p className="lib-card-sub">{card.sellerLine}</p>}
-        {typeof card.viewCount === "number" && (
-          <p className="lib-card-views" data-returned={card.returnedAfterReveal ? "true" : undefined}>
-            {[
-              viewSignalLabel(card, nowMs),
-              `${card.viewCount} ${card.viewCount === 1 ? "view" : "views"}`,
-            ]
-              .filter(Boolean)
-              .join(" · ")}
-          </p>
-        )}
-        {/* Viewed signal (Phase 2) — quiet, concrete engagement facts on a
-            muted secondary line (capped + prioritized in viewEngagementFacts).
-            Empty on a flag-off / Phase-1 card, so nothing new renders there. */}
-        {(() => {
-          const facts = viewEngagementFacts(card);
-          return facts.length > 0 ? (
-            <p className="lib-card-facts" data-testid="lib-card-facts">
-              {facts.join(" · ")}
-            </p>
-          ) : null;
-        })()}
+        {libraryV2 ? (
+          // V2 cockpit — the de-duplicated signal. On a follow-up card the nudge
+          // marker leads (action state + reason) and the context line carries
+          // recency + opens only; the engagement facts are NOT repeated (the
+          // marker owns them), so a card never shows the same fact twice. On a
+          // non-follow-up live card there is no marker, just status + count + one
+          // fact. cardSignal returns both undefined on a draft / never-opened /
+          // flag-off card, so nothing renders.
+          (() => {
+            const sig = cardSignal(card, nowMs);
+            return (
+              <>
+                {sig.marker && (
+                  <p className="lib-card-followup" data-testid="lib-card-followup">
+                    {sig.marker}
+                  </p>
+                )}
+                {sig.context && (
+                  <p
+                    className="lib-card-views"
+                    data-testid="lib-card-context"
+                    data-returned={card.returnedAfterReveal ? "true" : undefined}
+                  >
+                    {sig.context}
+                  </p>
+                )}
+              </>
+            );
+          })()
+        ) : (
+          <>
+            {typeof card.viewCount === "number" && (
+              <p className="lib-card-views" data-returned={card.returnedAfterReveal ? "true" : undefined}>
+                {[
+                  viewSignalLabel(card, nowMs),
+                  `${card.viewCount} ${card.viewCount === 1 ? "view" : "views"}`,
+                ]
+                  .filter(Boolean)
+                  .join(" · ")}
+              </p>
+            )}
+            {/* Viewed signal (Phase 2) — quiet, concrete engagement facts on a
+                muted secondary line (capped + prioritized in viewEngagementFacts).
+                Empty on a flag-off / Phase-1 card, so nothing new renders there. */}
+            {(() => {
+              const facts = viewEngagementFacts(card);
+              return facts.length > 0 ? (
+                <p className="lib-card-facts" data-testid="lib-card-facts">
+                  {facts.join(" · ")}
+                </p>
+              ) : null;
+            })()}
 
-        {/* Viewed signal (Phase 3) — the calm advisory follow-up marker + its
-            concrete reason. A quiet suggestion, never an alarm: no badge, no
-            urgency, no hype. Present only when the route flagged the page worth
-            a follow-up (under VIEWED_SIGNAL_NUDGE_ENABLED), so a flag-off card
-            renders nothing here. */}
-        {(() => {
-          const marker = followUpMarkerLabel(card);
-          return marker ? (
-            <p className="lib-card-followup" data-testid="lib-card-followup">
-              {marker}
-            </p>
-          ) : null;
-        })()}
+            {/* Viewed signal (Phase 3) — the calm advisory follow-up marker + its
+                concrete reason. A quiet suggestion, never an alarm: no badge, no
+                urgency, no hype. Present only when the route flagged the page worth
+                a follow-up (under VIEWED_SIGNAL_NUDGE_ENABLED), so a flag-off card
+                renders nothing here. */}
+            {(() => {
+              const marker = followUpMarkerLabel(card);
+              return marker ? (
+                <p className="lib-card-followup" data-testid="lib-card-followup">
+                  {marker}
+                </p>
+              ) : null;
+            })()}
+          </>
+        )}
 
         {isPending && (
           <p className="lib-pending-note">
