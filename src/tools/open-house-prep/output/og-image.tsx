@@ -1,6 +1,6 @@
 import type { ReactElement } from 'react';
 import type { HandoutRecord } from '@/lib/share-urls';
-import type { OpenHousePrepDraft } from '../engine/types';
+import { clampPublicHandoutData } from './public-payload';
 
 /**
  * OH-specific Open Graph card (1200×630). Consumed by /api/og/[slug]
@@ -17,19 +17,14 @@ const COLORS = {
   textSecondary: '#a3a3a3',
 } as const;
 
-interface AgentContact {
-  name?: string;
-  brokerage?: string;
-}
-
 export function renderOpenHouseOg(handout: HandoutRecord): ReactElement {
-  const data = handout.data as Partial<OpenHousePrepDraft> & {
-    agentContact?: AgentContact;
-  };
-  const address = data.propertyAddress ?? 'Open house';
+  // Read through the same data-minimization clamp as the handout page, so
+  // the OG card only ever reads allowlisted public fields.
+  const data = clampPublicHandoutData(handout.data);
+  const address = data.propertyAddress || 'Open house';
   const city = data.propertyCity ?? '';
   const agentName = data.agentContact?.name ?? '';
-  const eventDate = data.eventDate ?? '';
+  const eventDate = data.eventDate || '';
 
   return (
     <div
