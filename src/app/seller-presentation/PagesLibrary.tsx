@@ -41,7 +41,9 @@ import {
   applyManualOrder,
   buildDuplicateDraft,
   bulkActionValidity,
+  countWorthFollowUp,
   filterByTab,
+  followUpMarkerLabel,
   isAtOrOverLiveCap,
   isCrossDeviceOnly,
   listMetaLine,
@@ -444,6 +446,10 @@ export function PagesLibrary({
   );
 
   const counts = useMemo(() => tabCounts(cards), [cards]);
+  // Phase 3 — how many pages are worth a follow-up, for the calm header count.
+  // 0 (and the count hides) on a flag-off list, since no card carries
+  // `worthFollowUp` unless the nudge flag populated it server-side.
+  const followUpCount = useMemo(() => countWorthFollowUp(cards), [cards]);
   const visibleCards = useMemo(() => filterByTab(cards, tab), [cards, tab]);
   // SP-LIB-5 — the Active tab renders in the agent's manual order (Cards + List
   // both). For Archived (and whenever reorder is off) this is exactly today's
@@ -693,6 +699,37 @@ export function PagesLibrary({
     }
   }
 
+  // Viewed signal (Phase 3) — clear a page from the advisory nudge set. One
+  // bounded, owner-scoped write (records `followedUpAt`); strictly advisory, it
+  // sends nothing. On success the page reloads and the marker + header count drop
+  // for that page. Only ever reachable when the page is worth a follow-up (the
+  // control renders solely under the nudge flag).
+  async function markFollowedUp(card: PageCard) {
+    if (!card.slug) return;
+    setActionError(null);
+    setBusyKey(card.key);
+    try {
+      const res = await fetch("/api/seller-presentation/follow-up", {
+        method: "POST",
+        headers: { "Content-Type": "application/json" },
+        body: JSON.stringify({ slug: card.slug, action: "mark" }),
+      });
+      const body = (await res.json().catch(() => ({}))) as {
+        ok?: boolean;
+        error?: string;
+      };
+      if (!res.ok || !body.ok) {
+        setActionError(body.error ?? "Could not mark as followed up.");
+        return;
+      }
+      await load();
+    } catch {
+      setActionError("Could not mark as followed up. Please try again.");
+    } finally {
+      setBusyKey(null);
+    }
+  }
+
   function requestDelete(card: PageCard) {
     setConfirm({
       title: "Delete this page?",
@@ -868,6 +905,7 @@ export function PagesLibrary({
       onRestore: () => setArchived(card, false),
       onDuplicate: () => duplicate(card),
       onDelete: () => requestDelete(card),
+      onMarkFollowedUp: () => markFollowedUp(card),
     };
   }
 
@@ -890,6 +928,15 @@ export function PagesLibrary({
               </p>
             </div>
             <div className="lib-head-actions">
+              {followUpCount > 0 && (
+                <span
+                  className="lib-followup-count"
+                  data-testid="lib-followup-count"
+                  title="Pages a seller engaged with recently. A quiet suggestion to reach out — nothing is sent for you."
+                >
+                  {followUpCount} worth a follow-up
+                </span>
+              )}
               {cap > 0 && (
                 <span
                   className="lib-meter"
@@ -1232,6 +1279,8 @@ interface PageItemProps {
   onRestore: () => void;
   onDuplicate: () => void;
   onDelete: () => void;
+  /** Phase 3 — clear this page from the advisory follow-up nudge set. */
+  onMarkFollowedUp: () => void;
 }
 
 /**
@@ -1454,6 +1503,7 @@ function PageCardView({
   onRestore,
   onDuplicate,
   onDelete,
+  onMarkFollowedUp,
 }: PageItemProps) {
   const isArchived = card.status === "archived";
   const isLive = card.status === "live" || card.status === "live-edits-pending";
@@ -1572,6 +1622,20 @@ function PageCardView({
           ) : null;
         })()}
 
+        {/* Viewed signal (Phase 3) — the calm advisory follow-up marker + its
+            concrete reason. A quiet suggestion, never an alarm: no badge, no
+            urgency, no hype. Present only when the route flagged the page worth
+            a follow-up (under VIEWED_SIGNAL_NUDGE_ENABLED), so a flag-off card
+            renders nothing here. */}
+        {(() => {
+          const marker = followUpMarkerLabel(card);
+          return marker ? (
+            <p className="lib-card-followup" data-testid="lib-card-followup">
+              {marker}
+            </p>
+          ) : null;
+        })()}
+
         {isPending && (
           <p className="lib-pending-note">
             Your seller still sees the last published version. Update the live
@@ -1632,6 +1696,18 @@ function PageCardView({
                   {copied ? "Copied" : "Copy link"}
                 </button>
               </>
+            )}
+
+            {card.worthFollowUp && (
+              <button
+                type="button"
+                className="lib-btn lib-btn-quiet"
+                onClick={onMarkFollowedUp}
+                disabled={busy}
+                data-testid="lib-action-followup"
+              >
+                Mark as followed up
+              </button>
             )}
 
             {!isArchived && (
@@ -1708,6 +1784,7 @@ function PageRowView({
   onRestore,
   onDuplicate,
   onDelete,
+  onMarkFollowedUp,
 }: PageItemProps) {
   const isArchived = card.status === "archived";
   const canResume = !!card.instanceId;
@@ -1815,6 +1892,7 @@ function PageRowView({
             onArchive={onArchive}
             onDuplicate={onDuplicate}
             onDelete={onDelete}
+            onMarkFollowedUp={onMarkFollowedUp}
           />
         )}
       </div>
@@ -1913,6 +1991,7 @@ function primaryActionLabel(card: PageCard): string {
 }
 
 const ROW_ACTION_LABEL: Record<RowAction, string> = {
+  "mark-followed-up": "Mark as followed up",
   "update-live": "Update live page",
   "view-live": "View live page",
   "copy-link": "Copy link",
@@ -1924,6 +2003,7 @@ const ROW_ACTION_LABEL: Record<RowAction, string> = {
 // View + copy are read-only and stay live while a mutating action is in flight,
 // exactly as on the card; everything else disables until the action settles.
 const ROW_ACTION_BLOCKS_ON_BUSY: Record<RowAction, boolean> = {
+  "mark-followed-up": true,
   "update-live": true,
   "view-live": false,
   "copy-link": false,
@@ -1950,6 +2030,7 @@ function RowMenu({
   onArchive,
   onDuplicate,
   onDelete,
+  onMarkFollowedUp,
 }: {
   card: PageCard;
   actions: RowAction[];
@@ -1961,6 +2042,7 @@ function RowMenu({
   onArchive: () => void;
   onDuplicate: () => void;
   onDelete: () => void;
+  onMarkFollowedUp: () => void;
 }) {
   const [open, setOpen] = useState(false);
   const wrapRef = useRef<HTMLDivElement>(null);
@@ -1968,6 +2050,7 @@ function RowMenu({
   const menuRef = useRef<HTMLDivElement>(null);
 
   const handlerFor: Record<RowAction, () => void> = {
+    "mark-followed-up": onMarkFollowedUp,
     "update-live": onUpdateLive,
     "view-live": onViewLive,
     "copy-link": onCopyLink,

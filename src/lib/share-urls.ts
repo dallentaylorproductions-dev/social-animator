@@ -75,6 +75,16 @@ export interface HandoutRecord {
    * simply has no stamp.
    */
   revealedAt?: string;
+  /**
+   * Viewed signal (Phase 3) - ISO 8601 UTC stamp of when the OWNER marked this
+   * page "followed up" from the library's advisory nudge. Bounded, owner-scoped,
+   * and the ONLY write Phase 3 adds. The follow-up nudge clears for any
+   * meaningful engagement at or before this moment, so marking followed-up drops
+   * the page from the nudge set (a later seller return re-qualifies). ABSENT on
+   * every page never marked + on every pre-feature page; no migration. Never
+   * read back onto the seller's page (agent-only, like the rest of the layer).
+   */
+  followedUpAt?: string;
   /** Type-specific payload. Validated by the consuming tool. */
   data: Record<string, unknown>;
 }
@@ -283,6 +293,33 @@ export async function setHandoutArchived(
     archived,
     updatedAt: new Date().toISOString(),
   });
+  return true;
+}
+
+/**
+ * Viewed signal (Phase 3) - set / clear a page's owner follow-up mark. Owner
+ * must match (same guard as `setHandoutArchived`). Pass an ISO stamp to mark the
+ * page followed-up (drops it from the advisory nudge set) or `null` to clear the
+ * mark (reversible-safe). Deliberately does NOT bump `updatedAt`: marking
+ * followed-up is quiet owner metadata, not a content edit, so it never re-sorts
+ * the library or trips an edits-pending state. Returns false for a missing
+ * record or an owner mismatch.
+ */
+export async function setHandoutFollowedUp(
+  slug: string,
+  ownerEmail: string,
+  followedUpAt: string | null,
+): Promise<boolean> {
+  const record = await kv.get<HandoutRecord>(handoutKey(slug));
+  if (!record) return false;
+  if (record.ownerEmail !== ownerEmail.toLowerCase()) return false;
+  const next: HandoutRecord = { ...record };
+  if (followedUpAt) {
+    next.followedUpAt = followedUpAt;
+  } else {
+    delete next.followedUpAt;
+  }
+  await kv.set(handoutKey(slug), next);
   return true;
 }
 
