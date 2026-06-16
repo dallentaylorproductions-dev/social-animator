@@ -2,6 +2,7 @@ import { NextResponse } from 'next/server';
 import { auth } from '@/lib/auth';
 import { publishHandout } from '@/lib/share-urls';
 import { clampDraft } from '@/tools/open-house-prep/engine/types';
+import { toPublicHandoutData } from '@/tools/open-house-prep/output/public-payload';
 
 /**
  * POST /api/oh-prep/publish
@@ -12,6 +13,13 @@ import { clampDraft } from '@/tools/open-house-prep/engine/types';
  * agent's BrandSettings contact fields into the data payload so the
  * visitor handout page can render the "Your agent" section server-side
  * without cross-device localStorage access.
+ *
+ * Data-minimization (memory `sep-ohprep-publish-data-minimization-gap`):
+ * the route builds the PUBLIC payload via `toPublicHandoutData` and passes
+ * ONLY that to `publishHandout`. The raw draft — with agent-only fields
+ * like `preEventNotes`, talking points, and follow-up commitments — NEVER
+ * enters the public KV record. Mirrors the seller-presentation publish
+ * route's allowlist boundary.
  *
  * Body: { draft: OpenHousePrepDraft, agentContact: { name, brokerage,
  *         phone, email, licenseNumber } }
@@ -62,13 +70,17 @@ export async function POST(req: Request) {
     );
   }
 
-  // Persist a flat data payload: every clamped draft field + the agent
-  // contact block. The visitor handout page reads from data.agentContact
-  // for Section 6 ("Your agent") and Section 7 ("What to do next").
-  const data: Record<string, unknown> = {
-    ...draft,
-    agentContact: payload.agentContact ?? { email },
-  };
+  // Privacy boundary: build the PUBLIC-only payload (explicit allowlist
+  // projection, no spread) and persist ONLY that. The raw draft's
+  // agent-only fields (preEventNotes, talking points, common questions,
+  // conversion prompts, follow-up commitments, dataSource, brand color
+  // overrides) are dropped here and never reach the public KV record. The
+  // visitor handout page reads data.agentContact for Section 6 ("Your
+  // agent") and the contact CTAs.
+  const data = toPublicHandoutData(
+    draft,
+    payload.agentContact ?? { email },
+  ) as unknown as Record<string, unknown>;
 
   try {
     const result = await publishHandout({

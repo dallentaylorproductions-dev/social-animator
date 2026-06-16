@@ -5,6 +5,7 @@ import {
   type NeighborhoodFact,
   type OpenHousePrepDraft,
 } from '../engine/types';
+import { clampPublicHandoutData } from './public-payload';
 import { HandoutDownloadButton } from './HandoutDownloadButton';
 
 /**
@@ -33,12 +34,15 @@ export interface HandoutAgentContact {
 }
 
 export function OpenHouseHandoutPage({ handout }: { handout: HandoutRecord }) {
-  const raw = handout.data as Partial<OpenHousePrepDraft> & {
-    agentContact?: HandoutAgentContact;
-  };
-  const draft = clampDraft(raw);
+  // Read-time data-minimization clamp: re-run the publish-time allowlist on
+  // the stored record so a pre-fix / hand-edited record that still carries
+  // private fields (e.g. preEventNotes) has them dropped here — they never
+  // reach the renderer OR get serialized to the client via the download
+  // button's props. New records are already minimal, so this is a no-op.
+  const publicData = clampPublicHandoutData(handout.data);
+  const draft = clampDraft(publicData);
   const agentContact: HandoutAgentContact =
-    raw.agentContact ?? { email: handout.ownerEmail };
+    publicData.agentContact ?? { email: handout.ownerEmail };
   // v1.45.2 P3-NEW03: only render the "Your agent" section when the
   // publishing agent has populated their brand profile. Otherwise the
   // visitor sees literal placeholder text ("Your agent") which reads
