@@ -13,6 +13,7 @@ import {
   POSTER_SCRUB_OVER_AUTO_PAYLOAD,
   STATE_A_COVERFLOW_PAYLOAD,
   STATE_A_COVERFLOW_PAIR_PAYLOAD,
+  STATE_A_COVERFLOW_TRIO_PAYLOAD,
   STATE_A_COVERFLOW_SINGLE_PAYLOAD,
   STATE_A_FULL_PAYLOAD,
   STATE_A_MINIMAL_PAYLOAD,
@@ -152,6 +153,7 @@ export default async function SellerPresentationPreview({ searchParams }: PagePr
     // aggregate hidden. The capability-cards-only (empty) state is `state-a`.
     "state-a-coverflow",
     "state-a-coverflow-pair",
+    "state-a-coverflow-trio",
     "state-a-coverflow-single",
   ] as const;
   type Variant = (typeof VARIANTS)[number];
@@ -207,8 +209,10 @@ export default async function SellerPresentationPreview({ searchParams }: PagePr
                                     ? STATE_A_COVERFLOW_PAYLOAD
                                     : variant === "state-a-coverflow-pair"
                                       ? STATE_A_COVERFLOW_PAIR_PAYLOAD
-                                      : variant === "state-a-coverflow-single"
-                                        ? STATE_A_COVERFLOW_SINGLE_PAYLOAD
+                                      : variant === "state-a-coverflow-trio"
+                                        ? STATE_A_COVERFLOW_TRIO_PAYLOAD
+                                        : variant === "state-a-coverflow-single"
+                                          ? STATE_A_COVERFLOW_SINGLE_PAYLOAD
                                         : FULL_PAYLOAD;
 
   // E.0 — optional brand-color override (drives the brand-colors e2e

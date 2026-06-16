@@ -141,21 +141,27 @@ test.describe("State A — the prepared dossier renders (rich fixture)", () => {
     ).toHaveCount(0);
   });
 
-  test("3b · trust band — one compact strip pairing the quote with the relocated track-record stat", async ({
+  test("3b · reviews strip — quote + a confident text-only Zillow link-out (stat relocated out)", async ({
     page,
   }) => {
     await page.goto(STATE_A);
-    // Social proof collapsed to a small strip with the compliant source mark.
+    // The reviews section: a quote + a clearly-clickable link-out, the compliant
+    // source mark TEXT ONLY (no logo).
     const strip = page.getByTestId("fs-sa-testimonial");
     await expect(strip).toBeVisible();
     await expect(strip).toContainText("Zillow");
-    // The relocated credibility figure lives in the trust band, clearly labeled
-    // as the agent's track record (first-name possessive), never the subject.
-    const cred = page.getByTestId("fs-sa-credibility");
-    await expect(cred).toBeVisible();
-    await expect(cred).toContainText("101.3%");
-    await expect(cred).toContainText("sale-to-list");
-    await expect(cred).toContainText("recent listings");
+    await expect(strip.locator("img")).toHaveCount(0);
+    await expect(strip.getByTestId("fs-sa-reviews-outlink")).toContainText(
+      "See all of Marisol's reviews",
+    );
+    // v1.5x RELOCATION: the 101.3% track-record stat is NO LONGER in the trust
+    // strip (it moved to the Appointment Brief chart column).
+    await expect(strip.getByTestId("fs-sa-credibility")).toHaveCount(0);
+    await expect(strip).not.toContainText("101.3%");
+    // It does still render on the page, in the brief's two-stat column.
+    await expect(
+      page.getByTestId("fs-sa-brief").getByTestId("fs-sa-credibility"),
+    ).toContainText("101.3%");
   });
 
   test("4 · campaign spread — capability samples + seller-centered reach line", async ({

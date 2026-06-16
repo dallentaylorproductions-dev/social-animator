@@ -170,12 +170,18 @@ function ValuationPrepared({
 }
 
 /**
- * The trust band - ALL of State A's social proof collapsed into one small strip:
- * a single short quote (★★★★★ + the compliant source mark, e.g. "on Zillow®")
- * paired with the agent's track-record stat (the sale-to-list credibility figure
- * relocated out of the valuation block). One quote is enough; this is a compact
- * band, not a full reviews section. Each half flexes out independently, and the
- * whole band flexes out when neither a review nor a stat is backed.
+ * The reviews section (v1.5x) - its own confident moment, not a leftover strip.
+ * With the agent track-record stat relocated to the Appointment Brief, this is
+ * the emotional proof: a prominent quote paired with a trust block - a sized-up
+ * 5.0 rating + stars and a clearly-clickable "See all of [Agent]'s reviews on
+ * [source]" link-out (reusing the full-presentation reviewsOutlink pattern).
+ *
+ * COMPLIANCE: the review source is TEXT ONLY (e.g. "on Zillow®"), never a logo,
+ * per each platform's trademark terms - the same flag-gated mark the flagship
+ * Reviews uses. The rating is a clean 5.0 (matching flagship), no invented count.
+ *
+ * FLEX-OUT: quote-only -> the link-out block drops and the quote centers; outlink
+ * only -> the block stands alone; neither -> the whole section drops.
  */
 function TrustStrip({
   payload,
@@ -186,19 +192,23 @@ function TrustStrip({
 }) {
   const review = payload.reviews?.[0];
   const hasQuote = !!review?.body?.trim();
-  const proof = credibilityStat(payload);
-  if (!hasQuote && !proof) return null;
+  const outlink = payload.reviewsOutlink;
+  if (!hasQuote && !outlink) return null;
 
-  const source = payload.reviewsOutlink
-    ? detectReviewsSource(payload.reviewsOutlink.url)
-    : null;
-  // Match the flagship Reviews compliance: Zillow is a text-only mark.
+  const source = outlink ? detectReviewsSource(outlink.url) : null;
+  // Match the flagship Reviews compliance: Zillow is a TEXT-ONLY mark (no logo);
+  // the "®" rides the source-logos flag, exactly as the flagship treats it.
   const sourceNote =
     sourceLogos && source === "Zillow"
       ? "on Zillow®"
       : source
         ? `on ${source}`
         : null;
+
+  const first = payload.agent.name?.trim().split(/\s+/)[0];
+  const seeAllLabel = first
+    ? `See all of ${first}'s reviews`
+    : "See all reviews";
 
   const attribution = hasQuote
     ? [
@@ -211,17 +221,25 @@ function TrustStrip({
         .join(" · ")
     : "";
 
+  const solo = !(hasQuote && outlink);
+
   return (
     <section
       className="section z-offwhite sa-quote"
       data-testid="fs-sa-testimonial"
     >
-      {/* Unified single-panel lockup: quote on the left, the track-record stat as
-          a shared light proof-panel rail on the right. FLEX-OUT: stat absent ->
-          the quote centers into a complete panel and the rail is removed entirely
-          (sa-quote__panel--solo); quote absent -> the rail stands alone. */}
+      <div className="reveal">
+        <div className="eyebrow">
+          Reviews <span className="rule" aria-hidden="true" />
+        </div>
+        <h2 className="head">
+          Sellers, in <em>their words</em>.
+        </h2>
+      </div>
+      {/* Quote on the left; the rating + link-out as a confident trust block on
+          the right. FLEX-OUT: one side absent -> the panel centers the survivor. */}
       <div
-        className={`sa-quote__panel reveal${hasQuote && proof ? "" : " sa-quote__panel--solo"}`}
+        className={`sa-quote__panel reveal${solo ? " sa-quote__panel--solo" : ""}`}
       >
         {hasQuote && (
           <div className="sa-quote__main">
@@ -243,27 +261,43 @@ function TrustStrip({
             </p>
             <div className="sa-quote__attr">
               {attribution || review!.attributionName}
-              {sourceNote && (
-                <span
-                  className="sa-quote__src"
-                  data-testid="fs-sa-testimonial-src"
-                >
-                  {" "}
-                  {sourceNote}
-                </span>
-              )}
             </div>
           </div>
         )}
-        {proof && (
-          <ProofPanel
-            variant="light"
-            className="sa-quote__rail"
-            label={proof.label}
-            testid="fs-sa-credibility"
-          >
-            {proof.value}
-          </ProofPanel>
+        {outlink && (
+          <div className="sa-reviews" data-testid="fs-sa-reviews">
+            <div className="sa-reviews__rate">
+              <span
+                className="stars sa-reviews__stars"
+                aria-label="Five out of five stars"
+                role="img"
+              >
+                ★★★★★
+              </span>
+              <span className="sa-reviews__score">5.0</span>
+              {sourceNote && (
+                <span
+                  className="sa-reviews__of"
+                  data-testid="fs-sa-reviews-src"
+                >
+                  Average rating {sourceNote}
+                </span>
+              )}
+            </div>
+            <a
+              className="sa-reviews__link"
+              href={outlink.url}
+              target="_blank"
+              rel="noopener noreferrer"
+              data-testid="fs-sa-reviews-outlink"
+            >
+              {seeAllLabel}
+              {sourceNote ? ` ${sourceNote}` : ""}{" "}
+              <span className="sa-reviews__arrow" aria-hidden="true">
+                →
+              </span>
+            </a>
+          </div>
         )}
       </div>
     </section>
@@ -374,44 +408,6 @@ function ConfirmTime({ payload, appt }: { payload: PublicPayload; appt: Appt }) 
       </div>
     </section>
   );
-}
-
-/**
- * Derive ONE credibility figure from the agent track record - the sale-to-list
- * (a percentage stat) as quiet money-proof in the trust band. Returns null when
- * no such stat is backed, so the figure flexes out. NOT the subject home's
- * price: the label frames it crisply as the agent's record across PAST listings
- * ("[Agent]'s average sale-to-list across recent listings"), so it can never be
- * mistaken for this home's valuation or a guarantee.
- */
-function credibilityStat(
-  payload: PublicPayload,
-): { value: string; label: string } | null {
-  const stats = payload.whyUs?.performanceStats ?? [];
-  const pct = stats.find((s) =>
-    /%/.test((s.yourValue ?? "") + (s.unit ?? "")),
-  );
-  const stat = pct ?? stats[0];
-  if (!stat?.yourValue?.trim()) return null;
-  const metric = stat.label?.trim();
-  const first = payload.agent.name?.trim().split(/\s+/)[0];
-  // "Marisol's average sale-to-list across recent listings." First-name
-  // possessive + the metric lowercased so it reads as one natural phrase.
-  const phrase = metric
-    ? `${lowerFirst(metric)} across recent listings`
-    : "track record across recent listings";
-  const label = first ? `${first}'s ${phrase}` : capitalize(phrase);
-  return { value: stat.yourValue, label };
-}
-
-/** "Average sale-to-list" -> "average sale-to-list" (only the first letter). */
-function lowerFirst(s: string): string {
-  return s ? s[0].toLowerCase() + s.slice(1) : s;
-}
-
-/** "average …" -> "Average …" (only the first letter), for the no-name fallback. */
-function capitalize(s: string): string {
-  return s ? s[0].toUpperCase() + s.slice(1) : s;
 }
 
 /**

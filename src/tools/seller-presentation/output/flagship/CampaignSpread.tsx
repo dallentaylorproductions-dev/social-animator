@@ -9,7 +9,8 @@ import {
   CAPABILITY_PHOTO_SUB,
   CAPABILITY_VIDEO_LABEL,
   CAPABILITY_VIDEO_SUB,
-  COVERFLOW_AGGREGATE_SUFFIX,
+  COVERFLOW_AGGREGATE_CAP,
+  COVERFLOW_AGGREGATE_LABEL,
   COVERFLOW_EYEBROW,
   COVERFLOW_VIEWS_LABEL,
   EXPOSURE_LINE,
@@ -134,17 +135,31 @@ export function CampaignSpread({ payload }: { payload: PublicPayload }) {
 }
 
 /**
- * Zone 5 position in the fan. Center is forward + upright (earns the teal
- * keyline); the inner pair bends back ~23°; the outer pair are quiet ~36° peeks
- * with NO band (they only signal "there's more"). Mapped from the listing index
- * so the arrangement degrades honestly: 1 listing is centered alone, 2 form a
- * gentle pair (no faked peeks), 3–5 fan out symmetrically.
+ * Zone 5 position in the fan ("gently dimensional", v1.5x). Center is forward +
+ * upright (earns the teal keyline); the inner pair bends back; the outer pair are
+ * quiet ~36° peeks with NO band (they only signal "there's more"). Mapped from
+ * the listing index so the few-card states read intentional, NEVER overlapping or
+ * clipping an address:
+ *   1 → a centered single (keeps the keyline)
+ *   2 → a SEPARATED balanced pair (pair-left/right, pushed to ±54% so the cards
+ *       never cross — the old ±30% in-left/in-right overlapped ~118px and clipped
+ *       the address); a pair has no single focus, so NO keyline.
+ *   3 → a trio (center keyline + an inner pair pushed out to ±52%, no overlap)
+ *   4+ → the shipped symmetric fan (center / inner ±23° / outer ±36° peeks)
  */
-type CoverflowPos = "center" | "in-left" | "in-right" | "out-left" | "out-right";
+type CoverflowPos =
+  | "center"
+  | "in-left"
+  | "in-right"
+  | "out-left"
+  | "out-right"
+  | "pair-left"
+  | "pair-right";
 
 function coverflowPositions(n: number): CoverflowPos[] {
   if (n <= 1) return ["center"];
-  if (n === 2) return ["in-left", "in-right"];
+  if (n === 2) return ["pair-left", "pair-right"];
+  if (n === 3) return ["in-left", "center", "in-right"];
   const center = Math.floor(n / 2);
   return Array.from({ length: n }, (_, i): CoverflowPos => {
     const off = i - center;
@@ -173,16 +188,19 @@ function ListingsCoverflow({ listings }: { listings: PublicRecentListing[] }) {
       typeof l.viewCount === "number",
   );
   const showAggregate = numbered.length >= 2;
-  const aggregateTotal = numbered
-    .reduce((sum, l) => sum + l.viewCount, 0)
-    .toLocaleString("en-US");
+  const aggregateRaw = numbered.reduce((sum, l) => sum + l.viewCount, 0);
+  const aggregateTotal = aggregateRaw.toLocaleString("en-US");
 
+  // Per-count modifier — drives the "gently dimensional" few-card layouts on
+  // desktop (state-a.css). 4+ carries no modifier (the symmetric fan).
   const fanClass =
     listings.length === 1
-      ? " sa-cf__fan--single"
+      ? " sa-cf__fan--n1"
       : listings.length === 2
-        ? " sa-cf__fan--pair"
-        : "";
+        ? " sa-cf__fan--n2"
+        : listings.length === 3
+          ? " sa-cf__fan--n3"
+          : "";
 
   return (
     <div className="sa-cf reveal" data-testid="fs-sa-cf">
@@ -200,10 +218,23 @@ function ListingsCoverflow({ listings }: { listings: PublicRecentListing[] }) {
         </div>
       </div>
       {showAggregate && (
-        <p className="sa-cf__agg" data-testid="fs-sa-cf-aggregate">
-          <strong className="sa-cf__aggnum">{aggregateTotal}</strong>{" "}
-          {COVERFLOW_AGGREGATE_SUFFIX}
-        </p>
+        // The aggregate now reads in the shared proof-number language (mono
+        // label · Newsreader teal number · mono caption — the same treatment as
+        // the brief's stat panels), so every number on the page reads designed,
+        // not assembled. The number counts up once on view (data-countup-num,
+        // wired by the motion island); the SSR text is the true total so a
+        // no-JS / reduced-motion render shows it at rest.
+        <div className="sa-cf__agg" data-testid="fs-sa-cf-aggregate">
+          <span className="sa-proof__label">{COVERFLOW_AGGREGATE_LABEL}</span>
+          <span
+            className="sa-proof__num sa-cf__aggnum"
+            data-countup-num
+            data-countup-final={String(aggregateRaw)}
+          >
+            {aggregateTotal}
+          </span>
+          <span className="sa-proof__cap">{COVERFLOW_AGGREGATE_CAP}</span>
+        </div>
       )}
     </div>
   );

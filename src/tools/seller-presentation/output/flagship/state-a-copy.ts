@@ -116,9 +116,11 @@ export const COVERFLOW_EYEBROW = "Recent listings, real reach";
 export const COVERFLOW_VIEWS_LABEL = "Views";
 
 /**
- * Suffix of the aggregate line beneath the fan. The renderer prepends the summed
- * total (the agent's OWN real per-card view counts, grouped with thousands
- * separators) as the teal lead, so the number is the one earned accent. Renders
- * only when enough cards carry a number, so it is never a hollow claim.
+ * The aggregate proof lockup beneath the fan (the shared proof-number language:
+ * mono label · summed Newsreader teal number · mono caption). The number is the
+ * agent's OWN real per-card view counts, summed at render and grouped with
+ * thousands separators, so it is never a hollow claim. Renders only when enough
+ * cards carry a number.
  */
-export const COVERFLOW_AGGREGATE_SUFFIX = "buyer views across recent listings";
+export const COVERFLOW_AGGREGATE_LABEL = "Across recent listings";
+export const COVERFLOW_AGGREGATE_CAP = "Buyer views";

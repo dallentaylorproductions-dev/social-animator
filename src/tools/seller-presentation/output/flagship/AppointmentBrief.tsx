@@ -9,6 +9,7 @@ import {
 import { compHasPhoto } from "@/lib/seller-presentation/rentcast-autofill";
 import { CompPhotoPlaceholder } from "./CompPhotoPlaceholder";
 import { ProofPanel } from "./ProofPanel";
+import { credibilityStat } from "./credibility-stat";
 import {
   PROOF_NEIGHBORHOOD_CAPTION,
   PROOF_NEIGHBORHOOD_LABEL,
@@ -63,18 +64,20 @@ export function AppointmentBrief({
     .map((m) => ({ month: m.month?.trim() || "", price: parseNum(m.medianPrice) }))
     .filter((p): p is { month: string; price: number } => p.price != null);
   const series = points.map((p) => p.price);
+  const months = points.map((p) => p.month);
   const hasSpark = series.length >= 2;
-  const axisStart = hasSpark ? points[0].month : "";
-  const axisEnd = hasSpark ? points[points.length - 1].month : "";
   const activityLine = neighborhoodActivityLine(payload, series);
-  // The coordinated `+6%` proof number: the agent-stamped trailing-12-month YoY
-  // delta (the same source the activity line prefers), formatted as a number.
-  // Present only when that explicit delta exists; otherwise the proof panel
-  // collapses and the trend panel runs full-width (the activity line keeps its
-  // endpoint fallback, so a series-only neighborhood still narrates its trend).
+  // The coordinated `+X%` MARKET proof number: the agent-stamped trailing-12-month
+  // YoY delta (the same source the activity line prefers), formatted as a number.
   const delta = trendDeltaPercent(payload);
   const deltaLabel =
     delta != null ? `${delta >= 0 ? "+" : "-"}${Math.round(Math.abs(delta))}%` : null;
+  // v1.5x — the AGENT track-record stat (e.g. 101.3% sale-to-list), relocated
+  // here from the trust strip so the two proofs (market trend over agent record)
+  // read as one stacked block beside the chart. Reads the same existing payload
+  // field; flexes out when unbacked.
+  const stat = credibilityStat(payload);
+  const hasProofs = !!deltaLabel || !!stat;
   const hasActivity = hasSpark || !!activityLine;
 
   const hasLaunch = (payload.whyUs?.marketingApproach?.length ?? 0) > 0;
@@ -176,33 +179,44 @@ export function AppointmentBrief({
             <div className="sa-brief__art-head">
               <span className="sa-brief__art-k">Neighborhood activity</span>
             </div>
-            {/* Trend panel + the coordinated +6% proof pair. The tonal panel holds
-                the full-width sparkline, its month axis, and the calm serif line;
-                the shared light proof-panel carries the signed delta as a number.
-                FLEX-OUT: no delta -> the proof panel collapses and the trend panel
-                runs full-width (sa-trend--solo), no orphaned "+6%" slot. */}
-            <div className={`sa-trend${deltaLabel ? "" : " sa-trend--solo"}`}>
+            {/* The fuller neighborhood chart (the §05 chart vocabulary — light
+                gridlines, a $k y-axis, month x-labels, a subtle teal area fill,
+                and the current-point halo) over the calm serif takeaway, paired
+                with a STACKED two-stat proof column: the market `+X%` trend over
+                the agent's relocated track-record figure, both in the one shared
+                proof treatment. FLEX-OUT: neither stat backed -> the column drops
+                and the chart panel runs full-width (sa-trend--solo). */}
+            <div className={`sa-trend${hasProofs ? "" : " sa-trend--solo"}`}>
               <div className="sa-trend__panel">
-                {hasSpark && <Sparkline series={series} />}
-                {hasSpark && (axisStart || axisEnd) && (
-                  <div className="sa-trend__axis" aria-hidden="true">
-                    <span>{axisStart}</span>
-                    <span>{axisEnd}</span>
-                  </div>
+                {hasSpark && (
+                  <AreaTrendChart series={series} months={months} />
                 )}
                 {activityLine && (
                   <p className="sa-brief__activity-line">{activityLine}</p>
                 )}
               </div>
-              {deltaLabel && (
-                <ProofPanel
-                  variant="light"
-                  label={PROOF_NEIGHBORHOOD_LABEL}
-                  caption={PROOF_NEIGHBORHOOD_CAPTION}
-                  testid="fs-sa-proof-z2"
-                >
-                  {deltaLabel}
-                </ProofPanel>
+              {hasProofs && (
+                <div className="sa-trend__proofs">
+                  {deltaLabel && (
+                    <ProofPanel
+                      variant="light"
+                      label={PROOF_NEIGHBORHOOD_LABEL}
+                      caption={PROOF_NEIGHBORHOOD_CAPTION}
+                      testid="fs-sa-proof-z2"
+                    >
+                      {deltaLabel}
+                    </ProofPanel>
+                  )}
+                  {stat && (
+                    <ProofPanel
+                      variant="light"
+                      label={stat.label}
+                      testid="fs-sa-credibility"
+                    >
+                      {stat.value}
+                    </ProofPanel>
+                  )}
+                </div>
               )}
             </div>
           </div>
@@ -233,49 +247,122 @@ export function AppointmentBrief({
 }
 
 /**
- * Compact, axis-less sparkline of the area median trend (editorial, not a chart
- * widget). The line draws on once when the brief scrolls into view, gated on the
- * `.reveal.in` ancestor (state-a.css); the approximate polyline length is passed
- * as `--len` so the dash animation knows how far to travel. Reduced motion lands
- * it already-drawn.
+ * The fuller neighborhood-trend chart (v1.5x). Borrows the page's own §05
+ * AreaChart vocabulary — light gridlines, a $k y-axis, month x-labels, a subtle
+ * teal area fill, and a current-point halo — so the trend reads as real DATA, not
+ * a hand-drawn line, while staying a calm 1:1-page chart (hairline grid, muted
+ * labels, low-opacity fill — no dashboard noise). It plots the SAME real
+ * `monthlySeries` median values the axis-less sparkline did; the y-axis shows the
+ * neighborhood median PRICE (public market data, never the subject home's number).
+ *
+ * The line keeps the existing `.sa-spark__line` draw-on (state-a.css): undrawn
+ * until the brief's `.reveal` enters, then the dash retracts; `--len` is the
+ * polyline length, computed SSR-stable here. Reduced motion lands it drawn.
  */
-function Sparkline({ series }: { series: number[] }) {
-  const W = 240,
-    H = 64,
-    pad = 4;
-  const min = Math.min(...series);
-  const max = Math.max(...series);
+function AreaTrendChart({
+  series,
+  months,
+}: {
+  series: number[];
+  months: string[];
+}) {
+  const W = 420,
+    H = 210,
+    padL = 46,
+    padR = 14,
+    padT = 18,
+    padB = 30;
+  const minV = Math.min(...series);
+  const maxV = Math.max(...series);
+  // Breathing room above/below the series so the line never kisses the edges.
+  const pad = (maxV - minV) * 0.12 || maxV * 0.04 || 1;
+  const min = minV - pad;
+  const max = maxV + pad;
   const span = max - min || 1;
+  const lastI = series.length - 1;
   const x = (i: number) =>
-    pad + (i / (series.length - 1)) * (W - pad * 2);
-  const y = (v: number) => pad + (1 - (v - min) / span) * (H - pad * 2);
-  const coords = series.map((v, i) => ({ px: x(i), py: y(v) }));
-  const pts = coords.map((c) => `${c.px.toFixed(1)},${c.py.toFixed(1)}`);
-  // Sum the segment lengths for the draw-on dash offset (SSR-stable, no DOM).
+    padL + (lastI === 0 ? 0.5 : i / lastI) * (W - padL - padR);
+  const y = (v: number) => padT + (1 - (v - min) / span) * (H - padT - padB);
+  const coords = series.map((v, i): [number, number] => [x(i), y(v)]);
+  const linePts = coords
+    .map((c) => `${c[0].toFixed(1)},${c[1].toFixed(1)}`)
+    .join(" ");
   let len = 0;
   for (let i = 1; i < coords.length; i++) {
-    len += Math.hypot(coords[i].px - coords[i - 1].px, coords[i].py - coords[i - 1].py);
+    len += Math.hypot(coords[i][0] - coords[i - 1][0], coords[i][1] - coords[i - 1][1]);
   }
-  const lastI = series.length - 1;
+  const baseY = H - padB;
+  const areaPath =
+    `M ${x(0).toFixed(1)},${y(series[0]).toFixed(1)} ` +
+    series.map((v, i) => `L ${x(i).toFixed(1)},${y(v).toFixed(1)}`).join(" ") +
+    ` L ${x(lastI).toFixed(1)},${baseY.toFixed(1)} L ${x(0).toFixed(1)},${baseY.toFixed(1)} Z`;
+  // Three clean value ticks spread across the domain (the §05 formula), labeled
+  // in $k from the raw median dollars.
+  const ticks = [max - span * 0.18, min + span * 0.5, min + span * 0.16].map((t) =>
+    Math.round(t),
+  );
+  // A few evenly-spaced month labels (never all of them — that reads busy).
+  const xCount = Math.min(series.length, 5);
+  const xIdx = Array.from(
+    new Set(
+      Array.from({ length: xCount }, (_, k) =>
+        Math.round((k / (xCount - 1 || 1)) * lastI),
+      ),
+    ),
+  );
   return (
     <svg
-      className="sa-spark"
+      className="sa-chart"
       viewBox={`0 0 ${W} ${H}`}
       role="img"
-      aria-label="Neighborhood price trend"
+      aria-label="Neighborhood median sale price, trailing 12 months"
       data-testid="fs-sa-brief-spark"
+      style={{ "--len": Math.ceil(len) } as CSSProperties}
     >
-      <polyline
-        className="sa-spark__line"
-        points={pts.join(" ")}
-        style={{ "--len": Math.ceil(len) } as CSSProperties}
-      />
+      {ticks.map((tv, i) => (
+        <g key={`t${i}`}>
+          <line
+            className="sa-chart__grid"
+            x1={padL}
+            x2={W - padR}
+            y1={y(tv)}
+            y2={y(tv)}
+          />
+          <text
+            className="sa-chart__ylabel"
+            x={padL - 8}
+            y={y(tv) + 3}
+            textAnchor="end"
+          >
+            ${Math.round(tv / 1000)}k
+          </text>
+        </g>
+      ))}
+      <path className="sa-chart__area" d={areaPath} />
       <circle
-        className="sa-spark__dot"
+        className="sa-chart__halo"
         cx={x(lastI)}
         cy={y(series[lastI])}
-        r="3"
+        r="9"
       />
+      <polyline className="sa-spark__line" points={linePts} />
+      <circle
+        className="sa-spark__dot sa-chart__cur"
+        cx={x(lastI)}
+        cy={y(series[lastI])}
+        r="4"
+      />
+      {xIdx.map((i) => (
+        <text
+          key={`x${i}`}
+          className="sa-chart__xlabel"
+          x={x(i)}
+          y={H - 9}
+          textAnchor={i === 0 ? "start" : i === lastI ? "end" : "middle"}
+        >
+          {months[i]}
+        </text>
+      ))}
     </svg>
   );
 }
