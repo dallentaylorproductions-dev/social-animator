@@ -18,6 +18,7 @@ const PAIR = "/seller-presentation-preview?fixture=state-a-coverflow-pair";
 const TRIO = "/seller-presentation-preview?fixture=state-a-coverflow-trio";
 const SINGLE = "/seller-presentation-preview?fixture=state-a-coverflow-single";
 const EMPTY = "/seller-presentation-preview?fixture=state-a"; // no recentListings
+const BROKEN = "/seller-presentation-preview?fixture=state-a-coverflow-broken";
 
 function px(value: string): number {
   return parseFloat(value || "0");
@@ -222,6 +223,30 @@ test.describe("State A · Zone 5 — listings coverflow", () => {
     await expect(page.getByTestId("fs-sa-spread-reach")).toBeVisible();
     // ...but the coverflow is entirely absent (flex-out / flag-off parity).
     await expect(page.getByTestId("fs-sa-cf")).toHaveCount(0);
+  });
+
+  test("broken photo URL falls back to the neutral placeholder, never a blank card", async ({
+    page,
+  }) => {
+    await page.setViewportSize({ width: 1280, height: 1400 });
+    await page.goto(BROKEN);
+    await expect(page.getByTestId("fs-sa-cf")).toBeVisible();
+
+    // The center card (index 1) carries a non-empty photoUrl that 404s and has
+    // no Street View coverage. On the failed load the card must show the neutral
+    // house-glyph placeholder — never a blank white photo area.
+    const center = page.getByTestId("fs-sa-cf-card-1");
+    await expect(center.locator(".sa-photo-ph")).toBeVisible();
+    // The placeholder REPLACES the broken <img>, so no img is left stranded.
+    await expect(center.locator("img.sa-cf__photo")).toHaveCount(0);
+    // The band stays legible regardless (address renders on the solid band).
+    await expect(center).toContainText("1240 Hawthorne St");
+
+    // The valid-photo path is untouched: the flanking cards still render their
+    // working uploads as an <img>, with no placeholder.
+    const flank = page.getByTestId("fs-sa-cf-card-0");
+    await expect(flank.locator("img.sa-cf__photo")).toHaveCount(1);
+    await expect(flank.locator(".sa-photo-ph")).toHaveCount(0);
   });
 
   test("State B (full) never renders the coverflow", async ({ page }) => {

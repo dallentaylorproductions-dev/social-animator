@@ -1234,8 +1234,10 @@
   position: absolute;
   inset: 0;
   z-index: 0;
-  background-size: cover;
-  background-position: center;
+  width: 100%;
+  height: 100%;
+  object-fit: cover;
+  object-position: center;
 }
 /* The center card earns the one teal keyline (all surfaces). */
 .fs-page.state-a .sa-cf__card--center::after {

@@ -479,7 +479,9 @@ export function BrandProfileForm() {
       </SPEntitlementProvider>
 
       <p className="text-[11px] text-neutral-600 leading-relaxed pt-4 border-t border-neutral-900">
-        Saved automatically. Stored in your browser only.
+        {serverEnabled
+          ? "Saved automatically. Synced to your account, so your settings follow you across devices."
+          : "Saved automatically. Stored in your browser only."}
       </p>
     </div>
   );
