@@ -5,14 +5,17 @@ import { useBrandSettings } from "@/lib/brand";
 import { brandToPublishInputs } from "./preview/preview-payload";
 import { spStrategyDisplayLabel } from "../content/strategy-display-labels";
 import {
+  isInvitationStatus,
   validateForExport,
   REQUIRED_INPUT_LABELS,
   type SellerPresentationDraft,
 } from "../engine/types";
+import { formatAppointment } from "../engine/appointment";
 import {
   formatPriceRangeDisplay,
   isPriceRangeActive,
 } from "../engine/price-range";
+import { useSPEntitlement } from "./SPEntitlementContext";
 
 type StepId =
   | "property"
@@ -114,7 +117,19 @@ export function StepReview({
   });
   const [exportState, setExportState] = useState<ExportState>("idle");
   const { settings: brand } = useBrandSettings();
+  const { sellerStateAEnabled } = useSPEntitlement();
   const missing = validateForExport(draft);
+
+  // Seller State A — the prepared invitation is a leaner, pre-walkthrough
+  // surface: it carries no price, no pricing strategy, and no pitch points, so
+  // the Review step drops those summary rows (they would all read "—" and
+  // re-introduce the very price the invitation is built to withhold) and speaks
+  // in "send your invitation" language instead of "publish the full
+  // presentation." Full presentation (revealed / absent, or the flag off) is
+  // byte-identical to before.
+  const invitation =
+    sellerStateAEnabled === true && isInvitationStatus(draft.valuationStatus);
+  const appointmentLabel = formatAppointment(draft.appointmentAt)?.full ?? "—";
 
   // The publish inputs (agentContact + A7d.2 reviews + E.0/E.1 brand colors)
   // are built by the SHARED `brandToPublishInputs` so this real publish and the
@@ -237,10 +252,11 @@ export function StepReview({
   return (
     <section className="sec6" data-testid="step-review">
       <div className="sec-head">
-        <h2 className="sec-title">Review</h2>
+        <h2 className="sec-title">{invitation ? "Review and send" : "Review"}</h2>
         <p className="sec-sub">
-          Check the summary. Publish to get a shareable link for your seller,
-          then download the prep PDF for yourself.
+          {invitation
+            ? "Take one last look, then send your seller the invitation. It shows them you have done your homework before you even meet."
+            : "Check the summary. Publish to get a shareable link for your seller, then download the prep PDF for yourself."}
         </p>
       </div>
 
@@ -249,60 +265,80 @@ export function StepReview({
       ) : (
         <div className="sec6-ready" data-testid="step-review-ready">
           <span className="sec6-ready-dot" aria-hidden />
-          <span className="sec6-ready-label">Ready to publish</span>
+          <span className="sec6-ready-label">
+            {invitation ? "Ready to send" : "Ready to publish"}
+          </span>
         </div>
       )}
 
       <div className="sec6-summary" data-testid="step-review-summary">
         <h3 className="sec6-summary-head">Summary</h3>
-        <div className="sec6-rows">
-          <SummaryRow label="Property" value={draft.propertyAddress || "—"} />
-          {draft.propertyCity && (
-            <SummaryRow label="City" value={draft.propertyCity} />
-          )}
-          <SummaryRow
-            label="Recommended price"
-            value={
-              isPriceRangeActive(
-                draft.recommendedPriceLow,
-                draft.recommendedPriceHigh,
-              )
-                ? formatPriceRangeDisplay(
-                    draft.recommendedPriceLow!,
-                    draft.recommendedPriceHigh!,
-                  )
-                : draft.recommendedPrice || "—"
-            }
-          />
-          <SummaryRow
-            label="Price rationale"
-            value={
-              draft.priceRationale
-                ? `${draft.priceRationale.slice(0, 80)}${draft.priceRationale.length > 80 ? "…" : ""}`
-                : "—"
-            }
-          />
-          <SummaryRow
-            label="Pricing strategy"
-            value={spStrategyDisplayLabel(draft.pricingStrategyId)}
-          />
-          <SummaryRow label="Confidence" value={confidenceLabel} />
-          <SummaryRow label="Comps" value={`${draft.comps.length} provided`} />
-          <div className="sec6-row">
-            <span className="sec6-row-label">Pitch points</span>
-            <span className="sec6-row-value sec6-pitch">
-              <span className="sec6-pitch-total">{totalPitchPoints} total</span>
-              <span className="sec6-pitch-sep">·</span>
-              <span className="sec6-pitch-count">
-                {publicPitchPoints.length} 🌐 public
-              </span>
-              <span className="sec6-pitch-sep">·</span>
-              <span className="sec6-pitch-count">
-                {privatePitchPoints.length} 🔒 private
-              </span>
-            </span>
+        {invitation ? (
+          // Invitation summary — only what the invitation actually carries. No
+          // price / rationale / strategy / confidence / pitch-point rows: those
+          // belong to the full presentation and would read "—" here, re-surfacing
+          // the very price the invitation is built to withhold.
+          <div className="sec6-rows">
+            <SummaryRow label="Property" value={draft.propertyAddress || "—"} />
+            {draft.propertyCity && (
+              <SummaryRow label="City" value={draft.propertyCity} />
+            )}
+            <SummaryRow label="Appointment" value={appointmentLabel} />
+            <SummaryRow
+              label="Nearby sales"
+              value={`${draft.comps.length} ready to show`}
+            />
           </div>
-        </div>
+        ) : (
+          <div className="sec6-rows">
+            <SummaryRow label="Property" value={draft.propertyAddress || "—"} />
+            {draft.propertyCity && (
+              <SummaryRow label="City" value={draft.propertyCity} />
+            )}
+            <SummaryRow
+              label="Recommended price"
+              value={
+                isPriceRangeActive(
+                  draft.recommendedPriceLow,
+                  draft.recommendedPriceHigh,
+                )
+                  ? formatPriceRangeDisplay(
+                      draft.recommendedPriceLow!,
+                      draft.recommendedPriceHigh!,
+                    )
+                  : draft.recommendedPrice || "—"
+              }
+            />
+            <SummaryRow
+              label="Price rationale"
+              value={
+                draft.priceRationale
+                  ? `${draft.priceRationale.slice(0, 80)}${draft.priceRationale.length > 80 ? "…" : ""}`
+                  : "—"
+              }
+            />
+            <SummaryRow
+              label="Pricing strategy"
+              value={spStrategyDisplayLabel(draft.pricingStrategyId)}
+            />
+            <SummaryRow label="Confidence" value={confidenceLabel} />
+            <SummaryRow label="Comps" value={`${draft.comps.length} provided`} />
+            <div className="sec6-row">
+              <span className="sec6-row-label">Pitch points</span>
+              <span className="sec6-row-value sec6-pitch">
+                <span className="sec6-pitch-total">{totalPitchPoints} total</span>
+                <span className="sec6-pitch-sep">·</span>
+                <span className="sec6-pitch-count">
+                  {publicPitchPoints.length} 🌐 public
+                </span>
+                <span className="sec6-pitch-sep">·</span>
+                <span className="sec6-pitch-count">
+                  {privatePitchPoints.length} 🔒 private
+                </span>
+              </span>
+            </div>
+          </div>
+        )}
       </div>
 
       <div className="sec6-outputs">
@@ -325,6 +361,7 @@ export function StepReview({
           onPublish={handlePublish}
           onRevoke={handleRevoke}
           disabled={Boolean(missing)}
+          invitation={invitation}
           propertyAddress={draft.propertyAddress ?? ""}
           propertyCity={draft.propertyCity ?? ""}
           preparedFor={draft.preparedFor ?? ""}
@@ -346,8 +383,9 @@ export function StepReview({
                 : "Download prep PDF (agent only)"}
           </button>
           <p className="sec6-download-sub">
-            Private companion to the seller page. Includes your full strategy,
-            comp notes, and private talking points. Not shared with the client.
+            {invitation
+              ? "Private companion for your own prep. Holds the nearby sales you reviewed and your notes for the walkthrough. Not shared with the client."
+              : "Private companion to the seller page. Includes your full strategy, comp notes, and private talking points. Not shared with the client."}
           </p>
           {typeof exportState === "object" && "error" in exportState && (
             <p className="sec6-download-error" data-testid="step-review-download-error">
@@ -365,6 +403,7 @@ function PublishSection({
   onPublish,
   onRevoke,
   disabled,
+  invitation,
   propertyAddress,
   propertyCity,
   preparedFor,
@@ -374,11 +413,15 @@ function PublishSection({
   onPublish: () => void;
   onRevoke: (slug: string) => void;
   disabled: boolean;
+  /** Seller State A — drives the "invitation" vs "seller page" publish copy. */
+  invitation: boolean;
   propertyAddress: string;
   propertyCity: string;
   preparedFor: string;
   agentName: string;
 }) {
+  // The publish action verb + noun, in invitation vs full-presentation voice.
+  const publishLabel = invitation ? "Publish invitation" : "Publish seller page";
   if (state.kind === "published") {
     const origin =
       typeof window !== "undefined" ? window.location.origin : "";
@@ -389,12 +432,15 @@ function PublishSection({
       propertyCity,
       presentationUrl: url,
       agentName,
+      invitation,
     });
     return (
       <div className="sec6-published" data-testid="step-review-published">
         <div className="sec6-published-head">
           <span className="sec6-published-dot" aria-hidden />
-          <span className="sec6-published-label">Seller page published</span>
+          <span className="sec6-published-label">
+            {invitation ? "Invitation published" : "Seller page published"}
+          </span>
         </div>
         <div className="sec6-url-row">
           <code className="sec6-url">{url}</code>
@@ -455,7 +501,7 @@ function PublishSection({
           disabled={disabled}
           className="sec6-publish-btn"
         >
-          Publish seller page
+          {publishLabel}
         </button>
       </div>
     );
@@ -486,7 +532,7 @@ function PublishSection({
       data-testid="step-review-publish"
       className="sec6-publish-btn"
     >
-      {state.kind === "publishing" ? "Publishing…" : "Publish seller page"}
+      {state.kind === "publishing" ? "Publishing…" : publishLabel}
     </button>
   );
 }
@@ -546,6 +592,13 @@ export function buildSampleSendText(input: {
   propertyCity?: string;
   presentationUrl: string;
   agentName?: string;
+  /**
+   * Seller State A — the prepared invitation is a BEFORE-appointment page with
+   * no price yet, so its sample message frames a quick look ahead of the
+   * meeting and never mentions pricing context or a recommendation. Defaults
+   * false so the full-presentation message is byte-identical to before.
+   */
+  invitation?: boolean;
 }): string {
   const sellerName = deriveSellerName(input.preparedFor);
   const propertyLabel = derivePropertyLabel(
@@ -555,10 +608,13 @@ export function buildSampleSendText(input: {
   const agentName = (input.agentName ?? "").trim();
 
   const greeting = sellerName ? `Hi ${sellerName},` : "Hi there,";
-  const body = `I put together the presentation for ${propertyLabel} so you can review everything in one place, including pricing context, recent nearby sales, and the plan I'd recommend if we move forward.`;
+  const body = input.invitation
+    ? `I put together a quick page for ${propertyLabel} ahead of our appointment, so you can see how I'm preparing and what to expect when we meet.`
+    : `I put together the presentation for ${propertyLabel} so you can review everything in one place, including pricing context, recent nearby sales, and the plan I'd recommend if we move forward.`;
   const link = `Here's the link: ${input.presentationUrl}`;
-  const closing =
-    "Take a look when you have a minute, and if anything stands out or you want to talk through the pricing together, I'm happy to walk through it with you.";
+  const closing = input.invitation
+    ? "Take a look when you have a minute. I'm looking forward to walking through everything with you in person."
+    : "Take a look when you have a minute, and if anything stands out or you want to talk through the pricing together, I'm happy to walk through it with you.";
 
   // Blank-line spacing between each paragraph so the message is scannable
   // when pasted into a text or email, and the link sits on its own line

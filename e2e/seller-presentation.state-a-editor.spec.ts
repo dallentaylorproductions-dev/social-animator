@@ -158,4 +158,72 @@ test.describe("Seller State A editor — lean invitation flow", () => {
     await expect(page.getByTestId("step-comps")).toBeVisible();
     await expect(page.getByTestId("rail-step-strategy")).toBeVisible();
   });
+
+  test("invitation Review step is lean and invitation-voiced (no price residue)", async ({
+    page,
+  }) => {
+    await enableStateA(page);
+    // Return a stable slug so the publish action reaches the published state
+    // where the sample send-text renders.
+    await page.route("**/api/seller-presentation/publish*", (route) =>
+      route.fulfill({
+        status: 200,
+        contentType: "application/json",
+        body: JSON.stringify({ ok: true, slug: "testslug" }),
+      }),
+    );
+    await page.goto("/seller-presentation");
+    await expect(page.getByTestId("step-property")).toBeVisible();
+
+    // Invitation mode + a complete, publishable invitation (address + the
+    // dated appointment the invitation gate requires).
+    await page.getByTestId("step-property-mode-invitation").click();
+    await page.getByTestId("step-property-address").fill("1234 Test Drive NE");
+    await page.getByTestId("step-property-city").fill("Tacoma");
+    await page.getByTestId("step-property-state").fill("WA");
+    await page
+      .getByTestId("step-property-appointment")
+      .fill("2099-01-01T13:00");
+    await expect(page.getByTestId("step-property-saved-hint")).toBeVisible();
+
+    // Walk the lean flow to Review & send (Nearby sales → Area & video → Review).
+    await page.getByTestId("wizard-next").click();
+    await expect(page.getByTestId("step-nearby-sales")).toBeVisible();
+    await page.getByTestId("wizard-next").click();
+    await expect(page.getByTestId("step-editorial")).toBeVisible();
+    // Area & video step is invitation-voiced, not "Editorial extras".
+    await expect(page.getByTestId("step-editorial")).toContainText(
+      "Area and video",
+    );
+    await page.getByTestId("wizard-next").click();
+    await expect(page.getByTestId("step-review")).toBeVisible();
+
+    // The Review summary drops every price-residue row (those belong to the
+    // full presentation and would read "—" here, re-surfacing a price the
+    // invitation withholds). Only invitation-relevant rows remain.
+    const summary = page.getByTestId("step-review-summary");
+    await expect(summary).not.toContainText("Recommended price");
+    await expect(summary).not.toContainText("Price rationale");
+    await expect(summary).not.toContainText("Pricing strategy");
+    await expect(summary).not.toContainText("Confidence");
+    await expect(summary).not.toContainText("Pitch points");
+    await expect(summary).toContainText("Appointment");
+
+    // Invitation-voiced status + publish verb.
+    await expect(page.getByTestId("step-review-ready")).toContainText(
+      "Ready to send",
+    );
+    await expect(page.getByTestId("step-review-publish")).toContainText(
+      "Publish invitation",
+    );
+
+    // Publish → the sample send-text frames a pre-appointment look and never
+    // mentions pricing or a dollar figure.
+    await page.getByTestId("step-review-publish").click();
+    const sample = page.getByTestId("step-review-sample-text");
+    await expect(sample).toBeVisible();
+    await expect(sample).toContainText("ahead of our appointment");
+    await expect(sample).not.toContainText("pricing");
+    await expect(sample).not.toContainText("$");
+  });
 });
