@@ -165,6 +165,53 @@ test.describe("deriveFollowUpNudge - dismiss + re-qualify", () => {
   });
 });
 
+test.describe("deriveFollowUpNudge - lastMeaningfulAt (V2 group recency key)", () => {
+  test("no nudge → no timestamp", () => {
+    expect(deriveFollowUpNudge(views(), { nowMs: NOW }).lastMeaningfulAt).toBeUndefined();
+  });
+
+  test("a single qualifying session stamps its own time", () => {
+    const at = isoBefore(2 * HOUR);
+    const nudge = deriveFollowUpNudge(
+      views({ recent: [{ at, sid: "s1", afterReveal: false, videoPlayed: true }] }),
+      { nowMs: NOW },
+    );
+    expect(nudge.lastMeaningfulAt).toBe(at);
+  });
+
+  test("the MOST-RECENT qualifying session wins, regardless of recent[] order", () => {
+    const older = isoBefore(5 * DAY);
+    const newer = isoBefore(1 * DAY);
+    const nudge = deriveFollowUpNudge(
+      views({
+        count: 2,
+        // newest-first order on purpose — the max, not the last element, wins
+        recent: [
+          { at: newer, sid: "s2", afterReveal: false, reachedEnd: true },
+          { at: older, sid: "s1", afterReveal: false, videoPlayed: true },
+        ],
+      }),
+      { nowMs: NOW },
+    );
+    expect(nudge.lastMeaningfulAt).toBe(newer);
+  });
+
+  test("a non-meaningful (plain opened) session never sets the timestamp", () => {
+    const nudge = deriveFollowUpNudge(
+      views({
+        count: 2,
+        recent: [
+          { at: isoBefore(3 * DAY), sid: "s1", afterReveal: false, videoPlayed: true },
+          { at: isoBefore(1 * DAY), sid: "s2", afterReveal: false }, // plain open, newer
+        ],
+      }),
+      { nowMs: NOW },
+    );
+    // The newer plain-open does NOT move the stamp; the meaningful s1 owns it.
+    expect(nudge.lastMeaningfulAt).toBe(isoBefore(3 * DAY));
+  });
+});
+
 // ── library projection: marker / header count / List meta / row menu ──
 
 function liveCard(over: Partial<PageCard> = {}): PageCard {

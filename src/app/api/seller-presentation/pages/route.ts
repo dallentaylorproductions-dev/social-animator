@@ -121,6 +121,9 @@ export async function GET() {
                 ? {
                     worthFollowUp: true,
                     followUpReasons: nudge.reasons,
+                    ...(nudge.lastMeaningfulAt
+                      ? { followUpAt: nudge.lastMeaningfulAt }
+                      : {}),
                   }
                 : {}),
             };

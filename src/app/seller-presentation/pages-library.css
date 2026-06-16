@@ -259,6 +259,43 @@
   font-size: 13.5px; line-height: 1.6;
 }
 
+/* ─── v2 cockpit: sections + "all caught up" (PAGES_LIBRARY_V2) ────────── */
+/* The Active tab splits into the pinned "Worth a follow-up" group and the
+   "Active pages" section. The section owns the top spacing so the nested
+   grid/list sits tight under its heading (overriding their own 28px margin).
+   Calm + structural only — accent/type refinement is Pass 3. */
+.sep-library .lib-section { margin-top: 28px; }
+.sep-library .lib-section + .lib-section { margin-top: 38px; }
+.sep-library .lib-section > .lib-grid,
+.sep-library .lib-section > .lib-list { margin-top: 16px; }
+.sep-library .lib-section-head { margin-bottom: 2px; }
+.sep-library .lib-section-title {
+  margin: 0;
+  font-size: 14px; font-weight: 600; letter-spacing: -0.01em;
+  color: var(--fg);
+}
+.sep-library .lib-section-sub {
+  margin: 4px 0 0;
+  font-size: 12.5px; color: var(--fg-mute);
+}
+/* The calm no-follow-ups affordance — a quiet line, never an empty card. */
+.sep-library .lib-caughtup {
+  margin-top: 28px;
+  padding: 16px 18px;
+  border: 1px solid var(--border);
+  border-radius: var(--radius-md);
+  background: var(--surface);
+}
+.sep-library .lib-caughtup-title {
+  margin: 0;
+  font-size: 13.5px; font-weight: 600;
+  color: var(--fg);
+}
+.sep-library .lib-caughtup-sub {
+  margin: 4px 0 0;
+  font-size: 12.5px; color: var(--fg-mute);
+}
+
 /* ─── grid + card (ported from .tile) ────────────────────────────────── */
 .sep-library .lib-grid {
   margin-top: 28px;

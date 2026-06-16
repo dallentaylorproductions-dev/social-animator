@@ -84,6 +84,12 @@ export interface ServerPageSummary {
   worthFollowUp?: boolean;
   /** The concrete, prioritized reasons it is worth a follow-up (capped upstream). */
   followUpReasons?: string[];
+  /**
+   * ISO 8601 UTC of the most-recent meaningful engagement that qualified this
+   * page. Set ONLY alongside `worthFollowUp`; drives the V2 cockpit's follow-up
+   * group sort (most-recent first). Omitted on a flag-off / non-qualifying page.
+   */
+  followUpAt?: string;
 }
 
 /** A merged card the library renders. */
@@ -123,6 +129,8 @@ export interface PageCard {
   /** Viewed signal (Phase 3) — advisory follow-up nudge, present only under flag. */
   worthFollowUp?: boolean;
   followUpReasons?: string[];
+  /** Most-recent meaningful engagement (ISO 8601); set only with `worthFollowUp`. */
+  followUpAt?: string;
 }
 
 export function publicUrlForSlug(slug: string): string {
@@ -281,6 +289,7 @@ export function mergePages(input: MergeInput): PageCard[] {
         lingered: serverPage.lingered,
         worthFollowUp: serverPage.worthFollowUp,
         followUpReasons: serverPage.followUpReasons,
+        followUpAt: serverPage.followUpAt,
       });
       continue;
     }
@@ -321,6 +330,7 @@ export function mergePages(input: MergeInput): PageCard[] {
       lingered: page.lingered,
       worthFollowUp: page.worthFollowUp,
       followUpReasons: page.followUpReasons,
+      followUpAt: page.followUpAt,
     });
   }
 
@@ -796,4 +806,130 @@ export function listMetaLine(card: PageCard, nowMs: number): string {
   if (card.worthFollowUp) parts.push("Worth a follow-up");
   if (parts.length === 0) return `Live ${relativeTimeAgo(card.updatedAt, nowMs)}`;
   return parts.join(" · ");
+}
+
+// ===========================================================================
+// Library v2 cockpit (PAGES_LIBRARY_V2).
+//
+// "Your pages" becomes the agent's seller-activity cockpit: a pinned "Worth a
+// follow-up" group at the top (recency-sorted), the rest under "Active pages"
+// in the agent's existing order, de-duplicated card signal lines (a card never
+// shows the same fact twice), and a calm, non-alarming usage line. Everything
+// here is PURE so the component stays a thin shell and the unit tests pin the
+// behavior — same discipline as the rest of this module. All of it is inert
+// unless the component is rendered under the flag, so a flag-off library is
+// byte-identical to today.
+// ===========================================================================
+
+/**
+ * Rank a follow-up card's strongest signal for the group tiebreak: returned
+ * after the reveal (strongest) < watched/read < merely opened. Lower sorts
+ * earlier. Recency is the primary key; this only breaks ties. PURE.
+ */
+function followUpSignalRank(card: PageCard): number {
+  if (card.returnedAfterReveal) return 0;
+  if (card.watchedVideo || card.readToEnd) return 1;
+  return 2;
+}
+
+/**
+ * Sort the "Worth a follow-up" group by MOST-RECENT meaningful engagement first
+ * (`followUpAt`, the route-computed timestamp of the newest qualifying session),
+ * breaking ties by signal strength (returned > watched/read > opened) then by
+ * key for a stable, total order. Non-mutating. PURE.
+ */
+export function sortFollowUpGroup(cards: PageCard[]): PageCard[] {
+  return [...cards].sort((a, b) => {
+    // Most-recent first (a missing stamp sorts last).
+    const byRecency = (b.followUpAt ?? "").localeCompare(a.followUpAt ?? "");
+    if (byRecency !== 0) return byRecency;
+    const byStrength = followUpSignalRank(a) - followUpSignalRank(b);
+    if (byStrength !== 0) return byStrength;
+    return a.key.localeCompare(b.key);
+  });
+}
+
+/**
+ * Split the ACTIVE cards into the pinned "Worth a follow-up" group and the rest.
+ * The group is every card the route flagged `worthFollowUp`, recency-sorted; the
+ * rest KEEP their incoming order (the agent's manual order, or most-recent-first)
+ * untouched. A card never lands in both. PURE — the cockpit grouping the
+ * component renders. On a flag-off / no-nudge list the group is empty and every
+ * card stays in `rest`, so the structure collapses to today's single list.
+ */
+export function splitFollowUp(cards: PageCard[]): {
+  followUp: PageCard[];
+  rest: PageCard[];
+} {
+  const followUp: PageCard[] = [];
+  const rest: PageCard[] = [];
+  for (const card of cards) {
+    (card.worthFollowUp ? followUp : rest).push(card);
+  }
+  return { followUp: sortFollowUpGroup(followUp), rest };
+}
+
+/** The calm subline under the "Worth a follow-up" group heading. PURE. */
+export function followUpSubline(count: number): string {
+  return `${count} ${count === 1 ? "seller" : "sellers"} recently engaged with their page`;
+}
+
+/**
+ * The de-duplicated signal lines a V2 cockpit CARD shows, so no fact ever
+ * appears twice. PURE; the cards view reads this so the voice never drifts.
+ *
+ *   - Follow-up card (worthFollowUp): `marker` leads with the action state
+ *     ("Worth a follow-up · <reasons>"), and `context` is a single muted line of
+ *     recency + repeat-opens ("Opened · 2h ago · 3 views"). It deliberately
+ *     OMITS the engagement facts (the marker owns them as reasons) and the
+ *     "Returned" label (already a reason), so the card never says one thing
+ *     twice.
+ *   - Non-follow-up live card: no `marker`; `context` leads with the opened/
+ *     returned status + count and AT MOST ONE engagement fact.
+ *   - Draft / archived / never-opened: both undefined (the status chip + meta
+ *     line elsewhere carry those).
+ */
+export interface CardSignal {
+  marker?: string;
+  context?: string;
+}
+
+export function cardSignal(card: PageCard, nowMs: number): CardSignal {
+  if (typeof card.viewCount !== "number" || card.viewCount < 1) return {};
+  const countLabel = `${card.viewCount} ${card.viewCount === 1 ? "view" : "views"}`;
+
+  if (card.worthFollowUp) {
+    // Recency context only — the marker already carries the meaningful reasons.
+    const recency = card.lastViewedAt
+      ? `Opened · ${relativeTimeAgo(card.lastViewedAt, nowMs)}`
+      : undefined;
+    const context = [recency, countLabel].filter(Boolean).join(" · ");
+    return { marker: followUpMarkerLabel(card), context: context || undefined };
+  }
+
+  // Non-follow-up live card: status + count + a single engagement fact.
+  const parts = [
+    viewSignalLabel(card, nowMs),
+    countLabel,
+    ...viewEngagementFacts(card, 1),
+  ].filter(Boolean);
+  return { context: parts.length > 0 ? parts.join(" · ") : undefined };
+}
+
+/**
+ * The calm usage meter line for the V2 header. PURE. Only LIVE pages count
+ * (drafts + archived are free), and the cap is SHOWN, not enforced (pre-
+ * billing) — so an over-cap agent gets a plain, non-alarming "N live pages ·
+ * plan limit M", NEVER an alarming "68 of 25". Under the cap it keeps the
+ * familiar "N of M live". Undefined when there is no cap to show.
+ */
+export function usageMeterLabel(
+  liveCount: number,
+  cap: number,
+): string | undefined {
+  if (cap <= 0) return undefined;
+  if (liveCount > cap) {
+    return `${liveCount} live ${liveCount === 1 ? "page" : "pages"} · plan limit ${cap}`;
+  }
+  return `${liveCount} of ${cap} live`;
 }
