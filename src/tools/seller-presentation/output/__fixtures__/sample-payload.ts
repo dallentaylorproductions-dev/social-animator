@@ -803,3 +803,37 @@ export const STATE_A_COVERFLOW_SINGLE_PAYLOAD: PublicPayload = {
     },
   ],
 };
+
+/**
+ * Seller State A · Zone 5 — the broken-photo-URL guard (Zone 5 smoke fix). The
+ * center card carries a NON-EMPTY photoUrl that 404s and has no Street View
+ * coverage, so its only candidate fails to load: the card must fall back to the
+ * neutral house-glyph placeholder, never a blank white photo area. The flanking
+ * cards carry working photos (the valid-photo path stays intact alongside it).
+ */
+export const STATE_A_COVERFLOW_BROKEN_PHOTO_PAYLOAD: PublicPayload = {
+  ...STATE_A_FULL_PAYLOAD,
+  recentListings: [
+    {
+      address: "77 Cedar Court",
+      city: "Westbrook",
+      photoUrl: "/sample-assets/kitchen.webp",
+      viewCount: 37610,
+    },
+    {
+      address: "1240 Hawthorne St",
+      city: "Maple Heights",
+      // A non-empty URL that will 404 at view time, with no Street View
+      // coverage — the broken-load path the fix guards against.
+      photoUrl: "/sample-assets/__nonexistent-broken-photo__.webp",
+      hasStreetView: false,
+      viewCount: 41184,
+    },
+    {
+      address: "15117 Prescott Loop SE",
+      city: "Yelm",
+      photoUrl: "/sample-assets/exterior.webp",
+      viewCount: 32246,
+    },
+  ],
+};

@@ -4,6 +4,7 @@ import {
   STREET_VIEW_FOV,
   STREET_VIEW_PITCH,
 } from "@/lib/seller-presentation/street-view";
+import { ListingCardPhoto } from "./ListingCardPhoto";
 import {
   CAPABILITY_PHOTO_LABEL,
   CAPABILITY_PHOTO_SUB,
@@ -252,8 +253,12 @@ function ListingCard({
   // Outer peeks carry no band/label at all — they only signal "there's more".
   const isPeek = pos === "out-left" || pos === "out-right";
 
-  // Photo: hosted upload wins; else the Street View fallback, requested fresh
-  // from Google at view time (same pattern as the comp thumbs — no bytes stored).
+  // Photo candidates, in priority order: the hosted upload first, then the
+  // Street View fallback (requested fresh from Google at view time, same pattern
+  // as the comp thumbs — no bytes stored). The card renders the first that
+  // LOADS: a non-empty-but-broken upload URL now falls through to Street View
+  // (then a neutral placeholder) at view time instead of leaving a blank white
+  // photo area, while empty-photo and valid-photo paths are unchanged.
   const sv = listing.hasStreetView
     ? streetViewStaticUrl(listing.streetViewPanoId, {
         heading: listing.streetViewHeading,
@@ -261,7 +266,9 @@ function ListingCard({
         pitch: STREET_VIEW_PITCH,
       })
     : null;
-  const photo = listing.photoUrl?.trim() || sv || undefined;
+  const photoSources = [listing.photoUrl?.trim() || undefined, sv].filter(
+    (s): s is string => Boolean(s),
+  );
 
   // The number is the hero. Optional + never fabricated: when absent the card
   // shows photo + address only, with no empty slot. `sourceLabel` is plumbed for
@@ -275,11 +282,10 @@ function ListingCard({
       data-pos={pos}
       data-testid={`fs-sa-cf-card-${index}`}
     >
-      {photo && (
-        <span
-          className="sa-cf__photo"
-          aria-hidden="true"
-          style={{ backgroundImage: `url("${photo.replace(/"/g, '\\"')}")` }}
+      {photoSources.length > 0 && (
+        <ListingCardPhoto
+          sources={photoSources}
+          testId={`fs-sa-cf-photo-${index}`}
         />
       )}
       {!isPeek && (
