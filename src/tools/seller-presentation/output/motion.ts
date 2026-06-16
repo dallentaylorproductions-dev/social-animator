@@ -223,6 +223,21 @@ function wireWaveformPlay(root: Document): Array<() => void> {
 /** sessionStorage key for the opaque per-session view token. */
 const VIEW_SID_KEY = "sa-view-sid";
 
+// ---- Viewed signal (Phase 2): one engagement SUMMARY per session ----------
+/**
+ * The WELCOME video on each surface (State A hero + State B agent note). Bound
+ * specifically so playing an unrelated sample clip never reads as "watched your
+ * video". Generic across both render arms.
+ */
+const WELCOME_VIDEO_SELECTOR = "video.sa-hero__video-player, video.video__player";
+/**
+ * The closing / CTA block on each surface (flagship agent band + State A confirm
+ * CTA). Reaching it in view = "read to the end". Existing testids, no markup
+ * change to the render.
+ */
+const CLOSING_BLOCK_SELECTOR =
+  '[data-testid="fs-agent"], [data-testid="fs-sa-confirm-cta"]';
+
 /**
  * A stable opaque token for THIS browser session, minted once and reused across
  * in-session refreshes (sessionStorage), so the server can de-dupe a refresh
@@ -246,8 +261,31 @@ function sessionViewToken(): string | null {
   }
 }
 
+/** Fire-and-forget POST to the view route (sendBeacon, fetch+keepalive fallback). */
+function postViewBeacon(slug: string, payload: string): void {
+  const url = `/api/h/${encodeURIComponent(slug)}/view`;
+  try {
+    if (
+      typeof navigator !== "undefined" &&
+      typeof navigator.sendBeacon === "function"
+    ) {
+      navigator.sendBeacon(url, new Blob([payload], { type: "application/json" }));
+    } else {
+      void fetch(url, {
+        method: "POST",
+        body: payload,
+        headers: { "Content-Type": "application/json" },
+        keepalive: true,
+      }).catch(() => {});
+    }
+  } catch {
+    // Best-effort: a capture failure never affects the seller's page.
+  }
+}
+
 export function PresentationPageMotion({
   viewSignalSlug,
+  engagementEnabled = false,
 }: {
   /**
    * Viewed signal (Phase 1). When set (the page is a live /h/<slug> AND the
@@ -256,6 +294,14 @@ export function PresentationPageMotion({
    * non-public render like the wizard preview) fires nothing - byte-identical.
    */
   viewSignalSlug?: string;
+  /**
+   * Viewed signal (Phase 2). When true (VIEWED_SIGNAL_ENGAGEMENT_ENABLED on,
+   * resolved server-side) AND a Phase 1 `viewSignalSlug` is present, capture
+   * this session's engagement depth (welcome-video play, read-to-end, dwell) and
+   * send ONE summary beacon on pagehide. False (flag-off) captures + sends
+   * NOTHING - byte-identical to Phase 1.
+   */
+  engagementEnabled?: boolean;
 } = {}) {
   // Open beacon - isolated effect so it is independent of the motion wiring and
   // a no-op whenever `viewSignalSlug` is absent.
@@ -263,29 +309,80 @@ export function PresentationPageMotion({
     if (!viewSignalSlug) return;
     const sid = sessionViewToken();
     if (!sid) return;
-    const url = `/api/h/${encodeURIComponent(viewSignalSlug)}/view`;
-    const payload = JSON.stringify({ sid });
-    try {
-      if (
-        typeof navigator !== "undefined" &&
-        typeof navigator.sendBeacon === "function"
-      ) {
-        navigator.sendBeacon(
-          url,
-          new Blob([payload], { type: "application/json" }),
-        );
-      } else {
-        void fetch(url, {
-          method: "POST",
-          body: payload,
-          headers: { "Content-Type": "application/json" },
-          keepalive: true,
-        }).catch(() => {});
-      }
-    } catch {
-      // Best-effort: a capture failure never affects the seller's page.
-    }
+    postViewBeacon(viewSignalSlug, JSON.stringify({ sid }));
   }, [viewSignalSlug]);
+
+  // Engagement summary (Phase 2) - track depth in refs during the session, send
+  // ONE summary on the first pagehide / visibility-hidden. Rides Phase 1: a
+  // no-op unless BOTH a slug is present AND engagement is enabled, so flag-off is
+  // byte-identical (no listeners, no observer, no beacon).
+  useEffect(() => {
+    if (!viewSignalSlug || !engagementEnabled) return;
+    const sid = sessionViewToken();
+    if (!sid) return;
+
+    const loadedAt = Date.now();
+    let videoPlayed = false;
+    let reachedEnd = false;
+    let sent = false;
+
+    const onPlay = () => {
+      videoPlayed = true;
+    };
+    const videos = Array.from(
+      document.querySelectorAll<HTMLVideoElement>(WELCOME_VIDEO_SELECTOR),
+    );
+    videos.forEach((v) => v.addEventListener("play", onPlay));
+
+    let endObserver: IntersectionObserver | null = null;
+    const closing = document.querySelector<HTMLElement>(CLOSING_BLOCK_SELECTOR);
+    if (closing && typeof window.IntersectionObserver === "function") {
+      endObserver = new IntersectionObserver(
+        (entries) => {
+          for (const entry of entries) {
+            if (entry.isIntersecting) {
+              reachedEnd = true;
+              endObserver?.disconnect();
+              endObserver = null;
+            }
+          }
+        },
+        { rootMargin: "0px 0px -10% 0px", threshold: 0.5 },
+      );
+      endObserver.observe(closing);
+    }
+
+    const sendSummary = () => {
+      if (sent) return;
+      sent = true;
+      postViewBeacon(
+        viewSignalSlug,
+        JSON.stringify({
+          sid,
+          engagement: {
+            videoPlayed,
+            reachedEnd,
+            dwellMs: Date.now() - loadedAt,
+          },
+        }),
+      );
+    };
+    const onVisibility = () => {
+      if (document.visibilityState === "hidden") sendSummary();
+    };
+    // pagehide is the terminal close; visibilitychange->hidden covers mobile
+    // backgrounding (where pagehide may not fire). The `sent` guard keeps it to
+    // ONE summary per session whichever fires first.
+    window.addEventListener("pagehide", sendSummary);
+    document.addEventListener("visibilitychange", onVisibility);
+
+    return () => {
+      videos.forEach((v) => v.removeEventListener("play", onPlay));
+      endObserver?.disconnect();
+      window.removeEventListener("pagehide", sendSummary);
+      document.removeEventListener("visibilitychange", onVisibility);
+    };
+  }, [viewSignalSlug, engagementEnabled]);
 
   useEffect(() => {
     const root = document;

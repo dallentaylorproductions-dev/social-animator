@@ -3,7 +3,10 @@ import type { HandoutRecord } from "@/lib/share-urls";
 import { clampPublicPayload, type PublicPayload } from "../public-payload";
 import { consumerRoleVars, deriveConsumerRoles } from "../consumer-roles";
 import { PresentationPageMotion } from "../motion";
-import { viewSignalSlugFor } from "@/lib/seller-presentation/viewed-signal";
+import {
+  isViewedSignalEngagementEnabled,
+  viewSignalSlugFor,
+} from "@/lib/seller-presentation/viewed-signal";
 import { detectReviewsSource } from "../presentation-page";
 import { formatAppointment } from "../../engine/appointment";
 import { newsreader } from "./fonts";
@@ -86,7 +89,10 @@ export function StateAPage({
           showCtas={false}
         />
       </div>
-      <PresentationPageMotion viewSignalSlug={viewSignalSlugFor(handout)} />
+      <PresentationPageMotion
+        viewSignalSlug={viewSignalSlugFor(handout)}
+        engagementEnabled={isViewedSignalEngagementEnabled()}
+      />
     </div>
   );
 }
