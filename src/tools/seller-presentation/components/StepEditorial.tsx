@@ -24,7 +24,7 @@ import type {
   PresentationVideo,
   SellerPresentationDraft,
 } from "../engine/types";
-import { effectivePosterUrl } from "../engine/types";
+import { effectivePosterUrl, isInvitationStatus } from "../engine/types";
 import { deriveAreaStatsFromComps } from "@/lib/seller-presentation/area-stats-from-comps";
 import { useSPEntitlement } from "./SPEntitlementContext";
 
@@ -165,6 +165,15 @@ export function StepEditorial({ draft, setDraft }: StepEditorialProps) {
   );
   const videoUploadInFlight = videoUploadSession.status === "uploading";
 
+  // Seller State A — in the prepared invitation this step is the "Area & video"
+  // touch-up, so it speaks in the invitation's calmer, optional-touches voice.
+  // Both blocks here (the welcome video + the area snapshot) DO appear on the
+  // invitation, so nothing is hidden; only the framing copy changes. Full
+  // presentation (revealed / absent, or the flag off) is byte-identical.
+  const { sellerStateAEnabled } = useSPEntitlement();
+  const invitation =
+    sellerStateAEnabled === true && isInvitationStatus(draft.valuationStatus);
+
   const isOpen = (k: SectionKey) =>
     added.has(k) || (k === "video" && videoUploadInFlight);
 
@@ -199,10 +208,13 @@ export function StepEditorial({ draft, setDraft }: StepEditorialProps) {
   return (
     <section className="sec5" data-testid="step-editorial">
       <div className="sec-head">
-        <h2 className="sec-title">Editorial extras</h2>
+        <h2 className="sec-title">
+          {invitation ? "Area and video" : "Editorial extras"}
+        </h2>
         <p className="sec-sub">
-          Optional. Add the sections that fit this listing. Skip the rest and
-          the page hides them cleanly.
+          {invitation
+            ? "Optional touches that make your invitation feel personal. Add a short welcome video and the neighborhood snapshot, or skip them and the page stays clean."
+            : "Optional. Add the sections that fit this listing. Skip the rest and the page hides them cleanly."}
         </p>
       </div>
 
