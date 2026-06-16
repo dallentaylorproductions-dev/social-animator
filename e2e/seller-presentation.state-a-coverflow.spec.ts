@@ -15,6 +15,7 @@ import { test, expect } from "@playwright/test";
 
 const FULL = "/seller-presentation-preview?fixture=state-a-coverflow";
 const PAIR = "/seller-presentation-preview?fixture=state-a-coverflow-pair";
+const TRIO = "/seller-presentation-preview?fixture=state-a-coverflow-trio";
 const SINGLE = "/seller-presentation-preview?fixture=state-a-coverflow-single";
 const EMPTY = "/seller-presentation-preview?fixture=state-a"; // no recentListings
 
@@ -79,8 +80,11 @@ test.describe("State A · Zone 5 — listings coverflow", () => {
     const agg = page.getByTestId("fs-sa-cf-aggregate");
     await expect(agg).toBeVisible();
     // 32,246 + 41,184 + 37,610 + 28,560 = 139,600 (incl. the two peek numbers).
+    // The aggregate now reads in the shared proof-number lockup (mono label ·
+    // Newsreader teal number · mono caption); the number counts up to the total.
     await expect(agg).toContainText("139,600");
-    await expect(agg).toContainText("buyer views across recent listings");
+    await expect(agg).toContainText("Across recent listings");
+    await expect(agg).toContainText("Buyer views");
     // The total reads teal (blue channel dominant), distinct from the white card
     // numbers — proving teal is reserved for the keyline + aggregate.
     const aggColor = await agg
@@ -142,15 +146,55 @@ test.describe("State A · Zone 5 — listings coverflow", () => {
     expect(transform === "none" || transform === "").toBeTruthy();
   });
 
-  test("2-listing state: a gentle pair, aggregate present", async ({ page }) => {
+  test("2-listing state: a SEPARATED pair (no overlap/clip), aggregate present", async ({
+    page,
+  }) => {
     await page.setViewportSize({ width: 1280, height: 1400 });
     await page.goto(PAIR);
     await expect(page.getByTestId("fs-sa-cf")).toBeVisible();
-    await expect(page.getByTestId("fs-sa-cf-card-0")).toBeVisible();
-    await expect(page.getByTestId("fs-sa-cf-card-1")).toBeVisible();
+    const card0 = page.getByTestId("fs-sa-cf-card-0");
+    const card1 = page.getByTestId("fs-sa-cf-card-1");
+    await expect(card0).toBeVisible();
+    await expect(card1).toBeVisible();
     await expect(page.getByTestId("fs-sa-cf-card-2")).toHaveCount(0);
+    // The v1.5x few-card fix: the pair is pushed to ±54% so the cards never cross
+    // (the old ±30% overlapped ~118px and clipped the address). Let the entrance
+    // settle into the arrangement, then assert the two cards do NOT overlap.
+    await page.getByTestId("fs-sa-cf").scrollIntoViewIfNeeded();
+    await expect(page.locator(".sa-cf.reveal.in")).toHaveCount(1);
+    await page.waitForTimeout(900); // entrance transition (.6s) + stagger
+    const b0 = await card0.boundingBox();
+    const b1 = await card1.boundingBox();
+    expect(b0).not.toBeNull();
+    expect(b1).not.toBeNull();
+    const overlap =
+      Math.min(b0!.x + b0!.width, b1!.x + b1!.width) - Math.max(b0!.x, b1!.x);
+    // No meaningful overlap (negative/near-zero = a clean gap between the cards).
+    expect(overlap).toBeLessThan(b0!.width * 0.2);
+    // The centers are clearly separated (not stacked, as the broken state was).
+    const c0 = b0!.x + b0!.width / 2;
+    const c1 = b1!.x + b1!.width / 2;
+    expect(Math.abs(c1 - c0)).toBeGreaterThan(b0!.width * 0.8);
+    // Neither card carries the center keyline (a balanced pair has no single focus).
+    await expect(page.locator(".sa-cf__card--center")).toHaveCount(0);
     // Both carry a number → aggregate (78,794) renders.
     await expect(page.getByTestId("fs-sa-cf-aggregate")).toContainText("78,794");
+  });
+
+  test("3-listing state: a trio with a center keyline + separated inner pair", async ({
+    page,
+  }) => {
+    await page.setViewportSize({ width: 1280, height: 1400 });
+    await page.goto(TRIO);
+    await expect(page.getByTestId("fs-sa-cf")).toBeVisible();
+    // Middle card is the center (earns the keyline); the inner pair flank it.
+    await expect(page.getByTestId("fs-sa-cf-card-0")).toBeVisible();
+    const center = page.getByTestId("fs-sa-cf-card-1");
+    await expect(center).toHaveClass(/sa-cf__card--center/);
+    await expect(page.getByTestId("fs-sa-cf-card-2")).toBeVisible();
+    await expect(page.getByTestId("fs-sa-cf-card-3")).toHaveCount(0);
+    // No card clips its address (full street name present on each banded card).
+    await expect(center).toContainText("Hawthorne");
   });
 
   test("single-listing state: one card, aggregate hidden (below the ≥2 gate)", async ({

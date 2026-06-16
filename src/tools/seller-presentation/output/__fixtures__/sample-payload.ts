@@ -651,10 +651,12 @@ export const STATE_A_NO_VIDEO_PAYLOAD: PublicPayload = {
 };
 
 /**
- * Seller State A — Zone 2 flex-out: a trend SERIES with no agent-stamped YoY
- * delta. The sparkline panel runs full-width and the `+6%` proof panel collapses
- * (no orphaned slot); the activity line still narrates the trend from its series
- * endpoints. Same rich invitation otherwise.
+ * Seller State A — Zone 2 flex-out: a trend SERIES with NO proofs (no agent-
+ * stamped YoY delta AND no track-record stat). The chart panel runs full-width
+ * and the two-stat proof column collapses entirely (no orphaned slot); the
+ * activity line still narrates the trend from its series endpoints. (v1.5x — the
+ * stat now lives in this column too, so "trend only" must clear BOTH proofs to
+ * exercise the solo state.) Same rich invitation otherwise.
  */
 export const STATE_A_TREND_ONLY_PAYLOAD: PublicPayload = {
   ...STATE_A_FULL_PAYLOAD,
@@ -662,6 +664,10 @@ export const STATE_A_TREND_ONLY_PAYLOAD: PublicPayload = {
     ...STATE_A_FULL_PAYLOAD.areaStats,
     medianSaleDeltaYoy: "",
   } as PublicPayload["areaStats"],
+  whyUs: {
+    ...STATE_A_FULL_PAYLOAD.whyUs,
+    performanceStats: [],
+  } as PublicPayload["whyUs"],
 };
 
 /**
@@ -747,6 +753,36 @@ export const STATE_A_COVERFLOW_PAIR_PAYLOAD: PublicPayload = {
       city: "Westbrook",
       photoUrl: "/sample-assets/kitchen.webp",
       viewCount: 37610,
+    },
+  ],
+};
+
+/**
+ * Seller State A · Zone 5 — the 3-listing TRIO state (v1.5x few-card): a center
+ * card (index 1, earns the keyline) flanked by a SEPARATED inner pair pushed to
+ * ±52% so no edge crosses (no overlap / no clipped address). All three carry a
+ * number, so the aggregate sums them.
+ */
+export const STATE_A_COVERFLOW_TRIO_PAYLOAD: PublicPayload = {
+  ...STATE_A_FULL_PAYLOAD,
+  recentListings: [
+    {
+      address: "77 Cedar Court",
+      city: "Westbrook",
+      photoUrl: "/sample-assets/kitchen.webp",
+      viewCount: 37610,
+    },
+    {
+      address: "1240 Hawthorne St",
+      city: "Maple Heights",
+      photoUrl: "/sample-assets/living-room.webp",
+      viewCount: 41184,
+    },
+    {
+      address: "15117 Prescott Loop SE",
+      city: "Yelm",
+      photoUrl: "/sample-assets/exterior.webp",
+      viewCount: 32246,
     },
   ],
 };

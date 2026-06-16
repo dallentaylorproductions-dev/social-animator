@@ -143,6 +143,82 @@ function startPriceCountup(priceEl: HTMLElement): void {
   requestAnimationFrame(tick);
 }
 
+// ---- v1.5x State-A coverflow: aggregate count-up + mobile swipe cue ----------
+const AGG_COUNTUP_MS = 1100;
+const easeOutCubic = (t: number) => 1 - Math.pow(1 - t, 3);
+function nowMs(): number {
+  return typeof performance !== "undefined" &&
+    typeof performance.now === "function"
+    ? performance.now()
+    : Date.now();
+}
+
+/** Count-up for a State-A proof aggregate ([data-countup-num] carrying its true
+ *  total in data-countup-final). Rises 0 → final with ease-out cubic, writing a
+ *  grouped text node each frame. The SSR text is already the true total, so a
+ *  no-JS / reduced-motion render shows it at rest (this only enhances). */
+function startAggCountup(el: HTMLElement): void {
+  if (el.dataset.countupDone === "1") return;
+  const finalRaw = el.getAttribute("data-countup-final");
+  const finalValue = finalRaw ? parseInt(finalRaw, 10) : NaN;
+  if (!Number.isFinite(finalValue) || finalValue <= 0) return;
+  el.dataset.countupDone = "1";
+  const t0 = nowMs();
+  const tick = (now: number) => {
+    const t = Math.min(1, (now - t0) / AGG_COUNTUP_MS);
+    el.textContent = Math.round(
+      finalValue * easeOutCubic(t),
+    ).toLocaleString("en-US");
+    if (t < 1) requestAnimationFrame(tick);
+  };
+  requestAnimationFrame(tick);
+}
+
+/** PROPOSED mobile swipe cue: one gentle scroll nudge as the coverflow settles,
+ *  signaling "this moves". Only fires when the fan is the mobile peek carousel
+ *  (overflow-x auto) AND actually has overflow (2+ cards); the desktop 3D stage
+ *  is overflow:visible and is skipped. Reduced motion skips it (the observer is
+ *  never created on that path). Droppable in verification. */
+function maybeSwipeCue(fan: HTMLElement): void {
+  if (typeof fan.scrollTo !== "function") return;
+  if (getComputedStyle(fan).overflowX === "visible") return;
+  if (fan.scrollWidth - fan.clientWidth < 24) return;
+  window.setTimeout(() => {
+    fan.scrollTo({ left: 32, behavior: "smooth" });
+    window.setTimeout(() => fan.scrollTo({ left: 0, behavior: "smooth" }), 520);
+  }, 700);
+}
+
+/** The State-A welcome-video waveform is one play target: clicking the waveform
+ *  pill (or pressing Enter/Space) plays the SAME video the center control does.
+ *  Wires every [data-wave-play] to its section's <video>. No player rewrite. */
+function wireWaveformPlay(root: Document): Array<() => void> {
+  const teardowns: Array<() => void> = [];
+  root.querySelectorAll<HTMLElement>("[data-wave-play]").forEach((pill) => {
+    const video = pill
+      .closest<HTMLElement>(".sa-hello, .sa-hello__pedestal")
+      ?.querySelector<HTMLVideoElement>("video.sa-hero__video-player");
+    if (!video) return;
+    const play = () => {
+      const p = video.play();
+      if (p && typeof p.catch === "function") p.catch(() => {});
+    };
+    const onKey = (e: KeyboardEvent) => {
+      if (e.key === "Enter" || e.key === " ") {
+        e.preventDefault();
+        play();
+      }
+    };
+    pill.addEventListener("click", play);
+    pill.addEventListener("keydown", onKey);
+    teardowns.push(() => {
+      pill.removeEventListener("click", play);
+      pill.removeEventListener("keydown", onKey);
+    });
+  });
+  return teardowns;
+}
+
 export function PresentationPageMotion() {
   useEffect(() => {
     const root = document;
@@ -156,6 +232,8 @@ export function PresentationPageMotion() {
 
     let observer: IntersectionObserver | null = null;
     let priceObserver: IntersectionObserver | null = null;
+    let aggObserver: IntersectionObserver | null = null;
+    let cueObserver: IntersectionObserver | null = null;
 
     if (prefersReduced) {
       targets.forEach((el) => el.classList.add("in"));
@@ -193,6 +271,43 @@ export function PresentationPageMotion() {
           { rootMargin: "0px 0px -8% 0px", threshold: 0.25 },
         );
         priceTargets.forEach((el) => priceObserver!.observe(el));
+      }
+
+      // State-A coverflow aggregate count-up ("buyer views" total). State-A-only
+      // selector — no-op on the revealed page.
+      const aggTargets = root.querySelectorAll<HTMLElement>(
+        "[data-countup-num]",
+      );
+      if (aggTargets.length > 0) {
+        aggObserver = new IntersectionObserver(
+          (entries) => {
+            for (const entry of entries) {
+              if (entry.isIntersecting) {
+                startAggCountup(entry.target as HTMLElement);
+                aggObserver?.unobserve(entry.target);
+              }
+            }
+          },
+          { rootMargin: "0px 0px -8% 0px", threshold: 0.5 },
+        );
+        aggTargets.forEach((el) => aggObserver!.observe(el));
+      }
+
+      // State-A coverflow mobile swipe cue (one-time, optional).
+      const cueTargets = root.querySelectorAll<HTMLElement>(".sa-cf__fan");
+      if (cueTargets.length > 0) {
+        cueObserver = new IntersectionObserver(
+          (entries) => {
+            for (const entry of entries) {
+              if (entry.isIntersecting) {
+                maybeSwipeCue(entry.target as HTMLElement);
+                cueObserver?.unobserve(entry.target);
+              }
+            }
+          },
+          { threshold: 0.6 },
+        );
+        cueTargets.forEach((el) => cueObserver!.observe(el));
       }
     } else {
       // No IntersectionObserver (very old browser) — degrade to
@@ -232,12 +347,19 @@ export function PresentationPageMotion() {
       btn.addEventListener("click", onShare),
     );
 
+    // Wire the State-A welcome-video waveform as a play target (interaction, not
+    // animation — wired regardless of reduced motion). No-op on the revealed page.
+    const waveTeardowns = wireWaveformPlay(root);
+
     return () => {
       observer?.disconnect();
       priceObserver?.disconnect();
+      aggObserver?.disconnect();
+      cueObserver?.disconnect();
       shareButtons.forEach((btn) =>
         btn.removeEventListener("click", onShare),
       );
+      waveTeardowns.forEach((fn) => fn());
     };
   }, []);
 

@@ -141,7 +141,11 @@ const UX1_TOUCHED_COPY: Array<{ file: string; phrase: string }> = [
   },
   {
     file: 'src/tools/seller-presentation/output/flagship/state-a-copy.ts',
-    phrase: 'buyer views across recent listings',
+    phrase: 'Across recent listings',
+  },
+  {
+    file: 'src/tools/seller-presentation/output/flagship/state-a-copy.ts',
+    phrase: 'Buyer views',
   },
 ];
 

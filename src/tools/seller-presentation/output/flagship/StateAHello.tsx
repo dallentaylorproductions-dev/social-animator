@@ -1,3 +1,4 @@
+import type { CSSProperties } from "react";
 import type { PublicPayload } from "../public-payload";
 import {
   effectivePosterUrl,
@@ -5,11 +6,21 @@ import {
   withFirstFrameHint,
 } from "../../engine/types";
 import {
-  HELLO_CAPTION,
   HELLO_EYEBROW,
   HERO_VIDEO_ARIA,
   heroVideoLabel,
 } from "./state-a-copy";
+
+/**
+ * The welcome-video waveform amplitudes (a gentle, even envelope — NOT a loud
+ * equalizer). Each bar's `--h` is a height % of the 18px strip; `--i` staggers
+ * the slow ambient sway. Static SVG-free markup; the calm motion + the
+ * reduced-motion static fallback live in state-a.css.
+ */
+const HELLO_WAVE = [
+  34, 52, 70, 86, 62, 44, 72, 90, 58, 40, 56, 80, 52, 38, 64, 84, 60, 42, 50, 72,
+  46, 32,
+];
 
 /**
  * Seller State A · the hello video as its OWN section, directly below the hero.
@@ -77,10 +88,31 @@ export function StateAHello({ payload }: { payload: PublicPayload }) {
             }}
           />
         </div>
-        <div className="sa-hello__cap" data-testid="fs-sa-hello-cap">
-          <span className="sa-hello__cap-dot" aria-hidden="true" />
-          {HELLO_CAPTION}
-          {runtime && <span className="sa-hello__cap-rt"> · {runtime}</span>}
+        {/* The play affordance: a teal audio waveform that reads as "a personal
+            message". The WHOLE pill is one play target — clicking it (or Enter/
+            Space) plays the SAME video the inline control does (wired by the
+            motion island via data-wave-play; no player rewrite). Always-on but
+            calm (slow, low-amplitude sway in state-a.css), static under reduced
+            motion. Teal, not mint — mint is retired. Sits on the solid pedestal
+            surface, never over the video. */}
+        <div
+          className="sa-hello__wave"
+          data-testid="fs-sa-hello-cap"
+          data-wave-play
+          role="button"
+          tabIndex={0}
+          aria-label={runtime ? `Play ${label} · ${runtime}` : `Play ${label}`}
+        >
+          <span className="sa-hello__wave-play" aria-hidden="true" />
+          <span className="sa-hello__wave-bars" aria-hidden="true">
+            {HELLO_WAVE.map((h, i) => (
+              <i
+                key={i}
+                style={{ "--h": h, "--i": i } as CSSProperties}
+              />
+            ))}
+          </span>
+          {runtime && <span className="sa-hello__wave-rt">{runtime}</span>}
         </div>
       </div>
     </section>
