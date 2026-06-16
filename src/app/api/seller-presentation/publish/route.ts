@@ -1,6 +1,11 @@
 import { NextResponse } from "next/server";
 import { auth } from "@/lib/auth";
-import { publishHandout, updateHandout } from "@/lib/share-urls";
+import {
+  getHandoutRecord,
+  publishHandout,
+  updateHandout,
+} from "@/lib/share-urls";
+import { isViewedSignalEnabled } from "@/lib/seller-presentation/viewed-signal";
 import { loadAgentProfile } from "@/lib/entitlements/load-agent-profile";
 import { resolveEntitlements } from "@/lib/entitlements/resolver";
 import { isCompPhotosEnabled } from "@/lib/seller-presentation/street-view";
@@ -9,6 +14,8 @@ import { isSellerListingsCoverflowEnabled } from "@/lib/seller-presentation/list
 import {
   clampDraft,
   describeMissingRequiredInputs,
+  isInvitationStatus,
+  type ValuationStatus,
 } from "@/tools/seller-presentation/engine/types";
 import {
   toPublicPayload,
@@ -222,7 +229,33 @@ export async function POST(req: Request) {
 
   try {
     if (reuseSlug) {
-      const updated = await updateHandout(reuseSlug, email, { data });
+      // Viewed signal (Phase 1): stamp `revealedAt` the FIRST time a State A
+      // invitation page is re-published into a revealed (State B) page - the
+      // reveal moment a later "returned after reveal" read compares against. We
+      // read the prior record's status (the public payload OMITS valuationStatus
+      // on a revealed publish, so the new status reads as not-invitation) and
+      // stamp only on the invitation -> revealed transition, once. Flag-off, a
+      // normal edit, or a still-invitation update writes nothing new, so the
+      // record is byte-identical to today.
+      let revealedAt: string | undefined;
+      if (isViewedSignalEnabled()) {
+        const existing = await getHandoutRecord(reuseSlug);
+        if (existing && !existing.revealedAt) {
+          const priorStatus = (
+            existing.data as { valuationStatus?: ValuationStatus }
+          )?.valuationStatus;
+          const nextStatus = (data as { valuationStatus?: ValuationStatus })
+            .valuationStatus;
+          if (isInvitationStatus(priorStatus) && !isInvitationStatus(nextStatus)) {
+            revealedAt = new Date().toISOString();
+          }
+        }
+      }
+      const updated = await updateHandout(
+        reuseSlug,
+        email,
+        revealedAt ? { data, revealedAt } : { data },
+      );
       if (updated) {
         return NextResponse.json(
           { ok: true, slug: reuseSlug },

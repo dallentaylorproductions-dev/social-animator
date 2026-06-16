@@ -65,6 +65,16 @@ export interface HandoutRecord {
    * "closed listing, free the slot, keep it to restore later."
    */
   archived?: boolean;
+  /**
+   * Viewed signal (Phase 1) - ISO 8601 UTC stamp of the moment a Seller State A
+   * page transitioned out of an invitation status into `revealed` (State B).
+   * Set ONCE, by the publish route, on that first reveal; never moved by a later
+   * edit (unlike `updatedAt`). ABSENT on a born-revealed normal page and on every
+   * pre-feature page - the "returned after reveal" read treats absent as "no
+   * reveal moment", so it never fires spuriously. No migration: an old record
+   * simply has no stamp.
+   */
+  revealedAt?: string;
   /** Type-specific payload. Validated by the consuming tool. */
   data: Record<string, unknown>;
 }
@@ -172,13 +182,29 @@ export async function revokeHandout(
 }
 
 /**
- * Update a handout's data or expiresAt. Slug unchanged; updatedAt refreshed.
- * Used for edit-after-publish (Audit 1B §9).
+ * Read a handout's RAW record by slug - including revoked / archived / expired,
+ * with no read-time filtering (unlike `fetchHandout`). Owner-agnostic; callers
+ * that mutate must enforce ownership themselves (e.g. `updateHandout`). Used by
+ * the publish route to read a page's prior `valuationStatus` so it can detect
+ * the State A -> State B reveal transition before re-publishing in place.
+ */
+export async function getHandoutRecord(
+  slug: string,
+): Promise<HandoutRecord | null> {
+  return (await kv.get<HandoutRecord>(handoutKey(slug))) ?? null;
+}
+
+/**
+ * Update a handout's data, expiresAt, or revealedAt. Slug unchanged; updatedAt
+ * refreshed. Used for edit-after-publish (Audit 1B §9) and the viewed-signal
+ * reveal stamp (Phase 1). `revealedAt` is write-once in practice (the route only
+ * passes it on the first invitation->revealed transition), but this setter is
+ * generic - it sets whatever the patch carries.
  */
 export async function updateHandout(
   slug: string,
   ownerEmail: string,
-  patch: Partial<Pick<HandoutRecord, 'data' | 'expiresAt'>>,
+  patch: Partial<Pick<HandoutRecord, 'data' | 'expiresAt' | 'revealedAt'>>,
 ): Promise<boolean> {
   const record = await kv.get<HandoutRecord>(handoutKey(slug));
   if (!record) return false;
@@ -187,6 +213,8 @@ export async function updateHandout(
     ...record,
     data: patch.data !== undefined ? patch.data : record.data,
     expiresAt: patch.expiresAt !== undefined ? patch.expiresAt : record.expiresAt,
+    revealedAt:
+      patch.revealedAt !== undefined ? patch.revealedAt : record.revealedAt,
     updatedAt: new Date().toISOString(),
   };
   await kv.set(handoutKey(slug), updated);
