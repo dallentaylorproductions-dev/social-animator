@@ -343,6 +343,14 @@
   font-family: var(--font-geist-mono), monospace;
   font-size: 11px; color: var(--fg-dim);
 }
+/* Viewed signal (Phase 2) — quiet, concrete engagement facts. A calm muted
+   secondary line under the status/views line; deliberately NOT a loud badge. */
+.sep-library .lib-card-facts {
+  margin: 2px 0 0;
+  font-size: 11px; line-height: 1.4;
+  color: var(--fg-mute);
+  overflow: hidden; text-overflow: ellipsis; white-space: nowrap;
+}
 .sep-library .lib-pending-note {
   margin: 6px 0 2px;
   font-size: 11.5px; line-height: 1.45;

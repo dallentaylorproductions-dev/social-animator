@@ -46,6 +46,7 @@ import {
   isCrossDeviceOnly,
   listMetaLine,
   viewSignalLabel,
+  viewEngagementFacts,
   LONG_PRESS_MS,
   mergePages,
   movedBeyond,
@@ -1559,6 +1560,17 @@ function PageCardView({
               .join(" · ")}
           </p>
         )}
+        {/* Viewed signal (Phase 2) — quiet, concrete engagement facts on a
+            muted secondary line (capped + prioritized in viewEngagementFacts).
+            Empty on a flag-off / Phase-1 card, so nothing new renders there. */}
+        {(() => {
+          const facts = viewEngagementFacts(card);
+          return facts.length > 0 ? (
+            <p className="lib-card-facts" data-testid="lib-card-facts">
+              {facts.join(" · ")}
+            </p>
+          ) : null;
+        })()}
 
         {isPending && (
           <p className="lib-pending-note">

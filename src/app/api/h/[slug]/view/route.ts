@@ -1,7 +1,14 @@
 import { NextResponse } from "next/server";
 import { fetchHandout } from "@/lib/share-urls";
-import { isViewedSignalEnabled } from "@/lib/seller-presentation/viewed-signal";
-import { isBotUserAgent, recordView } from "@/lib/seller-presentation/views-store";
+import {
+  isViewedSignalEnabled,
+  isViewedSignalEngagementEnabled,
+} from "@/lib/seller-presentation/viewed-signal";
+import {
+  isBotUserAgent,
+  recordEngagement,
+  recordView,
+} from "@/lib/seller-presentation/views-store";
 
 /**
  * POST /api/h/[slug]/view (viewed signal, Phase 1).
@@ -25,9 +32,20 @@ import { isBotUserAgent, recordView } from "@/lib/seller-presentation/views-stor
  *   - a missing / revoked / archived / expired page (fetchHandout -> null)
  *     records nothing.
  *
+ * Two beacon shapes hit this ONE route, distinguished by the body:
+ *   - `{ sid }`                       -> OPEN beacon (Phase 1), on mount. Owns
+ *                                        the count via `recordView`.
+ *   - `{ sid, engagement: {...} }`    -> ENGAGEMENT summary (Phase 2), one per
+ *                                        session on pagehide. Folds depth into
+ *                                        the SAME session via `recordEngagement`;
+ *                                        never creates a view. Honored ONLY when
+ *                                        VIEWED_SIGNAL_ENGAGEMENT_ENABLED is on,
+ *                                        so flag-off it is ignored (and the
+ *                                        seller page never sends it anyway).
+ *
  * No auth (the seller is anonymous) and no PII: only an opaque session id +
- * timestamps reach KV. The signal is read back solely through the auth-gated,
- * owner-scoped pages route - never onto the seller's page.
+ * timestamps + coarse engagement flags reach KV. The signal is read back solely
+ * through the auth-gated, owner-scoped pages route - never onto the seller's page.
  */
 export const runtime = "nodejs";
 
@@ -54,12 +72,32 @@ export async function POST(req: Request, { params }: RouteContext) {
   const { slug } = await params;
   if (!slug) return noContent();
 
-  // Opaque per-session token from the beacon body. Absent / malformed bodies
-  // drop to an empty sid, which `recordView` then ignores.
+  // Opaque per-session token + optional engagement summary from the beacon
+  // body. Absent / malformed bodies drop to an empty sid, which the recorders
+  // then ignore.
   let sid = "";
+  let engagement:
+    | { videoPlayed?: boolean; reachedEnd?: boolean; dwellMs?: unknown }
+    | undefined;
   try {
-    const body = (await req.json()) as { sid?: unknown };
+    const body = (await req.json()) as {
+      sid?: unknown;
+      engagement?: unknown;
+    };
     if (body && typeof body.sid === "string") sid = body.sid;
+    if (
+      body &&
+      body.engagement &&
+      typeof body.engagement === "object" &&
+      !Array.isArray(body.engagement)
+    ) {
+      const e = body.engagement as Record<string, unknown>;
+      engagement = {
+        videoPlayed: e.videoPlayed === true,
+        reachedEnd: e.reachedEnd === true,
+        dwellMs: e.dwellMs,
+      };
+    }
   } catch {
     // Non-JSON / empty body - nothing to record.
   }
@@ -71,7 +109,21 @@ export async function POST(req: Request, { params }: RouteContext) {
   if (!record) return noContent();
 
   try {
-    await recordView({ slug, sid, revealedAt: record.revealedAt });
+    if (engagement && isViewedSignalEngagementEnabled()) {
+      // Phase 2 engagement summary: fold this session's depth into its existing
+      // entry. Never creates a view (the open beacon owns the count). When the
+      // engagement flag is off we fall through to the open path below so the
+      // Phase 1 count is still honored even if a stray summary arrives.
+      await recordEngagement({
+        slug,
+        sid,
+        videoPlayed: engagement.videoPlayed,
+        reachedEnd: engagement.reachedEnd,
+        dwellMs: engagement.dwellMs,
+      });
+    } else {
+      await recordView({ slug, sid, revealedAt: record.revealedAt });
+    }
   } catch {
     // Best-effort: a transient KV hiccup must never surface to the seller.
   }

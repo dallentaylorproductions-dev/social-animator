@@ -66,6 +66,15 @@ export interface ServerPageSummary {
   lastViewedAt?: string;
   /** Viewed signal (Phase 1) — a retained open occurred after the reveal. */
   returnedAfterReveal?: boolean;
+  /**
+   * Viewed signal (Phase 2 — engagement). Populated by the pages route from the
+   * `views:<slug>` aggregate ONLY when VIEWED_SIGNAL_ENGAGEMENT_ENABLED is on;
+   * omitted (and the facts stay silent) when the flag is off, so a Phase-1 / flag-
+   * off card is byte-identical.
+   */
+  watchedVideo?: boolean;
+  readToEnd?: boolean;
+  lingered?: boolean;
 }
 
 /** A merged card the library renders. */
@@ -98,6 +107,10 @@ export interface PageCard {
   lastViewedAt?: string;
   /** Viewed signal (Phase 1) — a retained open occurred after the reveal. */
   returnedAfterReveal?: boolean;
+  /** Viewed signal (Phase 2) — concrete engagement facts, present only under flag. */
+  watchedVideo?: boolean;
+  readToEnd?: boolean;
+  lingered?: boolean;
 }
 
 export function publicUrlForSlug(slug: string): string {
@@ -251,6 +264,9 @@ export function mergePages(input: MergeInput): PageCard[] {
         viewCount: serverPage.viewCount,
         lastViewedAt: serverPage.lastViewedAt,
         returnedAfterReveal: serverPage.returnedAfterReveal,
+        watchedVideo: serverPage.watchedVideo,
+        readToEnd: serverPage.readToEnd,
+        lingered: serverPage.lingered,
       });
       continue;
     }
@@ -286,6 +302,9 @@ export function mergePages(input: MergeInput): PageCard[] {
       viewCount: page.viewCount,
       lastViewedAt: page.lastViewedAt,
       returnedAfterReveal: page.returnedAfterReveal,
+      watchedVideo: page.watchedVideo,
+      readToEnd: page.readToEnd,
+      lingered: page.lingered,
     });
   }
 
@@ -670,6 +689,26 @@ export function viewSignalLabel(card: PageCard, nowMs: number): string | undefin
 }
 
 /**
+ * Viewed signal (Phase 2) — the quiet, concrete engagement facts for a card,
+ * PRIORITIZED and CAPPED so the chip stays a glance. PURE; the cards view and
+ * the List meta line both read it so the voice never drifts.
+ *
+ * Returned-after-reveal (the strongest signal) is already the status LABEL
+ * (`viewSignalLabel` → "Returned"), so this returns only the depth facts, in
+ * priority order: watched video > read to end > lingered. Capped at `max`
+ * (default 2) — never the whole list, never a raw dwell number. Empty when the
+ * page has no engagement fields (flag-off / Phase-1 card), so those surfaces are
+ * byte-identical.
+ */
+export function viewEngagementFacts(card: PageCard, max = 2): string[] {
+  const facts: string[] = [];
+  if (card.watchedVideo) facts.push("Watched your video");
+  if (card.readToEnd) facts.push("Read to the end");
+  if (card.lingered) facts.push("Spent time reading");
+  return max >= 0 ? facts.slice(0, max) : facts;
+}
+
+/**
  * The row's secondary meta line (the status chip is rendered separately):
  *   - Draft     → "Started X ago"
  *   - Archived  → "Archived X ago" (by archivedAt, falling back to updatedAt)
@@ -694,6 +733,10 @@ export function listMetaLine(card: PageCard, nowMs: number): string {
   if (typeof card.viewCount === "number") {
     parts.push(`${card.viewCount} ${card.viewCount === 1 ? "view" : "views"}`);
   }
+  // Phase 2 — append the SINGLE strongest engagement fact in the dense List
+  // line (the cards view shows up to 2 on a secondary line). Empty on a flag-off
+  // card, so the line stays byte-identical to Phase 1.
+  parts.push(...viewEngagementFacts(card, 1));
   if (parts.length === 0) return `Live ${relativeTimeAgo(card.updatedAt, nowMs)}`;
   return parts.join(" · ");
 }

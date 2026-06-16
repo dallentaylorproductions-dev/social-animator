@@ -10,7 +10,10 @@ import { effectivePosterUrl } from "../engine/types";
 import { PresentationPageMotion } from "./motion";
 import dynamic from "next/dynamic";
 import { BrandEngine } from "@/lib/brand/color-engine";
-import { viewSignalSlugFor } from "@/lib/seller-presentation/viewed-signal";
+import {
+  isViewedSignalEngagementEnabled,
+  viewSignalSlugFor,
+} from "@/lib/seller-presentation/viewed-signal";
 import "./presentation-page.css";
 
 // Flagship (v2) template — code-split so its module graph (and the self-hosted
@@ -177,7 +180,10 @@ export function SellerPresentationV1({
         <EndMark />
         <Foot payload={payload} />
       </article>
-      <PresentationPageMotion viewSignalSlug={viewSignalSlugFor(handout)} />
+      <PresentationPageMotion
+        viewSignalSlug={viewSignalSlugFor(handout)}
+        engagementEnabled={isViewedSignalEngagementEnabled()}
+      />
     </main>
   );
 }

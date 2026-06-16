@@ -35,6 +35,15 @@ export interface PageViewEntry {
   sid: string;
   /** True iff this open happened AFTER the page's reveal (State A -> State B). */
   afterReveal: boolean;
+  // ---- Phase 2 (engagement) - folded in by THIS session's later summary
+  //      beacon (same sid). All optional + omitted-when-false, so a Phase-1
+  //      entry (or a session that sent no summary) is byte-identical. ----
+  /** The welcome video was played during this session. */
+  videoPlayed?: boolean;
+  /** The session scrolled through to the closing / CTA block. */
+  reachedEnd?: boolean;
+  /** Roughly how long the page was open this session (ms, clamped + coarse). */
+  dwellMs?: number;
 }
 
 /** The persisted `views:<slug>` record. */
@@ -48,9 +57,45 @@ export interface PageViews {
   lastViewedAt: string;
   /** Bounded, newest-last tail. Drives the returned-after-reveal read. */
   recent: PageViewEntry[];
+  // ---- Phase 2 (engagement) aggregate rollups - bounded scalars that SURVIVE
+  //      the `recent` FIFO eviction, so "ever watched the video" stays true past
+  //      VIEWS_RECENT_CAP sessions. All optional + omitted-when-false, so a
+  //      Phase-1 record carries none of these and reads byte-identically. ----
+  /** Any session ever played the welcome video. */
+  everWatchedVideo?: boolean;
+  /** Any session ever scrolled through to the closing / CTA block. */
+  everReadToEnd?: boolean;
+  /** The longest single-session dwell ever recorded (ms, clamped). */
+  maxDwellMs?: number;
 }
 
-/** The Phase 1 signal the agent surface reads. Pure projection of PageViews. */
+/**
+ * Dwell at or above this (ms) reads as "spent time reading" - a meaningful
+ * linger, not an accidental open-and-leave. 60s mirrors the scoping doc's
+ * coarse >60s bucket; the raw number is NEVER surfaced, only this predicate.
+ */
+export const LINGER_DWELL_MS = 60_000;
+
+/** Hard ceiling for a recorded dwell (ms) - a sane upper bound (24h) so a
+ *  backgrounded-for-days tab or a tampered beacon can't store garbage. */
+const MAX_DWELL_MS = 24 * 60 * 60 * 1000;
+
+/**
+ * Clamp a wire-supplied dwell to a finite, non-negative, bounded integer ms, or
+ * undefined when it isn't a usable number. Defense-at-boundary: the beacon body
+ * is untrusted.
+ */
+export function clampDwellMs(value: unknown): number | undefined {
+  if (typeof value !== "number" || !Number.isFinite(value) || value < 0) {
+    return undefined;
+  }
+  return Math.min(Math.floor(value), MAX_DWELL_MS);
+}
+
+/** The signal the agent surface reads. Pure projection of PageViews. Phase 1
+ *  fields (opened / count / lastViewedAt / returnedAfterReveal) plus the Phase 2
+ *  engagement predicates (always derivable; the route gates whether they reach
+ *  the chip behind VIEWED_SIGNAL_ENGAGEMENT_ENABLED). */
 export interface ViewSignal {
   /** count > 0. */
   opened: boolean;
@@ -60,6 +105,13 @@ export interface ViewSignal {
   lastViewedAt?: string;
   /** Any retained open stamped after the reveal - the strongest buying signal. */
   returnedAfterReveal: boolean;
+  // ---- Phase 2 engagement predicates (derived from the aggregate rollups). ----
+  /** Ever played the welcome video. */
+  watchedVideo: boolean;
+  /** Ever scrolled through to the closing / CTA. */
+  readToEnd: boolean;
+  /** Lingered: the longest session dwell met LINGER_DWELL_MS. */
+  lingered: boolean;
 }
 
 function viewsKey(slug: string): string {
@@ -123,22 +175,116 @@ export function applyView(
     firstViewedAt: existing.firstViewedAt,
     lastViewedAt: opts.at,
     recent: [...existing.recent, entry].slice(-VIEWS_RECENT_CAP),
+    // Preserve the Phase 2 engagement rollups across a later open — an open
+    // beacon must never wipe accumulated engagement (and they survive the
+    // recent[] FIFO eviction by living at the top level). Absent on a
+    // Phase-1 record, so they spread to nothing (byte-identical).
+    ...(existing.everWatchedVideo ? { everWatchedVideo: true } : {}),
+    ...(existing.everReadToEnd ? { everReadToEnd: true } : {}),
+    ...(existing.maxDwellMs ? { maxDwellMs: existing.maxDwellMs } : {}),
+  };
+}
+
+/**
+ * Fold ONE session's engagement summary into the page's views, PURELY. Returns
+ * the next record, or `null` when there is nothing to write:
+ *   - no existing record, or a blank `sid`, or no session entry matching the sid
+ *     (engagement attaches ONLY to a counted session - it never creates a view;
+ *     the open beacon owns the count). A genuinely lost open beacon means this
+ *     session's engagement is dropped (best-effort, cheap, rare).
+ *   - the summary carries nothing usable (no video, no reached-end, no dwell),
+ *     or folding it would change nothing (a duplicate / weaker summary).
+ *
+ * Folds are MONOTONIC: a flag only ever flips false->true, and dwell only ever
+ * rises (max), so a later, weaker summary for the same session can never erase a
+ * stronger earlier one. Updates BOTH the per-session entry (for the future
+ * timeline) AND the aggregate rollups (which survive `recent` eviction).
+ */
+export function applyEngagement(
+  existing: PageViews | null,
+  opts: {
+    sid: string;
+    videoPlayed?: boolean;
+    reachedEnd?: boolean;
+    dwellMs?: unknown;
+  },
+): PageViews | null {
+  if (!existing) return null;
+  const sid = opts.sid?.trim();
+  if (!sid) return null;
+  const idx = existing.recent.findIndex((e) => e.sid === sid);
+  if (idx < 0) return null;
+
+  const dwell = clampDwellMs(opts.dwellMs);
+  const video = !!opts.videoPlayed;
+  const reached = !!opts.reachedEnd;
+  if (!video && !reached && dwell === undefined) return null;
+
+  const entry = existing.recent[idx];
+  const nextVideo = entry.videoPlayed || video;
+  const nextReached = entry.reachedEnd || reached;
+  const nextDwell = Math.max(entry.dwellMs ?? 0, dwell ?? 0);
+
+  // No-op guard: if the fold changes nothing on this session's entry, skip the
+  // write (a re-sent or weaker summary).
+  const changed =
+    nextVideo !== !!entry.videoPlayed ||
+    nextReached !== !!entry.reachedEnd ||
+    nextDwell !== (entry.dwellMs ?? 0);
+  if (!changed) return null;
+
+  const foldedEntry: PageViewEntry = {
+    at: entry.at,
+    sid: entry.sid,
+    afterReveal: entry.afterReveal,
+    ...(nextVideo ? { videoPlayed: true } : {}),
+    ...(nextReached ? { reachedEnd: true } : {}),
+    ...(nextDwell > 0 ? { dwellMs: nextDwell } : {}),
+  };
+  const recent = [...existing.recent];
+  recent[idx] = foldedEntry;
+
+  const everVideo = existing.everWatchedVideo || nextVideo;
+  const everReached = existing.everReadToEnd || nextReached;
+  const maxDwell = Math.max(existing.maxDwellMs ?? 0, nextDwell);
+
+  return {
+    slug: existing.slug,
+    count: existing.count,
+    firstViewedAt: existing.firstViewedAt,
+    lastViewedAt: existing.lastViewedAt,
+    recent,
+    ...(everVideo ? { everWatchedVideo: true } : {}),
+    ...(everReached ? { everReadToEnd: true } : {}),
+    ...(maxDwell > 0 ? { maxDwellMs: maxDwell } : {}),
   };
 }
 
 /**
  * Project a stored record into the agent-facing signal. PURE. A missing record
- * (or a zero count) reads as "not opened" so the chip stays silent.
+ * (or a zero count) reads as "not opened" so the chip stays silent. The Phase 2
+ * engagement predicates are always derived here; the pages route decides whether
+ * to forward them onto the chip (gated by VIEWED_SIGNAL_ENGAGEMENT_ENABLED).
  */
 export function deriveViewSignal(views: PageViews | null): ViewSignal {
   if (!views || views.count < 1) {
-    return { opened: false, count: 0, returnedAfterReveal: false };
+    return {
+      opened: false,
+      count: 0,
+      returnedAfterReveal: false,
+      watchedVideo: false,
+      readToEnd: false,
+      lingered: false,
+    };
   }
   return {
     opened: true,
     count: views.count,
     lastViewedAt: views.lastViewedAt,
     returnedAfterReveal: views.recent.some((e) => e.afterReveal),
+    watchedVideo: !!views.everWatchedVideo,
+    readToEnd: !!views.everReadToEnd,
+    lingered: (views.maxDwellMs ?? 0) >= LINGER_DWELL_MS,
   };
 }
 
@@ -166,6 +312,32 @@ export async function recordView(opts: {
     at,
     sid: opts.sid,
     revealedAt: opts.revealedAt,
+  });
+  if (!next) return;
+  await kv.set(viewsKey(opts.slug), next);
+}
+
+/**
+ * Fold one session's engagement summary into the page's views (Phase 2). Reads
+ * the current record, applies the pure `applyEngagement`, and writes back ONLY
+ * when something changed (a summary with no usable signal, or for an unknown
+ * session, writes nothing). Best-effort: the summary arrives via a fire-and-
+ * forget `sendBeacon` on pagehide, so a transient KV hiccup never surfaces to
+ * the seller. Engagement NEVER creates a view - the open beacon owns the count.
+ */
+export async function recordEngagement(opts: {
+  slug: string;
+  sid: string;
+  videoPlayed?: boolean;
+  reachedEnd?: boolean;
+  dwellMs?: unknown;
+}): Promise<void> {
+  const existing = await getViews(opts.slug);
+  const next = applyEngagement(existing, {
+    sid: opts.sid,
+    videoPlayed: opts.videoPlayed,
+    reachedEnd: opts.reachedEnd,
+    dwellMs: opts.dwellMs,
   });
   if (!next) return;
   await kv.set(viewsKey(opts.slug), next);

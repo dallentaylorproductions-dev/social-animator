@@ -10,7 +10,10 @@ import {
   SELLER_PRESENTATION_HANDOUT_TYPE,
   type ServerPageSummary,
 } from "@/lib/seller-presentation/pages-library";
-import { isViewedSignalEnabled } from "@/lib/seller-presentation/viewed-signal";
+import {
+  isViewedSignalEnabled,
+  isViewedSignalEngagementEnabled,
+} from "@/lib/seller-presentation/viewed-signal";
 import { deriveViewSignal, getViews } from "@/lib/seller-presentation/views-store";
 
 /**
@@ -70,6 +73,10 @@ export async function GET() {
     // `views:<slug>` record ONLY when the flag is on. Reads are batched
     // (like listOwnerHandoutRecords) and an un-opened page is returned
     // unchanged, so a flag-off response is byte-identical to today.
+    // Phase 2 (engagement) is independently gated: the concrete depth facts are
+    // attached ONLY when VIEWED_SIGNAL_ENGAGEMENT_ENABLED is on, so a Phase-1-only
+    // response carries the status + N views exactly as before.
+    const engagementOn = isViewedSignalEngagementEnabled();
     const pages: ServerPageSummary[] = isViewedSignalEnabled()
       ? await Promise.all(
           base.map(async (page) => {
@@ -80,6 +87,13 @@ export async function GET() {
               viewCount: signal.count,
               lastViewedAt: signal.lastViewedAt,
               returnedAfterReveal: signal.returnedAfterReveal,
+              ...(engagementOn
+                ? {
+                    watchedVideo: signal.watchedVideo,
+                    readToEnd: signal.readToEnd,
+                    lingered: signal.lingered,
+                  }
+                : {}),
             };
           }),
         )

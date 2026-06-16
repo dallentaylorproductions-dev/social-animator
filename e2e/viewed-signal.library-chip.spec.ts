@@ -2,6 +2,7 @@ import { test, expect } from "@playwright/test";
 import {
   listMetaLine,
   mergePages,
+  viewEngagementFacts,
   viewSignalLabel,
   type PageCard,
   type ServerPageSummary,
@@ -114,6 +115,85 @@ test.describe("listMetaLine - viewed signal is additive", () => {
   });
 });
 
+// ===========================================================================
+// Phase 2 (engagement) — quiet concrete facts: prioritized, capped, a glance.
+// ===========================================================================
+
+test.describe("viewEngagementFacts", () => {
+  test("a card with no engagement fields (flag-off / Phase 1) yields no facts", () => {
+    expect(viewEngagementFacts(liveCard({ viewCount: 3 }))).toEqual([]);
+  });
+
+  test("facts render in priority order: watched > read > lingered", () => {
+    const facts = viewEngagementFacts(
+      liveCard({
+        viewCount: 2,
+        watchedVideo: true,
+        readToEnd: true,
+        lingered: true,
+      }),
+      3,
+    );
+    expect(facts).toEqual([
+      "Watched your video",
+      "Read to the end",
+      "Spent time reading",
+    ]);
+  });
+
+  test("capped at the 1-2 strongest (default 2) so the chip stays a glance", () => {
+    const facts = viewEngagementFacts(
+      liveCard({ watchedVideo: true, readToEnd: true, lingered: true }),
+    );
+    expect(facts).toEqual(["Watched your video", "Read to the end"]);
+  });
+
+  test("a single fact surfaces alone (e.g. only lingered)", () => {
+    expect(viewEngagementFacts(liveCard({ lingered: true }))).toEqual([
+      "Spent time reading",
+    ]);
+  });
+
+  test("no fact is ever a raw dwell number", () => {
+    const facts = viewEngagementFacts(
+      liveCard({ watchedVideo: true, readToEnd: true, lingered: true }),
+      3,
+    );
+    for (const f of facts) expect(f).not.toMatch(/\d/);
+  });
+});
+
+test.describe("listMetaLine - engagement fact is additive + glanceable", () => {
+  test("flag-off card (no engagement fields) is byte-identical to Phase 1", () => {
+    // No engagement fields → no fact appended → exactly the Phase 1 line.
+    expect(
+      listMetaLine(
+        liveCard({
+          sellerLine: "the Johnsons",
+          viewCount: 1,
+          lastViewedAt: "2026-06-15T10:00:00.000Z",
+        }),
+        NOW,
+      ),
+    ).toBe("the Johnsons · Opened · 2 hours ago · 1 view");
+  });
+
+  test("appends the SINGLE strongest fact in the dense list line", () => {
+    const line = listMetaLine(
+      liveCard({
+        viewCount: 3,
+        lastViewedAt: "2026-06-15T10:00:00.000Z",
+        returnedAfterReveal: true,
+        watchedVideo: true,
+        readToEnd: true,
+      }),
+      NOW,
+    );
+    // Returned (status) + count + the top fact only (watched) — not all facts.
+    expect(line).toBe("Returned · 3 views · Watched your video");
+  });
+});
+
 test.describe("mergePages - view fields flow onto the card", () => {
   const summary = (over: Partial<ServerPageSummary> = {}): ServerPageSummary => ({
     slug: "abc12345",
@@ -150,5 +230,33 @@ test.describe("mergePages - view fields flow onto the card", () => {
     expect(card.viewCount).toBeUndefined();
     expect(card.lastViewedAt).toBeUndefined();
     expect(card.returnedAfterReveal).toBeUndefined();
+    // Phase 2 engagement fields also absent → no facts.
+    expect(card.watchedVideo).toBeUndefined();
+    expect(card.readToEnd).toBeUndefined();
+    expect(card.lingered).toBeUndefined();
+    expect(viewEngagementFacts(card)).toEqual([]);
+  });
+
+  test("Phase 2 engagement fields flow onto the card (standalone + instance-backed)", () => {
+    const [card] = mergePages({
+      serverPages: [
+        summary({
+          viewCount: 4,
+          lastViewedAt: "2026-06-15T10:00:00.000Z",
+          watchedVideo: true,
+          readToEnd: true,
+          lingered: true,
+        }),
+      ],
+      instances: [],
+      sessionEmail: "agent@example.com",
+    });
+    expect(card.watchedVideo).toBe(true);
+    expect(card.readToEnd).toBe(true);
+    expect(card.lingered).toBe(true);
+    expect(viewEngagementFacts(card)).toEqual([
+      "Watched your video",
+      "Read to the end",
+    ]);
   });
 });
