@@ -40,6 +40,27 @@ export function isViewedSignalEngagementEnabled(): boolean {
 }
 
 /**
+ * Viewed signal (Phase 3) - the VIEWED_SIGNAL_NUDGE_ENABLED kill switch.
+ *
+ * OFF by default, INDEPENDENT of Phase 1 / Phase 2 so Cowork can verify the
+ * advisory follow-up nudge on preview before it goes live. When false the nudge
+ * layer is dark and every surface is exactly Phase 1/2:
+ *   - the pages route computes NO `worthFollowUp` (no marker, no reasons),
+ *   - the library header shows NO "worth a follow-up" count,
+ *   - the "Mark as followed up" control never renders and its route 503s, so
+ *     NOTHING is ever stored (no `followedUpAt` write).
+ *
+ * Nudge RIDES Phase 1: the derivation reads the same `views:<slug>` aggregate the
+ * Phase 1 read path already loads, so the route only computes the nudge when
+ * VIEWED_SIGNAL_ENABLED is also on (it never does anything on its own). Pure
+ * read-side derivation plus one bounded owner-scoped dismiss write; no new
+ * capture, no new beacon. Lazy per-call env read, same shape as the siblings.
+ */
+export function isViewedSignalNudgeEnabled(): boolean {
+  return process.env.VIEWED_SIGNAL_NUDGE_ENABLED === "true";
+}
+
+/**
  * The slug to hand the seller page's beacon island, or undefined when no beacon
  * should fire. Returns the slug only when the flag is on; the three seller render
  * arms (v1 / flagship / State A) all call this so the gate lives in ONE place and

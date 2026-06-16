@@ -13,8 +13,13 @@ import {
 import {
   isViewedSignalEnabled,
   isViewedSignalEngagementEnabled,
+  isViewedSignalNudgeEnabled,
 } from "@/lib/seller-presentation/viewed-signal";
-import { deriveViewSignal, getViews } from "@/lib/seller-presentation/views-store";
+import {
+  deriveFollowUpNudge,
+  deriveViewSignal,
+  getViews,
+} from "@/lib/seller-presentation/views-store";
 
 /**
  * GET /api/seller-presentation/pages (SP-LIB).
@@ -76,12 +81,30 @@ export async function GET() {
     // Phase 2 (engagement) is independently gated: the concrete depth facts are
     // attached ONLY when VIEWED_SIGNAL_ENGAGEMENT_ENABLED is on, so a Phase-1-only
     // response carries the status + N views exactly as before.
+    // Phase 3 (advisory follow-up nudge): independently gated. When on, the
+    // route derives a per-page `worthFollowUp` from the SAME `views:<slug>`
+    // aggregate Phase 1 already reads, plus the owner record's `followedUpAt`
+    // (the bounded dismiss). Purely read-side; no new capture. Owner-scoped: the
+    // followedUpAt comes from THIS agent's owner-indexed records, so agent A can
+    // never see agent B's nudges.
     const engagementOn = isViewedSignalEngagementEnabled();
+    const nudgeOn = isViewedSignalNudgeEnabled();
+    const followedUpBySlug = new Map(
+      records.map((r) => [r.slug, r.followedUpAt]),
+    );
+    const nowMs = Date.now();
     const pages: ServerPageSummary[] = isViewedSignalEnabled()
       ? await Promise.all(
           base.map(async (page) => {
-            const signal = deriveViewSignal(await getViews(page.slug));
+            const views = await getViews(page.slug);
+            const signal = deriveViewSignal(views);
             if (!signal.opened) return page;
+            const nudge = nudgeOn
+              ? deriveFollowUpNudge(views, {
+                  nowMs,
+                  followedUpAt: followedUpBySlug.get(page.slug),
+                })
+              : null;
             return {
               ...page,
               viewCount: signal.count,
@@ -92,6 +115,12 @@ export async function GET() {
                     watchedVideo: signal.watchedVideo,
                     readToEnd: signal.readToEnd,
                     lingered: signal.lingered,
+                  }
+                : {}),
+              ...(nudge?.worthFollowUp
+                ? {
+                    worthFollowUp: true,
+                    followUpReasons: nudge.reasons,
                   }
                 : {}),
             };

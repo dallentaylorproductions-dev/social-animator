@@ -123,6 +123,18 @@
   color: var(--st-pending);
   border-color: color-mix(in oklch, var(--st-pending) 45%, var(--border));
 }
+/* Viewed signal (Phase 3) — the calm "N worth a follow-up" header count. A
+   quiet pill in the muted voice, deliberately NOT an alert color or a red
+   badge: a glance, not an alarm. */
+.sep-library .lib-followup-count {
+  font-family: var(--font-geist-mono), monospace;
+  font-size: 11.5px; letter-spacing: 0.04em;
+  color: var(--fg-mute);
+  padding: 7px 12px;
+  border: 1px solid var(--border);
+  border-radius: 999px;
+  white-space: nowrap;
+}
 .sep-library .lib-newbtn {
   font-size: 13px; font-weight: 600;
   color: var(--bg);
@@ -349,6 +361,16 @@
   margin: 2px 0 0;
   font-size: 11px; line-height: 1.4;
   color: var(--fg-mute);
+  overflow: hidden; text-overflow: ellipsis; white-space: nowrap;
+}
+/* Viewed signal (Phase 3) — the advisory follow-up marker on a card. Calm and
+   on-voice: a quiet accent tint to set it apart from the muted facts line, but
+   no badge, no fill, no urgency. The reasons ride the same line, capped upstream
+   so it stays a glance. */
+.sep-library .lib-card-followup {
+  margin: 4px 0 0;
+  font-size: 11.5px; line-height: 1.4; font-weight: 500;
+  color: var(--accent);
   overflow: hidden; text-overflow: ellipsis; white-space: nowrap;
 }
 .sep-library .lib-pending-note {

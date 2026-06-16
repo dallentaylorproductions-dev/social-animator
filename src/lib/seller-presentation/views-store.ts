@@ -288,6 +288,77 @@ export function deriveViewSignal(views: PageViews | null): ViewSignal {
   };
 }
 
+/**
+ * Viewed signal (Phase 3) - the recency window (ms) for the advisory follow-up
+ * nudge. Meaningful engagement OLDER than this ages out and stops nudging, so a
+ * page the seller engaged with weeks ago no longer suggests a fresh follow-up.
+ * ~14 days, per the locked product rule. Pure read-side; the raw number is never
+ * surfaced, only the derived `worthFollowUp` predicate.
+ */
+export const FOLLOW_UP_WINDOW_MS = 14 * 24 * 60 * 60 * 1000;
+
+/** The advisory follow-up nudge for one page. Pure projection of PageViews. */
+export interface FollowUpNudge {
+  /** This page has meaningful + recent engagement the agent has not yet cleared. */
+  worthFollowUp: boolean;
+  /**
+   * The concrete reasons it qualifies, PRIORITIZED + capped, reusing the calm
+   * Phase 2 voice. Empty unless `worthFollowUp`. Returned-after-reveal leads (the
+   * strongest buying signal), then watched-video, then read-to-end.
+   */
+  reasons: string[];
+}
+
+/**
+ * Derive the advisory follow-up nudge for a page, PURELY. A page is "worth a
+ * follow-up" iff a RETAINED open is, per the locked rule (Phase 3):
+ *   - meaningful: that session watched the welcome video OR read to the end OR
+ *     returned after the reveal (a plain "opened once" is too thin and never
+ *     qualifies), AND
+ *   - recent: its open timestamp is within `windowMs` of `nowMs` (older
+ *     engagement ages out and stops nudging), AND
+ *   - not yet cleared: its open timestamp is strictly after `followedUpAt` (the
+ *     bounded owner-scoped dismiss). A page marked followed-up drops out; if the
+ *     seller engages AGAIN after that mark, the new session re-qualifies, so the
+ *     dismiss is "clear up to here", never permanent suppression.
+ *
+ * Derived from the bounded `recent` tail's per-session flags + timestamps, so the
+ * recency + meaningfulness are tied to a real moment (NOT the timestamp-less
+ * aggregate rollups, which only drive the always-on chip facts). No new capture;
+ * pure projection the route gates behind VIEWED_SIGNAL_NUDGE_ENABLED.
+ */
+export function deriveFollowUpNudge(
+  views: PageViews | null,
+  opts: { nowMs: number; followedUpAt?: string | null; windowMs?: number },
+): FollowUpNudge {
+  const NONE: FollowUpNudge = { worthFollowUp: false, reasons: [] };
+  if (!views || views.count < 1) return NONE;
+
+  const windowMs = opts.windowMs ?? FOLLOW_UP_WINDOW_MS;
+  const cutoff = opts.nowMs - windowMs;
+  const followedUpMs = opts.followedUpAt ? Date.parse(opts.followedUpAt) : NaN;
+
+  let returned = false;
+  let video = false;
+  let reached = false;
+  for (const e of views.recent) {
+    const atMs = Date.parse(e.at);
+    if (Number.isNaN(atMs)) continue;
+    if (atMs < cutoff) continue; // aged out of the recency window
+    if (!Number.isNaN(followedUpMs) && atMs <= followedUpMs) continue; // already cleared
+    if (e.afterReveal) returned = true;
+    if (e.videoPlayed) video = true;
+    if (e.reachedEnd) reached = true;
+  }
+
+  if (!returned && !video && !reached) return NONE;
+  const reasons: string[] = [];
+  if (returned) reasons.push("Returned after the reveal");
+  if (video) reasons.push("Watched your video");
+  if (reached) reasons.push("Read to the end");
+  return { worthFollowUp: true, reasons };
+}
+
 /** Read a page's views record (or null if none recorded). */
 export async function getViews(slug: string): Promise<PageViews | null> {
   return (await kv.get<PageViews>(viewsKey(slug))) ?? null;

@@ -75,6 +75,15 @@ export interface ServerPageSummary {
   watchedVideo?: boolean;
   readToEnd?: boolean;
   lingered?: boolean;
+  /**
+   * Viewed signal (Phase 3 — advisory follow-up nudge). Computed by the pages
+   * route from the `views:<slug>` aggregate + the record's `followedUpAt` ONLY
+   * when VIEWED_SIGNAL_NUDGE_ENABLED is on; omitted (and the nudge stays silent)
+   * when the flag is off, so a Phase-1/2 / flag-off card is byte-identical.
+   */
+  worthFollowUp?: boolean;
+  /** The concrete, prioritized reasons it is worth a follow-up (capped upstream). */
+  followUpReasons?: string[];
 }
 
 /** A merged card the library renders. */
@@ -111,6 +120,9 @@ export interface PageCard {
   watchedVideo?: boolean;
   readToEnd?: boolean;
   lingered?: boolean;
+  /** Viewed signal (Phase 3) — advisory follow-up nudge, present only under flag. */
+  worthFollowUp?: boolean;
+  followUpReasons?: string[];
 }
 
 export function publicUrlForSlug(slug: string): string {
@@ -267,6 +279,8 @@ export function mergePages(input: MergeInput): PageCard[] {
         watchedVideo: serverPage.watchedVideo,
         readToEnd: serverPage.readToEnd,
         lingered: serverPage.lingered,
+        worthFollowUp: serverPage.worthFollowUp,
+        followUpReasons: serverPage.followUpReasons,
       });
       continue;
     }
@@ -305,6 +319,8 @@ export function mergePages(input: MergeInput): PageCard[] {
       watchedVideo: page.watchedVideo,
       readToEnd: page.readToEnd,
       lingered: page.lingered,
+      worthFollowUp: page.worthFollowUp,
+      followUpReasons: page.followUpReasons,
     });
   }
 
@@ -323,6 +339,16 @@ export function mergePages(input: MergeInput): PageCard[] {
  */
 export function countLivePages(serverPages: ServerPageSummary[]): number {
   return serverPages.filter((p) => !p.archived).length;
+}
+
+/**
+ * Viewed signal (Phase 3) — how many merged cards are "worth a follow-up", for
+ * the calm count on the Pages header ("N worth a follow-up"). PURE. Counts the
+ * `worthFollowUp` cards the route flagged under VIEWED_SIGNAL_NUDGE_ENABLED, so
+ * a flag-off list yields 0 and the header shows nothing (byte-identical).
+ */
+export function countWorthFollowUp(cards: PageCard[]): number {
+  return cards.filter((c) => c.worthFollowUp).length;
 }
 
 /**
@@ -494,6 +520,7 @@ export function resolveViewMode(
  *   - delete       iff Draft or Archived (never Live)
  */
 export type RowAction =
+  | "mark-followed-up"
   | "update-live"
   | "view-live"
   | "copy-link"
@@ -510,6 +537,10 @@ export function secondaryRowActions(card: PageCard): RowAction[] {
   const canDelete = isDraft || isArchived;
 
   const actions: RowAction[] = [];
+  // Phase 3 — the advisory dismiss leads the menu when the page is worth a
+  // follow-up (only ever set under VIEWED_SIGNAL_NUDGE_ENABLED), so a flag-off
+  // row's menu is byte-identical.
+  if (card.worthFollowUp) actions.push("mark-followed-up");
   if (isPending && canResume) actions.push("update-live");
   if (isLive) {
     actions.push("view-live");
@@ -709,6 +740,28 @@ export function viewEngagementFacts(card: PageCard, max = 2): string[] {
 }
 
 /**
+ * Viewed signal (Phase 3) — the calm advisory marker for a card, or undefined
+ * when the page is not worth a follow-up (or the flag is off, so `worthFollowUp`
+ * is never set). PURE; the cards view and the List meta line both read it so the
+ * voice never drifts. Operations-partner tone, no hype, no urgency:
+ *   "Worth a follow-up · Watched your video · Read to the end"
+ * The reasons are the route-computed, prioritized list, capped to `maxReasons`
+ * (default 2) so the marker stays a glance. With no reasons it is still a quiet
+ * "Worth a follow-up" (the count never lies), never a red badge or an alarm.
+ */
+export function followUpMarkerLabel(
+  card: PageCard,
+  maxReasons = 2,
+): string | undefined {
+  if (!card.worthFollowUp) return undefined;
+  const reasons = (card.followUpReasons ?? []).slice(
+    0,
+    Math.max(0, maxReasons),
+  );
+  return ["Worth a follow-up", ...reasons].join(" · ");
+}
+
+/**
  * The row's secondary meta line (the status chip is rendered separately):
  *   - Draft     → "Started X ago"
  *   - Archived  → "Archived X ago" (by archivedAt, falling back to updatedAt)
@@ -737,6 +790,10 @@ export function listMetaLine(card: PageCard, nowMs: number): string {
   // line (the cards view shows up to 2 on a secondary line). Empty on a flag-off
   // card, so the line stays byte-identical to Phase 1.
   parts.push(...viewEngagementFacts(card, 1));
+  // Phase 3 — a single quiet "Worth a follow-up" token in the dense List line
+  // (the cards view shows the reasons too). Only set under the nudge flag, so a
+  // flag-off line stays byte-identical to Phase 1/2.
+  if (card.worthFollowUp) parts.push("Worth a follow-up");
   if (parts.length === 0) return `Live ${relativeTimeAgo(card.updatedAt, nowMs)}`;
   return parts.join(" · ");
 }
