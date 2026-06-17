@@ -501,46 +501,72 @@ test.describe("duplicate is always a fresh, unpublished Draft", () => {
 });
 
 test.describe("bulk action validity (mirrors single-card rules)", () => {
-  test("empty selection disables both actions", () => {
+  test("empty selection disables every action", () => {
     expect(bulkActionValidity([])).toEqual({
       canArchive: false,
+      canRestore: false,
       canDelete: false,
     });
   });
 
-  test("Draft + Live selection: archive OK, delete blocked (live present)", () => {
+  test("Draft + Live selection: archive OK, delete + restore blocked (live present)", () => {
     const v = bulkActionValidity([
       card({ status: "draft" }),
       card({ status: "live" }),
     ]);
     expect(v.canArchive).toBe(true);
     expect(v.canDelete).toBe(false);
+    expect(v.canRestore).toBe(false);
     expect(v.deleteReason).toMatch(/archive live pages/i);
+  });
+
+  test("live-only selection: archive only, no delete + no restore (Cockpit fix #8)", () => {
+    const v = bulkActionValidity([
+      card({ status: "live" }),
+      card({ status: "live-edits-pending" }),
+    ]);
+    expect(v.canArchive).toBe(true);
+    expect(v.canDelete).toBe(false);
+    expect(v.canRestore).toBe(false);
   });
 
   test("edits-pending counts as live for delete-block", () => {
     const v = bulkActionValidity([card({ status: "live-edits-pending" })]);
     expect(v.canDelete).toBe(false);
     expect(v.canArchive).toBe(true);
+    expect(v.canRestore).toBe(false);
   });
 
-  test("Draft + Archived selection: delete OK, archive blocked (already archived)", () => {
+  test("Draft + Archived selection: delete OK, archive + restore blocked", () => {
     const v = bulkActionValidity([
       card({ status: "draft" }),
       card({ status: "archived" }),
     ]);
     expect(v.canDelete).toBe(true);
     expect(v.canArchive).toBe(false);
+    // Restore needs the WHOLE selection archived — a draft has nothing to restore.
+    expect(v.canRestore).toBe(false);
     expect(v.archiveReason).toMatch(/already archived/i);
   });
 
-  test("all-Draft selection: both actions valid", () => {
+  test("all-Archived selection: restore + delete valid, archive blocked", () => {
+    const v = bulkActionValidity([
+      card({ status: "archived" }),
+      card({ status: "archived" }),
+    ]);
+    expect(v.canRestore).toBe(true);
+    expect(v.canDelete).toBe(true);
+    expect(v.canArchive).toBe(false);
+  });
+
+  test("all-Draft selection: archive + delete valid, no restore", () => {
     const v = bulkActionValidity([
       card({ status: "draft" }),
       card({ status: "draft" }),
     ]);
     expect(v.canArchive).toBe(true);
     expect(v.canDelete).toBe(true);
+    expect(v.canRestore).toBe(false);
   });
 });
 

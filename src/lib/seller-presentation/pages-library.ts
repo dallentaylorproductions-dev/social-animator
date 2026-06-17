@@ -441,32 +441,45 @@ export function buildDuplicateDraft(
 
 /**
  * Which bulk actions are valid for a selection (mirrors the single-card
- * rules). Archive is valid on Draft + Live (reversible); Delete is valid on
+ * rules). Archive is valid on Draft + Live (reversible); Restore (un-archive)
+ * is valid only when EVERY selected item is archived; Delete is valid on
  * Draft + Archived only, NEVER on a Live page (a live page must be archived
- * first so we can never delete one a seller is actively viewing). If the
- * selection contains an item ineligible for an action, that action is disabled
- * with a short reason rather than partially applied — predictable over clever.
+ * first so we can never delete one a seller is actively viewing).
+ *
+ * Cockpit fix P2 — the bulk toolbar renders CONTEXTUALLY off these flags: it
+ * shows ONLY the actions valid for the current selection and never a greyed /
+ * disabled control (a greyed Delete on a live selection reads as broken). The
+ * `*Reason` strings are retained for callers that still want to explain a
+ * single-card block, but the bulk bar no longer renders an invalid action at
+ * all. The validity rules themselves are unchanged — only the UI moved from
+ * "show + disable" to "show only when valid".
  */
 export interface BulkValidity {
   canArchive: boolean;
   archiveReason?: string;
+  /** Un-archive every selected page (Archived tab). Valid iff ALL are archived. */
+  canRestore: boolean;
   canDelete: boolean;
   deleteReason?: string;
 }
 
 export function bulkActionValidity(selected: PageCard[]): BulkValidity {
   if (selected.length === 0) {
-    return { canArchive: false, canDelete: false };
+    return { canArchive: false, canRestore: false, canDelete: false };
   }
   const hasArchived = selected.some((c) => c.status === "archived");
   const hasLive = selected.some(
     (c) => c.status === "live" || c.status === "live-edits-pending",
   );
+  // Restore only makes sense when the WHOLE selection is archived (un-archive
+  // back to Active); a draft/live page has nothing to restore.
+  const allArchived = selected.every((c) => c.status === "archived");
   return {
     canArchive: !hasArchived,
     archiveReason: hasArchived
       ? "Some selected pages are already archived"
       : undefined,
+    canRestore: allArchived,
     canDelete: !hasLive,
     deleteReason: hasLive ? "Archive live pages before deleting" : undefined,
   };
