@@ -671,6 +671,63 @@ export function movedBeyond(
 }
 
 // ===========================================================================
+// Cockpit fix P1 — portaled "⋯" overflow-menu placement (SP-LIB).
+//
+// The overflow menu is portaled to the library root and positioned `fixed`. Its
+// placement is PURE geometry — trigger rect + measured menu size + viewport —
+// kept here (no DOM) so the component wires it and the unit tests pin it: the
+// menu can never hang off-screen no matter where the trigger sits (an expanded
+// card's "⋯" can be mid-row, not just at a row's right edge).
+// ===========================================================================
+
+/** The bits of the trigger's bounding rect the menu placement needs. */
+export interface MenuTriggerRect {
+  top: number;
+  bottom: number;
+  right: number;
+}
+
+/** The viewport-fixed top/left the menu is clamped to. */
+export interface MenuCoords {
+  top: number;
+  left: number;
+}
+
+/** Keep the menu at least this far from every viewport edge. */
+export const MENU_VIEWPORT_MARGIN = 8;
+
+/**
+ * Clamp the menu fully inside the viewport from its trigger rect + measured size.
+ * Horizontally it right-aligns to the trigger, then shifts in from either edge;
+ * vertically it opens 6px below the trigger, FLIPS above when it would overflow
+ * the bottom (and there is room above), and otherwise pins to the bottom margin.
+ * So the menu is always fully on-screen on both axes regardless of where the
+ * trigger sits. PURE — the component passes `getBoundingClientRect()` +
+ * `offsetWidth/Height` + `innerWidth/Height`; the tests pass plain numbers.
+ */
+export function clampMenuCoords(
+  trigger: MenuTriggerRect,
+  menuWidth: number,
+  menuHeight: number,
+  viewportWidth: number,
+  viewportHeight: number,
+  margin: number = MENU_VIEWPORT_MARGIN,
+): MenuCoords {
+  let left = Math.min(
+    trigger.right - menuWidth,
+    viewportWidth - menuWidth - margin,
+  );
+  left = Math.max(margin, left);
+
+  let top = trigger.bottom + 6;
+  if (top + menuHeight > viewportHeight - margin) {
+    const above = trigger.top - 6 - menuHeight;
+    top = above >= margin ? above : Math.max(margin, viewportHeight - menuHeight - margin);
+  }
+  return { top, left };
+}
+
+// ===========================================================================
 // Library v5 — manual drag-to-reorder (SP-LIB-5 / PAGES_REORDER_ENABLED).
 //
 // The agent can arrange the ACTIVE tab into a custom order by dragging (List

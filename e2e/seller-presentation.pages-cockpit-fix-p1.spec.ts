@@ -3,7 +3,9 @@ import { readFileSync } from "fs";
 import path from "path";
 import {
   cardOverflowActions,
+  clampMenuCoords,
   secondaryRowActions,
+  MENU_VIEWPORT_MARGIN,
   type PageCard,
 } from "../src/lib/seller-presentation/pages-library";
 
@@ -21,9 +23,10 @@ import {
  *      drift.
  *   2. ACTION-AREA LAYOUT — the collapsed mobile face groups the chevron WITH the
  *      primary (no `margin-left: auto` stranding it at the screen edge).
- *   3. OVERFLOW MENU STACKING — the "⋯" menu is portaled (createPortal) and
- *      `position: fixed`, so it escapes the card's clip/stacking context, and it
- *      flips up near the viewport bottom.
+ *   3. OVERFLOW MENU STACKING + PLACEMENT — the "⋯" menu is portaled
+ *      (createPortal) and `position: fixed`, so it escapes the card's
+ *      clip/stacking context; it is measured then clamped fully within the
+ *      viewport on both axes (`clampMenuCoords`) so it never hangs off-screen.
  *   4. LONG-PRESS CLEAN SELECT — the card/row surface suppresses native text
  *      selection + the iOS touch-callout.
  *   5. HORIZONTAL-SCROLL LOCK — the library root is `overflow-x: hidden` +
@@ -107,14 +110,17 @@ test.describe("overflow menu — portaled above siblings, flips up", () => {
     expect(tsx).toContain("createPortal(menu, host)");
     // The portal host is the library root, so the menu keeps the library's CSS
     // tokens + `.lib-menu*` rules while escaping the card's clip/stacking trap.
-    expect(tsx).toContain('btn.closest<HTMLElement>(".sep-library")');
+    expect(tsx).toContain('closest<HTMLElement>(".sep-library")');
     expect(tsx).toContain('position: "fixed"');
   });
 
-  test("the menu opens downward normally and flips up near the viewport bottom", () => {
-    expect(tsx).toContain("const flipUp =");
-    expect(tsx).toContain("bottom: window.innerHeight - r.top + 6");
-    expect(tsx).toContain("top: r.bottom + 6");
+  test("the menu is measured then clamped (no estimate, no flash)", () => {
+    // Placement happens after mount from the menu's REAL size, and the menu is
+    // hidden until placed — so it appears already clamped on-screen.
+    expect(tsx).toContain("clampMenuCoords(");
+    expect(tsx).toContain("menu.offsetWidth");
+    expect(tsx).toContain("menu.offsetHeight");
+    expect(tsx).toContain("visibility: coords ? \"visible\" : \"hidden\"");
   });
 
   test("the menu CSS is fixed at a higher stacking layer (not absolute/clipped)", () => {
@@ -129,6 +135,82 @@ test.describe("overflow menu — portaled above siblings, flips up", () => {
     // also exempt the menu itself, or a menu-item click would close it first.
     expect(tsx).toContain("wrapRef.current?.contains(target)");
     expect(tsx).toContain("menuRef.current?.contains(target)");
+  });
+
+  test("the menu CSS caps its height so a tall menu scrolls, never overflows", () => {
+    expect(css).toMatch(/\.lib-menu \{[^}]*max-height: calc\(100vh - 16px\)/);
+    expect(css).toMatch(/\.lib-menu \{[^}]*overflow-y: auto/);
+  });
+});
+
+// ── clampMenuCoords — the menu is always fully on-screen (both axes) ──
+
+const VW = 390; // a phone viewport
+const VH = 844;
+const MW = 168; // the menu's min-width
+const MH = 140;
+const M = MENU_VIEWPORT_MARGIN;
+
+test.describe("clampMenuCoords — never hangs off-screen", () => {
+  test("right edge trigger with room below → opens down, right-aligned", () => {
+    // ⋯ near the right edge (a List row / table row): right-aligned to it.
+    const c = clampMenuCoords({ top: 200, bottom: 234, right: 370 }, MW, MH, VW, VH);
+    expect(c.top).toBe(234 + 6);
+    expect(c.left).toBe(370 - MW); // right edge of menu == trigger right
+    expect(c.left).toBeGreaterThanOrEqual(M);
+  });
+
+  test("trigger on the LEFT (mid-card ⋯) → clamps in, never off the left edge", () => {
+    // The observed bug: a left-positioned trigger right-aligned the menu off the
+    // left edge. The left clamp pins it to the margin instead.
+    const c = clampMenuCoords({ top: 200, bottom: 234, right: 90 }, MW, MH, VW, VH);
+    expect(c.left).toBe(M);
+    expect(c.left + MW).toBeLessThanOrEqual(VW - M + 1);
+  });
+
+  test("near the bottom → flips above the trigger", () => {
+    const c = clampMenuCoords({ top: 800, bottom: 834, right: 370 }, MW, MH, VW, VH);
+    // Flips up: bottom edge of the menu sits just above the trigger top.
+    expect(c.top).toBe(800 - 6 - MH);
+    expect(c.top).toBeGreaterThanOrEqual(M);
+    expect(c.top + MH).toBeLessThanOrEqual(VH - M);
+  });
+
+  test("never exceeds any viewport edge across a sweep of trigger positions", () => {
+    for (let right = 20; right <= VW; right += 17) {
+      for (let bottom = 20; bottom <= VH; bottom += 41) {
+        const c = clampMenuCoords(
+          { top: bottom - 34, bottom, right },
+          MW,
+          MH,
+          VW,
+          VH,
+        );
+        expect(c.left).toBeGreaterThanOrEqual(M);
+        expect(c.left + MW).toBeLessThanOrEqual(VW - M);
+        expect(c.top).toBeGreaterThanOrEqual(M);
+        expect(c.top + MH).toBeLessThanOrEqual(VH - M);
+      }
+    }
+  });
+});
+
+// ── header pill row wraps fully on-screen at phone width ──
+
+test.describe("header — pills + New page + Select wrap, no clipping", () => {
+  test("the action cluster wraps to full width at mobile (V3-scoped)", () => {
+    // The fix lives in the <=640px media query, scoped under the V3 hook so the
+    // dead flag-off path stays byte-identical.
+    expect(css).toContain("@media (max-width: 640px)");
+    expect(css).toMatch(
+      /\[data-library-v3="true"\] \.lib-head-actions \{[^}]*flex-wrap: wrap/,
+    );
+    expect(css).toMatch(
+      /\[data-library-v3="true"\] \.lib-head-actions \{[^}]*width: 100%/,
+    );
+    expect(css).toMatch(
+      /\[data-library-v3="true"\] \.lib-toolbar-right \{[^}]*flex-wrap: wrap/,
+    );
   });
 });
 

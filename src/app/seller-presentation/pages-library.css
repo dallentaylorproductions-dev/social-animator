@@ -902,6 +902,10 @@
   position: fixed;
   z-index: 45;
   min-width: 168px;
+  /* Vertical safety: a menu taller than the viewport scrolls internally instead
+     of running off-screen (the JS clamp pins its top to the 8px margin). */
+  max-height: calc(100vh - 16px);
+  overflow-y: auto;
   padding: 6px;
   background: var(--surface-hi);
   border: 1px solid var(--border-hi);
@@ -1197,6 +1201,18 @@
   /* Standalone PWA: keep the back control clear of the status bar (see base). */
   .sep-library .lib-shell { padding-top: max(22px, env(safe-area-inset-top, 0px)); }
   .sep-library .lib-head-row { align-items: flex-start; }
+  /* Cockpit fix P1 (mobile): the header pill row must not overflow the now
+     horizontally-locked viewport — "+ New page" was clipping off the unreachable
+     right edge. Give the actions cluster the full width and let the pills
+     ("N worth a follow-up" / usage) + "+ New page" WRAP fully on-screen, and let
+     the toolbar's Select wrap too, so nothing clips and everything stays
+     tappable. Scoped under the V3 hook so the dead flag-off path is byte-identical. */
+  .sep-library[data-library-v3="true"] .lib-head-actions {
+    width: 100%;
+    flex-wrap: wrap;
+    gap: 8px 10px;
+  }
+  .sep-library[data-library-v3="true"] .lib-toolbar-right { flex-wrap: wrap; }
   /* Keep the photo prominent (~116x84) and let the title/meta truncate so the
      chip + "⋯" always stay in view; trim the line padding to buy room. */
   .sep-library .lib-row-line { gap: 12px; padding: 8px 6px 8px 8px; }

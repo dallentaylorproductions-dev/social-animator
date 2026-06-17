@@ -42,6 +42,7 @@ import {
   applyManualOrder,
   buildDuplicateDraft,
   bulkActionValidity,
+  clampMenuCoords,
   cardLead,
   cardMode,
   cardOverflowActions,
@@ -78,6 +79,7 @@ import {
   tabCounts,
   VIEW_MODE_STORAGE_KEY,
   type LibraryTab,
+  type MenuCoords,
   type ManageSort,
   type ManageSortColumn,
   type PageCard,
@@ -2678,36 +2680,18 @@ const ROW_ACTION_BLOCKS_ON_BUSY: Record<RowAction, boolean> = {
   delete: true,
 };
 
-/** The viewport-fixed coordinates a portaled "⋯" menu is positioned at. */
-interface MenuPos {
-  /** Distance from the viewport right edge — the menu right-aligns to its trigger. */
-  right: number;
-  /** Set when the menu opens downward (room below). */
-  top?: number;
-  /** Set instead of `top` when the menu flips up (near the viewport bottom). */
-  bottom?: number;
-}
-
-/**
- * Estimate the menu's height before it paints, so the open handler can decide
- * down vs. up without a measure pass. Each item is ~38px; +12px for the menu's
- * own padding. Generous on purpose — over-estimating only makes it flip up a
- * little earlier, never clips.
- */
-function estimateMenuHeight(itemCount: number): number {
-  return itemCount * 38 + 12;
-}
-
 /**
  * The row's "⋯" overflow menu. Keyboard-accessible (Escape closes and returns
  * focus to the trigger; the first item is focused on open). The menu is
  * PORTALED into the library root (`.sep-library`) and positioned `fixed`, so it
  * escapes the card's `overflow`/stacking context and can never open behind a
- * sibling card or a section heading; it opens downward normally and FLIPS UP
- * when the trigger sits near the viewport bottom. The portal target stays inside
- * `.sep-library`, so the menu keeps the library's tokens + styles (no second
- * theme scope). It only ever renders the actions `secondaryRowActions` deemed
- * valid, and each item calls the SAME shared handler the card uses.
+ * sibling card or a section heading. After it mounts it is MEASURED and clamped
+ * fully within the viewport on both axes (`clampMenuCoords`) — shifting in from
+ * any edge and flipping above near the bottom — so it never hangs off-screen; it
+ * stays hidden until placed, so there is no reposition flash. The portal target
+ * stays inside `.sep-library`, so the menu keeps the library's tokens + styles
+ * (no second theme scope). It only ever renders the actions `secondaryRowActions`
+ * deemed valid, and each item calls the SAME shared handler the card uses.
  */
 function RowMenu({
   card,
@@ -2735,7 +2719,9 @@ function RowMenu({
   onMarkFollowedUp: () => void;
 }) {
   const [open, setOpen] = useState(false);
-  const [pos, setPos] = useState<MenuPos | null>(null);
+  // null until the menu has mounted and been measured — it renders hidden until
+  // then, so it appears already clamped on-screen (no reposition flash).
+  const [coords, setCoords] = useState<MenuCoords | null>(null);
   // The portal target: the library root, found from the trigger on open. Keeping
   // the menu inside `.sep-library` (not document.body) means the library's CSS
   // tokens + `.lib-menu*` rules still apply, while `position: fixed` frees it
@@ -2755,26 +2741,33 @@ function RowMenu({
     delete: onDelete,
   };
 
-  // Measure the trigger and choose down vs. up at open time, anchoring the menu's
-  // right edge to the trigger's right edge (kept at least 8px off the viewport
-  // edge so it never bleeds off-screen).
+  // Resolve the portal host now; the actual placement happens after the menu
+  // mounts and can be measured (see the positioning effect below).
   function openMenu() {
-    const btn = btnRef.current;
-    if (btn) {
-      const r = btn.getBoundingClientRect();
-      const est = estimateMenuHeight(actions.length);
-      const roomBelow = window.innerHeight - r.bottom;
-      const flipUp = roomBelow < est + 8 && r.top > est + 8;
-      setHost(btn.closest<HTMLElement>(".sep-library"));
-      setPos({
-        right: Math.max(8, window.innerWidth - r.right),
-        ...(flipUp
-          ? { bottom: window.innerHeight - r.top + 6 }
-          : { top: r.bottom + 6 }),
-      });
-    }
+    setHost(btnRef.current?.closest<HTMLElement>(".sep-library") ?? null);
+    setCoords(null);
     setOpen(true);
   }
+
+  // Position the portaled menu once it has mounted: measure its real size and
+  // clamp it fully within the viewport on both axes. Runs when `open` flips true
+  // (the menu is in the DOM, hidden, by then). Closing on scroll/resize means we
+  // never need to reposition a live menu.
+  useEffect(() => {
+    if (!open) return;
+    const menu = menuRef.current;
+    const trigger = btnRef.current;
+    if (!menu || !trigger) return;
+    setCoords(
+      clampMenuCoords(
+        trigger.getBoundingClientRect(),
+        menu.offsetWidth,
+        menu.offsetHeight,
+        window.innerWidth,
+        window.innerHeight,
+      ),
+    );
+  }, [open]);
 
   useEffect(() => {
     if (!open) return;
@@ -2820,7 +2813,7 @@ function RowMenu({
     fn();
   }
 
-  const menu = open && pos && (
+  const menu = open && (
     <div
       className="lib-menu"
       role="menu"
@@ -2829,8 +2822,10 @@ function RowMenu({
       data-testid="lib-row-menu"
       style={{
         position: "fixed",
-        right: pos.right,
-        ...(pos.bottom !== undefined ? { bottom: pos.bottom } : { top: pos.top }),
+        // Hidden (but laid out, so measurable) until clamped on-screen.
+        top: coords?.top ?? 0,
+        left: coords?.left ?? 0,
+        visibility: coords ? "visible" : "hidden",
       }}
     >
       {actions.map((action) => (
