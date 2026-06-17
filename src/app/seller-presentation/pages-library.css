@@ -778,6 +778,69 @@
   font-weight: 400;
 }
 
+/* ─── mobile tap-to-expand card (PAGES_CARD_EXPAND, Pass 2) ──────────────
+   The chevron + the collapsible `.lib-card-extra` are emitted ONLY when the
+   component marks a card `expandable` (phone width + flag on), so desktop and
+   the flag-off path never see this block — `[data-expandable]` / `[data-
+   expanded]` simply never appear there. Collapsed = the lead signal + the
+   primary action + the chevron; expanded reveals the rest inline. */
+.sep-library .lib-chevron {
+  margin-left: auto;
+  display: inline-flex; align-items: center; justify-content: center;
+  width: 34px; height: 34px;
+  border-radius: var(--radius-sm);
+  color: var(--fg-mute);
+  border: 1px solid transparent;
+  transition: color .2s, background .2s, border-color .2s;
+}
+.sep-library .lib-chevron:hover {
+  color: var(--fg);
+  background: var(--bg-2);
+  border-color: var(--border);
+}
+.sep-library .lib-chevron:focus-visible {
+  outline: 2px solid var(--accent); outline-offset: 2px;
+}
+.sep-library .lib-chevron-icon { transition: transform .2s ease; }
+.sep-library .lib-card[data-expanded="true"] .lib-chevron-icon {
+  transform: rotate(180deg);
+}
+
+/* Collapsed: the pending note + the extra action set fold away — only the lead
+   signal + the primary + the chevron remain on the face. */
+.sep-library .lib-card[data-expandable="true"]:not([data-expanded="true"]) .lib-pending-note {
+  display: none;
+}
+.sep-library .lib-card-extra { display: none; }
+.sep-library .lib-card[data-expanded="true"] .lib-card-extra {
+  display: flex; flex-direction: column; gap: 10px;
+  margin-top: 10px;
+  animation: lib-card-expand-in .16s ease;
+}
+/* The extra's own action row sits flush under the divider (no doubled gap). */
+.sep-library .lib-card-extra .lib-actions { margin-top: 0; }
+
+/* The "⋯" overflow opens below its button; the card clips with overflow:hidden,
+   so an EXPANDED card lets the menu escape. Round the poster's top corners then,
+   since the card's own rounding no longer clips them. */
+.sep-library .lib-card[data-expanded="true"] { overflow: visible; }
+.sep-library .lib-card[data-expanded="true"] .lib-poster {
+  border-top-left-radius: var(--radius-lg);
+  border-top-right-radius: var(--radius-lg);
+}
+
+@keyframes lib-card-expand-in {
+  from { opacity: 0; transform: translateY(-4px); }
+  to { opacity: 1; transform: translateY(0); }
+}
+/* Respect reduced motion: no chevron spin, no reveal slide — the state still
+   flips, just without animation (pages-library.css had no such block before). */
+@media (prefers-reduced-motion: reduce) {
+  .sep-library .lib-chevron,
+  .sep-library .lib-chevron-icon { transition: none; }
+  .sep-library .lib-card[data-expanded="true"] .lib-card-extra { animation: none; }
+}
+
 /* ─── responsive ─────────────────────────────────────────────────────── */
 @media (max-width: 1000px) {
   .sep-library .lib-grid { grid-template-columns: repeat(2, minmax(0, 1fr)); }
