@@ -66,12 +66,14 @@ import {
   LONG_PRESS_MS,
   MANAGE_EMPTY,
   MANAGE_LIST_COLUMNS,
+  MANAGE_SELECT_COLUMN_WIDTH,
   mergePages,
   movedBeyond,
   PAGES_ORDER_CACHE_KEY,
   resolveViewMode,
   sanitizePageOrder,
   secondaryRowActions,
+  selectAllState,
   tabCounts,
   VIEW_MODE_STORAGE_KEY,
   type LibraryTab,
@@ -619,14 +621,35 @@ export function PagesLibrary({
   const showManageAffordance = manageListEnabled && manageDesktop;
   const showManageTable = showManageAffordance && manageMode;
 
-  // Enter / leave the management table. Entering clears any in-flight select mode
-  // (the table carries no checkboxes this packet — bulk is Packet 2), so the bulk
-  // bar never dangles over a table it can't drive.
+  // Enter / leave the management table. The table carries its OWN always-on bulk
+  // checkboxes (Packet 2), independent of the Cards "Select" mode — so entering
+  // clears any in-flight Cards select mode (the two never stack), and leaving
+  // ("Done") clears the table selection so the bulk bar never dangles. Either
+  // way the table opens and closes on a clean selection.
   function toggleManage() {
     setManageMode((on) => {
       const next = !on;
       if (next && selectMode) exitSelect();
+      setSelected(new Set());
       return next;
+    });
+  }
+
+  // PAGES_MANAGE_LIST (Packet 2) — the header select-all over the CURRENT tab's
+  // rendered rows. When every visible row is already selected it clears them;
+  // otherwise it adds them all. Keyed by `card.key` into the SAME `selected` Set
+  // the cards use (view-agnostic), so `selectedCards` / `bulkActionValidity` /
+  // `runBulk` drive the table with zero new bulk logic.
+  function toggleSelectAll() {
+    const keys = visibleCards.map((c) => c.key);
+    setSelected((prev) => {
+      const allSelected = keys.length > 0 && keys.every((k) => prev.has(k));
+      if (allSelected) {
+        const next = new Set(prev);
+        for (const k of keys) next.delete(k);
+        return next;
+      }
+      return new Set([...prev, ...keys]);
     });
   }
 
@@ -652,6 +675,13 @@ export function PagesLibrary({
     () => bulkActionValidity(selectedCards),
     [selectedCards],
   );
+  // The bulk bar drives BOTH surfaces off the same selection: the Cards "Select"
+  // mode (shown whenever it's on, even at zero selected — its hint invites a
+  // tap), and the Manage table's always-on checkboxes (shown only once a row is
+  // checked, since there is no separate mode to enter). PAGES_MANAGE_LIST off ⇒
+  // the second clause is always false, so this is exactly today's `selectMode`.
+  const showBulkBar =
+    selectMode || (showManageTable && selectedCards.length > 0);
 
   function switchTab(next: LibraryTab) {
     if (next === tab) return;
@@ -1150,16 +1180,34 @@ export function PagesLibrary({
   // groups (the cockpit's follow-up group is a Cards concern).
   function renderManageTable(items: PageCard[]) {
     const sorted = sortManageList(items, manageSort);
+    // Select-all spans the CURRENT tab's rendered rows; sorting doesn't change
+    // the set, so `items` (== visibleCards) is the right basis for the tri-state.
+    const allState = selectAllState(
+      items.map((c) => c.key),
+      selected,
+    );
     return (
       <div className="lib-manage" data-testid="lib-manage">
         <table className="lib-table" data-testid="lib-table">
           <colgroup>
+            {/* PAGES_MANAGE_LIST (Packet 2) — leading bulk-select column; its
+                width keeps the fixed-layout grid summing to 100%. */}
+            <col style={{ width: MANAGE_SELECT_COLUMN_WIDTH }} />
             {MANAGE_LIST_COLUMNS.map((col) => (
               <col key={col.key} style={{ width: col.width }} />
             ))}
           </colgroup>
           <thead>
             <tr>
+              {/* PAGES_MANAGE_LIST (Packet 2) — select-all (indeterminate when
+                  some-but-not-all rows are selected). */}
+              <th
+                scope="col"
+                className="lib-th lib-th-check"
+                data-testid="lib-th-select"
+              >
+                <SelectAllCheckbox state={allState} onToggle={toggleSelectAll} />
+              </th>
               {MANAGE_LIST_COLUMNS.map((col) =>
                 col.sortable ? (
                   <th
@@ -1478,8 +1526,8 @@ export function PagesLibrary({
         )}
       </div>
 
-      {/* bulk action bar (select mode) */}
-      {selectMode && (
+      {/* bulk action bar — Cards "Select" mode OR a non-empty Manage selection */}
+      {showBulkBar && (
         <div className="lib-bulkbar" role="region" aria-label="Bulk actions" data-testid="lib-bulkbar">
           <span className="lib-bulk-count" data-testid="lib-bulk-count">
             {selectedCards.length > 0 ? (
@@ -2759,6 +2807,47 @@ function SortCaret({ active, dir }: { active: boolean; dir: "asc" | "desc" }) {
 }
 
 /**
+ * PAGES_MANAGE_LIST (Packet 2) — the table header's select-all checkbox. Reuses
+ * the card check visual (`.lib-check-box` + `CheckGlyph`), adding a third,
+ * indeterminate face (a dash) for the some-but-not-all case. The native input is
+ * visually hidden, so `aria-checked="mixed"` — not `input.indeterminate` — is
+ * what conveys the tri-state to assistive tech; the dash conveys it visually.
+ */
+function SelectAllCheckbox({
+  state,
+  onToggle,
+}: {
+  state: "none" | "some" | "all";
+  onToggle: () => void;
+}) {
+  return (
+    <label className="lib-row-check lib-check-all" data-no-longpress="true">
+      <input
+        type="checkbox"
+        checked={state === "all"}
+        aria-checked={state === "some" ? "mixed" : state === "all"}
+        onChange={onToggle}
+        aria-label="Select all pages"
+        data-testid="lib-select-all"
+        data-state={state}
+      />
+      <span
+        className="lib-check-box"
+        data-checked={state === "all" ? "true" : undefined}
+        data-indeterminate={state === "some" ? "true" : undefined}
+        aria-hidden="true"
+      >
+        {state === "all" ? (
+          <CheckGlyph />
+        ) : state === "some" ? (
+          <span className="lib-check-dash" />
+        ) : null}
+      </span>
+    </label>
+  );
+}
+
+/**
  * PAGES_MANAGE_LIST (Packet 1) — one row of the dense management table. Renders
  * the 7 columns (Address · Client · State · Last activity · Follow-up · Updated ·
  * Actions) from the SAME `PageItemProps` bundle Cards + List use, so a table row
@@ -2766,13 +2855,17 @@ function SortCaret({ active, dir }: { active: boolean; dir: "asc" | "desc" }) {
  * activity, Follow-up) render an intentional empty dash via the pure
  * `manage*Text` helpers — never a blank. The Actions cell reuses the card's
  * primary mapping (Open / Continue / Restore) + Copy link + the existing RowMenu
- * ("More"). No checkboxes this packet — Packet 2 drops a select cell in here.
+ * ("More"). The leading cell is an always-on bulk-select checkbox (Packet 2),
+ * bound to the shared `selected` Set via `checked` / `onToggleSelect` — the same
+ * selection the Cards "Select" flow uses, so `runBulk` drives both unchanged.
  */
 function PageTableRow({
   card,
   nowMs,
   busy,
   copied,
+  checked,
+  onToggleSelect,
   onContinue,
   onRestore,
   onUpdateLive,
@@ -2804,7 +2897,28 @@ function PageTableRow({
       data-status={card.status}
       data-slug={card.slug}
       data-testid="lib-table-row"
+      data-checked={checked || undefined}
     >
+      {/* PAGES_MANAGE_LIST (Packet 2) — always-on bulk-select checkbox, bound to
+          the shared `selected` Set. Reuses the card's check visual exactly. */}
+      <td className="lib-td lib-td-check" data-testid="lib-td-check">
+        <label className="lib-row-check" data-no-longpress="true">
+          <input
+            type="checkbox"
+            checked={checked}
+            onChange={onToggleSelect}
+            aria-label={`Select ${card.propertyLine}`}
+            data-testid="lib-table-row-check"
+          />
+          <span
+            className="lib-check-box"
+            data-checked={checked ? "true" : undefined}
+            aria-hidden="true"
+          >
+            {checked && <CheckGlyph />}
+          </span>
+        </label>
+      </td>
       <td className="lib-td lib-td-address" data-testid="lib-td-address">
         <span className="lib-td-address-text">{card.propertyLine}</span>
       </td>

@@ -1122,7 +1122,7 @@ export interface ManageColumn {
 }
 
 export const MANAGE_LIST_COLUMNS: readonly ManageColumn[] = [
-  { key: "address", label: "Address", sortable: true, width: "24%" },
+  { key: "address", label: "Address", sortable: true, width: "20%" },
   { key: "client", label: "Client", sortable: true, width: "15%" },
   { key: "state", label: "State", sortable: true, width: "9%" },
   { key: "lastActivity", label: "Last activity", sortable: true, width: "12%" },
@@ -1130,6 +1130,36 @@ export const MANAGE_LIST_COLUMNS: readonly ManageColumn[] = [
   { key: "updated", label: "Updated", sortable: true, width: "10%" },
   { key: "actions", label: "Actions", sortable: false, width: "18%" },
 ];
+
+/**
+ * PAGES_MANAGE_LIST (Packet 2) — the width of the leading bulk-select checkbox
+ * column in the Manage table. It is NOT a data column (no sort key, no
+ * comparator), so it lives beside MANAGE_LIST_COLUMNS rather than in it — but
+ * the colgroup still has ONE source of truth for every column width, keeping the
+ * `table-layout: fixed` grid intact. The 7 data columns now sum to 96% (Address
+ * trimmed 24%→20%) so this 4% leading column lands the total back at 100%.
+ */
+export const MANAGE_SELECT_COLUMN_WIDTH = "4%";
+
+/**
+ * PAGES_MANAGE_LIST (Packet 2) — the header select-all checkbox's tri-state for
+ * a rendered set of rows: "none" (unchecked), "all" (every row selected), or
+ * "some" (indeterminate). Pure so the source-contract spec can pin it without a
+ * browser. An empty set reads "none" (the UI leaves the header unchecked).
+ * Keyed by `card.key` into the SAME `selected` Set the cards use, so selection
+ * is view-agnostic across Cards / List / table.
+ */
+export function selectAllState(
+  rowKeys: readonly string[],
+  selected: ReadonlySet<string>,
+): "none" | "some" | "all" {
+  if (rowKeys.length === 0) return "none";
+  let count = 0;
+  for (const key of rowKeys) if (selected.has(key)) count += 1;
+  if (count === 0) return "none";
+  if (count === rowKeys.length) return "all";
+  return "some";
+}
 
 /** The table opens on most-recently-updated first — today's base ordering. */
 export const DEFAULT_MANAGE_SORT: ManageSort = { column: "updated", dir: "desc" };
