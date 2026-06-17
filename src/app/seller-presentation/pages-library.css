@@ -51,7 +51,12 @@
   -webkit-font-smoothing: antialiased;
   -moz-osx-font-smoothing: grayscale;
   min-height: 100vh;
+  /* App-feel: vertical-only. `overflow-x: hidden` clips any stray horizontal
+     overflow (so `scrollWidth <= clientWidth`), and `overscroll-behavior-x: none`
+     kills the horizontal rubber-band so the surface reads as a fixed native app,
+     not a scrollable web page. */
   overflow-x: hidden;
+  overscroll-behavior-x: none;
   position: relative;
   isolation: isolate;
 }
@@ -110,6 +115,11 @@
 .sep-library .lib-head-actions {
   display: flex; align-items: center; gap: 14px;
 }
+/* The info-pills group is transparent to layout by default, so the desktop
+   header row is byte-identical (the two pills stay direct flex children of
+   `.lib-head-actions`). The ≤640px rules turn it into a grouped set for the
+   stacked mobile header rhythm. */
+.sep-library .lib-head-pills { display: contents; }
 .sep-library .lib-meter {
   font-family: var(--font-geist-mono), monospace;
   font-size: 11.5px; letter-spacing: 0.04em;
@@ -383,6 +393,17 @@
 .sep-library .lib-card:hover .lib-poster-img { transform: scale(1.02); }
 .sep-library .lib-card[data-status="archived"] { opacity: 0.72; }
 
+/* Long-press enters select mode cleanly (cockpit fix): suppress native text
+   selection + the iOS touch-callout on the card / row surface, so a hold never
+   highlights the address or pops the iOS callout — it just enters select mode.
+   The whole surface is a tap target, so there is no text here to select anyway. */
+.sep-library .lib-card,
+.sep-library .lib-row {
+  -webkit-touch-callout: none;
+  -webkit-user-select: none;
+  user-select: none;
+}
+
 .sep-library .lib-poster {
   position: relative;
   aspect-ratio: 16 / 11;
@@ -394,6 +415,17 @@
   position: absolute; inset: 0;
   width: 100%; height: 100%; object-fit: cover;
   transition: transform .4s cubic-bezier(.2,.8,.2,1);
+}
+/* iOS long-press on a cover photo otherwise pops the native image menu / drag-
+   lift preview even with the card surface suppressed. Kill it on the image
+   itself (paired with draggable={false}) so a hold enters select mode cleanly;
+   the tap still bubbles to the card for open/expand. */
+.sep-library .lib-poster-img,
+.sep-library .lib-row-thumb-img {
+  -webkit-touch-callout: none;
+  -webkit-user-drag: none;
+  -webkit-user-select: none;
+  user-select: none;
 }
 .sep-library .lib-poster-empty {
   position: absolute; inset: 0;
@@ -858,7 +890,7 @@
    reduced motion. The border transition is harmless either way. */
 .sep-library .lib-row[data-reorderable="true"] { cursor: default; }
 
-/* ─── row "⋯" overflow menu (CSS-positioned, never fixed) ─────────────── */
+/* ─── row "⋯" overflow menu (portaled to the library root, position: fixed) ── */
 .sep-library .lib-row-menu { position: relative; flex: 0 0 auto; }
 .sep-library .lib-row-menu-btn {
   display: inline-flex; align-items: center; justify-content: center;
@@ -877,11 +909,19 @@
 .sep-library .lib-row-menu-btn:focus-visible {
   outline: 2px solid var(--accent); outline-offset: 2px;
 }
+/* The menu is portaled into the library root and positioned `fixed` (its top /
+   bottom / right coordinates are set inline at open time — downward normally,
+   flipped up near the viewport bottom). `fixed` + the high z-index lift it out
+   of any card's clip / stacking context, so it can never open behind a sibling
+   card or a section heading. */
 .sep-library .lib-menu {
-  position: absolute;
-  top: calc(100% + 6px); right: 0;
-  z-index: 30;
+  position: fixed;
+  z-index: 45;
   min-width: 168px;
+  /* Vertical safety: a menu taller than the viewport scrolls internally instead
+     of running off-screen (the JS clamp pins its top to the 8px margin). */
+  max-height: calc(100vh - 16px);
+  overflow-y: auto;
   padding: 6px;
   background: var(--surface-hi);
   border: 1px solid var(--border-hi);
@@ -975,6 +1015,25 @@
 .sep-library .lib-chevron-icon { transition: transform .2s ease; }
 .sep-library .lib-card[data-expanded="true"] .lib-chevron-icon {
   transform: rotate(180deg);
+}
+
+/* The collapsed face reads as ONE grouped control inside the body padding: the
+   primary action fills the row and the chevron sits flush to its right. This
+   replaces the chevron's `margin-left: auto` (which stranded it at the far-right
+   screen edge, disconnected from the primary) so the disclosure stays attached
+   to the action it expands and nothing touches the screen edge. */
+.sep-library .lib-card-face {
+  flex-wrap: nowrap;
+  align-items: stretch;
+  gap: 8px;
+}
+.sep-library .lib-card-face .lib-btn-primary {
+  flex: 1 1 auto;
+  min-width: 0;
+}
+.sep-library .lib-card-face .lib-chevron {
+  margin-left: 0;
+  flex: 0 0 auto;
 }
 
 /* Collapsed: the pending note + the extra action set fold away — only the lead
@@ -1158,6 +1217,46 @@
   /* Standalone PWA: keep the back control clear of the status bar (see base). */
   .sep-library .lib-shell { padding-top: max(22px, env(safe-area-inset-top, 0px)); }
   .sep-library .lib-head-row { align-items: flex-start; }
+  /* Cockpit fix P1 (mobile): the header pill row must not overflow the now
+     horizontally-locked viewport — "+ New page" was clipping off the unreachable
+     right edge. STACK the header into a clean vertical rhythm: the title block,
+     the two info pills as ONE grouped set, the full-width "+ New page" primary
+     CTA, then the tabs + Select/Cancel row. The gaps follow one scale — 8px
+     WITHIN a group (the pills set), 16px BETWEEN groups — so it reads aligned and
+     intentional, never crowded. Scoped under the V3 hook so the dead flag-off
+     path is byte-identical. */
+  .sep-library[data-library-v3="true"] .lib-head-row {
+    flex-direction: column;
+    align-items: stretch;
+    gap: 16px; /* between (a) title block and the actions stack */
+  }
+  /* The actions stack: pills set, then the CTA. align-items:stretch makes both
+     full width, so "+ New page" reads as a deliberate primary, not jammed under
+     the pills. 16px between the two groups. */
+  .sep-library[data-library-v3="true"] .lib-head-actions {
+    width: 100%;
+    flex-direction: column;
+    align-items: stretch;
+    gap: 16px;
+  }
+  /* (b) the two info pills, grouped: a tight 8px within-group gap, wrapping if a
+     long label needs it; left-aligned with the title above. */
+  .sep-library[data-library-v3="true"] .lib-head-pills {
+    display: flex;
+    flex-wrap: wrap;
+    gap: 8px;
+  }
+  /* (c) full-width primary CTA with real breathing room above (the 16px stack
+     gap) — centered label, comfortable tap target. */
+  .sep-library[data-library-v3="true"] .lib-newbtn {
+    width: 100%;
+    text-align: center;
+    padding: 12px 16px;
+  }
+  /* (d) the tabs + Select/Cancel row sits one between-group step (16px) below the
+     header, and wraps cleanly if needed. */
+  .sep-library[data-library-v3="true"] .lib-toolbar { margin-top: 16px; }
+  .sep-library[data-library-v3="true"] .lib-toolbar-right { flex-wrap: wrap; }
   /* Keep the photo prominent (~116x84) and let the title/meta truncate so the
      chip + "⋯" always stay in view; trim the line padding to buy room. */
   .sep-library .lib-row-line { gap: 12px; padding: 8px 6px 8px 8px; }

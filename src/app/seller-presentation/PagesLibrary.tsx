@@ -9,6 +9,7 @@ import {
   type MouseEvent as ReactMouseEvent,
   type PointerEvent as ReactPointerEvent,
 } from "react";
+import { createPortal } from "react-dom";
 import { Reorder, useDragControls, useReducedMotion } from "framer-motion";
 import { ChevronDown, GripVertical, House } from "lucide-react";
 import {
@@ -41,6 +42,7 @@ import {
   applyManualOrder,
   buildDuplicateDraft,
   bulkActionValidity,
+  clampMenuCoords,
   cardLead,
   cardMode,
   cardOverflowActions,
@@ -77,6 +79,7 @@ import {
   tabCounts,
   VIEW_MODE_STORAGE_KEY,
   type LibraryTab,
+  type MenuCoords,
   type ManageSort,
   type ManageSortColumn,
   type PageCard,
@@ -1338,38 +1341,45 @@ export function PagesLibrary({
               </p>
             </div>
             <div className="lib-head-actions">
-              {followUpCount > 0 && (
-                <span
-                  className="lib-followup-count"
-                  data-testid="lib-followup-count"
-                  title="Pages a seller engaged with recently. A quiet suggestion to reach out — nothing is sent for you."
-                >
-                  {followUpCount} worth a follow-up
-                </span>
-              )}
-              {cap > 0 &&
-                (libraryV2Enabled ? (
-                  // V2 — a quiet, separate usage line. The cap is shown, not
-                  // enforced (pre-billing), so an over-cap agent never sees an
-                  // alarming "68 of 25"; it reads "N live pages · plan limit M"
-                  // in the same muted voice, no alert color.
+              {/* The two info pills are grouped as ONE set so the mobile header
+                  can give them a tight internal gap and a larger gap to the
+                  "+ New page" CTA below. `display: contents` by default keeps the
+                  desktop row byte-identical (the wrapper generates no box); the
+                  ≤640px rules turn it into the grouped flex set. */}
+              <div className="lib-head-pills" data-testid="lib-head-pills">
+                {followUpCount > 0 && (
                   <span
-                    className="lib-meter"
-                    data-testid="lib-usage-meter"
-                    title="Only live pages count toward your limit. Drafts and archived pages are free."
+                    className="lib-followup-count"
+                    data-testid="lib-followup-count"
+                    title="Pages a seller engaged with recently. A quiet suggestion to reach out — nothing is sent for you."
                   >
-                    {usageMeterLabel(liveCount, cap)}
+                    {followUpCount} worth a follow-up
                   </span>
-                ) : (
-                  <span
-                    className="lib-meter"
-                    data-at-limit={atLimit ? "true" : undefined}
-                    data-testid="lib-usage-meter"
-                    title="Only live pages count toward your limit. Drafts and archived pages are free."
-                  >
-                    {liveCount} of {cap} live
-                  </span>
-                ))}
+                )}
+                {cap > 0 &&
+                  (libraryV2Enabled ? (
+                    // V2 — a quiet, separate usage line. The cap is shown, not
+                    // enforced (pre-billing), so an over-cap agent never sees an
+                    // alarming "68 of 25"; it reads "N live pages · plan limit M"
+                    // in the same muted voice, no alert color.
+                    <span
+                      className="lib-meter"
+                      data-testid="lib-usage-meter"
+                      title="Only live pages count toward your limit. Drafts and archived pages are free."
+                    >
+                      {usageMeterLabel(liveCount, cap)}
+                    </span>
+                  ) : (
+                    <span
+                      className="lib-meter"
+                      data-at-limit={atLimit ? "true" : undefined}
+                      data-testid="lib-usage-meter"
+                      title="Only live pages count toward your limit. Drafts and archived pages are free."
+                    >
+                      {liveCount} of {cap} live
+                    </span>
+                  ))}
+              </div>
               <button
                 type="button"
                 className="lib-newbtn"
@@ -1974,13 +1984,13 @@ function PageCardView({
   // silent no-op (SP-LIB-4).
   const crossDevice = isCrossDeviceOnly(card);
 
-  // Primary action by status (packet): Draft → Continue, Live → Open,
-  // Archived → Restore.
+  // Primary action by status (packet): Draft → Continue, Live → Edit page,
+  // Archived → Restore. The verb comes from the single source `primaryActionLabel`
+  // so Cards, the List row, and the Manage table can never drift; the card alone
+  // adds the busy "Restoring…" affordance on top of it.
   const primary = isArchived
     ? { label: busy ? "Restoring…" : "Restore", onClick: onRestore }
-    : isDraft
-      ? { label: "Continue", onClick: onContinue }
-      : { label: "Open", onClick: onContinue };
+    : { label: primaryActionLabel(card), onClick: onContinue };
   const primaryDisabled = busy || (primary.label !== "Restore" && !canResume);
 
   const longPress = useLongPress(onLongPressSelect, !selectMode);
@@ -2065,7 +2075,10 @@ function PageCardView({
       <div className="lib-poster">
         {card.cover ? (
           // eslint-disable-next-line @next/next/no-img-element
-          <img className="lib-poster-img" src={card.cover} alt="" />
+          // draggable={false} + the CSS drag/callout suppression keep an iOS
+          // long-press on the cover from popping the native image menu / drag-
+          // lift preview — a hold enters select mode cleanly instead.
+          <img className="lib-poster-img" src={card.cover} alt="" draggable={false} />
         ) : libraryV3 ? (
           // PAGES_LIBRARY_V3 (Pass 3b) — a photo-less page is a VALID prepared
           // page, not a broken one. Replace the abstract diamond with a quiet
@@ -2213,7 +2226,7 @@ function PageCardView({
           // inline on expand. The chevron is the keyboard/SR disclosure control
           // (aria-expanded + aria-controls); a body tap toggles the same state.
           <>
-            <div className="lib-actions" data-no-longpress="true">
+            <div className="lib-actions lib-card-face" data-no-longpress="true">
               <button
                 type="button"
                 className="lib-btn lib-btn-primary"
@@ -2448,7 +2461,7 @@ function PageRowView({
   const isArchived = card.status === "archived";
   const canResume = !!card.instanceId;
   // Same primary mapping + disabled rule as the card's primary button: Draft →
-  // Continue, Live → Open, Archived → Restore; disabled when busy or (for a
+  // Continue, Live → Edit page, Archived → Restore; disabled when busy or (for a
   // non-archived standalone page) there is no local draft to resume.
   const primaryAction = isArchived ? onRestore : onContinue;
   const primaryDisabled = busy || (!isArchived && !canResume);
@@ -2525,7 +2538,9 @@ function PageRowView({
           <span className="lib-row-thumb" aria-hidden="true">
             {card.cover ? (
               // eslint-disable-next-line @next/next/no-img-element
-              <img className="lib-row-thumb-img" src={card.cover} alt="" />
+              // draggable={false} + CSS drag/callout suppression: an iOS long-
+              // press on the thumb enters select mode, never the image menu / drag.
+              <img className="lib-row-thumb-img" src={card.cover} alt="" draggable={false} />
             ) : (
               <span className="lib-row-thumb-empty">◇</span>
             )}
@@ -2642,11 +2657,17 @@ function DragHandle({
   );
 }
 
-/** The verb a row's primary tap performs, for the hit button's accessible name. */
+/**
+ * The verb a card / row / table-row primary tap performs — the SINGLE source for
+ * the primary label across all three views (and the hit button's accessible
+ * name). A published page opens the seller-presentation editor, so the live verb
+ * is "Edit page" (not the older "Open"); a draft continues where it was left, an
+ * archived page restores.
+ */
 function primaryActionLabel(card: PageCard): string {
   if (card.status === "archived") return "Restore";
   if (card.status === "draft") return "Continue";
-  return "Open";
+  return "Edit page";
 }
 
 const ROW_ACTION_LABEL: Record<RowAction, string> = {
@@ -2673,10 +2694,16 @@ const ROW_ACTION_BLOCKS_ON_BUSY: Record<RowAction, boolean> = {
 
 /**
  * The row's "⋯" overflow menu. Keyboard-accessible (Escape closes and returns
- * focus to the trigger; the first item is focused on open) and CSS-positioned
- * (absolute, never `position: fixed`). It only ever renders the actions
- * `secondaryRowActions` deemed valid, and each item calls the SAME shared
- * handler the card uses.
+ * focus to the trigger; the first item is focused on open). The menu is
+ * PORTALED into the library root (`.sep-library`) and positioned `fixed`, so it
+ * escapes the card's `overflow`/stacking context and can never open behind a
+ * sibling card or a section heading. After it mounts it is MEASURED and clamped
+ * fully within the viewport on both axes (`clampMenuCoords`) — shifting in from
+ * any edge and flipping above near the bottom — so it never hangs off-screen; it
+ * stays hidden until placed, so there is no reposition flash. The portal target
+ * stays inside `.sep-library`, so the menu keeps the library's tokens + styles
+ * (no second theme scope). It only ever renders the actions `secondaryRowActions`
+ * deemed valid, and each item calls the SAME shared handler the card uses.
  */
 function RowMenu({
   card,
@@ -2704,6 +2731,14 @@ function RowMenu({
   onMarkFollowedUp: () => void;
 }) {
   const [open, setOpen] = useState(false);
+  // null until the menu has mounted and been measured — it renders hidden until
+  // then, so it appears already clamped on-screen (no reposition flash).
+  const [coords, setCoords] = useState<MenuCoords | null>(null);
+  // The portal target: the library root, found from the trigger on open. Keeping
+  // the menu inside `.sep-library` (not document.body) means the library's CSS
+  // tokens + `.lib-menu*` rules still apply, while `position: fixed` frees it
+  // from the card's clip/stacking trap.
+  const [host, setHost] = useState<HTMLElement | null>(null);
   const wrapRef = useRef<HTMLDivElement>(null);
   const btnRef = useRef<HTMLButtonElement>(null);
   const menuRef = useRef<HTMLDivElement>(null);
@@ -2718,12 +2753,45 @@ function RowMenu({
     delete: onDelete,
   };
 
+  // Resolve the portal host now; the actual placement happens after the menu
+  // mounts and can be measured (see the positioning effect below).
+  function openMenu() {
+    setHost(btnRef.current?.closest<HTMLElement>(".sep-library") ?? null);
+    setCoords(null);
+    setOpen(true);
+  }
+
+  // Position the portaled menu once it has mounted: measure its real size and
+  // clamp it fully within the viewport on both axes. Runs when `open` flips true
+  // (the menu is in the DOM, hidden, by then). Closing on scroll/resize means we
+  // never need to reposition a live menu.
+  useEffect(() => {
+    if (!open) return;
+    const menu = menuRef.current;
+    const trigger = btnRef.current;
+    if (!menu || !trigger) return;
+    setCoords(
+      clampMenuCoords(
+        trigger.getBoundingClientRect(),
+        menu.offsetWidth,
+        menu.offsetHeight,
+        window.innerWidth,
+        window.innerHeight,
+      ),
+    );
+  }, [open]);
+
   useEffect(() => {
     if (!open) return;
     function onDocPointer(e: MouseEvent) {
-      if (wrapRef.current && !wrapRef.current.contains(e.target as Node)) {
-        setOpen(false);
-      }
+      const target = e.target as Node;
+      // The menu now lives in a portal OUTSIDE the trigger's wrapper, so an
+      // outside-click must clear BOTH the trigger wrap and the menu itself —
+      // otherwise a click on a menu item would read as "outside" and close the
+      // menu before the item's handler runs.
+      if (wrapRef.current?.contains(target)) return;
+      if (menuRef.current?.contains(target)) return;
+      setOpen(false);
     }
     function onKey(e: KeyboardEvent) {
       if (e.key === "Escape") {
@@ -2731,8 +2799,15 @@ function RowMenu({
         btnRef.current?.focus();
       }
     }
+    // A fixed menu does not follow the page as it scrolls, so close on any scroll
+    // or resize rather than leave it detached from its trigger.
+    function onReflow() {
+      setOpen(false);
+    }
     document.addEventListener("mousedown", onDocPointer);
     document.addEventListener("keydown", onKey);
+    window.addEventListener("scroll", onReflow, true);
+    window.addEventListener("resize", onReflow);
     // Move focus into the menu so keyboard users land on an action.
     menuRef.current
       ?.querySelector<HTMLButtonElement>("button:not(:disabled)")
@@ -2740,6 +2815,8 @@ function RowMenu({
     return () => {
       document.removeEventListener("mousedown", onDocPointer);
       document.removeEventListener("keydown", onKey);
+      window.removeEventListener("scroll", onReflow, true);
+      window.removeEventListener("resize", onReflow);
     };
   }, [open]);
 
@@ -2747,6 +2824,41 @@ function RowMenu({
     setOpen(false);
     fn();
   }
+
+  const menu = open && (
+    <div
+      className="lib-menu"
+      role="menu"
+      ref={menuRef}
+      data-no-longpress="true"
+      data-testid="lib-row-menu"
+      style={{
+        position: "fixed",
+        // Hidden (but laid out, so measurable) until clamped on-screen.
+        top: coords?.top ?? 0,
+        left: coords?.left ?? 0,
+        visibility: coords ? "visible" : "hidden",
+      }}
+    >
+      {actions.map((action) => (
+        <button
+          key={action}
+          type="button"
+          role="menuitem"
+          className={
+            action === "delete"
+              ? "lib-menu-item lib-menu-item-danger"
+              : "lib-menu-item"
+          }
+          disabled={ROW_ACTION_BLOCKS_ON_BUSY[action] && busy}
+          onClick={() => run(handlerFor[action])}
+          data-testid={`lib-row-action-${action}`}
+        >
+          {action === "copy-link" && copied ? "Copied" : ROW_ACTION_LABEL[action]}
+        </button>
+      ))}
+    </div>
+  );
 
   return (
     <div className="lib-row-menu" ref={wrapRef} data-no-longpress="true">
@@ -2757,32 +2869,15 @@ function RowMenu({
         aria-haspopup="menu"
         aria-expanded={open}
         aria-label={`Actions for ${card.propertyLine}`}
-        onClick={() => setOpen((o) => !o)}
+        onClick={() => (open ? setOpen(false) : openMenu())}
         data-testid="lib-row-menu-btn"
       >
         <span aria-hidden="true">⋯</span>
       </button>
-      {open && (
-        <div className="lib-menu" role="menu" ref={menuRef} data-testid="lib-row-menu">
-          {actions.map((action) => (
-            <button
-              key={action}
-              type="button"
-              role="menuitem"
-              className={
-                action === "delete"
-                  ? "lib-menu-item lib-menu-item-danger"
-                  : "lib-menu-item"
-              }
-              disabled={ROW_ACTION_BLOCKS_ON_BUSY[action] && busy}
-              onClick={() => run(handlerFor[action])}
-              data-testid={`lib-row-action-${action}`}
-            >
-              {action === "copy-link" && copied ? "Copied" : ROW_ACTION_LABEL[action]}
-            </button>
-          ))}
-        </div>
-      )}
+      {/* Portal into the library root so the menu paints above every sibling
+          card / section heading; falls back to inline render until the host is
+          resolved (the first open always resolves it synchronously). */}
+      {menu && host ? createPortal(menu, host) : menu}
     </div>
   );
 }
@@ -2880,7 +2975,7 @@ function PageTableRow({
   const isLive = card.status === "live" || card.status === "live-edits-pending";
   const canResume = !!card.instanceId;
   // Same primary mapping + disabled rule as the card / row: Draft → Continue,
-  // Live → Open, Archived → Restore; disabled when busy or (for a non-archived
+  // Live → Edit page, Archived → Restore; disabled when busy or (for a non-archived
   // page published from another device) there is no local draft to resume.
   const primaryAction = isArchived ? onRestore : onContinue;
   const primaryDisabled = busy || (!isArchived && !canResume);
