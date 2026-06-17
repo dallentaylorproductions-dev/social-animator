@@ -93,6 +93,16 @@ export default async function SellerPresentationPage({
   // flag. Only the library uses it; the wizard is untouched.
   const libraryV3Enabled = process.env.PAGES_LIBRARY_V3 === "true";
 
+  // Pages Library — management List (PAGES_MANAGE_LIST, Packet 1). OFF by
+  // default; ships DARK on top of the V3 cockpit so it can be verified on
+  // preview before the single post-Packet-2 prod flip. When on, a desktop-only
+  // "Manage" affordance opens a dense, sortable 7-column table over the same
+  // already-loaded cards (no new fetch); Cards stays the primary view + the only
+  // view on mobile. A presentation add — read server-side and threaded down as a
+  // prop (mirroring libraryV3Enabled) so the client needs no separate public
+  // flag. Independent of PAGES_LIBRARY_V3; only the library uses it.
+  const manageListEnabled = process.env.PAGES_MANAGE_LIST === "true";
+
   const sp = await searchParams;
   const idParam = sp?.id;
   const hasId =
@@ -118,6 +128,7 @@ export default async function SellerPresentationPage({
       libraryV2Enabled={libraryV2Enabled}
       cardExpandEnabled={cardExpandEnabled}
       libraryV3Enabled={libraryV3Enabled}
+      manageListEnabled={manageListEnabled}
     />
   );
 }

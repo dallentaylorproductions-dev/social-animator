@@ -1012,6 +1012,107 @@
   .sep-library .lib-card[data-expanded="true"] .lib-card-extra { animation: none; }
 }
 
+/* ─── management List (PAGES_MANAGE_LIST, Packet 1) ──────────────────────
+   A dense, sortable table — the desktop-only "Manage" surface over the same
+   cards. Same V3 grammar as the cockpit: surface rows, hairline borders, muted
+   text, the established status chip. The accent rule stays strict (3b): teal
+   marks the Follow-up column's value only; every other column is neutral/muted,
+   sort carets included. Inert unless the flag renders it. */
+/* No overflow container here on purpose: the per-row "More" menu is CSS-absolute
+   and opens downward, so an `overflow` ancestor (overflow-x:auto computes
+   overflow-y to auto too) would CLIP it on the bottom rows. The List rows use the
+   same no-overflow pattern. Cells truncate (Address / Client) so the full-width
+   table fits the desktop shell without horizontal scroll. */
+.sep-library .lib-manage {
+  margin-top: 24px;
+  border: 1px solid var(--border);
+  border-radius: var(--radius-md);
+  background: var(--surface);
+}
+.sep-library .lib-table {
+  width: 100%;
+  table-layout: fixed;
+  border-collapse: collapse;
+  font-size: 13px;
+}
+.sep-library .lib-th {
+  text-align: left;
+  padding: 0;
+  border-bottom: 1px solid var(--border);
+  background: var(--bg-2);
+  white-space: nowrap;
+}
+.sep-library .lib-th-sort {
+  display: inline-flex; align-items: center; gap: 6px;
+  width: 100%;
+  padding: 11px 14px;
+  font-family: var(--font-geist-mono), monospace;
+  font-size: 10.5px; font-weight: 600; letter-spacing: 0.06em;
+  text-transform: uppercase;
+  color: var(--fg-dim);
+  transition: color .2s;
+}
+.sep-library .lib-th-sort:hover { color: var(--fg-mute); }
+.sep-library .lib-th-sort[data-active="true"] { color: var(--fg); }
+.sep-library .lib-th-sort:focus-visible {
+  outline: 2px solid var(--accent); outline-offset: -2px;
+}
+.sep-library .lib-th-actions {
+  padding: 11px 14px;
+  text-align: right;
+  font-family: var(--font-geist-mono), monospace;
+  font-size: 10.5px; font-weight: 600; letter-spacing: 0.06em;
+  text-transform: uppercase;
+  color: var(--fg-dim);
+}
+.sep-library .lib-sort-caret {
+  font-size: 8px;
+  color: var(--fg-faint);
+  transition: color .2s;
+}
+.sep-library .lib-sort-caret[data-active="true"] { color: inherit; }
+
+.sep-library .lib-tr {
+  border-bottom: 1px solid var(--border);
+  transition: background .15s;
+}
+.sep-library .lib-tr:last-child { border-bottom: none; }
+.sep-library .lib-tr:hover { background: var(--surface-hi); }
+.sep-library .lib-tr[data-status="archived"] { opacity: 0.72; }
+.sep-library .lib-td {
+  padding: 11px 14px;
+  color: var(--fg-mute);
+  vertical-align: middle;
+  /* table-layout is fixed, so text cells truncate within their column. */
+  white-space: nowrap;
+  overflow: hidden;
+  text-overflow: ellipsis;
+}
+.sep-library .lib-td[data-empty="true"] { color: var(--fg-faint); }
+.sep-library .lib-td-address {
+  color: var(--fg);
+  font-weight: 500;
+}
+.sep-library .lib-td-address-text {
+  display: block;
+  overflow: hidden; text-overflow: ellipsis; white-space: nowrap;
+}
+/* The Actions cell holds the absolutely-positioned "More" menu, so it must NOT
+   clip (every other cell does, to truncate text). */
+.sep-library .lib-td-actions { overflow: visible; text-align: right; }
+/* The ONE accented column: a non-empty follow-up value reads teal (the work). */
+.sep-library .lib-td-followup:not([data-empty="true"]) { color: var(--accent); }
+.sep-library .lib-td-actions-row {
+  display: inline-flex; align-items: center; gap: 6px;
+  justify-content: flex-end;
+}
+/* Compact the action controls so Open / Copy link / More fit the column at
+   every desktop width without wrapping or clipping. */
+.sep-library .lib-td-actions .lib-btn {
+  padding: 5px 9px;
+  white-space: nowrap;
+}
+
 /* ─── responsive ─────────────────────────────────────────────────────── */
 @media (max-width: 1000px) {
   .sep-library .lib-grid { grid-template-columns: repeat(2, minmax(0, 1fr)); }
