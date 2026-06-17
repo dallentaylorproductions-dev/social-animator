@@ -51,7 +51,12 @@
   -webkit-font-smoothing: antialiased;
   -moz-osx-font-smoothing: grayscale;
   min-height: 100vh;
+  /* App-feel: vertical-only. `overflow-x: hidden` clips any stray horizontal
+     overflow (so `scrollWidth <= clientWidth`), and `overscroll-behavior-x: none`
+     kills the horizontal rubber-band so the surface reads as a fixed native app,
+     not a scrollable web page. */
   overflow-x: hidden;
+  overscroll-behavior-x: none;
   position: relative;
   isolation: isolate;
 }
@@ -382,6 +387,17 @@
 }
 .sep-library .lib-card:hover .lib-poster-img { transform: scale(1.02); }
 .sep-library .lib-card[data-status="archived"] { opacity: 0.72; }
+
+/* Long-press enters select mode cleanly (cockpit fix): suppress native text
+   selection + the iOS touch-callout on the card / row surface, so a hold never
+   highlights the address or pops the iOS callout — it just enters select mode.
+   The whole surface is a tap target, so there is no text here to select anyway. */
+.sep-library .lib-card,
+.sep-library .lib-row {
+  -webkit-touch-callout: none;
+  -webkit-user-select: none;
+  user-select: none;
+}
 
 .sep-library .lib-poster {
   position: relative;
@@ -858,7 +874,7 @@
    reduced motion. The border transition is harmless either way. */
 .sep-library .lib-row[data-reorderable="true"] { cursor: default; }
 
-/* ─── row "⋯" overflow menu (CSS-positioned, never fixed) ─────────────── */
+/* ─── row "⋯" overflow menu (portaled to the library root, position: fixed) ── */
 .sep-library .lib-row-menu { position: relative; flex: 0 0 auto; }
 .sep-library .lib-row-menu-btn {
   display: inline-flex; align-items: center; justify-content: center;
@@ -877,10 +893,14 @@
 .sep-library .lib-row-menu-btn:focus-visible {
   outline: 2px solid var(--accent); outline-offset: 2px;
 }
+/* The menu is portaled into the library root and positioned `fixed` (its top /
+   bottom / right coordinates are set inline at open time — downward normally,
+   flipped up near the viewport bottom). `fixed` + the high z-index lift it out
+   of any card's clip / stacking context, so it can never open behind a sibling
+   card or a section heading. */
 .sep-library .lib-menu {
-  position: absolute;
-  top: calc(100% + 6px); right: 0;
-  z-index: 30;
+  position: fixed;
+  z-index: 45;
   min-width: 168px;
   padding: 6px;
   background: var(--surface-hi);
@@ -975,6 +995,25 @@
 .sep-library .lib-chevron-icon { transition: transform .2s ease; }
 .sep-library .lib-card[data-expanded="true"] .lib-chevron-icon {
   transform: rotate(180deg);
+}
+
+/* The collapsed face reads as ONE grouped control inside the body padding: the
+   primary action fills the row and the chevron sits flush to its right. This
+   replaces the chevron's `margin-left: auto` (which stranded it at the far-right
+   screen edge, disconnected from the primary) so the disclosure stays attached
+   to the action it expands and nothing touches the screen edge. */
+.sep-library .lib-card-face {
+  flex-wrap: nowrap;
+  align-items: stretch;
+  gap: 8px;
+}
+.sep-library .lib-card-face .lib-btn-primary {
+  flex: 1 1 auto;
+  min-width: 0;
+}
+.sep-library .lib-card-face .lib-chevron {
+  margin-left: 0;
+  flex: 0 0 auto;
 }
 
 /* Collapsed: the pending note + the extra action set fold away — only the lead
