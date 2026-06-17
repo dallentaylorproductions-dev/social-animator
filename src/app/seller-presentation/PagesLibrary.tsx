@@ -52,11 +52,20 @@ import {
   isAtOrOverLiveCap,
   isCrossDeviceOnly,
   listMetaLine,
+  manageClientText,
+  manageFollowUpText,
+  manageLastActivityText,
+  manageUpdatedText,
+  nextManageSort,
+  sortManageList,
   splitFollowUp,
   usageMeterLabel,
   viewSignalLabel,
   viewEngagementFacts,
+  DEFAULT_MANAGE_SORT,
   LONG_PRESS_MS,
+  MANAGE_EMPTY,
+  MANAGE_LIST_COLUMNS,
   mergePages,
   movedBeyond,
   PAGES_ORDER_CACHE_KEY,
@@ -66,6 +75,8 @@ import {
   tabCounts,
   VIEW_MODE_STORAGE_KEY,
   type LibraryTab,
+  type ManageSort,
+  type ManageSortColumn,
   type PageCard,
   type PageStatus,
   type RowAction,
@@ -168,6 +179,7 @@ export function PagesLibrary({
   libraryV2Enabled = false,
   cardExpandEnabled = false,
   libraryV3Enabled = false,
+  manageListEnabled = false,
 }: {
   ownerEmail: string | null;
   /**
@@ -216,6 +228,18 @@ export function PagesLibrary({
    * and desktop. Owner-scoped; nothing seller-facing.
    */
   libraryV3Enabled?: boolean;
+  /**
+   * PAGES_MANAGE_LIST (Packet 1) — when true, a desktop-only "Manage" affordance
+   * opens a dense, sortable 7-column table (Address · Client · State · Last
+   * activity · Follow-up · Updated · Actions) over the SAME already-loaded cards
+   * (no new fetch). Cards stays the primary operating view + the only view on
+   * mobile; Manage is an opt-in mode with a clear way back to Cards. Sorting is
+   * client-side + stable; only the Follow-up column earns the teal accent. Bulk
+   * select / checkboxes are out of scope (Packet 2). Default false ⇒ byte-
+   * identical to today's V3 cockpit (no Manage affordance, no table). Independent
+   * of libraryV3Enabled; owner-scoped, nothing seller-facing.
+   */
+  manageListEnabled?: boolean;
 }) {
   // SP-KEYSTONE — the server's draft instances for this agent (the DRAFT slice
   // when the flag is on). null = not loaded / the fetch failed ⇒ fall back to
@@ -264,6 +288,18 @@ export function PagesLibrary({
   // collapsed and the flag-off path never reads it. 640px matches the single-
   // column card grid breakpoint in pages-library.css.
   const [isNarrow, setIsNarrow] = useState(false);
+
+  // PAGES_MANAGE_LIST (Packet 1) — the desktop-only management table. `manageMode`
+  // is the opt-in toggle (Cards stays the default); `manageDesktop` is a dedicated
+  // desktop guard (its OWN matchMedia below, independent of cardExpandEnabled, so
+  // "desktop-only" is reliable regardless of PAGES_CARD_EXPAND). `manageSort` holds
+  // the active column + direction, opening on most-recently-updated first.
+  // Initialized to STABLE constants so the server + first client render agree
+  // (the table never shows pre-mount, and the affordance is desktop-gated post-
+  // mount, hydration-safe like the view-mode default). All inert unless the flag.
+  const [manageMode, setManageMode] = useState(false);
+  const [manageDesktop, setManageDesktop] = useState(false);
+  const [manageSort, setManageSort] = useState<ManageSort>(DEFAULT_MANAGE_SORT);
 
   // v5 — the agent's manual order for the Active tab (SP-LIB-5). A list of
   // card KEYS, owner-scoped + persisted server-side (cross-device). `order`
@@ -394,6 +430,26 @@ export function PagesLibrary({
     mq.addEventListener("change", onChange);
     return () => mq.removeEventListener("change", onChange);
   }, [cardExpandEnabled]);
+
+  // PAGES_MANAGE_LIST (Packet 1) — track whether the viewport is a DESKTOP, so the
+  // "Manage" affordance + the dense table only ever show there (Cards stays the
+  // only mobile view). This is the management-List's OWN matchMedia, gated on its
+  // OWN flag (not cardExpandEnabled), so the desktop-only guard is reliable
+  // regardless of PAGES_CARD_EXPAND. Read post-mount (never during render) + kept
+  // current via its change event, so a resize across the breakpoint reflows: if
+  // the viewport shrinks while in Manage mode, `manageDesktop` flips false and the
+  // render falls back to Cards. Inert (no listener) unless the flag is on, so the
+  // flag-off path is byte-identical. 960px (above LIBRARY_MOBILE_MAX_WIDTH's 768)
+  // is the floor that gives the dense 7-column table real room — it stays a roomy-
+  // desktop management surface, never a cramped tablet/phone one.
+  useEffect(() => {
+    if (!manageListEnabled || typeof window === "undefined") return;
+    const mq = window.matchMedia("(min-width: 960px)");
+    setManageDesktop(mq.matches);
+    const onChange = (e: MediaQueryListEvent) => setManageDesktop(e.matches);
+    mq.addEventListener("change", onChange);
+    return () => mq.removeEventListener("change", onChange);
+  }, [manageListEnabled]);
 
   // On unmount, FLUSH (not drop) a pending debounced order write — otherwise a
   // reorder made in the last debounce window before navigating away is lost
@@ -553,6 +609,32 @@ export function PagesLibrary({
   // Whether to show the Cards/List toggle. Under V3 there is only one view
   // (Cards), so the toggle hides entirely; flag-off shows both as today.
   const showViewToggle = !libraryV3Enabled;
+
+  // PAGES_MANAGE_LIST (Packet 1) — the desktop-only "Manage" affordance shows only
+  // under the flag AND on a desktop viewport (Cards is the only mobile view). The
+  // dense table renders in place of the cards only while ALSO toggled on; if the
+  // viewport shrinks below the desktop guard mid-session, `manageDesktop` flips
+  // false and the render falls back to Cards automatically. Flag-off ⇒ both are
+  // always false, so the render is byte-identical to today's V3 cockpit.
+  const showManageAffordance = manageListEnabled && manageDesktop;
+  const showManageTable = showManageAffordance && manageMode;
+
+  // Enter / leave the management table. Entering clears any in-flight select mode
+  // (the table carries no checkboxes this packet — bulk is Packet 2), so the bulk
+  // bar never dangles over a table it can't drive.
+  function toggleManage() {
+    setManageMode((on) => {
+      const next = !on;
+      if (next && selectMode) exitSelect();
+      return next;
+    });
+  }
+
+  // Header-click sort: re-clicking the active column flips direction; a new column
+  // adopts its natural default direction (pure `nextManageSort`).
+  function onSortColumn(column: ManageSortColumn) {
+    setManageSort((current) => nextManageSort(current, column));
+  }
 
   // Drag-to-reorder is List-view + Active-tab only, and never during select
   // mode (which owns the press gesture). Cards view still shows the order; it
@@ -1057,6 +1139,84 @@ export function PagesLibrary({
     );
   }
 
+  // PAGES_MANAGE_LIST (Packet 1) — the dense, sortable management table. Renders
+  // the SAME cards (`rowProps` is the exact prop bundle Cards + List use, so a
+  // table row can never drift from a card) sorted client-side by the active
+  // column (`sortManageList`, stable + deterministic). The 7 columns come straight
+  // off MANAGE_LIST_COLUMNS; clickable sortable headers cycle asc/desc; the
+  // Follow-up column is the ONLY accented (teal) column. No checkboxes this packet
+  // (Packet 2 drops a bulk-select cell in without restructuring). The set is the
+  // current tab's `visibleCards` (Archived shows its own pages); the table never
+  // groups (the cockpit's follow-up group is a Cards concern).
+  function renderManageTable(items: PageCard[]) {
+    const sorted = sortManageList(items, manageSort);
+    return (
+      <div className="lib-manage" data-testid="lib-manage">
+        <table className="lib-table" data-testid="lib-table">
+          <colgroup>
+            {MANAGE_LIST_COLUMNS.map((col) => (
+              <col key={col.key} style={{ width: col.width }} />
+            ))}
+          </colgroup>
+          <thead>
+            <tr>
+              {MANAGE_LIST_COLUMNS.map((col) =>
+                col.sortable ? (
+                  <th
+                    key={col.key}
+                    scope="col"
+                    className="lib-th"
+                    data-accent={col.accent ? "true" : undefined}
+                    aria-sort={
+                      manageSort.column === col.key
+                        ? manageSort.dir === "asc"
+                          ? "ascending"
+                          : "descending"
+                        : "none"
+                    }
+                    data-testid={`lib-th-${col.key}`}
+                  >
+                    <button
+                      type="button"
+                      className="lib-th-sort"
+                      data-active={
+                        manageSort.column === col.key ? "true" : undefined
+                      }
+                      onClick={() =>
+                        onSortColumn(col.key as ManageSortColumn)
+                      }
+                      data-testid={`lib-sort-${col.key}`}
+                    >
+                      <span className="lib-th-label">{col.label}</span>
+                      <SortCaret
+                        active={manageSort.column === col.key}
+                        dir={manageSort.dir}
+                      />
+                    </button>
+                  </th>
+                ) : (
+                  <th
+                    key={col.key}
+                    scope="col"
+                    className="lib-th lib-th-actions"
+                    data-testid={`lib-th-${col.key}`}
+                  >
+                    {col.label}
+                  </th>
+                ),
+              )}
+            </tr>
+          </thead>
+          <tbody>
+            {sorted.map((card) => (
+              <PageTableRow key={card.key} {...rowProps(card)} />
+            ))}
+          </tbody>
+        </table>
+      </div>
+    );
+  }
+
   // The Active-tab body. V2 splits it into the pinned "Worth a follow-up" group
   // (recency-sorted) above an "Active pages" section (existing order preserved);
   // a card never appears in both. When the group is empty the cockpit shows no
@@ -1260,7 +1420,28 @@ export function PagesLibrary({
               </div>
             )}
 
-            {!loading && cards.length > 0 && (
+            {/* PAGES_MANAGE_LIST (Packet 1) — the desktop-only "Manage" mode
+                entry. Shows only under the flag AND on a desktop viewport (Cards
+                stays the only mobile view); flag-off / mobile renders nothing, so
+                the DOM is byte-identical. Toggling it opens the dense table in
+                place of the cards; the pressed "Done" state is the clear way back
+                to Cards. */}
+            {showManageAffordance && !loading && cards.length > 0 && (
+              <button
+                type="button"
+                className="lib-btn lib-manage-toggle"
+                aria-pressed={manageMode}
+                data-active={manageMode ? "true" : undefined}
+                onClick={toggleManage}
+                data-testid="lib-manage-toggle"
+              >
+                {manageMode ? "Done" : "Manage"}
+              </button>
+            )}
+
+            {/* Select / bulk is hidden while the management table is open — the
+                table carries no checkboxes this packet (bulk is Packet 2). */}
+            {!loading && cards.length > 0 && !showManageTable && (
               <button
                 type="button"
                 className="lib-btn lib-select-toggle"
@@ -1282,6 +1463,11 @@ export function PagesLibrary({
           <EmptyState onCreate={newPage} />
         ) : visibleCards.length === 0 ? (
           <TabEmpty tab={tab} />
+        ) : showManageTable ? (
+          // PAGES_MANAGE_LIST (Packet 1) — the dense table replaces the cards /
+          // cockpit while Manage mode is on (desktop only). It shows the current
+          // tab's pages, sorted; the follow-up grouping stays a Cards concern.
+          renderManageTable(visibleCards)
         ) : tab === "active" ? (
           renderActiveBody()
         ) : (
@@ -2550,5 +2736,153 @@ function RowMenu({
         </div>
       )}
     </div>
+  );
+}
+
+/**
+ * PAGES_MANAGE_LIST (Packet 1) — the sort caret a sortable column header shows.
+ * Neutral by default; the active column's caret points up (asc) / down (desc) and
+ * brightens. CSS keeps it muted (no accent) — only the Follow-up column earns
+ * teal, and that is on its value, not its caret.
+ */
+function SortCaret({ active, dir }: { active: boolean; dir: "asc" | "desc" }) {
+  return (
+    <span
+      className="lib-sort-caret"
+      data-active={active ? "true" : undefined}
+      data-dir={active ? dir : undefined}
+      aria-hidden="true"
+    >
+      {active ? (dir === "asc" ? "▲" : "▼") : "⇅"}
+    </span>
+  );
+}
+
+/**
+ * PAGES_MANAGE_LIST (Packet 1) — one row of the dense management table. Renders
+ * the 7 columns (Address · Client · State · Last activity · Follow-up · Updated ·
+ * Actions) from the SAME `PageItemProps` bundle Cards + List use, so a table row
+ * can never drift from a card. The optional / flag-gated cells (Client, Last
+ * activity, Follow-up) render an intentional empty dash via the pure
+ * `manage*Text` helpers — never a blank. The Actions cell reuses the card's
+ * primary mapping (Open / Continue / Restore) + Copy link + the existing RowMenu
+ * ("More"). No checkboxes this packet — Packet 2 drops a select cell in here.
+ */
+function PageTableRow({
+  card,
+  nowMs,
+  busy,
+  copied,
+  onContinue,
+  onRestore,
+  onUpdateLive,
+  onViewLive,
+  onCopyLink,
+  onArchive,
+  onDuplicate,
+  onDelete,
+  onMarkFollowedUp,
+}: PageItemProps) {
+  const isArchived = card.status === "archived";
+  const isLive = card.status === "live" || card.status === "live-edits-pending";
+  const canResume = !!card.instanceId;
+  // Same primary mapping + disabled rule as the card / row: Draft → Continue,
+  // Live → Open, Archived → Restore; disabled when busy or (for a non-archived
+  // page published from another device) there is no local draft to resume.
+  const primaryAction = isArchived ? onRestore : onContinue;
+  const primaryDisabled = busy || (!isArchived && !canResume);
+  const crossDevice = isCrossDeviceOnly(card);
+  const actions = secondaryRowActions(card);
+
+  const clientText = manageClientText(card);
+  const lastActivityText = manageLastActivityText(card, nowMs);
+  const followUpText = manageFollowUpText(card, nowMs);
+
+  return (
+    <tr
+      className="lib-tr"
+      data-status={card.status}
+      data-slug={card.slug}
+      data-testid="lib-table-row"
+    >
+      <td className="lib-td lib-td-address" data-testid="lib-td-address">
+        <span className="lib-td-address-text">{card.propertyLine}</span>
+      </td>
+      <td
+        className="lib-td lib-td-client"
+        data-empty={clientText === MANAGE_EMPTY ? "true" : undefined}
+        data-testid="lib-td-client"
+      >
+        {clientText}
+      </td>
+      <td className="lib-td lib-td-state" data-testid="lib-td-state">
+        <span className="lib-chip lib-row-chip" data-status={card.status}>
+          {STATUS_LABEL[card.status]}
+        </span>
+      </td>
+      <td
+        className="lib-td lib-td-activity"
+        data-empty={lastActivityText === MANAGE_EMPTY ? "true" : undefined}
+        data-testid="lib-td-activity"
+      >
+        {lastActivityText}
+      </td>
+      {/* The ONE accented column (3b: teal = the follow-up signal only). */}
+      <td
+        className="lib-td lib-td-followup"
+        data-accent="true"
+        data-empty={followUpText === MANAGE_EMPTY ? "true" : undefined}
+        data-testid="lib-td-followup"
+      >
+        {followUpText}
+      </td>
+      <td className="lib-td lib-td-updated" data-testid="lib-td-updated">
+        {manageUpdatedText(card, nowMs)}
+      </td>
+      <td className="lib-td lib-td-actions" data-testid="lib-td-actions">
+        <div className="lib-td-actions-row">
+          <button
+            type="button"
+            className="lib-btn lib-td-open"
+            onClick={primaryAction}
+            disabled={primaryDisabled}
+            title={
+              crossDevice
+                ? "Published from another device. Use View live or Copy link."
+                : undefined
+            }
+            data-testid="lib-td-open"
+          >
+            {primaryActionLabel(card)}
+          </button>
+          {/* Copy link is a per-row action on a LIVE page only (a draft has no
+              public URL; an archived page's link is not for sharing). The More
+              menu carries it too for live pages — same shared handler. */}
+          {isLive && card.publicUrl && (
+            <button
+              type="button"
+              className="lib-btn lib-td-copy"
+              onClick={onCopyLink}
+              data-testid="lib-td-copy"
+            >
+              {copied ? "Copied" : "Copy link"}
+            </button>
+          )}
+          <RowMenu
+            card={card}
+            actions={actions}
+            busy={busy}
+            copied={copied}
+            onUpdateLive={onUpdateLive}
+            onViewLive={onViewLive}
+            onCopyLink={onCopyLink}
+            onArchive={onArchive}
+            onDuplicate={onDuplicate}
+            onDelete={onDelete}
+            onMarkFollowedUp={onMarkFollowedUp}
+          />
+        </div>
+      </td>
+    </tr>
   );
 }

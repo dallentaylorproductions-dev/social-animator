@@ -1066,3 +1066,222 @@ export function usageMeterLabel(
   }
   return `${liveCount} of ${cap} live`;
 }
+
+// ===========================================================================
+// Management List (PAGES_MANAGE_LIST, Packet 1) — the dense sortable table.
+//
+// V3 keeps Cards as the primary operating view; "Manage" is an opt-in, desktop-
+// only management surface that renders this columnar table over the SAME already-
+// loaded cards (no new fetch). Everything here is PURE — the column set, the
+// per-column comparators, the stable sort, and the empty-graceful cell text — so
+// the component stays a thin shell and the unit tests pin the behavior, exactly
+// like the rest of this module. Inert unless the component renders under the
+// flag, so a flag-off library is byte-identical to today's V3 cockpit. Bulk
+// select / checkboxes are deliberately OUT of scope (Packet 2).
+// ===========================================================================
+
+/** The placeholder a management-List cell shows when its optional field is empty. */
+export const MANAGE_EMPTY = "—";
+
+/**
+ * The sortable management-List columns. "actions" is a 7th column but is not
+ * sortable (it holds the per-row Open / Copy link / More controls), so it is
+ * tracked in MANAGE_LIST_COLUMNS, not here.
+ */
+export type ManageSortColumn =
+  | "address"
+  | "client"
+  | "state"
+  | "lastActivity"
+  | "followUp"
+  | "updated";
+
+export type SortDir = "asc" | "desc";
+
+export interface ManageSort {
+  column: ManageSortColumn;
+  dir: SortDir;
+}
+
+/**
+ * One management-List column. `key` is the sort key (or "actions" for the non-
+ * sortable Actions column); `accent` marks the ONE column that earns the teal
+ * next-action accent (consistent with 3b: teal = the follow-up signal only).
+ * The component renders headers + cells straight off this list, and the source-
+ * contract test asserts the exact 7 columns + their order, so the table can
+ * never silently drift.
+ */
+export interface ManageColumn {
+  key: ManageSortColumn | "actions";
+  label: string;
+  sortable: boolean;
+  accent?: boolean;
+  /** Column width as a table percentage (the table is `table-layout: fixed`,
+   *  so cells truncate within these instead of the table overflowing). */
+  width: string;
+}
+
+export const MANAGE_LIST_COLUMNS: readonly ManageColumn[] = [
+  { key: "address", label: "Address", sortable: true, width: "24%" },
+  { key: "client", label: "Client", sortable: true, width: "15%" },
+  { key: "state", label: "State", sortable: true, width: "9%" },
+  { key: "lastActivity", label: "Last activity", sortable: true, width: "12%" },
+  { key: "followUp", label: "Follow-up", sortable: true, accent: true, width: "12%" },
+  { key: "updated", label: "Updated", sortable: true, width: "10%" },
+  { key: "actions", label: "Actions", sortable: false, width: "18%" },
+];
+
+/** The table opens on most-recently-updated first — today's base ordering. */
+export const DEFAULT_MANAGE_SORT: ManageSort = { column: "updated", dir: "desc" };
+
+/**
+ * A fresh column starts on its most useful direction: time columns (and the
+ * follow-up signal) lead with the newest / strongest first (desc); the text +
+ * status columns read top-down alphabetically (asc). Re-clicking the active
+ * column flips this (see the component's toggle).
+ */
+export function defaultDirFor(column: ManageSortColumn): SortDir {
+  return column === "lastActivity" ||
+    column === "updated" ||
+    column === "followUp"
+    ? "desc"
+    : "asc";
+}
+
+/**
+ * "Last activity" sort key — the most-recent meaningful timestamp, with the
+ * pinned fallback chain: the follow-up engagement, else the last open, else the
+ * last publish/update (always present). PURE. This is the SORT key only; the
+ * column DISPLAYS `lastViewedAt` (a dash when never opened) via
+ * `manageLastActivityText`, so an unopened page still sorts sanely by `updatedAt`
+ * while reading as empty.
+ */
+export function lastActivityAt(card: PageCard): string {
+  return card.followUpAt ?? card.lastViewedAt ?? card.updatedAt;
+}
+
+/**
+ * Status sort rank — most-active first: live, then edits-pending, draft, and
+ * archived last. A deliberate semantic order (not alphabetical), so sorting
+ * "State" groups the live listings the agent works on at the top.
+ */
+const STATUS_SORT_RANK: Record<PageStatus, number> = {
+  live: 0,
+  "live-edits-pending": 1,
+  draft: 2,
+  archived: 3,
+};
+
+/** Follow-up sort: worth-a-follow-up pages outrank the rest, then by recency. */
+function compareFollowUp(a: PageCard, b: PageCard): number {
+  const aw = a.worthFollowUp ? 1 : 0;
+  const bw = b.worthFollowUp ? 1 : 0;
+  if (aw !== bw) return aw - bw;
+  return (a.followUpAt ?? "").localeCompare(b.followUpAt ?? "");
+}
+
+/**
+ * The ascending comparison for a single column (negative ⇒ a sorts before b).
+ * Strings + ISO timestamps compare with localeCompare; "State" uses the semantic
+ * rank above; "Last activity" uses the pinned fallback chain; "Follow-up" leads
+ * with the nudge flag then recency. PURE — direction + the stable tiebreak are
+ * applied by `sortManageList`.
+ */
+function compareByColumn(
+  a: PageCard,
+  b: PageCard,
+  column: ManageSortColumn,
+): number {
+  switch (column) {
+    case "address":
+      return a.propertyLine.localeCompare(b.propertyLine);
+    case "client":
+      return (a.sellerLine ?? "").localeCompare(b.sellerLine ?? "");
+    case "state":
+      return STATUS_SORT_RANK[a.status] - STATUS_SORT_RANK[b.status];
+    case "lastActivity":
+      return lastActivityAt(a).localeCompare(lastActivityAt(b));
+    case "followUp":
+      return compareFollowUp(a, b);
+    case "updated":
+      return a.updatedAt.localeCompare(b.updatedAt);
+  }
+}
+
+/**
+ * Sort the already-loaded cards for the management table. Non-mutating, stable,
+ * and TOTAL: the chosen column drives the order (asc/desc), and a `key`
+ * tiebreak — ALWAYS ascending, regardless of `dir` — makes the result fully
+ * deterministic (equal-on-column rows never shuffle between renders). PURE; the
+ * comparator runs over the cards the library already holds, never a new fetch.
+ */
+export function sortManageList(
+  cards: PageCard[],
+  { column, dir }: ManageSort,
+): PageCard[] {
+  const factor = dir === "asc" ? 1 : -1;
+  return [...cards].sort((a, b) => {
+    const primary = compareByColumn(a, b, column) * factor;
+    if (primary !== 0) return primary;
+    return a.key.localeCompare(b.key);
+  });
+}
+
+/**
+ * Toggle the sort on a header click: re-clicking the active column flips its
+ * direction; clicking a new column adopts that column on its natural default
+ * direction (`defaultDirFor`). PURE — the component holds the `ManageSort` state
+ * and calls this. Returns a NEW object (never mutates the input).
+ */
+export function nextManageSort(
+  current: ManageSort,
+  column: ManageSortColumn,
+): ManageSort {
+  if (current.column === column) {
+    return { column, dir: current.dir === "asc" ? "desc" : "asc" };
+  }
+  return { column, dir: defaultDirFor(column) };
+}
+
+// ── empty-graceful cell text (the optional / flag-gated columns) ──
+// Client (`sellerLine`), Last activity (`lastViewedAt`), and Follow-up
+// (`worthFollowUp`/`followUpAt`) are only populated under the VIEWED_SIGNAL_*
+// nudge flags, so on a flag-off / unopened page they are absent. Each helper
+// returns an intentional `MANAGE_EMPTY` dash rather than a blank, so the table
+// reads as deliberately empty, never broken. PURE; the component renders these
+// verbatim and the unit tests pin the empty + populated shapes.
+
+/** Client column — the prepared-for seller line, or the empty dash. */
+export function manageClientText(card: PageCard): string {
+  return card.sellerLine ?? MANAGE_EMPTY;
+}
+
+/**
+ * Last-activity column — the last open as a relative label, or the empty dash
+ * when the page has not been opened (or the viewed-signal flag is off). The SORT
+ * still uses `lastActivityAt`'s `updatedAt` fallback, so an unopened page reads
+ * empty here yet keeps a sane position.
+ */
+export function manageLastActivityText(card: PageCard, nowMs: number): string {
+  return card.lastViewedAt
+    ? relativeTimeAgo(card.lastViewedAt, nowMs)
+    : MANAGE_EMPTY;
+}
+
+/**
+ * Follow-up column (the ONE accented column) — when the page is worth a follow-
+ * up, the recency of the qualifying engagement (or a plain "Worth a follow-up"
+ * when no stamp is set); otherwise the empty dash. Only ever non-empty under the
+ * nudge flag, so a flag-off column is all dashes (intentional, not broken).
+ */
+export function manageFollowUpText(card: PageCard, nowMs: number): string {
+  if (!card.worthFollowUp) return MANAGE_EMPTY;
+  return card.followUpAt
+    ? relativeTimeAgo(card.followUpAt, nowMs)
+    : "Worth a follow-up";
+}
+
+/** Updated column — the last publish/update as a relative label (always present). */
+export function manageUpdatedText(card: PageCard, nowMs: number): string {
+  return relativeTimeAgo(card.updatedAt, nowMs);
+}
