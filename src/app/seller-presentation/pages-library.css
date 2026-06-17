@@ -417,6 +417,68 @@
   text-wrap: pretty;
 }
 
+/* ─── v3 card hierarchy: one clear lead per mode (PAGES_LIBRARY_V3, Pass 3a) ──
+   The card's `data-mode` (follow-up / live / draft / archived) drives the
+   visual WEIGHT of the address anchor + the three-tier lead. Hierarchy is
+   weight, size, spacing, and neutral/muted TONE only — NO accent (that is 3b).
+   The `data-mode` attr + the `.lib-lead/.lib-reason/.lib-context` lines are
+   emitted ONLY under the flag, so a flag-off card carries none of this and its
+   styling is byte-identical. */
+
+/* Address is the card anchor — the strongest type. */
+.sep-library .lib-card[data-mode] .lib-card-title {
+  font-size: 15.5px;
+  letter-spacing: -0.015em;
+}
+/* A touch more room so the lead reads as the decision point, not a label. */
+.sep-library .lib-card[data-mode] .lib-body { gap: 5px; }
+
+/* Tier 1 — the lead state. Neutral, the heaviest line after the address; the
+   per-mode weight/size below sets follow-up (the work) apart from live. */
+.sep-library .lib-lead {
+  margin: 4px 0 0;
+  font-size: 12.5px; line-height: 1.35; font-weight: 600;
+  color: var(--fg);
+  overflow: hidden; text-overflow: ellipsis; white-space: nowrap;
+}
+/* Tier 2 — the reason, said once, neutral. */
+.sep-library .lib-reason {
+  margin: 1px 0 0;
+  font-size: 12px; line-height: 1.4;
+  color: var(--fg-mute);
+  overflow: hidden; text-overflow: ellipsis; white-space: nowrap;
+}
+/* Tier 3 — muted supporting context (recency + repeat-opens). Mono to match the
+   card's existing meta voice; the quietest line on the card. */
+.sep-library .lib-context {
+  margin: 1px 0 0;
+  font-family: var(--font-geist-mono), monospace;
+  font-size: 11px; color: var(--fg-dim);
+  overflow: hidden; text-overflow: ellipsis; white-space: nowrap;
+}
+
+/* Follow-up mode = the WORK: the lead is the largest + heaviest state on the
+   card, with a little more space above it, so it pulls the eye first. */
+.sep-library .lib-card[data-mode="follow-up"] .lib-lead {
+  margin-top: 6px;
+  font-size: 13px; font-weight: 600;
+  color: var(--fg);
+}
+/* Live mode = activity: a calmer, lighter lead — present, but it does not
+   compete with the follow-up cards for attention. */
+.sep-library .lib-card[data-mode="live"] .lib-lead {
+  font-weight: 500;
+  color: var(--fg-dim);
+}
+
+/* Collapsed mobile card stays ruthless (Pass 2): the lead + one support line
+   (the reason) on the scan face; the muted context folds away until expand,
+   mirroring how the pending note collapses. Desktop (never expandable) always
+   shows all three tiers. */
+.sep-library .lib-card[data-expandable="true"]:not([data-expanded="true"]) .lib-context {
+  display: none;
+}
+
 /* actions */
 .sep-library .lib-actions {
   margin-top: 12px;

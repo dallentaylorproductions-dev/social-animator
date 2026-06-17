@@ -508,11 +508,22 @@ export function isViewMode(value: unknown): value is ViewMode {
  * viewport default: List on mobile widths, Cards otherwise. PURE — the caller
  * reads localStorage + window.innerWidth in an effect (never during render, to
  * stay hydration-safe) and passes them in.
+ *
+ * PAGES_LIBRARY_V3 (Pass 3a) — when `mobileCardsOnly` is true, List becomes
+ * desktop-only: at mobile widths the library is ALWAYS Cards, regardless of a
+ * saved (desktop-set) preference. The preference is still honored on desktop
+ * (and preserved in storage), so a user who chose List keeps List on the wide
+ * screen and gets the dense Cards scan on the phone. Default false ⇒ today's
+ * behavior, byte-identical.
  */
 export function resolveViewMode(
   saved: string | null,
   viewportWidth: number,
+  mobileCardsOnly = false,
 ): ViewMode {
+  if (mobileCardsOnly && viewportWidth <= LIBRARY_MOBILE_MAX_WIDTH) {
+    return "cards";
+  }
   if (isViewMode(saved)) return saved;
   return viewportWidth <= LIBRARY_MOBILE_MAX_WIDTH ? "list" : "cards";
 }
@@ -948,6 +959,94 @@ export function cardSignal(card: PageCard, nowMs: number): CardSignal {
     ...viewEngagementFacts(card, 1),
   ].filter(Boolean);
   return { context: parts.length > 0 ? parts.join(" · ") : undefined };
+}
+
+// ===========================================================================
+// Library v3 cockpit polish — card hierarchy (PAGES_LIBRARY_V3, Pass 3a).
+//
+// Pass 3a gives every card ONE clear lead by mode (follow-up / live / draft),
+// with the action-first hierarchy: address anchor (strongest), lead state (the
+// decision point), reason said ONCE (neutral), supporting context (muted). The
+// MODE drives visual weight in CSS (weight/size/spacing + neutral-muted tone —
+// no accent; that is 3b); the projection below is the three-tier text. PURE so
+// the desktop card and the collapsed mobile card share one source of truth and
+// the unit tests pin it. Inert unless the component renders under the flag, so a
+// flag-off card is byte-identical to the V2 (Pass 1/2) card.
+// ===========================================================================
+
+/**
+ * The card's hierarchy mode — the one idea the card leads with. Follow-up (the
+ * work) and live (activity) only ever differ on a published page; a draft leads
+ * with "Draft", an archived card with "Archived". `worthFollowUp` is route-set
+ * only under the nudge flag, so a flag-off published page is always "live".
+ */
+export type CardMode = "follow-up" | "live" | "draft" | "archived";
+
+export function cardMode(card: PageCard): CardMode {
+  if (card.status === "archived") return "archived";
+  if (card.status === "draft") return "draft";
+  // live / live-edits-pending: the work (a recent meaningful engagement) leads
+  // over plain activity.
+  return card.worthFollowUp ? "follow-up" : "live";
+}
+
+/**
+ * The three-tier card lead (Pass 3a). One clear lead per mode, then the reason
+ * said ONCE, then muted context — never the same fact twice. PURE; both the
+ * desktop card and the collapsed mobile card read it so the hierarchy never
+ * drifts. Built on the SAME view-signal helpers as `cardSignal`, just split
+ * across three tiers instead of one de-duplicated line:
+ *
+ *   - Follow-up: lead "Worth a follow-up"; reason = the prioritized reasons
+ *     (capped, neutral); context = recency + repeat-opens ("Opened · 2h ago ·
+ *     3 views"). The reason owns the engagement facts, so context omits them.
+ *   - Live (opened): lead = the opened/returned status; reason = the single
+ *     strongest engagement fact (if any); context = the repeat-open count.
+ *   - Draft / archived / never-opened: empty — the status chip + the primary
+ *     action carry the state, no signal lines.
+ */
+export interface CardLead {
+  /** The decision-point line — the single strongest state after the address. */
+  lead?: string;
+  /** The reason, said ONCE, in a neutral voice. */
+  reason?: string;
+  /** Muted supporting context (recency + repeat-opens). */
+  context?: string;
+}
+
+export function cardLead(card: PageCard, nowMs: number): CardLead {
+  const countLabel =
+    typeof card.viewCount === "number" && card.viewCount >= 1
+      ? `${card.viewCount} ${card.viewCount === 1 ? "view" : "views"}`
+      : undefined;
+
+  const mode = cardMode(card);
+
+  if (mode === "follow-up") {
+    const reasons = (card.followUpReasons ?? []).slice(0, 2);
+    const recency = card.lastViewedAt
+      ? `Opened · ${relativeTimeAgo(card.lastViewedAt, nowMs)}`
+      : undefined;
+    return {
+      lead: "Worth a follow-up",
+      reason: reasons.length ? reasons.join(" · ") : undefined,
+      context: [recency, countLabel].filter(Boolean).join(" · ") || undefined,
+    };
+  }
+
+  if (mode === "live") {
+    // Only an OPENED live page has a lead to show; an unopened one leans on its
+    // "Live" chip + primary, same as a draft (no signal lines).
+    if (!countLabel) return {};
+    return {
+      lead: viewSignalLabel(card, nowMs),
+      reason: viewEngagementFacts(card, 1)[0],
+      context: countLabel,
+    };
+  }
+
+  // draft / archived: the chip + the primary action carry the state.
+  return {};
 }
 
 /**

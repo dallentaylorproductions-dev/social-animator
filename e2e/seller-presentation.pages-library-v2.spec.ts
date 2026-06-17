@@ -283,7 +283,9 @@ test.describe("PAGES_LIBRARY_V2 is gated (flag-off byte-identical)", () => {
     // which short-circuits to today's render when the flag is off.
     expect(tsx).toContain("if (!libraryV2Enabled) return renderItems(orderedCards, canReorder);");
     // The de-dup card branch and the alarm-banner suppression are both gated.
-    expect(tsx).toContain("{libraryV2 ? (");
+    // (Pass 3a nests this under the V3 lead ternary — `) : libraryV2 ? (` — so
+    // the gate reads `libraryV2 ? (` rather than `{libraryV2 ? (`.)
+    expect(tsx).toContain("libraryV2 ? (");
     expect(tsx).toContain("{atLimit && !libraryV2Enabled && (");
   });
 });
