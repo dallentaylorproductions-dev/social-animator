@@ -82,6 +82,17 @@ export default async function SellerPresentationPage({
   // public flag. Only the library uses it; the wizard is untouched.
   const cardExpandEnabled = process.env.PAGES_CARD_EXPAND === "true";
 
+  // Pages Library Pass 3a — Cards as the mobile default + the action-first card
+  // hierarchy (one clear lead per card by mode). OFF by default; ships DARK on
+  // top of the V2 cockpit so it can be verified on preview before the single
+  // post-3c prod flip. When on, List becomes desktop-only (hidden at mobile
+  // widths, Cards is the mobile default) and each card leads with one state
+  // (follow-up / live / draft) via weight/spacing/muted tone — no accent (3b).
+  // A presentation + default re-shape — read server-side and threaded down as a
+  // prop (mirroring cardExpandEnabled) so the client needs no separate public
+  // flag. Only the library uses it; the wizard is untouched.
+  const libraryV3Enabled = process.env.PAGES_LIBRARY_V3 === "true";
+
   const sp = await searchParams;
   const idParam = sp?.id;
   const hasId =
@@ -106,6 +117,7 @@ export default async function SellerPresentationPage({
       reorderEnabled={reorderEnabled}
       libraryV2Enabled={libraryV2Enabled}
       cardExpandEnabled={cardExpandEnabled}
+      libraryV3Enabled={libraryV3Enabled}
     />
   );
 }

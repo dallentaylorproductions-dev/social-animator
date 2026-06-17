@@ -41,6 +41,8 @@ import {
   applyManualOrder,
   buildDuplicateDraft,
   bulkActionValidity,
+  cardLead,
+  cardMode,
   cardOverflowActions,
   cardSignal,
   countWorthFollowUp,
@@ -49,6 +51,7 @@ import {
   followUpSubline,
   isAtOrOverLiveCap,
   isCrossDeviceOnly,
+  LIBRARY_MOBILE_MAX_WIDTH,
   listMetaLine,
   splitFollowUp,
   usageMeterLabel,
@@ -165,6 +168,7 @@ export function PagesLibrary({
   reorderEnabled = false,
   libraryV2Enabled = false,
   cardExpandEnabled = false,
+  libraryV3Enabled = false,
 }: {
   ownerEmail: string | null;
   /**
@@ -202,6 +206,17 @@ export function PagesLibrary({
    * is narrow, so the flag-off DOM is unchanged.
    */
   cardExpandEnabled?: boolean;
+  /**
+   * PAGES_LIBRARY_V3 (Pass 3a) — when true, Cards become the mobile DEFAULT
+   * (List is desktop-only and hidden at mobile widths), and every card leads
+   * with one clear state by mode (follow-up / live / draft) via the action-first
+   * hierarchy (address anchor → lead → reason once → muted context). A presentation
+   * + default re-shape of the V2 card — read server-side and threaded down as a
+   * prop (mirroring cardExpandEnabled) so the client needs no separate public
+   * flag. Default false ⇒ byte-identical to the V2 (Pass 1/2) library on mobile
+   * and desktop. Owner-scoped; nothing seller-facing.
+   */
+  libraryV3Enabled?: boolean;
 }) {
   // SP-KEYSTONE — the server's draft instances for this agent (the DRAFT slice
   // when the flag is on). null = not loaded / the fetch failed ⇒ fall back to
@@ -250,6 +265,15 @@ export function PagesLibrary({
   // collapsed and the flag-off path never reads it. 640px matches the single-
   // column card grid breakpoint in pages-library.css.
   const [isNarrow, setIsNarrow] = useState(false);
+
+  // PAGES_LIBRARY_V3 (Pass 3a) — is the viewport a phone/small tablet (the same
+  // LIBRARY_MOBILE_MAX_WIDTH=768 breakpoint the view-mode default keys off)? On
+  // mobile under V3, List is desktop-only: the toggle hides and the render is
+  // forced to Cards regardless of a saved (desktop-set) preference. Initialized
+  // to a STABLE false (desktop) so the server and first client render agree, then
+  // resolved + kept current via matchMedia. Inert unless the flag is on (no
+  // listener attached), so the flag-off path is byte-identical.
+  const [isMobile, setIsMobile] = useState(false);
 
   // v5 — the agent's manual order for the Active tab (SP-LIB-5). A list of
   // card KEYS, owner-scoped + persisted server-side (cross-device). `order`
@@ -343,7 +367,12 @@ export function PagesLibrary({
     } catch {
       // storage disabled / private mode — fall through to the viewport default
     }
-    setViewMode(resolveViewMode(saved, window.innerWidth));
+    // PAGES_LIBRARY_V3 — when on, List is desktop-only, so mobile resolves to
+    // Cards regardless of a saved (desktop-set) preference. Flag-off keeps
+    // today's saved-wins / viewport-default resolution, byte-identical.
+    setViewMode(
+      resolveViewMode(saved, window.innerWidth, libraryV3Enabled),
+    );
     setNowMs(Date.now());
     // Seed the order from the offline cache for an immediate ordered paint;
     // load() refreshes it from the server (the cross-device source of truth).
@@ -358,7 +387,22 @@ export function PagesLibrary({
         // no cache / parse error — the server fetch in load() fills it in
       }
     }
-  }, [reorderEnabled, setOrderLocal]);
+  }, [reorderEnabled, setOrderLocal, libraryV3Enabled]);
+
+  // PAGES_LIBRARY_V3 (Pass 3a) — track whether the viewport is mobile (the
+  // LIBRARY_MOBILE_MAX_WIDTH=768 breakpoint), so List can be hidden + the render
+  // forced to Cards there. Inert unless the flag is on (no listener attached), so
+  // the flag-off path is byte-identical. matchMedia is read in the effect (never
+  // during render) and kept current via its change event, so a rotate / resize
+  // across the breakpoint reflows the toggle + view correctly.
+  useEffect(() => {
+    if (!libraryV3Enabled || typeof window === "undefined") return;
+    const mq = window.matchMedia(`(max-width: ${LIBRARY_MOBILE_MAX_WIDTH}px)`);
+    setIsMobile(mq.matches);
+    const onChange = (e: MediaQueryListEvent) => setIsMobile(e.matches);
+    mq.addEventListener("change", onChange);
+    return () => mq.removeEventListener("change", onChange);
+  }, [libraryV3Enabled]);
 
   // PAGES_CARD_EXPAND (Pass 2) — track whether the viewport is a phone, so the
   // Cards view can collapse/expand there only. Inert unless the flag is on (no
@@ -523,11 +567,25 @@ export function PagesLibrary({
         : visibleCards,
     [reorderEnabled, tab, visibleCards, order],
   );
+  // PAGES_LIBRARY_V3 (Pass 3a) — the view actually rendered. List is desktop-only
+  // under V3, so on mobile the render is forced to Cards regardless of the saved
+  // `viewMode` (which still governs desktop + is preserved in storage). Flag-off
+  // (and V3 on desktop) ⇒ `effectiveViewMode === viewMode`, so the render is
+  // byte-identical.
+  const effectiveViewMode: ViewMode =
+    libraryV3Enabled && isMobile ? "cards" : viewMode;
+  // Whether to show the Cards/List toggle. Under V3 on mobile there is only one
+  // view (Cards), so the toggle hides; everywhere else it shows both as today.
+  const showViewToggle = !(libraryV3Enabled && isMobile);
+
   // Drag-to-reorder is List-view + Active-tab only, and never during select
   // mode (which owns the press gesture). Cards view still shows the order; it
   // just isn't draggable this round (card-grid drag is a noted follow-up).
   const canReorder =
-    reorderEnabled && tab === "active" && viewMode === "list" && !selectMode;
+    reorderEnabled &&
+    tab === "active" &&
+    effectiveViewMode === "list" &&
+    !selectMode;
   const selectedCards = useMemo(
     () => visibleCards.filter((c) => selected.has(c.key)),
     [visibleCards, selected],
@@ -949,6 +1007,10 @@ export function PagesLibrary({
     return {
       card,
       libraryV2: libraryV2Enabled,
+      // PAGES_LIBRARY_V3 (Pass 3a) — the card leads with one clear state by mode
+      // (the desktop card + the collapsed mobile card). PageRowView ignores it
+      // (List hierarchy is out of scope this pass).
+      libraryV3: libraryV3Enabled,
       // PAGES_CARD_EXPAND (Pass 2) — collapsible only on a phone with the flag
       // on. PageRowView ignores it (List is out of scope this pass).
       expandable: cardExpandEnabled && isNarrow,
@@ -1001,7 +1063,7 @@ export function PagesLibrary({
         </Reorder.Group>
       );
     }
-    if (viewMode === "list") {
+    if (effectiveViewMode === "list") {
       return (
         <div className="lib-list" data-testid="lib-list">
           {items.map((card) => (
@@ -1180,33 +1242,38 @@ export function PagesLibrary({
           </div>
 
           <div className="lib-toolbar-right">
-            <div
-              className="lib-viewtoggle"
-              role="group"
-              aria-label="Choose layout"
-              data-testid="lib-view-toggle"
-            >
-              <button
-                type="button"
-                className="lib-tab lib-viewbtn"
-                aria-pressed={viewMode === "cards"}
-                data-active={viewMode === "cards" ? "true" : undefined}
-                onClick={() => chooseView("cards")}
-                data-testid="lib-view-cards"
+            {/* PAGES_LIBRARY_V3 (Pass 3a) — List is desktop-only: the toggle
+                hides on mobile under the flag (Cards is the only view there).
+                Everywhere else it shows both, exactly as today. */}
+            {showViewToggle && (
+              <div
+                className="lib-viewtoggle"
+                role="group"
+                aria-label="Choose layout"
+                data-testid="lib-view-toggle"
               >
-                Cards
-              </button>
-              <button
-                type="button"
-                className="lib-tab lib-viewbtn"
-                aria-pressed={viewMode === "list"}
-                data-active={viewMode === "list" ? "true" : undefined}
-                onClick={() => chooseView("list")}
-                data-testid="lib-view-list"
-              >
-                List
-              </button>
-            </div>
+                <button
+                  type="button"
+                  className="lib-tab lib-viewbtn"
+                  aria-pressed={effectiveViewMode === "cards"}
+                  data-active={effectiveViewMode === "cards" ? "true" : undefined}
+                  onClick={() => chooseView("cards")}
+                  data-testid="lib-view-cards"
+                >
+                  Cards
+                </button>
+                <button
+                  type="button"
+                  className="lib-tab lib-viewbtn"
+                  aria-pressed={effectiveViewMode === "list"}
+                  data-active={effectiveViewMode === "list" ? "true" : undefined}
+                  onClick={() => chooseView("list")}
+                  data-testid="lib-view-list"
+                >
+                  List
+                </button>
+              </div>
+            )}
 
             {!loading && cards.length > 0 && (
               <button
@@ -1403,6 +1470,13 @@ interface PageItemProps {
    * Default off ⇒ the three independent Phase 1/2/3 lines, byte-identical.
    */
   libraryV2: boolean;
+  /**
+   * PAGES_LIBRARY_V3 (Pass 3a) — render the action-first card hierarchy: a
+   * `data-mode` weight class on the card and the three-tier lead (lead state →
+   * reason once → muted context). Card view only; PageRowView ignores it. Default
+   * off ⇒ the V2 (Pass 1/2) signal lines, byte-identical.
+   */
+  libraryV3: boolean;
   /**
    * PAGES_CARD_EXPAND (Pass 2) — render this card collapsed-by-default with an
    * inline tap-to-expand affordance (Cards view, phone widths only). Set by the
@@ -1645,6 +1719,7 @@ function ExplainNote({
 function PageCardView({
   card,
   libraryV2,
+  libraryV3,
   expandable = false,
   nowMs,
   serverDraftsEnabled,
@@ -1731,6 +1806,10 @@ function PageCardView({
     <article
       className="lib-card"
       data-status={card.status}
+      // PAGES_LIBRARY_V3 (Pass 3a) — the hierarchy mode drives the card's visual
+      // weight in CSS (follow-up > live > draft). Emitted only under the flag, so
+      // a flag-off card carries no `data-mode` and its styling is unchanged.
+      data-mode={libraryV3 ? cardMode(card) : undefined}
       data-testid="lib-card"
       data-slug={card.slug}
       data-selectable={selectMode ? "true" : undefined}
@@ -1781,7 +1860,39 @@ function PageCardView({
       <div className="lib-body">
         <h3 className="lib-card-title">{card.propertyLine}</h3>
         {card.sellerLine && <p className="lib-card-sub">{card.sellerLine}</p>}
-        {libraryV2 ? (
+        {libraryV3 ? (
+          // PAGES_LIBRARY_V3 (Pass 3a) — the three-tier lead. One clear lead by
+          // mode, the reason said ONCE, then muted context — never the same fact
+          // twice. The visual weight per tier (and per mode) is CSS, keyed off
+          // the card's `data-mode`; this is purely the text. Empty on a draft /
+          // archived / never-opened card (the chip + primary carry the state).
+          (() => {
+            const h = cardLead(card, nowMs);
+            return (
+              <>
+                {h.lead && (
+                  <p className="lib-lead" data-testid="lib-card-lead">
+                    {h.lead}
+                  </p>
+                )}
+                {h.reason && (
+                  <p className="lib-reason" data-testid="lib-card-reason">
+                    {h.reason}
+                  </p>
+                )}
+                {h.context && (
+                  <p
+                    className="lib-context"
+                    data-testid="lib-card-context"
+                    data-returned={card.returnedAfterReveal ? "true" : undefined}
+                  >
+                    {h.context}
+                  </p>
+                )}
+              </>
+            );
+          })()
+        ) : libraryV2 ? (
           // V2 cockpit — the de-duplicated signal. On a follow-up card the nudge
           // marker leads (action state + reason) and the context line carries
           // recency + opens only; the engagement facts are NOT repeated (the
