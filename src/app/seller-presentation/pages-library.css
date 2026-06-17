@@ -411,6 +411,17 @@
   width: 100%; height: 100%; object-fit: cover;
   transition: transform .4s cubic-bezier(.2,.8,.2,1);
 }
+/* iOS long-press on a cover photo otherwise pops the native image menu / drag-
+   lift preview even with the card surface suppressed. Kill it on the image
+   itself (paired with draggable={false}) so a hold enters select mode cleanly;
+   the tap still bubbles to the card for open/expand. */
+.sep-library .lib-poster-img,
+.sep-library .lib-row-thumb-img {
+  -webkit-touch-callout: none;
+  -webkit-user-drag: none;
+  -webkit-user-select: none;
+  user-select: none;
+}
 .sep-library .lib-poster-empty {
   position: absolute; inset: 0;
   display: flex; align-items: center; justify-content: center;
@@ -1203,10 +1214,15 @@
   .sep-library .lib-head-row { align-items: flex-start; }
   /* Cockpit fix P1 (mobile): the header pill row must not overflow the now
      horizontally-locked viewport — "+ New page" was clipping off the unreachable
-     right edge. Give the actions cluster the full width and let the pills
-     ("N worth a follow-up" / usage) + "+ New page" WRAP fully on-screen, and let
-     the toolbar's Select wrap too, so nothing clips and everything stays
-     tappable. Scoped under the V3 hook so the dead flag-off path is byte-identical. */
+     right edge. STACK the header (titles over a full-width actions cluster) and
+     let the pills ("N worth a follow-up" / usage) + "+ New page" WRAP fully
+     on-screen, and let the toolbar's Select/Cancel wrap too, so nothing clips and
+     everything stays tappable. Scoped under the V3 hook so the dead flag-off path
+     is byte-identical. */
+  .sep-library[data-library-v3="true"] .lib-head-row {
+    flex-direction: column;
+    align-items: stretch;
+  }
   .sep-library[data-library-v3="true"] .lib-head-actions {
     width: 100%;
     flex-wrap: wrap;

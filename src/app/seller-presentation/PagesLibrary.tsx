@@ -2068,7 +2068,10 @@ function PageCardView({
       <div className="lib-poster">
         {card.cover ? (
           // eslint-disable-next-line @next/next/no-img-element
-          <img className="lib-poster-img" src={card.cover} alt="" />
+          // draggable={false} + the CSS drag/callout suppression keep an iOS
+          // long-press on the cover from popping the native image menu / drag-
+          // lift preview — a hold enters select mode cleanly instead.
+          <img className="lib-poster-img" src={card.cover} alt="" draggable={false} />
         ) : libraryV3 ? (
           // PAGES_LIBRARY_V3 (Pass 3b) — a photo-less page is a VALID prepared
           // page, not a broken one. Replace the abstract diamond with a quiet
@@ -2528,7 +2531,9 @@ function PageRowView({
           <span className="lib-row-thumb" aria-hidden="true">
             {card.cover ? (
               // eslint-disable-next-line @next/next/no-img-element
-              <img className="lib-row-thumb-img" src={card.cover} alt="" />
+              // draggable={false} + CSS drag/callout suppression: an iOS long-
+              // press on the thumb enters select mode, never the image menu / drag.
+              <img className="lib-row-thumb-img" src={card.cover} alt="" draggable={false} />
             ) : (
               <span className="lib-row-thumb-empty">◇</span>
             )}

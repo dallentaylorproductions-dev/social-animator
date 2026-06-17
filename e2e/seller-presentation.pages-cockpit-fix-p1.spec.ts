@@ -198,10 +198,13 @@ test.describe("clampMenuCoords — never hangs off-screen", () => {
 // ── header pill row wraps fully on-screen at phone width ──
 
 test.describe("header — pills + New page + Select wrap, no clipping", () => {
-  test("the action cluster wraps to full width at mobile (V3-scoped)", () => {
+  test("the header stacks + the action cluster wraps full-width at mobile (V3-scoped)", () => {
     // The fix lives in the <=640px media query, scoped under the V3 hook so the
     // dead flag-off path stays byte-identical.
     expect(css).toContain("@media (max-width: 640px)");
+    expect(css).toMatch(
+      /\[data-library-v3="true"\] \.lib-head-row \{[^}]*flex-direction: column/,
+    );
     expect(css).toMatch(
       /\[data-library-v3="true"\] \.lib-head-actions \{[^}]*flex-wrap: wrap/,
     );
@@ -211,6 +214,29 @@ test.describe("header — pills + New page + Select wrap, no clipping", () => {
     expect(css).toMatch(
       /\[data-library-v3="true"\] \.lib-toolbar-right \{[^}]*flex-wrap: wrap/,
     );
+  });
+});
+
+// ── iOS image long-press: no native photo menu / drag-lift on cover + thumb ──
+
+test.describe("cover/thumb images — clean long-press (no iOS image menu/drag)", () => {
+  test("both cover + thumbnail imgs are non-draggable", () => {
+    // draggable={false} on the cover <img> and the List/expanded-card thumbnail.
+    expect(tsx).toContain('className="lib-poster-img" src={card.cover} alt="" draggable={false}');
+    expect(tsx).toContain('className="lib-row-thumb-img" src={card.cover} alt="" draggable={false}');
+  });
+
+  test("the image CSS suppresses the iOS callout + user-drag + selection", () => {
+    // Targeted at the images specifically (the card-surface suppression alone
+    // does not stop iOS from popping the image menu / drag preview).
+    expect(css).toMatch(
+      /\.lib-poster-img,\s*\n?\s*\.sep-library \.lib-row-thumb-img \{/,
+    );
+    expect(css).toMatch(
+      /\.lib-row-thumb-img \{[^}]*-webkit-touch-callout: none/,
+    );
+    expect(css).toMatch(/\.lib-row-thumb-img \{[^}]*-webkit-user-drag: none/);
+    expect(css).toMatch(/\.lib-row-thumb-img \{[^}]*user-select: none/);
   });
 });
 
