@@ -1057,6 +1057,41 @@
 .sep-library .lib-th-sort:focus-visible {
   outline: 2px solid var(--accent); outline-offset: -2px;
 }
+/* PAGES_MANAGE_LIST (Packet 2) — the leading bulk-select column. The header +
+   each row center their checkbox; the cell never truncates (it holds no text).
+   A checked row gets a faint accent wash so the selection reads at a glance. */
+.sep-library .lib-th-check {
+  padding: 11px 0 11px 14px;
+  text-align: left;
+  background: var(--bg-2);
+}
+.sep-library .lib-td-check {
+  overflow: visible;
+  padding: 11px 0 11px 14px;
+}
+.sep-library .lib-th-check .lib-row-check,
+.sep-library .lib-td-check .lib-row-check {
+  padding-left: 0;
+}
+.sep-library .lib-tr[data-checked="true"] {
+  background: color-mix(in oklch, var(--accent) 9%, transparent);
+}
+.sep-library .lib-tr[data-checked="true"]:hover {
+  background: color-mix(in oklch, var(--accent) 14%, transparent);
+}
+/* The indeterminate (some-but-not-all) face on the select-all box: a centered
+   dash on the same mint fill the checked box uses. */
+.sep-library .lib-check-box[data-indeterminate="true"] {
+  background: var(--accent);
+  border-color: var(--accent);
+}
+.sep-library .lib-check-dash {
+  display: block;
+  width: 11px;
+  height: 2px;
+  border-radius: 1px;
+  background: var(--bg);
+}
 .sep-library .lib-th-actions {
   padding: 11px 14px;
   text-align: right;

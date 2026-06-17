@@ -792,12 +792,14 @@ test.describe("select-mode checkbox is bound to selected state in BOTH layouts",
   );
 
   test("both checkbox sites bind the box fill to `checked` and render the glyph", () => {
-    // Cards (.lib-check) AND List (.lib-row-check) each render the box with the
-    // data-checked binding + the conditional CheckGlyph — two occurrences each.
+    // Cards (.lib-check), List (.lib-row-check), AND the Manage table's per-row
+    // bulk checkbox (PAGES_MANAGE_LIST Packet 2) each render the box with the
+    // SAME data-checked binding + conditional CheckGlyph — three occurrences each,
+    // never a layout-scoped fork.
     const dataBound = tsx.match(/data-checked=\{checked \? "true" : undefined\}/g);
-    expect(dataBound?.length).toBe(2);
+    expect(dataBound?.length).toBe(3);
     const glyph = tsx.match(/\{checked && <CheckGlyph \/>\}/g);
-    expect(glyph?.length).toBe(2);
+    expect(glyph?.length).toBe(3);
     // The glyph component exists.
     expect(tsx).toContain("function CheckGlyph()");
   });
