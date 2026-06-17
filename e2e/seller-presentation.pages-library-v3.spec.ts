@@ -10,28 +10,29 @@ import {
 } from "../src/lib/seller-presentation/pages-library";
 
 /**
- * Pages Library v3 — Pass 3a: mobile-default Cards + card hierarchy
+ * Pages Library v3 — Pass 3a (card hierarchy) + Pass 3c (Cards is the only view)
  * (PAGES_LIBRARY_V3).
  *
- * Pass 3a does the structural-visual half of the cockpit polish: Cards become
- * the mobile DEFAULT (List is desktop-only), and every card leads with ONE
- * clear state by mode (follow-up / live / draft) via the action-first hierarchy
- * (address anchor → lead → reason once → muted context). Both halves are pure
- * derivation in pages-library.ts, so — consistent with how Pass 1/2 were pinned
- * (the e2e harness renders the WIZARD on the bare route, library flag off) —
- * this runs as a node-context spec:
+ * Pass 3a does the structural-visual half of the cockpit polish: every card
+ * leads with ONE clear state by mode (follow-up / live / draft) via the
+ * action-first hierarchy (address anchor → lead → reason once → muted context).
+ * Pass 3c finishes the cockpit by hiding the Cards/List toggle entirely — Cards
+ * is the single, intentional operating view under V3 (a real dense-management
+ * List returns later as its own dedicated effort). Both are pure derivation /
+ * flag gating, so — consistent with how Pass 1/2 were pinned (the e2e harness
+ * renders the WIZARD on the bare route, library flag off) — this runs as a
+ * node-context spec:
  *
- *   1. PURE: the mobile-cards-only view resolution, the per-status card MODE,
- *      and the three-tier lead projection (no fact shown twice), pinned across
- *      every state.
- *   2. SOURCE-CONTRACT: the flag is read + threaded, the mobile default + the
- *      hidden List toggle are gated on `libraryV3Enabled && isMobile`, and the
- *      `data-mode` weight class + the three-tier DOM render only under the flag —
- *      so flag-off / desktop is byte-identical.
+ *   1. PURE: the view resolution (still resolved + preserved for the future
+ *      List effort), the per-status card MODE, and the three-tier lead
+ *      projection (no fact shown twice), pinned across every state.
+ *   2. SOURCE-CONTRACT: the flag is read + threaded, the V3 render is forced to
+ *      Cards + the List toggle is hidden (`showViewToggle = !libraryV3Enabled`,
+ *      Pass 3c), and the `data-mode` weight class + three-tier DOM render only
+ *      under the flag — so flag-off is byte-identical.
  *
- * The in-browser mobile verification (opens in Cards with no stored pref, List
- * hidden on mobile + reachable on desktop, the per-mode visual weight) is the
- * preview check the packet assigns to Cowork, at mobile width with
+ * The in-browser verification (Cards only, no List toggle, no dead UI, flag-off
+ * identical) is the preview check the packet assigns to Cowork, with
  * PAGES_LIBRARY_V3=true.
  */
 
@@ -190,20 +191,28 @@ test.describe("PAGES_LIBRARY_V3 is gated (flag-off + desktop byte-identical)", (
     expect(page).toContain("libraryV3Enabled={libraryV3Enabled}");
   });
 
-  test("the mobile default keys the V3 flag into resolveViewMode", () => {
+  test("the saved view pref still resolves (preserved for a future List effort)", () => {
+    // resolveViewMode still runs + threads the flag, so `viewMode` is preserved
+    // in storage even though Pass 3c forces the V3 render to Cards. A future
+    // dedicated management-List effort can revive the saved preference.
     expect(tsx).toContain(
       "resolveViewMode(saved, window.innerWidth, libraryV3Enabled)",
     );
-    // isMobile tracks the SAME breakpoint the view default uses (768), reactively.
-    expect(tsx).toContain(
-      "window.matchMedia(`(max-width: ${LIBRARY_MOBILE_MAX_WIDTH}px)`)",
-    );
   });
 
-  test("on mobile under V3 the render is forced to Cards and the toggle hides", () => {
-    expect(tsx).toContain('libraryV3Enabled && isMobile ? "cards" : viewMode');
-    expect(tsx).toContain("const showViewToggle = !(libraryV3Enabled && isMobile)");
+  test("under V3 the render is forced to Cards and the toggle hides entirely (Pass 3c)", () => {
+    // Cards is the single operating view under V3 — on every viewport, not just
+    // mobile. Flag-off ⇒ effectiveViewMode === viewMode, so it is byte-identical.
+    expect(tsx).toContain(
+      'const effectiveViewMode: ViewMode = libraryV3Enabled ? "cards" : viewMode;',
+    );
+    expect(tsx).toContain("const showViewToggle = !libraryV3Enabled;");
     expect(tsx).toContain("{showViewToggle && (");
+    // The V3 mobile-only viewport listener is gone — the toggle no longer keys
+    // off a breakpoint; it is purely flag-gated.
+    expect(tsx).not.toContain(
+      "window.matchMedia(`(max-width: ${LIBRARY_MOBILE_MAX_WIDTH}px)`)",
+    );
   });
 
   test("the card hierarchy DOM is emitted only inside the libraryV3 branch", () => {

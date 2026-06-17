@@ -51,7 +51,6 @@ import {
   followUpSubline,
   isAtOrOverLiveCap,
   isCrossDeviceOnly,
-  LIBRARY_MOBILE_MAX_WIDTH,
   listMetaLine,
   splitFollowUp,
   usageMeterLabel,
@@ -207,8 +206,8 @@ export function PagesLibrary({
    */
   cardExpandEnabled?: boolean;
   /**
-   * PAGES_LIBRARY_V3 (Pass 3a) — when true, Cards become the mobile DEFAULT
-   * (List is desktop-only and hidden at mobile widths), and every card leads
+   * PAGES_LIBRARY_V3 (Pass 3a/3c) — when true, Cards is the ONLY view (the
+   * Cards/List toggle is hidden entirely, Pass 3c), and every card leads
    * with one clear state by mode (follow-up / live / draft) via the action-first
    * hierarchy (address anchor → lead → reason once → muted context). A presentation
    * + default re-shape of the V2 card — read server-side and threaded down as a
@@ -265,15 +264,6 @@ export function PagesLibrary({
   // collapsed and the flag-off path never reads it. 640px matches the single-
   // column card grid breakpoint in pages-library.css.
   const [isNarrow, setIsNarrow] = useState(false);
-
-  // PAGES_LIBRARY_V3 (Pass 3a) — is the viewport a phone/small tablet (the same
-  // LIBRARY_MOBILE_MAX_WIDTH=768 breakpoint the view-mode default keys off)? On
-  // mobile under V3, List is desktop-only: the toggle hides and the render is
-  // forced to Cards regardless of a saved (desktop-set) preference. Initialized
-  // to a STABLE false (desktop) so the server and first client render agree, then
-  // resolved + kept current via matchMedia. Inert unless the flag is on (no
-  // listener attached), so the flag-off path is byte-identical.
-  const [isMobile, setIsMobile] = useState(false);
 
   // v5 — the agent's manual order for the Active tab (SP-LIB-5). A list of
   // card KEYS, owner-scoped + persisted server-side (cross-device). `order`
@@ -367,8 +357,10 @@ export function PagesLibrary({
     } catch {
       // storage disabled / private mode — fall through to the viewport default
     }
-    // PAGES_LIBRARY_V3 — when on, List is desktop-only, so mobile resolves to
-    // Cards regardless of a saved (desktop-set) preference. Flag-off keeps
+    // Resolve the saved-wins / viewport-default `viewMode`. Under PAGES_LIBRARY_V3
+    // the render is forced to Cards (Pass 3c), so this value only governs the
+    // flag-off library — but it is still resolved + preserved so a future
+    // dedicated List effort can revive the saved preference. Flag-off keeps
     // today's saved-wins / viewport-default resolution, byte-identical.
     setViewMode(
       resolveViewMode(saved, window.innerWidth, libraryV3Enabled),
@@ -388,21 +380,6 @@ export function PagesLibrary({
       }
     }
   }, [reorderEnabled, setOrderLocal, libraryV3Enabled]);
-
-  // PAGES_LIBRARY_V3 (Pass 3a) — track whether the viewport is mobile (the
-  // LIBRARY_MOBILE_MAX_WIDTH=768 breakpoint), so List can be hidden + the render
-  // forced to Cards there. Inert unless the flag is on (no listener attached), so
-  // the flag-off path is byte-identical. matchMedia is read in the effect (never
-  // during render) and kept current via its change event, so a rotate / resize
-  // across the breakpoint reflows the toggle + view correctly.
-  useEffect(() => {
-    if (!libraryV3Enabled || typeof window === "undefined") return;
-    const mq = window.matchMedia(`(max-width: ${LIBRARY_MOBILE_MAX_WIDTH}px)`);
-    setIsMobile(mq.matches);
-    const onChange = (e: MediaQueryListEvent) => setIsMobile(e.matches);
-    mq.addEventListener("change", onChange);
-    return () => mq.removeEventListener("change", onChange);
-  }, [libraryV3Enabled]);
 
   // PAGES_CARD_EXPAND (Pass 2) — track whether the viewport is a phone, so the
   // Cards view can collapse/expand there only. Inert unless the flag is on (no
@@ -567,16 +544,15 @@ export function PagesLibrary({
         : visibleCards,
     [reorderEnabled, tab, visibleCards, order],
   );
-  // PAGES_LIBRARY_V3 (Pass 3a) — the view actually rendered. List is desktop-only
-  // under V3, so on mobile the render is forced to Cards regardless of the saved
-  // `viewMode` (which still governs desktop + is preserved in storage). Flag-off
-  // (and V3 on desktop) ⇒ `effectiveViewMode === viewMode`, so the render is
-  // byte-identical.
-  const effectiveViewMode: ViewMode =
-    libraryV3Enabled && isMobile ? "cards" : viewMode;
-  // Whether to show the Cards/List toggle. Under V3 on mobile there is only one
-  // view (Cards), so the toggle hides; everywhere else it shows both as today.
-  const showViewToggle = !(libraryV3Enabled && isMobile);
+  // PAGES_LIBRARY_V3 (Pass 3c) — Cards is the only view under V3. The render is
+  // forced to Cards regardless of the saved `viewMode` (which still governs the
+  // flag-off library and is preserved in storage so a future dedicated List
+  // effort can revive it). Flag-off ⇒ `effectiveViewMode === viewMode`, so the
+  // render is byte-identical.
+  const effectiveViewMode: ViewMode = libraryV3Enabled ? "cards" : viewMode;
+  // Whether to show the Cards/List toggle. Under V3 there is only one view
+  // (Cards), so the toggle hides entirely; flag-off shows both as today.
+  const showViewToggle = !libraryV3Enabled;
 
   // Drag-to-reorder is List-view + Active-tab only, and never during select
   // mode (which owns the press gesture). Cards view still shows the order; it
@@ -1250,9 +1226,10 @@ export function PagesLibrary({
           </div>
 
           <div className="lib-toolbar-right">
-            {/* PAGES_LIBRARY_V3 (Pass 3a) — List is desktop-only: the toggle
-                hides on mobile under the flag (Cards is the only view there).
-                Everywhere else it shows both, exactly as today. */}
+            {/* PAGES_LIBRARY_V3 (Pass 3c) — Cards is the only view under V3, so
+                the toggle hides entirely (Cards is the single operating view).
+                Flag-off shows both exactly as today; the List render path is
+                preserved for a future dedicated management-List effort. */}
             {showViewToggle && (
               <div
                 className="lib-viewtoggle"
