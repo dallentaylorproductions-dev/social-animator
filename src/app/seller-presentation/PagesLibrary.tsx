@@ -10,7 +10,7 @@ import {
   type PointerEvent as ReactPointerEvent,
 } from "react";
 import { Reorder, useDragControls, useReducedMotion } from "framer-motion";
-import { GripVertical } from "lucide-react";
+import { ChevronDown, GripVertical } from "lucide-react";
 import {
   cacheInstance,
   createInstance,
@@ -41,6 +41,7 @@ import {
   applyManualOrder,
   buildDuplicateDraft,
   bulkActionValidity,
+  cardOverflowActions,
   cardSignal,
   countWorthFollowUp,
   filterByTab,
@@ -163,6 +164,7 @@ export function PagesLibrary({
   serverDraftsEnabled = false,
   reorderEnabled = false,
   libraryV2Enabled = false,
+  cardExpandEnabled = false,
 }: {
   ownerEmail: string | null;
   /**
@@ -188,6 +190,18 @@ export function PagesLibrary({
    * the "N of M live" meter, the at-limit banner).
    */
   libraryV2Enabled?: boolean;
+  /**
+   * PAGES_CARD_EXPAND (Pass 2) — when true, the Cards view at mobile widths
+   * renders collapsed-by-default cards (the lead signal + one primary action),
+   * expanding inline on tap to reveal the full engagement detail + action set
+   * (destructive actions behind a "⋯" overflow). Scoped to narrow viewports via
+   * `isNarrow` (a post-mount matchMedia read, hydration-safe like the view-mode
+   * default); desktop keeps today's fully-shown card. Default false ⇒ byte-
+   * identical to the Pass 1 library on mobile and desktop. Owner-scoped; the
+   * collapse/expand affordance never renders unless this is on AND the viewport
+   * is narrow, so the flag-off DOM is unchanged.
+   */
+  cardExpandEnabled?: boolean;
 }) {
   // SP-KEYSTONE — the server's draft instances for this agent (the DRAFT slice
   // when the flag is on). null = not loaded / the fetch failed ⇒ fall back to
@@ -227,6 +241,15 @@ export function PagesLibrary({
   // ago"). Snapshotted in the mount effect (not read during render) so the
   // server and first client render agree and render stays pure.
   const [nowMs, setNowMs] = useState(0);
+
+  // PAGES_CARD_EXPAND (Pass 2) — is the viewport narrow (a phone)? Initialized to
+  // a STABLE false so the server and first client render agree (the card paints
+  // fully shown, exactly as today), then resolved + kept current in the effect
+  // below via matchMedia. Drives the mobile-only collapse/expand: the card is
+  // collapsible only when `cardExpandEnabled && isNarrow`, so desktop is never
+  // collapsed and the flag-off path never reads it. 640px matches the single-
+  // column card grid breakpoint in pages-library.css.
+  const [isNarrow, setIsNarrow] = useState(false);
 
   // v5 — the agent's manual order for the Active tab (SP-LIB-5). A list of
   // card KEYS, owner-scoped + persisted server-side (cross-device). `order`
@@ -336,6 +359,20 @@ export function PagesLibrary({
       }
     }
   }, [reorderEnabled, setOrderLocal]);
+
+  // PAGES_CARD_EXPAND (Pass 2) — track whether the viewport is a phone, so the
+  // Cards view can collapse/expand there only. Inert unless the flag is on (no
+  // listener attached), so the flag-off path is byte-identical. matchMedia is
+  // read in the effect (never during render) and kept current via its change
+  // event, so a rotate / resize across the breakpoint reflows correctly.
+  useEffect(() => {
+    if (!cardExpandEnabled || typeof window === "undefined") return;
+    const mq = window.matchMedia("(max-width: 640px)");
+    setIsNarrow(mq.matches);
+    const onChange = (e: MediaQueryListEvent) => setIsNarrow(e.matches);
+    mq.addEventListener("change", onChange);
+    return () => mq.removeEventListener("change", onChange);
+  }, [cardExpandEnabled]);
 
   // On unmount, FLUSH (not drop) a pending debounced order write — otherwise a
   // reorder made in the last debounce window before navigating away is lost
@@ -912,6 +949,9 @@ export function PagesLibrary({
     return {
       card,
       libraryV2: libraryV2Enabled,
+      // PAGES_CARD_EXPAND (Pass 2) — collapsible only on a phone with the flag
+      // on. PageRowView ignores it (List is out of scope this pass).
+      expandable: cardExpandEnabled && isNarrow,
       nowMs,
       serverDraftsEnabled,
       busy: busyKey === card.key || bulkBusy,
@@ -1363,6 +1403,13 @@ interface PageItemProps {
    * Default off ⇒ the three independent Phase 1/2/3 lines, byte-identical.
    */
   libraryV2: boolean;
+  /**
+   * PAGES_CARD_EXPAND (Pass 2) — render this card collapsed-by-default with an
+   * inline tap-to-expand affordance (Cards view, phone widths only). Set by the
+   * parent to `cardExpandEnabled && isNarrow`. PageRowView ignores it (List is
+   * Pass 3); when false the card renders exactly as today.
+   */
+  expandable?: boolean;
   /** Client snapshot of Date.now() for relative-time meta (List rows only). */
   nowMs: number;
   /** SP-KEYSTONE — server drafts on ⇒ the cross-device note copy is honest. */
@@ -1598,6 +1645,7 @@ function ExplainNote({
 function PageCardView({
   card,
   libraryV2,
+  expandable = false,
   nowMs,
   serverDraftsEnabled,
   busy,
@@ -1643,14 +1691,32 @@ function PageCardView({
 
   const longPress = useLongPress(onLongPressSelect, !selectMode);
 
-  // The whole card is the primary tap target (packet). Inner controls
-  // (buttons / the checkbox) self-handle, so a click that bubbled up from one
-  // is ignored here; a long-press just fired swallows its trailing click.
+  // PAGES_CARD_EXPAND (Pass 2) — collapse/expand state for the phone card. Local
+  // + per-card, so toggling one card never collapses another (Decision 4:
+  // independent toggles). Reset on remount (Decision 5). All inert unless
+  // `expandable` (phone + flag on); on desktop / flag-off the card renders
+  // exactly as today, so none of this changes the markup there.
+  const [expanded, setExpanded] = useState(false);
+  const extraId = `lib-card-extra-${card.key}`;
+  // The destructive / housekeeping actions that live behind the expanded card's
+  // "⋯" overflow (archive / duplicate / delete) — a filter of the same
+  // secondaryRowActions the List row menu uses, so the two never drift.
+  const overflowActions = expandable ? cardOverflowActions(card) : [];
+
+  // The whole card is the tap target (packet). Inner controls (buttons / the
+  // checkbox) self-handle, so a click that bubbled up from one is ignored here;
+  // a long-press just fired swallows its trailing click. When the card is
+  // expandable (phone + flag on), a body tap TOGGLES expand and NEVER navigates
+  // (Decision 2) — navigation stays on the explicit primary button.
   function onCardClick(e: ReactMouseEvent) {
     if (longPress.consumeIfFired()) return;
     if ((e.target as HTMLElement).closest("button, a, label, input")) return;
     if (selectMode) {
       onToggleSelect();
+      return;
+    }
+    if (expandable) {
+      setExpanded((v) => !v);
       return;
     }
     if (busy) return;
@@ -1670,6 +1736,8 @@ function PageCardView({
       data-selectable={selectMode ? "true" : undefined}
       data-checked={selectMode && checked ? "true" : undefined}
       data-cross-device={crossDevice ? "true" : undefined}
+      data-expandable={expandable ? "true" : undefined}
+      data-expanded={expandable && expanded ? "true" : undefined}
       onClick={onCardClick}
       {...longPress.handlers}
     >
@@ -1799,99 +1867,205 @@ function PageCardView({
           />
         )}
 
-        {!selectMode && (
-          <div className="lib-actions" data-no-longpress="true">
-            <button
-              type="button"
-              className="lib-btn lib-btn-primary"
-              onClick={primary.onClick}
-              disabled={primaryDisabled}
-              data-testid="lib-action-primary"
+        {!selectMode && expandable ? (
+          // PAGES_CARD_EXPAND (Pass 2) — collapsed face: just the primary action
+          // + the chevron disclosure. Everything else (the workflow actions and
+          // the destructive "⋯" overflow) lives in `.lib-card-extra`, revealed
+          // inline on expand. The chevron is the keyboard/SR disclosure control
+          // (aria-expanded + aria-controls); a body tap toggles the same state.
+          <>
+            <div className="lib-actions" data-no-longpress="true">
+              <button
+                type="button"
+                className="lib-btn lib-btn-primary"
+                onClick={primary.onClick}
+                disabled={primaryDisabled}
+                data-testid="lib-action-primary"
+              >
+                {primary.label}
+              </button>
+              <button
+                type="button"
+                className="lib-chevron"
+                onClick={() => setExpanded((v) => !v)}
+                aria-expanded={expanded}
+                aria-controls={extraId}
+                aria-label={`${expanded ? "Hide" : "Show"} details for ${card.propertyLine}`}
+                data-testid="lib-card-expand"
+              >
+                <ChevronDown
+                  className="lib-chevron-icon"
+                  size={16}
+                  aria-hidden="true"
+                />
+              </button>
+            </div>
+
+            <div
+              className="lib-card-extra"
+              id={extraId}
+              data-no-longpress="true"
+              data-testid="lib-card-extra"
             >
-              {primary.label}
-            </button>
+              <div className="lib-actions">
+                {isPending && canResume && (
+                  <button
+                    type="button"
+                    className="lib-btn lib-btn-accent"
+                    onClick={onUpdateLive}
+                    disabled={busy}
+                    data-testid="lib-action-update"
+                  >
+                    {busy ? "Updating…" : "Update live page"}
+                  </button>
+                )}
 
-            {isPending && canResume && (
+                {isLive && (
+                  <>
+                    <button
+                      type="button"
+                      className="lib-btn"
+                      onClick={onViewLive}
+                      data-testid="lib-action-view"
+                    >
+                      View live page
+                    </button>
+                    <button
+                      type="button"
+                      className="lib-btn"
+                      onClick={onCopyLink}
+                      data-testid="lib-action-copy"
+                    >
+                      {copied ? "Copied" : "Copy link"}
+                    </button>
+                  </>
+                )}
+
+                {card.worthFollowUp && (
+                  <button
+                    type="button"
+                    className="lib-btn lib-btn-quiet"
+                    onClick={onMarkFollowedUp}
+                    disabled={busy}
+                    data-testid="lib-action-followup"
+                  >
+                    Mark as followed up
+                  </button>
+                )}
+
+                {overflowActions.length > 0 && (
+                  <RowMenu
+                    card={card}
+                    actions={overflowActions}
+                    busy={busy}
+                    copied={copied}
+                    onUpdateLive={onUpdateLive}
+                    onViewLive={onViewLive}
+                    onCopyLink={onCopyLink}
+                    onArchive={onArchive}
+                    onDuplicate={onDuplicate}
+                    onDelete={onDelete}
+                    onMarkFollowedUp={onMarkFollowedUp}
+                  />
+                )}
+              </div>
+            </div>
+          </>
+        ) : (
+          !selectMode && (
+            <div className="lib-actions" data-no-longpress="true">
               <button
                 type="button"
-                className="lib-btn lib-btn-accent"
-                onClick={onUpdateLive}
-                disabled={busy}
-                data-testid="lib-action-update"
+                className="lib-btn lib-btn-primary"
+                onClick={primary.onClick}
+                disabled={primaryDisabled}
+                data-testid="lib-action-primary"
               >
-                {busy ? "Updating…" : "Update live page"}
+                {primary.label}
               </button>
-            )}
 
-            {isLive && (
-              <>
+              {isPending && canResume && (
                 <button
                   type="button"
-                  className="lib-btn"
-                  onClick={onViewLive}
-                  data-testid="lib-action-view"
+                  className="lib-btn lib-btn-accent"
+                  onClick={onUpdateLive}
+                  disabled={busy}
+                  data-testid="lib-action-update"
                 >
-                  View live page
+                  {busy ? "Updating…" : "Update live page"}
                 </button>
+              )}
+
+              {isLive && (
+                <>
+                  <button
+                    type="button"
+                    className="lib-btn"
+                    onClick={onViewLive}
+                    data-testid="lib-action-view"
+                  >
+                    View live page
+                  </button>
+                  <button
+                    type="button"
+                    className="lib-btn"
+                    onClick={onCopyLink}
+                    data-testid="lib-action-copy"
+                  >
+                    {copied ? "Copied" : "Copy link"}
+                  </button>
+                </>
+              )}
+
+              {card.worthFollowUp && (
                 <button
                   type="button"
-                  className="lib-btn"
-                  onClick={onCopyLink}
-                  data-testid="lib-action-copy"
+                  className="lib-btn lib-btn-quiet"
+                  onClick={onMarkFollowedUp}
+                  disabled={busy}
+                  data-testid="lib-action-followup"
                 >
-                  {copied ? "Copied" : "Copy link"}
+                  Mark as followed up
                 </button>
-              </>
-            )}
+              )}
 
-            {card.worthFollowUp && (
-              <button
-                type="button"
-                className="lib-btn lib-btn-quiet"
-                onClick={onMarkFollowedUp}
-                disabled={busy}
-                data-testid="lib-action-followup"
-              >
-                Mark as followed up
-              </button>
-            )}
+              {!isArchived && (
+                <button
+                  type="button"
+                  className="lib-btn lib-btn-quiet"
+                  onClick={onArchive}
+                  disabled={busy}
+                  data-testid="lib-action-archive"
+                >
+                  Archive
+                </button>
+              )}
 
-            {!isArchived && (
-              <button
-                type="button"
-                className="lib-btn lib-btn-quiet"
-                onClick={onArchive}
-                disabled={busy}
-                data-testid="lib-action-archive"
-              >
-                Archive
-              </button>
-            )}
+              {canResume && (
+                <button
+                  type="button"
+                  className="lib-btn lib-btn-quiet"
+                  onClick={onDuplicate}
+                  disabled={busy}
+                  data-testid="lib-action-duplicate"
+                >
+                  Duplicate
+                </button>
+              )}
 
-            {canResume && (
-              <button
-                type="button"
-                className="lib-btn lib-btn-quiet"
-                onClick={onDuplicate}
-                disabled={busy}
-                data-testid="lib-action-duplicate"
-              >
-                Duplicate
-              </button>
-            )}
-
-            {canDelete && (
-              <button
-                type="button"
-                className="lib-btn lib-btn-danger"
-                onClick={onDelete}
-                disabled={busy}
-                data-testid="lib-action-delete"
-              >
-                Delete
-              </button>
-            )}
-          </div>
+              {canDelete && (
+                <button
+                  type="button"
+                  className="lib-btn lib-btn-danger"
+                  onClick={onDelete}
+                  disabled={busy}
+                  data-testid="lib-action-delete"
+                >
+                  Delete
+                </button>
+              )}
+            </div>
+          )
         )}
       </div>
     </article>

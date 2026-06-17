@@ -562,6 +562,40 @@ export function secondaryRowActions(card: PageCard): RowAction[] {
   return actions;
 }
 
+/**
+ * PAGES_CARD_EXPAND (Pass 2) — the destructive / housekeeping actions that live
+ * behind the EXPANDED mobile card's "⋯" overflow, never on its collapsed face.
+ * Decision 5: the overflow holds ONLY archive / duplicate / delete; the primary
+ * workflow actions (Open, View live, Copy link, Mark as followed up, Update live)
+ * are never hidden behind the dots. PURE, and a FILTER of `secondaryRowActions`
+ * (not a second rule set), so the overflow can never drift from the row menu —
+ * it shows the same archive/duplicate/delete the row already validated, in order.
+ */
+export const CARD_OVERFLOW_ACTIONS: readonly RowAction[] = [
+  "archive",
+  "duplicate",
+  "delete",
+];
+
+export function cardOverflowActions(card: PageCard): RowAction[] {
+  return secondaryRowActions(card).filter((a) =>
+    CARD_OVERFLOW_ACTIONS.includes(a),
+  );
+}
+
+/**
+ * PAGES_CARD_EXPAND (Pass 2) — the workflow actions revealed INLINE when an
+ * expandable card is expanded: everything `secondaryRowActions` exposes except
+ * the overflow subset above. The primary (Open / Continue / Restore) is separate
+ * (it stays on the collapsed face), so this is purely the non-primary, non-
+ * overflow set: mark-followed-up, update-live, view-live, copy-link. PURE.
+ */
+export function cardExpandedInlineActions(card: PageCard): RowAction[] {
+  return secondaryRowActions(card).filter(
+    (a) => !CARD_OVERFLOW_ACTIONS.includes(a),
+  );
+}
+
 const MINUTE_MS = 60_000;
 const HOUR_MS = 60 * MINUTE_MS;
 const DAY_MS = 24 * HOUR_MS;

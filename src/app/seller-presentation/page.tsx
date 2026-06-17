@@ -72,6 +72,16 @@ export default async function SellerPresentationPage({
   // the library uses it; the wizard is untouched.
   const libraryV2Enabled = process.env.PAGES_LIBRARY_V2 === "true";
 
+  // Pages Library Pass 2 — mobile tap-to-expand cards. OFF by default; ships
+  // DARK on top of (independent of) PAGES_LIBRARY_V2 so it can be verified on
+  // preview before flipping. When on, the Cards view at mobile widths renders
+  // collapsed-by-default cards (one primary action) that expand inline on tap to
+  // reveal the full engagement detail + action set; desktop is untouched. A
+  // presentation-only re-shape of the V2 card — read server-side and threaded
+  // down as a prop (mirroring libraryV2Enabled) so the client needs no separate
+  // public flag. Only the library uses it; the wizard is untouched.
+  const cardExpandEnabled = process.env.PAGES_CARD_EXPAND === "true";
+
   const sp = await searchParams;
   const idParam = sp?.id;
   const hasId =
@@ -95,6 +105,7 @@ export default async function SellerPresentationPage({
       serverDraftsEnabled={serverDraftsEnabled}
       reorderEnabled={reorderEnabled}
       libraryV2Enabled={libraryV2Enabled}
+      cardExpandEnabled={cardExpandEnabled}
     />
   );
 }
