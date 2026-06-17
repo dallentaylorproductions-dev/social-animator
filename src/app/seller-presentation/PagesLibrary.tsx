@@ -10,7 +10,7 @@ import {
   type PointerEvent as ReactPointerEvent,
 } from "react";
 import { Reorder, useDragControls, useReducedMotion } from "framer-motion";
-import { ChevronDown, GripVertical } from "lucide-react";
+import { ChevronDown, GripVertical, House } from "lucide-react";
 import {
   cacheInstance,
   createInstance,
@@ -1128,7 +1128,15 @@ export function PagesLibrary({
   }
 
   return (
-    <div className="sep-library" data-testid="seller-pages-library">
+    <div
+      className="sep-library"
+      // PAGES_LIBRARY_V3 (Pass 3b) — the page-level accent + cockpit polish
+      // (header pills, the follow-up tray, the caught-up state) scope under this
+      // root hook. Card-internal polish keys off the card's own `data-mode` (also
+      // flag-only), so a flag-off library carries neither and is byte-identical.
+      data-library-v3={libraryV3Enabled ? "true" : undefined}
+      data-testid="seller-pages-library"
+    >
       <div className="lib-shell">
         <header className="lib-head">
           <a href="/dashboard" className="lib-back">
@@ -1847,6 +1855,15 @@ function PageCardView({
         {card.cover ? (
           // eslint-disable-next-line @next/next/no-img-element
           <img className="lib-poster-img" src={card.cover} alt="" />
+        ) : libraryV3 ? (
+          // PAGES_LIBRARY_V3 (Pass 3b) — a photo-less page is a VALID prepared
+          // page, not a broken one. Replace the abstract diamond with a quiet
+          // "prepared page" placeholder: a soft neutral gradient + a small home
+          // glyph (neutral, no accent — teal is reserved for a next action). Flag-
+          // off keeps the original ◇ markup, so it stays byte-identical.
+          <div className="lib-poster-empty lib-poster-prepared" aria-hidden="true">
+            <House className="lib-poster-icon" size={26} aria-hidden="true" />
+          </div>
         ) : (
           <div className="lib-poster-empty" aria-hidden="true">
             <span>◇</span>

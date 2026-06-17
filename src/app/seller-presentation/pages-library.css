@@ -135,6 +135,67 @@
   border-radius: 999px;
   white-space: nowrap;
 }
+
+/* ─── Pass 3b: page-level accent + cockpit polish (PAGES_LIBRARY_V3) ──────────
+   Scoped under the root `[data-library-v3="true"]` hook (set only under the
+   flag), so a flag-off library matches none of these and is byte-identical.
+   The accent rule is strict: teal marks the follow-up signal (the WORK) only;
+   the plan-limit / usage pill stays neutral account context, never a warning. */
+
+/* The follow-up header count earns a soft teal accent — it is a next-action
+   signal (N pages a seller engaged with), tied to the on-card marker. Soft, not
+   loud: a quiet tint + a leading dot, never a filled alert badge. */
+.sep-library[data-library-v3="true"] .lib-followup-count {
+  display: inline-flex; align-items: center; gap: 7px;
+  color: var(--accent);
+  border-color: color-mix(in oklch, var(--accent) 38%, var(--border));
+  background: color-mix(in oklch, var(--accent) 9%, transparent);
+}
+.sep-library[data-library-v3="true"] .lib-followup-count::before {
+  content: "";
+  width: 6px; height: 6px; border-radius: 50%;
+  background: var(--accent);
+  box-shadow: 0 0 6px color-mix(in oklch, var(--accent) 65%, transparent);
+}
+/* The usage / plan-limit pill stays NEUTRAL account context (not a warning):
+   the V2 label already drops the at-limit color, and here we pin it muted even
+   if some future label re-introduced the data-at-limit hook — the agent is not
+   blocked, so it must never read as an error under the cockpit. */
+.sep-library[data-library-v3="true"] .lib-meter,
+.sep-library[data-library-v3="true"] .lib-meter[data-at-limit="true"] {
+  color: var(--fg-mute);
+  border-color: var(--border);
+}
+
+/* The "Worth a follow-up" group is a calm WORK TRAY, not an alert banner: a
+   small teal dot ties its heading into the accent system (this is the work),
+   with no banner fill, border, or urgency. The "Active pages" heading and every
+   other section title stay plain. */
+.sep-library[data-library-v3="true"] [data-testid="lib-followup-group"] .lib-section-title {
+  display: inline-flex; align-items: center; gap: 8px;
+}
+.sep-library[data-library-v3="true"] [data-testid="lib-followup-group"] .lib-section-title::before {
+  content: "";
+  width: 7px; height: 7px; border-radius: 50%;
+  background: var(--accent);
+  box-shadow: 0 0 7px color-mix(in oklch, var(--accent) 60%, transparent);
+}
+
+/* Caught-up / no-engagement state reads INTENTIONAL, not blank: a centered,
+   softly-graded calm panel (no accent — there is no action to take). The copy
+   ("All caught up" / "When a seller meaningfully engages...") is unchanged. */
+.sep-library[data-library-v3="true"] .lib-caughtup {
+  text-align: center;
+  padding: 24px 22px;
+  background:
+    radial-gradient(120% 100% at 50% 0%, color-mix(in oklch, var(--fg) 4%, transparent), transparent 72%),
+    var(--surface);
+}
+.sep-library[data-library-v3="true"] .lib-caughtup-sub {
+  margin-inline: auto;
+  max-width: 30ch;
+  text-wrap: pretty;
+}
 .sep-library .lib-newbtn {
   font-size: 13px; font-weight: 600;
   color: var(--bg);
@@ -457,19 +518,67 @@
   overflow: hidden; text-overflow: ellipsis; white-space: nowrap;
 }
 
-/* Follow-up mode = the WORK: the lead is the largest + heaviest state on the
-   card, with a little more space above it, so it pulls the eye first. */
+/* Follow-up mode = the WORK (Pass 3b accent system). Teal marks a next action,
+   so the "Worth a follow-up" lead becomes a small teal PILL with a leading dot —
+   it whispers "this one matters", it does not shout. It shrinks to its content
+   (a pill, not a full-width band) and overrides the base lead's nowrap/ellipsis
+   so the pill never clips. The reason + context below it stay neutral/muted
+   (evidence is never teal). */
 .sep-library .lib-card[data-mode="follow-up"] .lib-lead {
-  margin-top: 6px;
-  font-size: 13px; font-weight: 600;
-  color: var(--fg);
+  align-self: flex-start;
+  display: inline-flex; align-items: center; gap: 7px;
+  margin-top: 7px;
+  padding: 3px 11px 3px 9px;
+  font-size: 11.5px; font-weight: 600; letter-spacing: 0.01em;
+  color: var(--accent);
+  background: color-mix(in oklch, var(--accent) 12%, transparent);
+  border: 1px solid color-mix(in oklch, var(--accent) 30%, var(--border));
+  border-radius: 999px;
+  overflow: visible; text-overflow: clip; white-space: nowrap;
+  max-width: 100%;
 }
-/* Live mode = activity: a calmer, lighter lead — present, but it does not
-   compete with the follow-up cards for attention. */
+.sep-library .lib-card[data-mode="follow-up"] .lib-lead::before {
+  content: "";
+  flex: 0 0 auto;
+  width: 6px; height: 6px; border-radius: 50%;
+  background: var(--accent);
+  box-shadow: 0 0 6px color-mix(in oklch, var(--accent) 70%, transparent);
+}
+/* The card itself carries a subtle teal left rail so the follow-up reads at a
+   glance in the grid — an inset shadow (no layout shift, survives hover). The
+   selection box-shadow (when checked) intentionally overrides it. */
+.sep-library .lib-card[data-mode="follow-up"] {
+  box-shadow: inset 3px 0 0 0 color-mix(in oklch, var(--accent) 50%, transparent);
+}
+/* Live mode = activity (evidence, never teal): a calmer, lighter lead — present,
+   but it does not compete with the follow-up cards for attention. */
 .sep-library .lib-card[data-mode="live"] .lib-lead {
   font-weight: 500;
   color: var(--fg-dim);
 }
+
+/* Action-row weight (Pass 3b): under the V3 card the secondary (quiet) actions
+   shed their border so the primary (strong neutral fill) and any accent action
+   (Update live) carry the energy; destructive keeps its danger tint. Clear
+   primary > secondary > destructive weight without hiding anything. */
+.sep-library .lib-card[data-mode] .lib-actions .lib-btn-quiet {
+  border-color: transparent;
+}
+.sep-library .lib-card[data-mode] .lib-actions .lib-btn-quiet:hover {
+  border-color: var(--border);
+}
+
+/* Photo-less poster (Pass 3b): a valid PREPARED page, not a broken one. A soft
+   neutral gradient + a quiet home glyph — deliberately NO accent (teal is a
+   next-action signal, and an empty photo is neither work nor activity). Layered
+   over .lib-poster-empty (same flex centering), overriding its accent radial. */
+.sep-library .lib-poster-prepared {
+  color: var(--fg-dim);
+  background:
+    radial-gradient(120% 100% at 50% 0%, color-mix(in oklch, var(--fg) 6%, transparent), transparent 70%),
+    linear-gradient(165deg, var(--surface-hi), var(--bg-2));
+}
+.sep-library .lib-poster-icon { opacity: 0.62; }
 
 /* Collapsed mobile card stays ruthless (Pass 2): the lead + one support line
    (the reason) on the scan face; the muted context folds away until expand,
