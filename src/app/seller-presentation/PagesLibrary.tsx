@@ -1341,38 +1341,45 @@ export function PagesLibrary({
               </p>
             </div>
             <div className="lib-head-actions">
-              {followUpCount > 0 && (
-                <span
-                  className="lib-followup-count"
-                  data-testid="lib-followup-count"
-                  title="Pages a seller engaged with recently. A quiet suggestion to reach out — nothing is sent for you."
-                >
-                  {followUpCount} worth a follow-up
-                </span>
-              )}
-              {cap > 0 &&
-                (libraryV2Enabled ? (
-                  // V2 — a quiet, separate usage line. The cap is shown, not
-                  // enforced (pre-billing), so an over-cap agent never sees an
-                  // alarming "68 of 25"; it reads "N live pages · plan limit M"
-                  // in the same muted voice, no alert color.
+              {/* The two info pills are grouped as ONE set so the mobile header
+                  can give them a tight internal gap and a larger gap to the
+                  "+ New page" CTA below. `display: contents` by default keeps the
+                  desktop row byte-identical (the wrapper generates no box); the
+                  ≤640px rules turn it into the grouped flex set. */}
+              <div className="lib-head-pills" data-testid="lib-head-pills">
+                {followUpCount > 0 && (
                   <span
-                    className="lib-meter"
-                    data-testid="lib-usage-meter"
-                    title="Only live pages count toward your limit. Drafts and archived pages are free."
+                    className="lib-followup-count"
+                    data-testid="lib-followup-count"
+                    title="Pages a seller engaged with recently. A quiet suggestion to reach out — nothing is sent for you."
                   >
-                    {usageMeterLabel(liveCount, cap)}
+                    {followUpCount} worth a follow-up
                   </span>
-                ) : (
-                  <span
-                    className="lib-meter"
-                    data-at-limit={atLimit ? "true" : undefined}
-                    data-testid="lib-usage-meter"
-                    title="Only live pages count toward your limit. Drafts and archived pages are free."
-                  >
-                    {liveCount} of {cap} live
-                  </span>
-                ))}
+                )}
+                {cap > 0 &&
+                  (libraryV2Enabled ? (
+                    // V2 — a quiet, separate usage line. The cap is shown, not
+                    // enforced (pre-billing), so an over-cap agent never sees an
+                    // alarming "68 of 25"; it reads "N live pages · plan limit M"
+                    // in the same muted voice, no alert color.
+                    <span
+                      className="lib-meter"
+                      data-testid="lib-usage-meter"
+                      title="Only live pages count toward your limit. Drafts and archived pages are free."
+                    >
+                      {usageMeterLabel(liveCount, cap)}
+                    </span>
+                  ) : (
+                    <span
+                      className="lib-meter"
+                      data-at-limit={atLimit ? "true" : undefined}
+                      data-testid="lib-usage-meter"
+                      title="Only live pages count toward your limit. Drafts and archived pages are free."
+                    >
+                      {liveCount} of {cap} live
+                    </span>
+                  ))}
+              </div>
               <button
                 type="button"
                 className="lib-newbtn"

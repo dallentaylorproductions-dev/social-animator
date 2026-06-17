@@ -197,19 +197,41 @@ test.describe("clampMenuCoords — never hangs off-screen", () => {
 
 // ── header pill row wraps fully on-screen at phone width ──
 
-test.describe("header — pills + New page + Select wrap, no clipping", () => {
-  test("the header stacks + the action cluster wraps full-width at mobile (V3-scoped)", () => {
-    // The fix lives in the <=640px media query, scoped under the V3 hook so the
-    // dead flag-off path stays byte-identical.
+test.describe("header — stacked mobile rhythm (grouped, not crowded)", () => {
+  test("the pills are grouped in a wrapper that is layout-transparent on desktop", () => {
+    // The wrapper exists in the markup but is `display: contents` by default, so
+    // the desktop header row is byte-identical (pills stay direct flex children).
+    expect(tsx).toContain('className="lib-head-pills"');
+    expect(css).toMatch(/\.lib-head-pills \{[^}]*display: contents/);
+  });
+
+  test("the mobile header stacks into one consistent spacing rhythm (V3-scoped)", () => {
+    // <=640px, scoped under the V3 hook so the dead flag-off path stays
+    // byte-identical: title block / pills set / CTA / tabs row, with 8px WITHIN
+    // the pills set and a larger 16px BETWEEN every group.
     expect(css).toContain("@media (max-width: 640px)");
+    // (a)->actions: the header stacks with a 16px between-group gap
     expect(css).toMatch(
-      /\[data-library-v3="true"\] \.lib-head-row \{[^}]*flex-direction: column/,
+      /\[data-library-v3="true"\] \.lib-head-row \{[^}]*flex-direction: column;[^}]*gap: 16px/,
+    );
+    // the actions stack vertically, full width, 16px between (b) pills and (c) CTA
+    expect(css).toMatch(
+      /\[data-library-v3="true"\] \.lib-head-actions \{[^}]*flex-direction: column;[^}]*gap: 16px/,
     );
     expect(css).toMatch(
-      /\[data-library-v3="true"\] \.lib-head-actions \{[^}]*flex-wrap: wrap/,
+      /\[data-library-v3="true"\] \.lib-head-actions \{[^}]*align-items: stretch/,
     );
+    // (b) the two pills, grouped with a tight 8px within-group gap
     expect(css).toMatch(
-      /\[data-library-v3="true"\] \.lib-head-actions \{[^}]*width: 100%/,
+      /\[data-library-v3="true"\] \.lib-head-pills \{[^}]*display: flex;[^}]*gap: 8px/,
+    );
+    // (c) full-width primary CTA
+    expect(css).toMatch(
+      /\[data-library-v3="true"\] \.lib-newbtn \{[^}]*width: 100%/,
+    );
+    // (d) tabs + Select row sits one between-group step below, wraps if needed
+    expect(css).toMatch(
+      /\[data-library-v3="true"\] \.lib-toolbar \{[^}]*margin-top: 16px/,
     );
     expect(css).toMatch(
       /\[data-library-v3="true"\] \.lib-toolbar-right \{[^}]*flex-wrap: wrap/,
