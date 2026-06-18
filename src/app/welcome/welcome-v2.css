@@ -99,6 +99,21 @@
   color: var(--o2-muted);
   margin: 0;
 }
+/* Silent-confirm line (Q3): a quiet "already on file" acknowledgement, never an
+   invite. The teal tick marks it as confirmed, not a pending ask. */
+.onbv2__confirm {
+  display: flex;
+  align-items: center;
+  gap: 8px;
+  font-size: 13px;
+  color: var(--o2-muted);
+  margin: 0;
+}
+.onbv2__confirm::before {
+  content: "✓";
+  color: var(--o2-accent);
+  font-weight: 700;
+}
 
 /* Inputs ------------------------------------------------------------------- */
 .onbv2__field { display: flex; flex-direction: column; gap: 8px; }

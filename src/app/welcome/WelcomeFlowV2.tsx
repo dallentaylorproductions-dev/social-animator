@@ -18,6 +18,10 @@ import { putServerBrandSettings } from '@/lib/brand-settings-client';
 import { putServerDraft } from '@/tools/seller-presentation/hooks/server-draft-client';
 import { sampleStateAPayload } from '@/tools/seller-presentation/components/preview/preview-payload';
 import { buildOnboardingStateAPayload } from '@/lib/onboarding/state-a-payload';
+import {
+  withAccountEmailFallback,
+  type AgentBranding,
+} from '@/tools/seller-presentation/output/public-payload';
 import { emitOnboardingEvent, ONBOARDING_EVENTS } from '@/lib/onboarding/funnel';
 import { markOnboardingSeen } from '@/lib/onboarding/seen';
 import { ONBOARDING_V2_SPOTLIGHTS } from '@/lib/onboarding/v2-spotlights';
@@ -352,22 +356,31 @@ export function WelcomeFlowV2({
 
     // Optional publish - ONLY when the draft already clears the SAME gate the
     // wizard enforces (an invitation gates on address + appointment). A first-run
-    // page usually lands as a draft "ready to review". TODO(3d): the contact
-    // soft-gate + account-email reach fallback refine this.
+    // page usually lands as a draft "ready to review" instead.
     if (getMissingRequiredInputs(created.draft).length === 0) {
       try {
+        // Q4 reach fallback: a LIVE seller page is never unreachable. The agent's
+        // chosen contact wins; if they set neither email nor phone, the account
+        // email becomes the contact of last resort so ConfirmTime always renders
+        // a way to reach them. (The SP publish route does not apply this, so we
+        // fold it in here with the shared helper.)
+        const baseContact: AgentBranding = {
+          name: current.agentName,
+          brokerage: current.brokerage,
+          phone: current.contactPhone,
+          email: current.contactEmail,
+          licenseNumber: current.licenseNumber,
+        };
+        const agentContact = withAccountEmailFallback(
+          baseContact,
+          ownerEmail ?? '',
+        );
         const res = await fetch('/api/seller-presentation/publish', {
           method: 'POST',
           headers: { 'Content-Type': 'application/json' },
           body: JSON.stringify({
             draft: created.draft,
-            agentContact: {
-              name: current.agentName,
-              brokerage: current.brokerage,
-              phone: current.contactPhone,
-              email: current.contactEmail,
-              licenseNumber: current.licenseNumber,
-            },
+            agentContact,
             brandColors: { primaryColor: current.primaryColor },
           }),
         });
@@ -443,6 +456,10 @@ export function WelcomeFlowV2({
               hasContact={Boolean(
                 brand?.contactEmail?.trim() || brand?.contactPhone?.trim(),
               )}
+              contactSummary={
+                brand?.contactEmail?.trim() || brand?.contactPhone?.trim() || ''
+              }
+              willPublish={getMissingRequiredInputs(draftSeed).length === 0}
               onAdvance={setBeat}
               onFinish={() => void finish()}
               finishError={finishError}
@@ -542,6 +559,8 @@ interface RealBeatsProps {
   setAppointmentAt: (v: string) => void;
   onSaveContact: (email: string, phone: string) => void;
   hasContact: boolean;
+  contactSummary: string;
+  willPublish: boolean;
   onAdvance: (b: Beat) => void;
   onFinish: () => void;
   finishError: string | null;
@@ -718,6 +737,14 @@ function HeroBeat(p: RealBeatsProps) {
         data-testid="onbv2-headshot-input"
         onChange={(e) => p.onHeadshotFile(e.target.files?.[0] ?? null)}
       />
+      {/* Q3 silent confirm: an account that already carries a headshot shows the
+          face in the hero above and a quiet confirmation here - never a redundant
+          "add your photo" invite. */}
+      {p.hasHeadshot && (
+        <p className="onbv2__confirm" data-testid="onbv2-headshot-confirm">
+          Using the photo from your profile.
+        </p>
+      )}
       <div className="onbv2__actions">
         {!p.hasHeadshot && (
           <PrimaryBtn
@@ -1046,35 +1073,56 @@ function ContactBeat(p: RealBeatsProps) {
     p.onFinish();
   };
 
+  // Q4 framing: a complete page (address + appointment) saves live; otherwise it
+  // lands in the cockpit as a draft. The wording tracks what will actually happen
+  // and never normalizes a contactless send; the account-email fallback (applied
+  // at save) keeps any live page reachable.
+  const primaryLabel = p.willPublish ? 'Save to my pages' : 'Save as draft';
+
   return (
     <>
       <BeatHead eyebrow="Reachable" title="So they can actually reach you." />
       <SliceFrame payload={p.payload} section="meeting" testid="onbv2-slice-meeting" />
       <SliceFrame payload={p.payload} section="agent" testid="onbv2-slice-agent" />
 
-      {!p.hasContact && (
-        <div className="onbv2__field" data-testid="onbv2-contact-fields">
-          <label className="onbv2__label" htmlFor="onbv2-contact-email">
-            Best email
-          </label>
-          <input
-            id="onbv2-contact-email"
-            className="onbv2__input"
-            data-testid="onbv2-contact-email"
-            type="email"
-            value={email}
-            placeholder="you@brokerage.com"
-            onChange={(e) => setEmail(e.target.value)}
-          />
-          <input
-            className="onbv2__input"
-            aria-label="Best phone"
-            type="tel"
-            value={phone}
-            placeholder="Phone (optional)"
-            onChange={(e) => setPhone(e.target.value)}
-          />
-        </div>
+      {p.hasContact ? (
+        /* Q3 silent confirm: an account that already carries a reach method shows
+           a quiet confirmation, never a redundant contact invite. */
+        <p className="onbv2__confirm" data-testid="onbv2-contact-confirm">
+          Sellers can reach you at {p.contactSummary}.
+        </p>
+      ) : (
+        <>
+          <div className="onbv2__field" data-testid="onbv2-contact-fields">
+            <label className="onbv2__label" htmlFor="onbv2-contact-email">
+              Best email
+            </label>
+            <input
+              id="onbv2-contact-email"
+              className="onbv2__input"
+              data-testid="onbv2-contact-email"
+              type="email"
+              value={email}
+              placeholder="you@brokerage.com"
+              onChange={(e) => setEmail(e.target.value)}
+            />
+            <input
+              className="onbv2__input"
+              aria-label="Best phone"
+              type="tel"
+              value={phone}
+              placeholder="Phone (optional)"
+              onChange={(e) => setPhone(e.target.value)}
+            />
+          </div>
+          {/* Q4 soft fallback: skipping is fine, and a live page is never
+              unreachable - the account email stays on it until a direct line is
+              added. The copy never normalizes a contactless send. */}
+          <p className="onbv2__note" data-testid="onbv2-contact-fallback">
+            You can add a direct line later. Until then, sellers can still reach
+            you at your account email.
+          </p>
+        </>
       )}
 
       {/* Appointment is a ghosted, optional row - never a CTA (locked Gate-3). */}
@@ -1104,7 +1152,7 @@ function ContactBeat(p: RealBeatsProps) {
 
       <div className="onbv2__actions">
         <PrimaryBtn onClick={proceed} testid="onbv2-finish">
-          Save to my pages
+          {primaryLabel}
         </PrimaryBtn>
       </div>
       <Spotlight text={ONBOARDING_V2_SPOTLIGHTS.contact} />
