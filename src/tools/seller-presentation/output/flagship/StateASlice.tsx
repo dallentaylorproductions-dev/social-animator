@@ -17,6 +17,22 @@ import "./flagship.css";
 import "./state-a.css";
 
 /**
+ * Studio cockpit accent — the brighter site mint the dashboard (sep-studio.css)
+ * and Your Pages cockpit (pages-library.css) both resolve `--accent` to, mirrored
+ * here as the onboarding slice's UNSET-brand signature so the first-run reveal
+ * harmonizes with the studio chrome (`--o2-accent` in welcome-v2.css) instead of
+ * the brand-system default flagship blue (#037290).
+ *
+ * SCOPED TO ONBOARDING: this constant is fed to `deriveConsumerRoles` ONLY here,
+ * and `StateASlice` is imported ONLY by the V2 onboarding flow (WelcomeFlowV2).
+ * The live seller pages (FlagshipPage / StateAPage / PrelistingPage) call
+ * `deriveConsumerRoles` themselves with the agent's real accent and are NOT
+ * touched — an unset-brand published page still derives the #037290 default ramp,
+ * so no already-published page changes color.
+ */
+const STUDIO_MINT = "#5BF5C9";
+
+/**
  * StateASlice — render ONE real State A section, standalone, in the exact shell
  * StateAPage gives it (role vars + Newsreader + flagship/state-a CSS), so a
  * cropped slice looks byte-for-byte like that section does on the live page.
@@ -53,7 +69,10 @@ export function StateASlice({
   reviewSourceLogos?: boolean;
   preparedAt?: string;
 }) {
-  const roles = deriveConsumerRoles(payload.brandColors?.accent);
+  // Unset brand → studio mint (not the brand-system #037290 default), so the
+  // onboarding slice matches the studio chrome. A set brand still wins, so the
+  // slice stays an honest preview of the agent's own page when they have one.
+  const roles = deriveConsumerRoles(payload.brandColors?.accent || STUDIO_MINT);
   const roleVars = consumerRoleVars(roles) as CSSProperties;
   const appt = formatAppointment(payload.appointmentAt);
 
