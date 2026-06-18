@@ -2,7 +2,8 @@ import Link from "next/link";
 import { auth, signOut } from "@/lib/auth";
 import { loadAgentProfile } from "@/lib/entitlements/load-agent-profile";
 import { isDashboardHomeV2Enabled } from "@/lib/config/dashboard-home-v2";
-import { DashboardClient } from "./DashboardClient";
+import { isOnboardingFirstRunEnabled } from "@/lib/config/onboarding-first-run";
+import { DashboardEntry } from "./DashboardEntry";
 import "./sep-studio.css";
 
 /**
@@ -49,6 +50,12 @@ export default async function DashboardPage({
   // inline, and the flag-off path never reaches V2 code. Flag-off renders
   // byte-identical to today's dashboard.
   const dashboardHomeV2 = isDashboardHomeV2Enabled();
+
+  // ONBOARDING_FIRST_RUN (Pass 2) - read server-side, threaded as a prop the
+  // same way. Flag-off, DashboardEntry is a pure pass-through to DashboardClient
+  // (no markup, no fetch, no redirect), so the first-run entry stays
+  // byte-identical to today.
+  const onboardingFirstRun = isOnboardingFirstRunEnabled();
 
   return (
     <main
@@ -101,7 +108,8 @@ export default async function DashboardPage({
           </nav>
         </header>
 
-        <DashboardClient
+        <DashboardEntry
+          onboardingFirstRun={onboardingFirstRun}
           agentProfile={agentProfile}
           dashboardV2={dashboardHomeV2}
         />
