@@ -1,0 +1,296 @@
+/*
+ * Onboarding first-run flow (ONBOARDING_FIRST_RUN, Pass 2) - scoped styles.
+ *
+ * Every rule is anchored under `.onb` so this warm-dark, full-screen sequence
+ * can't leak into the dashboard, the wizard, or a published page. Mobile-first:
+ * the base layout is a single full-height column (one decision, one reveal);
+ * the desktop media query only CENTERS that column in a calm field - it never
+ * becomes a multi-pane builder (that's the explicit fast-follow, not this pass).
+ */
+
+.onb {
+  --onb-bg: #14110e;
+  --onb-panel: #1d1915;
+  --onb-line: rgba(255, 255, 255, 0.1);
+  --onb-ink: #f4efe8;
+  --onb-muted: #b6aba0;
+  --onb-accent: #d9a86c;
+  --onb-accent-ink: #20160c;
+
+  position: fixed;
+  inset: 0;
+  z-index: 50;
+  display: flex;
+  flex-direction: column;
+  background: radial-gradient(120% 80% at 50% -10%, #241e18 0%, var(--onb-bg) 60%);
+  color: var(--onb-ink);
+  font-family: var(--font-sans, system-ui, -apple-system, "Segoe UI", sans-serif);
+  overflow-y: auto;
+  -webkit-overflow-scrolling: touch;
+}
+
+.onb__inner {
+  width: 100%;
+  max-width: 480px;
+  margin: 0 auto;
+  padding: 24px 20px 40px;
+  display: flex;
+  flex-direction: column;
+  flex: 1;
+  min-height: 100%;
+}
+
+.onb__top {
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+  gap: 12px;
+  margin-bottom: 20px;
+}
+
+.onb__brand {
+  font-size: 12px;
+  letter-spacing: 0.14em;
+  text-transform: uppercase;
+  color: var(--onb-muted);
+}
+
+.onb__skip {
+  background: none;
+  border: none;
+  color: var(--onb-muted);
+  font-size: 13px;
+  cursor: pointer;
+  padding: 6px 4px;
+}
+.onb__skip:hover { color: var(--onb-ink); }
+
+.onb__body {
+  flex: 1;
+  display: flex;
+  flex-direction: column;
+  justify-content: center;
+  gap: 22px;
+}
+
+.onb__eyebrow {
+  font-size: 12px;
+  letter-spacing: 0.12em;
+  text-transform: uppercase;
+  color: var(--onb-accent);
+}
+
+.onb__title {
+  font-size: 28px;
+  line-height: 1.18;
+  font-weight: 600;
+  margin: 0;
+}
+
+.onb__sub {
+  font-size: 15px;
+  line-height: 1.5;
+  color: var(--onb-muted);
+  margin: 0;
+}
+
+/* Path picker -------------------------------------------------------------- */
+.onb__choices { display: grid; gap: 14px; }
+
+.onb__choice {
+  text-align: left;
+  background: var(--onb-panel);
+  border: 1px solid var(--onb-line);
+  border-radius: 16px;
+  padding: 18px 18px;
+  color: var(--onb-ink);
+  cursor: pointer;
+  transition: border-color 0.15s ease, transform 0.1s ease;
+}
+.onb__choice:hover { border-color: var(--onb-accent); }
+.onb__choice:active { transform: scale(0.99); }
+.onb__choice-title { font-size: 17px; font-weight: 600; margin: 0 0 4px; }
+.onb__choice-desc { font-size: 14px; color: var(--onb-muted); margin: 0; }
+
+/* Inputs ------------------------------------------------------------------- */
+.onb__field { display: flex; flex-direction: column; gap: 8px; }
+.onb__label { font-size: 13px; color: var(--onb-muted); }
+.onb__input {
+  width: 100%;
+  background: var(--onb-panel);
+  border: 1px solid var(--onb-line);
+  border-radius: 12px;
+  padding: 14px 14px;
+  color: var(--onb-ink);
+  font-size: 16px; /* 16px keeps iOS from zooming on focus */
+}
+.onb__input:focus { outline: none; border-color: var(--onb-accent); }
+.onb__row { display: grid; grid-template-columns: 1fr 1fr 1fr; gap: 10px; }
+
+/* Buttons ------------------------------------------------------------------ */
+.onb__actions { display: flex; flex-direction: column; gap: 10px; margin-top: 8px; }
+.onb__btn {
+  width: 100%;
+  border-radius: 12px;
+  padding: 15px 16px;
+  font-size: 16px;
+  font-weight: 600;
+  cursor: pointer;
+  border: 1px solid transparent;
+}
+.onb__btn--primary { background: var(--onb-accent); color: var(--onb-accent-ink); }
+.onb__btn--primary:disabled { opacity: 0.5; cursor: default; }
+.onb__btn--ghost {
+  background: transparent;
+  border-color: var(--onb-line);
+  color: var(--onb-ink);
+}
+
+/* Preparing skeleton ------------------------------------------------------- */
+.onb__skeleton { display: flex; flex-direction: column; gap: 14px; }
+.onb__sk-hero {
+  height: 180px;
+  border-radius: 16px;
+  background: linear-gradient(100deg, #221d18 30%, #2c261f 50%, #221d18 70%);
+  background-size: 200% 100%;
+  animation: onb-shimmer 1.4s ease-in-out infinite;
+}
+.onb__sk-line {
+  height: 14px;
+  border-radius: 7px;
+  background: linear-gradient(100deg, #221d18 30%, #2c261f 50%, #221d18 70%);
+  background-size: 200% 100%;
+  animation: onb-shimmer 1.4s ease-in-out infinite;
+}
+.onb__sk-line.short { width: 55%; }
+.onb__sk-line.mid { width: 75%; }
+@keyframes onb-shimmer {
+  0% { background-position: 200% 0; }
+  100% { background-position: -200% 0; }
+}
+@media (prefers-reduced-motion: reduce) {
+  .onb__sk-hero, .onb__sk-line { animation: none; }
+}
+
+/* Preview card ------------------------------------------------------------- */
+.onb__preview {
+  background: var(--onb-panel);
+  border: 1px solid var(--onb-line);
+  border-radius: 18px;
+  overflow: hidden;
+}
+.onb__preview-hero {
+  position: relative;
+  aspect-ratio: 16 / 10;
+  background: #2a241d center/cover no-repeat;
+}
+.onb__preview-hero--ghost {
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  color: var(--onb-muted);
+  font-size: 13px;
+  text-align: center;
+  padding: 16px;
+}
+.onb__sample-badge {
+  position: absolute;
+  top: 12px;
+  left: 12px;
+  background: rgba(20, 17, 14, 0.82);
+  color: var(--onb-ink);
+  font-size: 11px;
+  letter-spacing: 0.1em;
+  text-transform: uppercase;
+  padding: 5px 10px;
+  border-radius: 999px;
+  border: 1px solid var(--onb-line);
+}
+.onb__preview-body { padding: 16px 16px 18px; display: flex; flex-direction: column; gap: 14px; }
+.onb__preview-addr { font-size: 18px; font-weight: 600; margin: 0; }
+.onb__preview-city { font-size: 13px; color: var(--onb-muted); margin: 2px 0 0; }
+.onb__preview-price { font-size: 22px; font-weight: 600; margin: 0; }
+
+.onb__facts { display: flex; gap: 16px; font-size: 13px; color: var(--onb-muted); }
+.onb__facts strong { color: var(--onb-ink); font-weight: 600; }
+
+.onb__section-label {
+  font-size: 11px;
+  letter-spacing: 0.1em;
+  text-transform: uppercase;
+  color: var(--onb-muted);
+  margin: 0 0 8px;
+}
+.onb__comps { display: flex; flex-direction: column; gap: 8px; }
+.onb__comp {
+  display: flex;
+  justify-content: space-between;
+  gap: 10px;
+  font-size: 14px;
+  padding: 8px 0;
+  border-top: 1px solid var(--onb-line);
+}
+.onb__comp:first-child { border-top: none; }
+.onb__comp-sold { color: var(--onb-muted); white-space: nowrap; }
+
+/* "Awaiting your review" ghost section ------------------------------------- */
+.onb__await {
+  border: 1px dashed var(--onb-line);
+  border-radius: 12px;
+  padding: 14px;
+  font-size: 13px;
+  color: var(--onb-muted);
+  background: rgba(255, 255, 255, 0.02);
+}
+.onb__await strong { color: var(--onb-ink); font-weight: 600; }
+
+/* Make it yours - color swatches ------------------------------------------- */
+.onb__swatches { display: flex; gap: 12px; flex-wrap: wrap; }
+.onb__swatch {
+  width: 40px;
+  height: 40px;
+  border-radius: 999px;
+  border: 2px solid transparent;
+  cursor: pointer;
+  padding: 0;
+}
+.onb__swatch[aria-pressed="true"] { border-color: var(--onb-ink); }
+
+/* Ambient spotlight - a single ignorable line, never a modal --------------- */
+.onb__spotlight {
+  display: flex;
+  align-items: flex-start;
+  gap: 8px;
+  font-size: 13px;
+  line-height: 1.4;
+  color: var(--onb-muted);
+  background: rgba(217, 168, 108, 0.08);
+  border: 1px solid rgba(217, 168, 108, 0.18);
+  border-radius: 12px;
+  padding: 10px 12px;
+  margin-top: 16px;
+}
+.onb__spotlight-dot {
+  flex: none;
+  width: 6px;
+  height: 6px;
+  border-radius: 999px;
+  background: var(--onb-accent);
+  margin-top: 6px;
+}
+.onb__spotlight-x {
+  margin-left: auto;
+  background: none;
+  border: none;
+  color: var(--onb-muted);
+  cursor: pointer;
+  font-size: 14px;
+  line-height: 1;
+  padding: 2px 4px;
+}
+
+/* Desktop - calm centered column, NOT a builder pane ----------------------- */
+@media (min-width: 768px) {
+  .onb__inner { max-width: 520px; padding-top: 56px; padding-bottom: 56px; }
+  .onb__title { font-size: 32px; }
+}
