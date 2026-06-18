@@ -21,6 +21,12 @@ import { buildOnboardingStateAPayload } from '@/lib/onboarding/state-a-payload';
 import { emitOnboardingEvent, ONBOARDING_EVENTS } from '@/lib/onboarding/funnel';
 import { markOnboardingSeen } from '@/lib/onboarding/seen';
 import { ONBOARDING_V2_SPOTLIGHTS } from '@/lib/onboarding/v2-spotlights';
+import {
+  LEAD_EMPHASIS_LABELS,
+  LEAD_EMPHASIS_MORE,
+  LEAD_EMPHASIS_PRIMARY,
+  type LeadEmphasisKey,
+} from '@/lib/seller-presentation/lead-emphasis';
 import { uploadImageFile } from '@/lib/imageUpload';
 import {
   StateASlice,
@@ -74,24 +80,6 @@ const EMPTY_ADDRESS: AddressFields = { street: '', city: '', state: '', zip: '' 
 
 /** Minimum prepare beat so the "preparing" moment is always felt. */
 const SKELETON_MS = 1100;
-
-/**
- * BEAT 5 exposure levers (locked Gate-3 refinement): four primary levers shown
- * first; the rest live behind a "more" drawer so the one-tap promise stays true
- * on mobile. The key is the set-once value 3b will persist to
- * BrandSettings.leadEmphasis; the label is the only thing the agent ever sees.
- */
-const EXPOSURE_PRIMARY = [
-  { key: 'listing-launch', label: 'Polished listing launch' },
-  { key: 'social-reach', label: 'Social reach' },
-  { key: 'buyer-network', label: 'Buyer network' },
-  { key: 'open-house', label: 'Open-house visibility' },
-] as const;
-const EXPOSURE_MORE = [
-  { key: 'video-story', label: 'Video & storytelling' },
-  { key: 'fast-followup', label: 'Fast buyer follow-up' },
-  { key: 'local-market', label: 'Local market exposure' },
-] as const;
 
 interface PrepareResult {
   bedrooms?: string;
@@ -148,7 +136,7 @@ export function WelcomeFlowV2({
   const [firstName, setFirstName] = useState('');
   const [address, setAddress] = useState<AddressFields>(EMPTY_ADDRESS);
   const [prepared, setPrepared] = useState<PrepareResult | null>(null);
-  const [exposure, setExposure] = useState<string | null>(null);
+  const [exposure, setExposure] = useState<LeadEmphasisKey | null>(null);
   const [appointmentAt, setAppointmentAt] = useState('');
   const [finishError, setFinishError] = useState<string | null>(null);
 
@@ -278,14 +266,18 @@ export function WelcomeFlowV2({
   );
 
   // ── BEAT 5 exposure tap (SPINE 3) ───────────────────────────────────────
-  const chooseExposure = useCallback((key: string) => {
-    setExposure(key);
-    // TODO(3b): write set-once BrandSettings.leadEmphasis here and let
-    // CampaignSpread's headline honor it. 3a presents the tap as the beat's one
-    // action and advances; persistence + headline wiring land in 3b.
-    emitOnboardingEvent(ONBOARDING_EVENTS.trustSignalAdded, { kind: 'exposure' });
-    setBeat('trust');
-  }, []);
+  const chooseExposure = useCallback(
+    (key: LeadEmphasisKey) => {
+      setExposure(key);
+      // Locked Q7(b): write the set-once BrandSettings.leadEmphasis (reused across
+      // every future page); CampaignSpread's headline honors it, so the chosen
+      // lever immediately becomes the populated launch-story headline.
+      patchBrand({ leadEmphasis: key });
+      emitOnboardingEvent(ONBOARDING_EVENTS.trustSignalAdded, { kind: 'exposure' });
+      setBeat('trust');
+    },
+    [patchBrand],
+  );
 
   // ── BEAT 6 one review ───────────────────────────────────────────────────
   const addReview = useCallback(
@@ -522,8 +514,8 @@ interface RealBeatsProps {
   headshotError: string | null;
   onHeadshotFile: (f: File | null) => void;
   prepared: PrepareResult | null;
-  exposure: string | null;
-  onChooseExposure: (key: string) => void;
+  exposure: LeadEmphasisKey | null;
+  onChooseExposure: (key: LeadEmphasisKey) => void;
   onAddReview: (body: string, name: string) => void;
   hasReview: boolean;
   appointmentAt: string;
@@ -811,27 +803,27 @@ function CampaignBeat(p: RealBeatsProps) {
         testid="onbv2-slice-campaign"
       />
       <div className="onbv2__levers" data-testid="onbv2-exposure-levers">
-        {EXPOSURE_PRIMARY.map((lever) => (
+        {LEAD_EMPHASIS_PRIMARY.map((key) => (
           <button
-            key={lever.key}
+            key={key}
             type="button"
-            className={`onbv2__lever${exposureActive(p.exposure, lever.key)}`}
-            data-testid={`onbv2-lever-${lever.key}`}
-            onClick={() => p.onChooseExposure(lever.key)}
+            className={`onbv2__lever${exposureActive(p.exposure, key)}`}
+            data-testid={`onbv2-lever-${key}`}
+            onClick={() => p.onChooseExposure(key)}
           >
-            {lever.label}
+            {LEAD_EMPHASIS_LABELS[key]}
           </button>
         ))}
         {showMore &&
-          EXPOSURE_MORE.map((lever) => (
+          LEAD_EMPHASIS_MORE.map((key) => (
             <button
-              key={lever.key}
+              key={key}
               type="button"
-              className={`onbv2__lever${exposureActive(p.exposure, lever.key)}`}
-              data-testid={`onbv2-lever-${lever.key}`}
-              onClick={() => p.onChooseExposure(lever.key)}
+              className={`onbv2__lever${exposureActive(p.exposure, key)}`}
+              data-testid={`onbv2-lever-${key}`}
+              onClick={() => p.onChooseExposure(key)}
             >
-              {lever.label}
+              {LEAD_EMPHASIS_LABELS[key]}
             </button>
           ))}
       </div>

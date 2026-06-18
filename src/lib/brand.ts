@@ -8,6 +8,10 @@ import {
   type SettingsRecentListing,
   clampStoredRecentListings,
 } from "@/lib/seller-presentation/recent-listings";
+import {
+  type LeadEmphasisKey,
+  clampLeadEmphasis,
+} from "@/lib/seller-presentation/lead-emphasis";
 import { useServerBrandSettingsEnabled } from "@/lib/brand-settings-flag";
 import {
   fetchServerBrandSettings,
@@ -66,6 +70,14 @@ export interface BrandSettings {
   agentReviews?: Review[];
   /** A7d.2 — outlink URL for the reviews block (renderer pairs with a fixed "See all reviews on Zillow" label). */
   reviewsOutlinkUrl?: string;
+  /**
+   * Seller State A · Pass 2b — the agent's chosen "lead emphasis" (the one
+   * exposure lever picked at onboarding BEAT 5). AGENT-CONSTANT, set once,
+   * reused across every page (same provenance as `agentReviews`). Drives the
+   * `CampaignSpread` launch-story headline. Optional; unset renders the shipped
+   * default headline (byte-identical). Clamped to a known key on load.
+   */
+  leadEmphasis?: LeadEmphasisKey;
   /**
    * B0a — short agent tagline. AGENT-CONSTANT, set once. One of the three
    * text fields the "Draft from your reviews" helper can suggest (alongside
@@ -448,6 +460,10 @@ export function loadBrandSettings(): BrandSettings {
         parsed.reviewsOutlinkUrl.length > 0
           ? parsed.reviewsOutlinkUrl
           : undefined,
+      // Seller State A · Pass 2b — clamp the chosen lead emphasis to a known
+      // lever key on load; anything else (absent / tampered) drops to undefined
+      // ("use the shipped campaign headline"), byte-identical to today.
+      leadEmphasis: clampLeadEmphasis(parsed.leadEmphasis),
       agentTagline:
         typeof parsed.agentTagline === "string" && parsed.agentTagline.length > 0
           ? parsed.agentTagline

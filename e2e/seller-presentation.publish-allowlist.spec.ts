@@ -1089,6 +1089,10 @@ test.describe('toPublicPayload — white-label wordmark flag (F4)', () => {
     // Seller State A — the agent's quiet signature line (same brand-snapshot
     // provenance as the tagline; rendered only by the State A page).
     'signatureLine',
+    // Seller State A · Pass 2b — the set-once lead emphasis (onboarding BEAT 5;
+    // emitted ONLY in a State A invitation publish, absent on this revealed
+    // maxedDraft). Drives the CampaignSpread launch-story headline.
+    'leadEmphasis',
     // Seller State A · Zone 5 — the recent-listings coverflow (gated behind the
     // coverflow flag AND an invitation status; absent on this revealed maxedDraft).
     'recentListings',

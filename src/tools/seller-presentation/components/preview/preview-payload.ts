@@ -86,6 +86,10 @@ export function brandToPublishInputs(brand: BrandSettings) {
     sampleListingPhotoUrl: brand.sampleListingPhotoUrl,
     sampleVideoUrl: brand.sampleVideoUrl,
     sampleVideoPosterUrl: brand.sampleVideoPosterUrl,
+    // Seller State A · Pass 2b — the set-once lead emphasis (onboarding BEAT 5),
+    // same provenance/channel as the other State A brand-constants; the projector
+    // emits it ONLY in a State A invitation publish and clamps it to a known key.
+    leadEmphasis: brand.leadEmphasis,
     // Seller State A · Zone 5 — the agent's recent listings (the exposure
     // coverflow). The view count is stored as a formatted string in Settings;
     // the mapper parses it to an integer here so the projector's number gate

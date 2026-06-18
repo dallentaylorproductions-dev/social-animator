@@ -6,6 +6,8 @@ import {
 } from "@/lib/seller-presentation/street-view";
 import { ListingCardPhoto } from "./ListingCardPhoto";
 import {
+  CAMPAIGN_HEADLINE_BY_EMPHASIS,
+  CAMPAIGN_HEADLINE_DEFAULT,
   CAPABILITY_PHOTO_LABEL,
   CAPABILITY_PHOTO_SUB,
   CAPABILITY_VIDEO_LABEL,
@@ -16,6 +18,7 @@ import {
   COVERFLOW_VIEWS_LABEL,
   EXPOSURE_LINE,
 } from "./state-a-copy";
+import { isLeadEmphasisKey } from "@/lib/seller-presentation/lead-emphasis";
 
 /**
  * Seller State A · Signature B - "How I'll get your home seen" (campaign spread).
@@ -101,6 +104,12 @@ export function CampaignSpread({ payload }: { payload: PublicPayload }) {
 
   const [lead, ...rest] = frames;
 
+  // Pass 2b — the launch-story headline honors the agent's set-once lead emphasis
+  // (onboarding BEAT 5). Unset / unknown -> the shipped default, byte-identical.
+  const headline = isLeadEmphasisKey(payload.leadEmphasis)
+    ? CAMPAIGN_HEADLINE_BY_EMPHASIS[payload.leadEmphasis]
+    : CAMPAIGN_HEADLINE_DEFAULT;
+
   return (
     <section className="section sa-spread z-offwhite" data-testid="fs-sa-spread">
       <div className="reveal">
@@ -109,7 +118,7 @@ export function CampaignSpread({ payload }: { payload: PublicPayload }) {
           <span className="rule" aria-hidden="true" />
         </div>
         <h2 className="head">
-          Produced beautifully. <em>Put in front of buyers</em>.
+          {headline.lead} <em>{headline.em}</em>.
         </h2>
       </div>
 
