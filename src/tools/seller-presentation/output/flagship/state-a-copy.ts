@@ -31,6 +31,15 @@ export const CAMPAIGN_HEADLINE_DEFAULT = {
   em: "Put in front of buyers",
 } as const;
 
+/**
+ * The tasteful ghost sub-line shown beneath the launch-story headline when the
+ * agent has chosen a lead emphasis but has not added any capability samples or
+ * recent listings yet (the onboarding BEAT 5 climax, and any live page in the
+ * same state). Evergreen + seller-facing; names no asset and claims nothing the
+ * page does not have. The headline (the chosen lever) carries the meaning.
+ */
+export const CAMPAIGN_GHOST_SUB = "My plan to get your home seen.";
+
 export const CAMPAIGN_HEADLINE_BY_EMPHASIS: Record<
   LeadEmphasisKey,
   { lead: string; em: string }

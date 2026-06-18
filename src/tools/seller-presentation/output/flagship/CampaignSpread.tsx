@@ -6,6 +6,7 @@ import {
 } from "@/lib/seller-presentation/street-view";
 import { ListingCardPhoto } from "./ListingCardPhoto";
 import {
+  CAMPAIGN_GHOST_SUB,
   CAMPAIGN_HEADLINE_BY_EMPHASIS,
   CAMPAIGN_HEADLINE_DEFAULT,
   CAPABILITY_PHOTO_LABEL,
@@ -97,18 +98,23 @@ export function CampaignSpread({ payload }: { payload: PublicPayload }) {
   // beneath the cards, never required for the section to read.
   const listings = payload.recentListings ?? [];
 
-  // Byte-identical guarantee: with no listings, the guard is unchanged from
-  // today (no frames → no section). Listings render the section even in the
-  // unlikely case the capability frames are all unset.
-  if (frames.length === 0 && listings.length === 0) return null;
-
-  const [lead, ...rest] = frames;
-
   // Pass 2b — the launch-story headline honors the agent's set-once lead emphasis
   // (onboarding BEAT 5). Unset / unknown -> the shipped default, byte-identical.
-  const headline = isLeadEmphasisKey(payload.leadEmphasis)
-    ? CAMPAIGN_HEADLINE_BY_EMPHASIS[payload.leadEmphasis]
+  const emphasis = isLeadEmphasisKey(payload.leadEmphasis)
+    ? payload.leadEmphasis
+    : null;
+  const headline = emphasis
+    ? CAMPAIGN_HEADLINE_BY_EMPHASIS[emphasis]
     : CAMPAIGN_HEADLINE_DEFAULT;
+
+  // Byte-identical guarantee: with no frames AND no listings, the section still
+  // flexes out EXCEPT when the agent has picked a lead emphasis - then the chosen
+  // lever renders as the real headline + a tasteful ghost (the onboarding BEAT 5
+  // climax, and any live page where emphasis is set but no capability sample is
+  // yet uploaded). A page WITH frames renders identically to today.
+  if (frames.length === 0 && listings.length === 0 && !emphasis) return null;
+
+  const [lead, ...rest] = frames;
 
   return (
     <section className="section sa-spread z-offwhite" data-testid="fs-sa-spread">
@@ -122,7 +128,7 @@ export function CampaignSpread({ payload }: { payload: PublicPayload }) {
         </h2>
       </div>
 
-      {frames.length > 0 && (
+      {frames.length > 0 ? (
         <div className="sa-spread__grid reveal">
           <SpreadFrame frame={lead} lead />
           {rest.length > 0 && (
@@ -133,6 +139,24 @@ export function CampaignSpread({ payload }: { payload: PublicPayload }) {
             </div>
           )}
         </div>
+      ) : (
+        listings.length === 0 &&
+        emphasis && (
+          // No capability sample yet, but the agent picked a lead emphasis: render
+          // the chosen lever as one calm ghost frame so the headline has a body to
+          // sit over. Honest - it names the plan, never a fabricated asset.
+          <div className="sa-spread__grid reveal">
+            <div
+              className="sa-frame sa-frame--lead sa-frame--ghost"
+              data-testid="fs-sa-spread-ghost"
+            >
+              <div className="sa-frame__cap">
+                <span className="sa-frame__label">{headline.em}</span>
+                <span className="sa-frame__sub">{CAMPAIGN_GHOST_SUB}</span>
+              </div>
+            </div>
+          </div>
+        )
       )}
 
       {listings.length > 0 && <ListingsCoverflow listings={listings} />}

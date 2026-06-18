@@ -66,7 +66,16 @@ export function StateASlice({
       body = <StateAHello payload={payload} />;
       break;
     case "brief":
-      body = <AppointmentBrief payload={payload} preparedAt={preparedAt} />;
+      // Onboarding reveals the found nearby sales before Street View resolves, so
+      // relax the photo-forward gate (photographed comps still lead; text-only
+      // comps render the designed placeholder, never a blank).
+      body = (
+        <AppointmentBrief
+          payload={payload}
+          preparedAt={preparedAt}
+          requireCompPhoto={false}
+        />
+      );
       break;
     case "valuation":
       body = <ValuationPrepared payload={payload} appt={appt} />;

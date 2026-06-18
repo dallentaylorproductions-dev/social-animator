@@ -1128,6 +1128,15 @@
 .fs-page.state-a .sa-frame--lead {
   min-height: 260px;
 }
+/* Pass 2b — the calm ghost frame shown when the agent has picked a lead emphasis
+   but has no capability sample yet (onboarding BEAT 5 climax, or a live page in
+   the same state). A quiet dashed placeholder: no teal fill, no lift, so the
+   headline + chosen-lever label carry it and it never reads as a broken photo. */
+.fs-page.state-a .sa-frame--ghost {
+  background: var(--white);
+  border-style: dashed;
+  box-shadow: none;
+}
 .fs-page.state-a .sa-frame__photo {
   position: absolute;
   inset: 0;

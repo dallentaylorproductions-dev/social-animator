@@ -210,8 +210,8 @@ export function WelcomeFlowV2({
   const payload = useMemo(() => {
     if (!brand) return null;
     if (isSample) return sampleStateAPayload(brand);
-    return buildOnboardingStateAPayload(draftSeed, brand);
-  }, [brand, isSample, draftSeed]);
+    return buildOnboardingStateAPayload(draftSeed, brand, ownerEmail ?? '');
+  }, [brand, isSample, draftSeed, ownerEmail]);
 
   const exitToDashboard = useCallback(() => {
     emitOnboardingEvent(ONBOARDING_EVENTS.dismissed, { step: beat });
@@ -283,11 +283,12 @@ export function WelcomeFlowV2({
     (key: LeadEmphasisKey) => {
       setExposure(key);
       // Locked Q7(b): write the set-once BrandSettings.leadEmphasis (reused across
-      // every future page); CampaignSpread's headline honors it, so the chosen
-      // lever immediately becomes the populated launch-story headline.
+      // every future page); CampaignSpread's headline honors it. We do NOT advance
+      // here - the payload rebuilds and the chosen lever lights up the real
+      // section headline IN PLACE, so the "one tap lights one section" payoff is
+      // actually seen at the climax beat. The agent taps Continue to move on.
       patchBrand({ leadEmphasis: key });
       emitOnboardingEvent(ONBOARDING_EVENTS.trustSignalAdded, { kind: 'exposure' });
-      setBeat('trust');
     },
     [patchBrand],
   );
@@ -980,7 +981,7 @@ function CampaignBeat(p: RealBeatsProps) {
             </button>
           ))}
       </div>
-      {!showMore && (
+      {!showMore && !p.exposure && (
         <button
           type="button"
           className="onbv2__link"
@@ -989,6 +990,18 @@ function CampaignBeat(p: RealBeatsProps) {
         >
           More ways
         </button>
+      )}
+      {/* The chosen lever has lit up the real headline in the slice above; only
+          NOW does Continue appear, so the climax payoff is actually seen. */}
+      {p.exposure && (
+        <div className="onbv2__actions">
+          <PrimaryBtn
+            onClick={() => p.onAdvance('trust')}
+            testid="onbv2-campaign-continue"
+          >
+            Continue
+          </PrimaryBtn>
+        </div>
       )}
       <Spotlight text={ONBOARDING_V2_SPOTLIGHTS.campaign} />
     </>

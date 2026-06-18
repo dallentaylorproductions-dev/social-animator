@@ -24,6 +24,7 @@ import type { BrandSettings } from "@/lib/brand";
 import { brandToPublishInputs } from "@/tools/seller-presentation/components/preview/preview-payload";
 import {
   toPublicPayload,
+  withAccountEmailFallback,
   type PublicPayload,
 } from "@/tools/seller-presentation/output/public-payload";
 import {
@@ -34,12 +35,17 @@ import {
 export function buildOnboardingStateAPayload(
   draft: SellerPresentationDraft,
   brand: BrandSettings,
+  // The authenticated agent's account email - folded in as the reach of last
+  // resort (Q4) so the BEAT 7 ConfirmTime / AgentBand slices show a real way to
+  // reach the agent before they type a direct line, matching what a live publish
+  // carries. The agent's own brand email/phone still wins. Empty -> no fallback.
+  accountEmail: string = "",
 ): PublicPayload {
   const { agentContact, brandReviews, brandColors, brandWhyUs } =
     brandToPublishInputs(brand);
   return toPublicPayload(
     clampDraft(draft),
-    agentContact,
+    withAccountEmailFallback(agentContact, accountEmail),
     brandReviews,
     brandColors,
     // whiteLabel: onboarding never resolves the entitlement client-side — match

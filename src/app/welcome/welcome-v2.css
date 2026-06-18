@@ -264,6 +264,23 @@
   -webkit-overflow-scrolling: touch;
 }
 .onbv2__slice [data-flagship-shell] { min-height: 0; }
+/* The real State A sections reveal their content on scroll via a JS motion
+   island (adds `.in` to every `.reveal`). The onboarding reveal renders ONE
+   cropped slice with NO island (and deliberately no view-signal beacons), so we
+   land every `.reveal` at its final state here - the SAME override the flagship's
+   prefers-reduced-motion / print rules use, scoped to the slice. Without this the
+   slice content sits at opacity:0 and the frame looks empty. */
+.onbv2__slice .reveal {
+  opacity: 1 !important;
+  transform: none !important;
+  transition: none !important;
+}
+.onbv2__slice .rev-source-note,
+.onbv2__slice .rev-source-g {
+  opacity: 1 !important;
+  transform: none !important;
+  transition: none !important;
+}
 
 /* Sample badge ------------------------------------------------------------- */
 .onbv2__sample-badge {
