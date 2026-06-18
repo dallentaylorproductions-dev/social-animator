@@ -28,6 +28,7 @@ import { StageHeader } from './components/StageHeader';
 import { Tile, type TileStage } from './components/Tile';
 import { posterForSkillId } from './components/posters/posterForSkillId';
 import { SocialStudioTile } from './components/SocialStudio';
+import { DashboardHomeV2 } from './DashboardHomeV2';
 
 /**
  * Dashboard client island (v1.47 Lane A re-brand — SEP-S Studio shell).
@@ -168,7 +169,18 @@ function readWelcomeSnapshot(): WelcomeSnapshot {
 
 /* ───────────────────────────────────────────────────────────────────────── */
 
-export function DashboardClient({ agentProfile }: { agentProfile: AgentProfile }) {
+export function DashboardClient({
+  agentProfile,
+  dashboardV2 = false,
+}: {
+  agentProfile: AgentProfile;
+  /**
+   * DASHBOARD_HOME_V2 (Pass 1) — server-resolved. When false (default),
+   * the render below is byte-identical to the v1.47 Lane A dashboard.
+   * When true, the four-tier registry-driven home renders instead.
+   */
+  dashboardV2?: boolean;
+}) {
   const [activeStates, setActiveStates] = useState<WorkflowState[]>([]);
   const [brandConfigured, setBrandConfigured] = useState<boolean | null>(null);
   const [welcome, setWelcome] = useState<WelcomeSnapshot>({
@@ -269,6 +281,21 @@ export function DashboardClient({ agentProfile }: { agentProfile: AgentProfile }
         {/* Reserve hero-sized vertical space to minimize layout shift. */}
         <div style={{ minHeight: '480px' }} aria-hidden />
       </div>
+    );
+  }
+
+  // DASHBOARD_HOME_V2 (Pass 1) — the four-tier registry-driven operating
+  // home. Mounted only when the server-resolved flag is on; the V1 render
+  // below is left byte-identical for the flag-off path. Hooks above run
+  // unconditionally (Rules of Hooks); only the rendered tree branches.
+  if (dashboardV2) {
+    return (
+      <DashboardHomeV2
+        welcomeFirstName={welcome.firstName}
+        welcomeSubtitle={welcome.subtitle}
+        dateEyebrow={dateEyebrow}
+        visibilitySkills={visibilitySkills}
+      />
     );
   }
 
