@@ -132,6 +132,25 @@ test.describe("PAGES_MANAGE_LIST Packet 2 — bulk select wiring", () => {
     expect(tsx).toContain("onClick={requestBulkDelete}");
   });
 
+  test("Cockpit fix P2 — the bulk bar renders CONTEXTUALLY (hide, never grey)", () => {
+    // Each action is gated on its validity flag, so an invalid action is not
+    // rendered at all (never a greyed/disabled control).
+    expect(tsx).toContain("{validity.canArchive && (");
+    expect(tsx).toContain("{validity.canRestore && (");
+    expect(tsx).toContain("{validity.canDelete && (");
+    // The Archive/Delete buttons no longer disable on validity — the only
+    // `disabled` left is the transient `bulkBusy` re-entrancy guard.
+    expect(tsx).not.toContain("disabled={!validity.canArchive");
+    expect(tsx).not.toContain("disabled={!validity.canDelete");
+  });
+
+  test("Cockpit fix P2 — bulk Restore reuses runBulk + archiveOne (Archived tab)", () => {
+    // Un-archive every selected page through the SAME batched engine.
+    expect(tsx).toContain("function requestBulkRestore()");
+    expect(tsx).toContain("onClick={requestBulkRestore}");
+    expect(tsx).toContain("runBulk(targets, (c) => archiveOne(c, false))");
+  });
+
   test('"Done" (leaving Manage) clears the table selection', () => {
     // toggleManage clears `selected` so the bulk bar never dangles after exit.
     const toggle = tsx.slice(

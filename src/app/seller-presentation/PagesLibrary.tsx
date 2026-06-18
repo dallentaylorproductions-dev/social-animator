@@ -1077,6 +1077,25 @@ export function PagesLibrary({
     });
   }
 
+  // Cockpit fix P2 — bulk Restore (un-archive) for the Archived tab. Reuses the
+  // SAME batched engine as archive/delete: one `archiveOne(c, false)` per card,
+  // a single trailing reconcile (runBulk's load + pruneOrderKeys), no per-item
+  // optimistic fighting. Restore is non-destructive, but a confirm keeps the
+  // batched flow symmetric with archive/delete and states what happens (the
+  // pages return to Active). pruneOrderKeys is a no-op here — archived cards were
+  // already dropped from the order, so they re-slot on top of Active on reload.
+  function requestBulkRestore() {
+    if (!validity.canRestore || selectedCards.length === 0) return;
+    const targets = [...selectedCards];
+    const n = targets.length;
+    setConfirm({
+      title: `Restore ${n} ${n === 1 ? "page" : "pages"}?`,
+      body: "Restored pages return to Active. Published pages go back online and use a slot.",
+      confirmLabel: "Restore",
+      onConfirm: () => runBulk(targets, (c) => archiveOne(c, false)),
+    });
+  }
+
   function requestBulkDelete() {
     if (!validity.canDelete || selectedCards.length === 0) return;
     const targets = [...selectedCards];
@@ -1546,27 +1565,47 @@ export function PagesLibrary({
               <span className="lib-bulk-hint">Tap pages to select</span>
             )}
           </span>
+          {/* Cockpit fix P2 — contextual toolbar: render ONLY the actions valid
+              for the current selection, never a greyed/disabled one. A live/mixed
+              Active selection shows Archive · Cancel (no Delete); a draft-only one
+              shows Archive · Delete · Cancel; an Archived selection shows
+              Restore · Delete · Cancel. `bulkBusy` still disables transiently
+              while an in-flight batch runs (re-entrancy guard, not a validity
+              grey-out). */}
           <div className="lib-bulk-actions">
-            <button
-              type="button"
-              className="lib-btn"
-              disabled={!validity.canArchive || bulkBusy}
-              title={validity.archiveReason}
-              onClick={requestBulkArchive}
-              data-testid="lib-bulk-archive"
-            >
-              Archive
-            </button>
-            <button
-              type="button"
-              className="lib-btn lib-btn-danger"
-              disabled={!validity.canDelete || bulkBusy}
-              title={validity.deleteReason}
-              onClick={requestBulkDelete}
-              data-testid="lib-bulk-delete"
-            >
-              Delete
-            </button>
+            {validity.canArchive && (
+              <button
+                type="button"
+                className="lib-btn"
+                disabled={bulkBusy}
+                onClick={requestBulkArchive}
+                data-testid="lib-bulk-archive"
+              >
+                Archive
+              </button>
+            )}
+            {validity.canRestore && (
+              <button
+                type="button"
+                className="lib-btn"
+                disabled={bulkBusy}
+                onClick={requestBulkRestore}
+                data-testid="lib-bulk-restore"
+              >
+                Restore
+              </button>
+            )}
+            {validity.canDelete && (
+              <button
+                type="button"
+                className="lib-btn lib-btn-danger"
+                disabled={bulkBusy}
+                onClick={requestBulkDelete}
+                data-testid="lib-bulk-delete"
+              >
+                Delete
+              </button>
+            )}
             <button
               type="button"
               className="lib-btn lib-btn-quiet"
