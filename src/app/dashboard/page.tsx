@@ -1,6 +1,7 @@
 import Link from "next/link";
 import { auth, signOut } from "@/lib/auth";
 import { loadAgentProfile } from "@/lib/entitlements/load-agent-profile";
+import { isDashboardHomeV2Enabled } from "@/lib/config/dashboard-home-v2";
 import { DashboardClient } from "./DashboardClient";
 import "./sep-studio.css";
 
@@ -42,6 +43,12 @@ export default async function DashboardPage({
   const agentProfile = await loadAgentProfile(email || null, {
     testTier: sp.testTier,
   });
+
+  // DASHBOARD_HOME_V2 (Pass 1) — read server-side, threaded as a prop so
+  // the flag can differ between preview and prod without a NEXT_PUBLIC
+  // inline, and the flag-off path never reaches V2 code. Flag-off renders
+  // byte-identical to today's dashboard.
+  const dashboardHomeV2 = isDashboardHomeV2Enabled();
 
   return (
     <main
@@ -94,7 +101,10 @@ export default async function DashboardPage({
           </nav>
         </header>
 
-        <DashboardClient agentProfile={agentProfile} />
+        <DashboardClient
+          agentProfile={agentProfile}
+          dashboardV2={dashboardHomeV2}
+        />
       </div>
     </main>
   );
