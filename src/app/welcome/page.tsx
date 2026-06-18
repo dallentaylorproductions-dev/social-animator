@@ -1,8 +1,11 @@
 import { redirect } from "next/navigation";
 import { auth } from "@/lib/auth";
 import { isOnboardingFirstRunEnabled } from "@/lib/config/onboarding-first-run";
+import { isOnboardingFirstRunV2Enabled } from "@/lib/config/onboarding-first-run-v2";
 import { WelcomeFlow } from "./WelcomeFlow";
+import { WelcomeFlowV2 } from "./WelcomeFlowV2";
 import "./welcome.css";
+import "./welcome-v2.css";
 
 /**
  * /welcome - the output-first first-run flow (ONBOARDING_FIRST_RUN, Pass 2).
@@ -28,13 +31,25 @@ import "./welcome.css";
 export const dynamic = "force-dynamic";
 
 export default async function WelcomePage() {
-  if (!isOnboardingFirstRunEnabled()) {
+  // V2 supersedes V1 at /welcome when on; with BOTH flags off the flow does not
+  // exist (redirect to /dashboard), so entry stays byte-identical to today.
+  const v2 = isOnboardingFirstRunV2Enabled();
+  if (!isOnboardingFirstRunEnabled() && !v2) {
     redirect("/dashboard");
   }
 
   const session = await auth();
   const ownerEmail = session?.user?.email ?? null;
   const serverDraftsEnabled = process.env.SERVER_DRAFTS_ENABLED === "true";
+
+  if (v2) {
+    return (
+      <WelcomeFlowV2
+        ownerEmail={ownerEmail}
+        serverDraftsEnabled={serverDraftsEnabled}
+      />
+    );
+  }
 
   return (
     <WelcomeFlow

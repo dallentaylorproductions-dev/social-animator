@@ -3,6 +3,7 @@ import { auth, signOut } from "@/lib/auth";
 import { loadAgentProfile } from "@/lib/entitlements/load-agent-profile";
 import { isDashboardHomeV2Enabled } from "@/lib/config/dashboard-home-v2";
 import { isOnboardingFirstRunEnabled } from "@/lib/config/onboarding-first-run";
+import { isOnboardingFirstRunV2Enabled } from "@/lib/config/onboarding-first-run-v2";
 import { DashboardEntry } from "./DashboardEntry";
 import "./sep-studio.css";
 
@@ -51,11 +52,14 @@ export default async function DashboardPage({
   // byte-identical to today's dashboard.
   const dashboardHomeV2 = isDashboardHomeV2Enabled();
 
-  // ONBOARDING_FIRST_RUN (Pass 2) - read server-side, threaded as a prop the
-  // same way. Flag-off, DashboardEntry is a pure pass-through to DashboardClient
-  // (no markup, no fetch, no redirect), so the first-run entry stays
-  // byte-identical to today.
-  const onboardingFirstRun = isOnboardingFirstRunEnabled();
+  // ONBOARDING_FIRST_RUN (Pass 2) / _V2 (Pass 2b) - read server-side, threaded
+  // as a prop the same way. The entry gate fires for EITHER flag (V2 supersedes
+  // V1 at /welcome), so a V2-only preview still routes a brand-new agent into
+  // the flow. With BOTH off, DashboardEntry is a pure pass-through to
+  // DashboardClient (no markup, no fetch, no redirect), so the first-run entry
+  // stays byte-identical to today.
+  const onboardingFirstRun =
+    isOnboardingFirstRunEnabled() || isOnboardingFirstRunV2Enabled();
 
   return (
     <main

@@ -1,0 +1,55 @@
+/**
+ * Onboarding first-run V2 (ONBOARDING_FIRST_RUN_V2) — build the live State A
+ * PublicPayload the 9-beat flow reveals one section at a time.
+ *
+ * This runs the agent's in-progress draft + their BrandSettings through the
+ * SAME `clampDraft → toPublicPayload` projection the publish route runs, so each
+ * revealed slice is byte-for-byte what the seller will receive — never a mock.
+ * It reuses `brandToPublishInputs` (the single construction StepReview + the
+ * wizard live-preview share) so the agent block, reviews, colors, and the State
+ * A capability assets all project identically to a real publish.
+ *
+ * Deliberately NOT `draftPreviewPayload`: that helper substitutes SAMPLE
+ * (tagged) track-record figures so the wizard's By-the-numbers band never looks
+ * empty. The onboarding reveal is publish-looking, and the locked map requires
+ * absence to GHOST (flex out), never to show example data on a real-looking
+ * surface — so we call `toPublicPayload` directly and let unset sections flex
+ * out honestly.
+ *
+ * Pure + client-safe (same as `preview-payload.ts`): no server-only imports, so
+ * it runs in the flow's client tree with no round-trip.
+ */
+
+import type { BrandSettings } from "@/lib/brand";
+import { brandToPublishInputs } from "@/tools/seller-presentation/components/preview/preview-payload";
+import {
+  toPublicPayload,
+  type PublicPayload,
+} from "@/tools/seller-presentation/output/public-payload";
+import {
+  clampDraft,
+  type SellerPresentationDraft,
+} from "@/tools/seller-presentation/engine/types";
+
+export function buildOnboardingStateAPayload(
+  draft: SellerPresentationDraft,
+  brand: BrandSettings,
+): PublicPayload {
+  const { agentContact, brandReviews, brandColors, brandWhyUs } =
+    brandToPublishInputs(brand);
+  return toPublicPayload(
+    clampDraft(draft),
+    agentContact,
+    brandReviews,
+    brandColors,
+    // whiteLabel: onboarding never resolves the entitlement client-side — match
+    // every other client-side preview render (wordmark shows).
+    false,
+    brandWhyUs,
+    // compPhotos: show the comp Street View thumbs in the prepared brief slice.
+    true,
+    // sellerStateA: resolve to the prepared-invitation render (the before-the-
+    // appointment dossier), which is the whole onboarding premise.
+    true,
+  );
+}
