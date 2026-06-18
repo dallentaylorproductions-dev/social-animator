@@ -36,26 +36,42 @@ import {
 export function AppointmentBrief({
   payload,
   preparedAt,
+  requireCompPhoto = true,
 }: {
   payload: PublicPayload;
   /** HandoutRecord.createdAt (ISO) - the truthful, republish-stable prepared date. */
   preparedAt?: string;
+  /**
+   * Whether a comp must carry a photo to earn a slot. DEFAULT true preserves the
+   * shipped photo-forward render exactly (live published pages pass nothing). The
+   * onboarding reveal passes false so the agent's REAL found nearby sales display
+   * before Street View is resolved - the comp card already renders a designed
+   * placeholder (never a blank) when a photo is absent. Photographed comps still
+   * lead, so a fully-photographed page is byte-identical either way.
+   */
+  requireCompPhoto?: boolean;
 }) {
   // Source the comps from whyPrice.comps (NOT the top-level payload.comps): the
   // Street View aiming data the flagship CompCard renders - pano id, heading,
   // hasStreetView - lives ONLY on whyPrice.comps. Reading payload.comps would
   // give addresses with no pano, so the thumbnails would never resolve.
   //
-  // THE PHOTO IS THE EVIDENCE: render only comps that actually have a photo
-  // (agent upload or resolved Street View). A comp with no photo would be an
-  // empty frame - which reads as unfinished - so it does not earn a slot in the
-  // seller-facing brief. The set was already photographed-first at authoring
-  // time; this filter is the render-time guarantee that no blank ever ships,
-  // and it flexes gracefully (shows what is available) when fewer than four
-  // resolved.
-  const comps = payload.whyPrice.comps
-    .filter((c) => compHasPhoto(c))
-    .slice(0, 4);
+  // THE PHOTO IS THE EVIDENCE: by default render only comps that actually have a
+  // photo (agent upload or resolved Street View), photographed-first, so no blank
+  // frame ever ships on a published page. When `requireCompPhoto` is relaxed (the
+  // onboarding reveal, before Street View resolves), the real found sales still
+  // show - photographed comps lead, then text-only comps render with the designed
+  // CompPhotoPlaceholder (the card's existing no-photo path), never a blank. A
+  // fully-photographed page yields the identical set either way.
+  const photographed = payload.whyPrice.comps.filter((c) => compHasPhoto(c));
+  const comps = (
+    requireCompPhoto
+      ? photographed
+      : [
+          ...photographed,
+          ...payload.whyPrice.comps.filter((c) => !compHasPhoto(c)),
+        ]
+  ).slice(0, 4);
   const hasNearby = comps.length > 0;
 
   // Keep the month label paired with each parseable price, so the sparkline's

@@ -107,7 +107,7 @@ type Appt = ReturnType<typeof formatAppointment>;
  * in the trust band below (not here), so this block can never read like part of
  * the home's valuation or a guarantee. Each supporting line flexes out.
  */
-function ValuationPrepared({
+export function ValuationPrepared({
   payload,
   appt,
 }: {
@@ -190,7 +190,7 @@ function ValuationPrepared({
  * FLEX-OUT: quote-only -> the link-out block drops and the quote centers; outlink
  * only -> the block stands alone; neither -> the whole section drops.
  */
-function TrustStrip({
+export function TrustStrip({
   payload,
   sourceLogos,
 }: {
@@ -316,7 +316,7 @@ function TrustStrip({
  * the flagship stepper treatment (reusing the .flow/.fstep DNA), the advocacy
  * "what I'll be looking for" line, then the one decided action (ConfirmTime).
  */
-function MeetingClose({ payload, appt }: { payload: PublicPayload; appt: Appt }) {
+export function MeetingClose({ payload, appt }: { payload: PublicPayload; appt: Appt }) {
   const steps = [
     {
       step: "Walk the home together",
@@ -366,7 +366,7 @@ function MeetingClose({ payload, appt }: { payload: PublicPayload; appt: Appt })
  * One action - "Confirm our time" + the agent's direct line. Not a form, not a
  * hard ask. Flexes out entirely when the agent has no reachable contact.
  */
-function ConfirmTime({ payload, appt }: { payload: PublicPayload; appt: Appt }) {
+export function ConfirmTime({ payload, appt }: { payload: PublicPayload; appt: Appt }) {
   const a = payload.agent;
   const email = a.email?.trim();
   const phone = a.phone?.trim();

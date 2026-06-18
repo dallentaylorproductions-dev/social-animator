@@ -14,6 +14,45 @@
  * "the listing" / "magazine-grade" assumptions.
  */
 
+import type { LeadEmphasisKey } from "@/lib/seller-presentation/lead-emphasis";
+
+/**
+ * Seller State A · Signature B — the campaign-spread launch-story headline.
+ *
+ * Rendered as `{lead} <em>{em}</em>.` The DEFAULT reproduces the shipped headline
+ * byte-for-byte, so an agent who never picked a lead emphasis (every existing
+ * page + every flag-off publish) renders exactly as today. When the agent picked
+ * one during onboarding (`BrandSettings.leadEmphasis` -> `payload.leadEmphasis`),
+ * the chosen lever becomes the populated headline. Evergreen + seller-facing, no
+ * em-dash, no over-claim, no duration / "the listing" assumption.
+ */
+export const CAMPAIGN_HEADLINE_DEFAULT = {
+  lead: "Produced beautifully.",
+  em: "Put in front of buyers",
+} as const;
+
+/**
+ * The tasteful ghost sub-line shown beneath the launch-story headline when the
+ * agent has chosen a lead emphasis but has not added any capability samples or
+ * recent listings yet (the onboarding BEAT 5 climax, and any live page in the
+ * same state). Evergreen + seller-facing; names no asset and claims nothing the
+ * page does not have. The headline (the chosen lever) carries the meaning.
+ */
+export const CAMPAIGN_GHOST_SUB = "My plan to get your home seen.";
+
+export const CAMPAIGN_HEADLINE_BY_EMPHASIS: Record<
+  LeadEmphasisKey,
+  { lead: string; em: string }
+> = {
+  "listing-launch": { lead: "A polished launch.", em: "Put in front of buyers" },
+  "social-reach": { lead: "Produced beautifully.", em: "Seen where buyers scroll" },
+  "buyer-network": { lead: "Produced beautifully.", em: "Shown to ready buyers" },
+  "open-house": { lead: "Doors open.", em: "Buyers walk through" },
+  "video-story": { lead: "Told as a story.", em: "Buyers remember" },
+  "fast-followup": { lead: "No buyer slips.", em: "Followed up fast" },
+  "local-market": { lead: "Priced for here.", em: "Placed for this market" },
+};
+
 /** First name from a full name, or undefined when there is no usable name. */
 function firstName(name: string | undefined): string | undefined {
   const first = name?.trim().split(/\s+/)[0];

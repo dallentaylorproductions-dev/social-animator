@@ -1,0 +1,352 @@
+/*
+ * Onboarding first-run V2 (ONBOARDING_FIRST_RUN_V2, Gate 3) - scoped styles.
+ *
+ * Every rule is anchored under `.onbv2` so this full-screen sequence can't leak
+ * into the dashboard, the wizard, a published page, or the shipped V1 `.onb`
+ * flow (which stays byte-identical). Accent = system TEAL (the locked Pass-2b
+ * decision; no gold), tuned to harmonize with the real State A slices the beats
+ * reveal. Mobile-first: a single full-height column, one decision per reveal;
+ * the desktop query only centers it, never a multi-pane builder.
+ */
+
+.onbv2 {
+  --o2-bg: #11100f;
+  --o2-panel: #1b1917;
+  --o2-line: rgba(255, 255, 255, 0.1);
+  --o2-ink: #f3efe9;
+  --o2-muted: #b3aaa1;
+  --o2-accent: #037290;
+  --o2-accent-soft: rgba(3, 114, 144, 0.14);
+  --o2-accent-line: rgba(3, 114, 144, 0.4);
+  --o2-accent-ink: #f4fbfd;
+
+  position: fixed;
+  inset: 0;
+  z-index: 50;
+  display: flex;
+  flex-direction: column;
+  background: radial-gradient(120% 80% at 50% -10%, #19211f 0%, var(--o2-bg) 60%);
+  color: var(--o2-ink);
+  font-family: var(--font-sans, system-ui, -apple-system, "Segoe UI", sans-serif);
+  overflow-y: auto;
+  -webkit-overflow-scrolling: touch;
+}
+
+.onbv2__inner {
+  width: 100%;
+  max-width: 480px;
+  margin: 0 auto;
+  padding: 24px 20px 40px;
+  display: flex;
+  flex-direction: column;
+  flex: 1;
+  min-height: 100%;
+}
+
+.onbv2__top {
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+  gap: 12px;
+  margin-bottom: 20px;
+}
+.onbv2__brand {
+  font-size: 12px;
+  letter-spacing: 0.14em;
+  text-transform: uppercase;
+  color: var(--o2-muted);
+}
+.onbv2__skip {
+  background: none;
+  border: none;
+  color: var(--o2-muted);
+  font-size: 13px;
+  cursor: pointer;
+  padding: 6px 4px;
+}
+.onbv2__skip:hover { color: var(--o2-ink); }
+
+.onbv2__body {
+  flex: 1;
+  display: flex;
+  flex-direction: column;
+  justify-content: center;
+  gap: 20px;
+}
+
+.onbv2__eyebrow {
+  font-size: 12px;
+  letter-spacing: 0.12em;
+  text-transform: uppercase;
+  color: var(--o2-accent);
+  margin: 0 0 8px;
+}
+.onbv2__title {
+  font-size: 27px;
+  line-height: 1.2;
+  font-weight: 600;
+  margin: 0;
+}
+.onbv2__sub {
+  font-size: 15px;
+  line-height: 1.5;
+  color: var(--o2-muted);
+  margin: 0;
+}
+.onbv2__note {
+  font-size: 13px;
+  line-height: 1.5;
+  color: var(--o2-muted);
+  margin: 0;
+}
+/* Silent-confirm line (Q3): a quiet "already on file" acknowledgement, never an
+   invite. The teal tick marks it as confirmed, not a pending ask. */
+.onbv2__confirm {
+  display: flex;
+  align-items: center;
+  gap: 8px;
+  font-size: 13px;
+  color: var(--o2-muted);
+  margin: 0;
+}
+.onbv2__confirm::before {
+  content: "✓";
+  color: var(--o2-accent);
+  font-weight: 700;
+}
+
+/* Inputs ------------------------------------------------------------------- */
+.onbv2__field { display: flex; flex-direction: column; gap: 8px; }
+.onbv2__label { font-size: 13px; color: var(--o2-muted); }
+.onbv2__input {
+  width: 100%;
+  background: var(--o2-panel);
+  border: 1px solid var(--o2-line);
+  border-radius: 12px;
+  padding: 14px 14px;
+  color: var(--o2-ink);
+  font-size: 16px; /* 16px keeps iOS from zooming on focus */
+}
+.onbv2__input:focus { outline: none; border-color: var(--o2-accent); }
+.onbv2__textarea { resize: vertical; min-height: 80px; line-height: 1.4; }
+.onbv2__row { display: grid; grid-template-columns: 1fr 1fr 1fr; gap: 10px; }
+
+/* Buttons ------------------------------------------------------------------ */
+.onbv2__actions { display: flex; flex-direction: column; gap: 10px; margin-top: 4px; }
+.onbv2__btn {
+  width: 100%;
+  border-radius: 12px;
+  padding: 15px 16px;
+  font-size: 16px;
+  font-weight: 600;
+  cursor: pointer;
+  border: 1px solid transparent;
+}
+.onbv2__btn--primary { background: var(--o2-accent); color: var(--o2-accent-ink); }
+.onbv2__btn--primary:disabled { opacity: 0.5; cursor: default; }
+.onbv2__btn--ghost {
+  background: transparent;
+  border-color: var(--o2-line);
+  color: var(--o2-ink);
+}
+.onbv2__link {
+  background: none;
+  border: none;
+  color: var(--o2-accent);
+  font-size: 14px;
+  cursor: pointer;
+  padding: 8px 4px;
+  align-self: center;
+}
+.onbv2__link:hover { text-decoration: underline; }
+
+/* Exposure levers (BEAT 5) ------------------------------------------------- */
+.onbv2__levers { display: grid; grid-template-columns: 1fr 1fr; gap: 10px; }
+.onbv2__lever {
+  text-align: left;
+  background: var(--o2-panel);
+  border: 1px solid var(--o2-line);
+  border-radius: 14px;
+  padding: 16px 14px;
+  color: var(--o2-ink);
+  font-size: 15px;
+  font-weight: 600;
+  cursor: pointer;
+  transition: border-color 0.15s ease, transform 0.1s ease;
+}
+.onbv2__lever:hover { border-color: var(--o2-accent); }
+.onbv2__lever:active { transform: scale(0.99); }
+.onbv2__lever--active {
+  border-color: var(--o2-accent);
+  background: var(--o2-accent-soft);
+}
+
+/* Ghost row (optional appointment, BEAT 7) --------------------------------- */
+.onbv2__ghostrow {
+  width: 100%;
+  text-align: left;
+  background: transparent;
+  border: 1px dashed var(--o2-line);
+  border-radius: 12px;
+  padding: 13px 14px;
+  color: var(--o2-muted);
+  font-size: 14px;
+  cursor: pointer;
+}
+.onbv2__ghostrow:hover { color: var(--o2-ink); border-color: var(--o2-accent-line); }
+
+/* Seller-name chip (BEAT 2, secondary to the headshot) --------------------- */
+.onbv2__seller-ghost {
+  align-self: flex-start;
+  background: none;
+  border: none;
+  color: var(--o2-muted);
+  font-size: 13px;
+  cursor: pointer;
+  padding: 4px 2px;
+  text-decoration: underline;
+  text-underline-offset: 3px;
+}
+.onbv2__seller-ghost:hover { color: var(--o2-ink); }
+.onbv2__seller {
+  display: flex;
+  align-items: center;
+  gap: 10px;
+  font-size: 13px;
+  color: var(--o2-muted);
+}
+.onbv2__seller-label {
+  background: rgba(255, 255, 255, 0.04);
+  border: 1px solid var(--o2-line);
+  border-radius: 999px;
+  padding: 6px 12px;
+  color: var(--o2-ink);
+}
+.onbv2__seller-edit {
+  background: none;
+  border: none;
+  color: var(--o2-accent);
+  font-size: 13px;
+  cursor: pointer;
+  padding: 4px 2px;
+}
+.onbv2__seller-edit:hover { text-decoration: underline; }
+.onbv2__seller-input { display: flex; flex-direction: column; gap: 8px; }
+.onbv2__seller-row { display: flex; align-items: center; gap: 12px; }
+.onbv2__btn--slim { width: auto; padding: 9px 18px; font-size: 14px; }
+
+/* Honest checklist (BEAT 3) ------------------------------------------------ */
+.onbv2__checklist {
+  list-style: none;
+  margin: 0;
+  padding: 0;
+  display: flex;
+  flex-direction: column;
+  gap: 8px;
+}
+.onbv2__checklist li {
+  display: flex;
+  align-items: center;
+  gap: 10px;
+  font-size: 14px;
+  color: var(--o2-ink);
+}
+.onbv2__check { color: var(--o2-accent); font-weight: 700; }
+
+/* The cropped real slice --------------------------------------------------- */
+.onbv2__slice {
+  border: 1px solid var(--o2-line);
+  border-radius: 18px;
+  overflow: hidden;
+  background: #fff;
+  max-height: 60vh;
+  overflow-y: auto;
+  -webkit-overflow-scrolling: touch;
+}
+.onbv2__slice [data-flagship-shell] { min-height: 0; }
+/* The real State A sections reveal their content on scroll via a JS motion
+   island (adds `.in` to every `.reveal`). The onboarding reveal renders ONE
+   cropped slice with NO island (and deliberately no view-signal beacons), so we
+   land every `.reveal` at its final state here - the SAME override the flagship's
+   prefers-reduced-motion / print rules use, scoped to the slice. Without this the
+   slice content sits at opacity:0 and the frame looks empty. */
+.onbv2__slice .reveal {
+  opacity: 1 !important;
+  transform: none !important;
+  transition: none !important;
+}
+.onbv2__slice .rev-source-note,
+.onbv2__slice .rev-source-g {
+  opacity: 1 !important;
+  transform: none !important;
+  transition: none !important;
+}
+
+/* Sample badge ------------------------------------------------------------- */
+.onbv2__sample-badge {
+  align-self: flex-start;
+  background: var(--o2-accent-soft);
+  color: var(--o2-accent);
+  font-size: 11px;
+  letter-spacing: 0.1em;
+  text-transform: uppercase;
+  padding: 5px 10px;
+  border-radius: 999px;
+  border: 1px solid var(--o2-accent-line);
+}
+
+/* Preparing skeleton ------------------------------------------------------- */
+.onbv2__skeleton { display: flex; flex-direction: column; gap: 14px; }
+.onbv2__sk-hero {
+  height: 180px;
+  border-radius: 16px;
+  background: linear-gradient(100deg, #1f1d1a 30%, #29251f 50%, #1f1d1a 70%);
+  background-size: 200% 100%;
+  animation: onbv2-shimmer 1.4s ease-in-out infinite;
+}
+.onbv2__sk-line {
+  height: 14px;
+  border-radius: 7px;
+  background: linear-gradient(100deg, #1f1d1a 30%, #29251f 50%, #1f1d1a 70%);
+  background-size: 200% 100%;
+  animation: onbv2-shimmer 1.4s ease-in-out infinite;
+}
+.onbv2__sk-line.short { width: 55%; }
+.onbv2__sk-line.mid { width: 75%; }
+@keyframes onbv2-shimmer {
+  0% { background-position: 200% 0; }
+  100% { background-position: -200% 0; }
+}
+
+/* Ambient spotlight - a single ignorable line, never a modal --------------- */
+.onbv2__spotlight {
+  display: flex;
+  align-items: flex-start;
+  gap: 8px;
+  font-size: 13px;
+  line-height: 1.4;
+  color: var(--o2-muted);
+  background: var(--o2-accent-soft);
+  border: 1px solid var(--o2-accent-line);
+  border-radius: 12px;
+  padding: 10px 12px;
+  margin-top: 8px;
+}
+.onbv2__spotlight-dot {
+  flex: none;
+  width: 6px;
+  height: 6px;
+  border-radius: 999px;
+  background: var(--o2-accent);
+  margin-top: 6px;
+}
+
+@media (prefers-reduced-motion: reduce) {
+  .onbv2__sk-hero, .onbv2__sk-line { animation: none; }
+}
+
+/* Desktop - calm centered column, NOT a builder pane ----------------------- */
+@media (min-width: 768px) {
+  .onbv2__inner { max-width: 520px; padding-top: 56px; padding-bottom: 56px; }
+  .onbv2__title { font-size: 31px; }
+}

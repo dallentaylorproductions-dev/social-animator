@@ -53,6 +53,10 @@ import {
   type PerformanceStat,
   type ProcessStep,
 } from "@/lib/whyus";
+import {
+  type LeadEmphasisKey,
+  clampLeadEmphasis,
+} from "@/lib/seller-presentation/lead-emphasis";
 
 // Re-export the public-safe locked-design types so consumers
 // (publish route, A7b renderer, allowlist spec) can import from one
@@ -188,6 +192,14 @@ export interface BrandWhyUsInput {
   sampleListingPhotoUrl?: string;
   sampleVideoUrl?: string;
   sampleVideoPosterUrl?: string;
+  /**
+   * Seller State A · Pass 2b — the agent's chosen lead emphasis (the one
+   * exposure lever from onboarding BEAT 5). Same provenance as the capability
+   * samples; wire-permissive (the projector clamps it to a known key and emits
+   * it ONLY in a State A invitation publish), so a flag-off / revealed publish is
+   * byte-identical whether set or not.
+   */
+  leadEmphasis?: string;
   /**
    * Seller State A · Zone 5 — the agent's recent listings for the exposure
    * coverflow ("Put in front of buyers"). Agent-entered once at onboarding (the
@@ -425,6 +437,14 @@ export interface PublicPayload {
   sampleListingPhotoUrl?: string;
   sampleVideoUrl?: string;
   sampleVideoPosterUrl?: string;
+  /**
+   * Seller State A · Pass 2b — the agent's chosen lead emphasis (onboarding
+   * BEAT 5), clamped to a known lever key. Emitted ONLY in a State A invitation
+   * publish; absent on a revealed / flag-off publish, so those stay byte-
+   * identical. `CampaignSpread` renders its launch-story headline from this; an
+   * absent value renders the shipped default headline.
+   */
+  leadEmphasis?: LeadEmphasisKey;
   /**
    * Seller State A · Zone 5 — the agent's recent listings for the exposure
    * coverflow. Emitted ONLY in a State A invitation publish AND behind the
@@ -1145,6 +1165,10 @@ export function toPublicPayload(
           sampleListingPhotoUrl: projectedSampleListingPhotoUrl,
           sampleVideoUrl: projectedSampleVideoUrl,
           sampleVideoPosterUrl: projectedSampleVideoPosterUrl,
+          // Pass 2b lead emphasis — clamped to a known lever key (undefined drops
+          // the key via JSON.stringify, so an agent who never picked one publishes
+          // the shipped default headline, byte-identical).
+          leadEmphasis: clampLeadEmphasis(brandWhyUs.leadEmphasis),
           // Zone 5 coverflow — already flag-gated above (undefined when the
           // coverflow flag is off OR no listings survived), so it drops out via
           // JSON.stringify and a State-A-but-flag-off publish stays byte-identical.
@@ -1332,6 +1356,7 @@ function clampStateAFields(r: Record<string, unknown>): {
   sampleListingPhotoUrl?: string;
   sampleVideoUrl?: string;
   sampleVideoPosterUrl?: string;
+  leadEmphasis?: LeadEmphasisKey;
   recentListings?: PublicRecentListing[];
 } {
   const valuationStatus = clampValuationStatus(r.valuationStatus);
@@ -1345,6 +1370,9 @@ function clampStateAFields(r: Record<string, unknown>): {
     sampleListingPhotoUrl: projectPublicWhyUsText(r.sampleListingPhotoUrl),
     sampleVideoUrl: projectPublicWhyUsText(r.sampleVideoUrl),
     sampleVideoPosterUrl: projectPublicWhyUsText(r.sampleVideoPosterUrl),
+    // Pass 2b — re-clamp the lead emphasis to a known key on read; survives ONLY
+    // alongside an invitation status (a stray value on a revealed record drops).
+    leadEmphasis: clampLeadEmphasis(r.leadEmphasis),
     // Zone 5 coverflow — re-run the SAME field-by-field projection on read, so a
     // hand-edited KV record can't smuggle an unbounded list, a fabricated /
     // non-integer view count, or a private key into the renderer. Survives ONLY
