@@ -180,6 +180,46 @@
 }
 .onbv2__ghostrow:hover { color: var(--o2-ink); border-color: var(--o2-accent-line); }
 
+/* Seller-name chip (BEAT 2, secondary to the headshot) --------------------- */
+.onbv2__seller-ghost {
+  align-self: flex-start;
+  background: none;
+  border: none;
+  color: var(--o2-muted);
+  font-size: 13px;
+  cursor: pointer;
+  padding: 4px 2px;
+  text-decoration: underline;
+  text-underline-offset: 3px;
+}
+.onbv2__seller-ghost:hover { color: var(--o2-ink); }
+.onbv2__seller {
+  display: flex;
+  align-items: center;
+  gap: 10px;
+  font-size: 13px;
+  color: var(--o2-muted);
+}
+.onbv2__seller-label {
+  background: rgba(255, 255, 255, 0.04);
+  border: 1px solid var(--o2-line);
+  border-radius: 999px;
+  padding: 6px 12px;
+  color: var(--o2-ink);
+}
+.onbv2__seller-edit {
+  background: none;
+  border: none;
+  color: var(--o2-accent);
+  font-size: 13px;
+  cursor: pointer;
+  padding: 4px 2px;
+}
+.onbv2__seller-edit:hover { text-decoration: underline; }
+.onbv2__seller-input { display: flex; flex-direction: column; gap: 8px; }
+.onbv2__seller-row { display: flex; align-items: center; gap: 12px; }
+.onbv2__btn--slim { width: auto; padding: 9px 18px; font-size: 14px; }
+
 /* Honest checklist (BEAT 3) ------------------------------------------------ */
 .onbv2__checklist {
   list-style: none;

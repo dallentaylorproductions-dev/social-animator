@@ -136,6 +136,12 @@ export function WelcomeFlowV2({
   const [firstName, setFirstName] = useState('');
   const [address, setAddress] = useState<AddressFields>(EMPTY_ADDRESS);
   const [prepared, setPrepared] = useState<PrepareResult | null>(null);
+  // Seller name (BEAT 2). NEVER inferred / auto-asserted: there is no reliable
+  // owner-name source (RentCast drops owner data), so the hero opens with a
+  // neutral byline and this stays empty until the agent OPTIONALLY taps "who's
+  // this for?" and types it. Per-page (the draft's preparedFor), not a brand
+  // constant.
+  const [sellerName, setSellerName] = useState('');
   const [exposure, setExposure] = useState<LeadEmphasisKey | null>(null);
   const [appointmentAt, setAppointmentAt] = useState('');
   const [finishError, setFinishError] = useState<string | null>(null);
@@ -187,10 +193,13 @@ export function WelcomeFlowV2({
       comps: prepared?.comps ?? [],
       valuationStatus: 'preparing_for_walkthrough',
       appointmentAt: appointmentAt.trim() || undefined,
-      // preparedFor (the seller's name) stays undefined in 3a -> neutral byline.
-      // TODO(3c): inferred-then-confirmed seller name lands here.
+      // preparedFor (the seller's name) is empty by default -> StateAHero renders
+      // its neutral byline. It is set ONLY when the agent optionally types it at
+      // BEAT 2; never inferred, never auto-asserted (a wrong name is worse than a
+      // ghost), so a page never publishes a guessed seller name.
+      preparedFor: sellerName.trim() || undefined,
     }),
-    [address, prepared, appointmentAt],
+    [address, prepared, appointmentAt, sellerName],
   );
 
   // The live payload the real slices render. Sample path swaps in the fixture.
@@ -278,6 +287,13 @@ export function WelcomeFlowV2({
     },
     [patchBrand],
   );
+
+  // ── BEAT 2 optional seller name ("who's this for?") ─────────────────────
+  const commitSellerName = useCallback((value: string) => {
+    const v = value.trim();
+    setSellerName(v);
+    if (v) emitOnboardingEvent(ONBOARDING_EVENTS.trustSignalAdded, { kind: 'seller-name' });
+  }, []);
 
   // ── BEAT 6 one review ───────────────────────────────────────────────────
   const addReview = useCallback(
@@ -414,6 +430,8 @@ export function WelcomeFlowV2({
               headshotBusy={headshotBusy}
               headshotError={headshotError}
               onHeadshotFile={onHeadshotFile}
+              sellerName={sellerName}
+              onSellerName={commitSellerName}
               prepared={prepared}
               exposure={exposure}
               onChooseExposure={chooseExposure}
@@ -513,6 +531,8 @@ interface RealBeatsProps {
   headshotBusy: boolean;
   headshotError: string | null;
   onHeadshotFile: (f: File | null) => void;
+  sellerName: string;
+  onSellerName: (v: string) => void;
   prepared: PrepareResult | null;
   exposure: LeadEmphasisKey | null;
   onChooseExposure: (key: LeadEmphasisKey) => void;
@@ -686,6 +706,10 @@ function HeroBeat(p: RealBeatsProps) {
     <>
       <BeatHead eyebrow="Your page" title="This one is yours. Add your face." />
       <SliceFrame payload={p.payload} section="hero" testid="onbv2-slice-hero" />
+      {/* Secondary, visually-quiet seller-name affordance. The PRIMARY action is
+          the headshot below; this never reads as "confirm a name, then upload".
+          Optional + never inferred: the hero opens neutral until the agent taps. */}
+      <SellerNameChip name={p.sellerName} onCommit={p.onSellerName} />
       <input
         ref={fileRef}
         type="file"
@@ -724,6 +748,108 @@ function HeroBeat(p: RealBeatsProps) {
       )}
       <Spotlight text={ONBOARDING_V2_SPOTLIGHTS.hero} />
     </>
+  );
+}
+
+/**
+ * BEAT 2 seller-name chip - the optional "who's this for?" affordance, the
+ * locked fallback for the missing inference source. Three small states, all
+ * visually secondary to the headshot:
+ *   - no name      -> a quiet ghost link "Who's this page for?"
+ *   - editing      -> one optional field (Enter / Add commits, never required)
+ *   - name set     -> a confirm chip "Prepared for {name}" with a Change tap
+ * The committed value drives the REAL hero byline (draft.preparedFor); a wrong
+ * guess never publishes because nothing is ever prefilled or inferred.
+ */
+function SellerNameChip({
+  name,
+  onCommit,
+}: {
+  name: string;
+  onCommit: (v: string) => void;
+}) {
+  const [open, setOpen] = useState(false);
+  const [value, setValue] = useState(name);
+
+  if (name && !open) {
+    return (
+      <div className="onbv2__seller" data-testid="onbv2-seller-confirm">
+        <span className="onbv2__seller-label">Prepared for {name}</span>
+        <button
+          type="button"
+          className="onbv2__seller-edit"
+          data-testid="onbv2-seller-edit"
+          onClick={() => {
+            setValue(name);
+            setOpen(true);
+          }}
+        >
+          Change
+        </button>
+      </div>
+    );
+  }
+
+  if (!open) {
+    return (
+      <button
+        type="button"
+        className="onbv2__seller-ghost"
+        data-testid="onbv2-seller-open"
+        onClick={() => {
+          setValue(name);
+          setOpen(true);
+        }}
+      >
+        Who&apos;s this page for?
+      </button>
+    );
+  }
+
+  const commit = () => {
+    onCommit(value);
+    setOpen(false);
+  };
+  return (
+    <div className="onbv2__seller-input" data-testid="onbv2-seller-input">
+      <input
+        className="onbv2__input"
+        type="text"
+        autoFocus
+        value={value}
+        placeholder="The Johnson family"
+        aria-label="Who this page is for"
+        data-testid="onbv2-seller-field"
+        onChange={(e) => setValue(e.target.value)}
+        onKeyDown={(e) => {
+          if (e.key === 'Enter') commit();
+        }}
+      />
+      <div className="onbv2__seller-row">
+        <button
+          type="button"
+          className="onbv2__btn onbv2__btn--ghost onbv2__btn--slim"
+          data-testid="onbv2-seller-save"
+          onClick={commit}
+        >
+          Add
+        </button>
+        {name && (
+          <button
+            type="button"
+            className="onbv2__seller-edit"
+            data-testid="onbv2-seller-clear"
+            onClick={() => {
+              onCommit('');
+              setValue('');
+              setOpen(false);
+            }}
+          >
+            Remove
+          </button>
+        )}
+      </div>
+    </div>
   );
 }
 
