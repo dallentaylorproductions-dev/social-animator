@@ -3,9 +3,11 @@
  *
  * Every rule is anchored under `.onbv2` so this full-screen sequence can't leak
  * into the dashboard, the wizard, a published page, or the shipped V1 `.onb`
- * flow (which stays byte-identical). Accent = system TEAL (the locked Pass-2b
- * decision; no gold), tuned to harmonize with the real State A slices the beats
- * reveal. Mobile-first: a single full-height column, one decision per reveal;
+ * flow (which stays byte-identical). Accent = the studio cockpit MINT (#5BF5C9,
+ * the dashboard / Your Pages `--accent`) so first-run onboarding matches the rest
+ * of the studio; the real State A slices the beats reveal are re-keyed to the same
+ * mint via `STUDIO_MINT` in StateASlice. Mobile-first: a single full-height column,
+ * one decision per reveal;
  * the desktop query only centers it, never a multi-pane builder.
  */
 
@@ -15,10 +17,16 @@
   --o2-line: rgba(255, 255, 255, 0.1);
   --o2-ink: #f3efe9;
   --o2-muted: #b3aaa1;
-  --o2-accent: #037290;
-  --o2-accent-soft: rgba(3, 114, 144, 0.14);
-  --o2-accent-line: rgba(3, 114, 144, 0.4);
-  --o2-accent-ink: #f4fbfd;
+  /* Accent = the studio cockpit mint (#5BF5C9), the same value the dashboard
+     (sep-studio.css) and Your Pages cockpit (pages-library.css) resolve `--accent`
+     to, so first-run onboarding matches the rest of the studio. (Was flagship blue
+     #037290.) Mint is light, so text that sits ON the accent fill — the primary
+     button — uses a dark ink (mirrors sep-studio's `.btn-primary` color); accent
+     used AS text/keylines on the dark chrome reads bright, as on the dashboard. */
+  --o2-accent: #5BF5C9;
+  --o2-accent-soft: rgba(91, 245, 201, 0.14);
+  --o2-accent-line: rgba(91, 245, 201, 0.4);
+  --o2-accent-ink: oklch(0.18 0.02 175);
 
   position: fixed;
   inset: 0;
