@@ -34,3 +34,37 @@ export function markOnboardingSeen(): void {
     // ignore quota / storage-disabled - the gate degrades to re-showing.
   }
 }
+
+/**
+ * Sample-walked marker (DASHBOARD_TODAY_SEAM, Pass 3).
+ *
+ * Distinct from `socanim_onboarding_seen`: that flag is set identically
+ * whether the agent walked the sample, finished a real page, or just hit
+ * "Skip for now" on the first beat, so it can't tell a sample-walker apart
+ * from a pure skipper. This marker is written ONLY when the agent actually
+ * opens the curated sample, giving the dashboard Today card a clean signal
+ * for the `sample-only` state ("you've seen what it does — now make one for
+ * your listing") instead of cold-starting them at `new`.
+ *
+ * Local + advisory like the other onboarding markers: worst case (storage
+ * disabled / cleared) the card degrades to `new`, never breaks.
+ */
+const SAMPLE_KEY = "socanim_onboarding_sample_walked";
+
+export function hasWalkedSample(): boolean {
+  if (typeof window === "undefined") return false;
+  try {
+    return window.localStorage.getItem(SAMPLE_KEY) === "1";
+  } catch {
+    return false;
+  }
+}
+
+export function markSampleWalked(): void {
+  if (typeof window === "undefined") return;
+  try {
+    window.localStorage.setItem(SAMPLE_KEY, "1");
+  } catch {
+    // ignore quota / storage-disabled - the card degrades to `new`.
+  }
+}

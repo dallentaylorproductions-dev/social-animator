@@ -2,6 +2,11 @@ import Link from "next/link";
 import { auth, signOut } from "@/lib/auth";
 import { loadAgentProfile } from "@/lib/entitlements/load-agent-profile";
 import { isDashboardHomeV2Enabled } from "@/lib/config/dashboard-home-v2";
+import {
+  isDashboardTodaySeamEnabled,
+  isTodaySeamPreviewAllowed,
+} from "@/lib/config/dashboard-today-seam";
+import { parseSeamPreview } from "./today-state";
 import { isOnboardingFirstRunEnabled } from "@/lib/config/onboarding-first-run";
 import { isOnboardingFirstRunV2Enabled } from "@/lib/config/onboarding-first-run-v2";
 import { DashboardEntry } from "./DashboardEntry";
@@ -51,6 +56,20 @@ export default async function DashboardPage({
   // inline, and the flag-off path never reaches V2 code. Flag-off renders
   // byte-identical to today's dashboard.
   const dashboardHomeV2 = isDashboardHomeV2Enabled();
+
+  // DASHBOARD_TODAY_SEAM (Pass 3) — read server-side, threaded the same way.
+  // Only meaningful when DASHBOARD_HOME_V2 is on (the Today card lives in V2);
+  // flag-off keeps the Pass-1 Today card byte-identical.
+  const dashboardTodaySeam = isDashboardTodaySeamEnabled();
+
+  // QA display override: `?todaySeam=new|sample|partial|returning` forces which
+  // Today-card state renders, so all four can be eyeballed on preview from an
+  // account that naturally only shows "returning". Double-gated server-side
+  // (feature on AND preview/dev env) — null (no override) in production, so it
+  // can never affect a real agent. Pure render override; touches no data.
+  const todaySeamPreview = isTodaySeamPreviewAllowed()
+    ? parseSeamPreview(sp.todaySeam)
+    : null;
 
   // ONBOARDING_FIRST_RUN (Pass 2) / _V2 (Pass 2b) - read server-side, threaded
   // as a prop the same way. The entry gate fires for EITHER flag (V2 supersedes
@@ -116,6 +135,8 @@ export default async function DashboardPage({
           onboardingFirstRun={onboardingFirstRun}
           agentProfile={agentProfile}
           dashboardV2={dashboardHomeV2}
+          todaySeam={dashboardTodaySeam}
+          todaySeamPreview={todaySeamPreview}
         />
       </div>
     </main>

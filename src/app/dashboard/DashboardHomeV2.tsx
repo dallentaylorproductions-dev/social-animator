@@ -17,7 +17,12 @@ import {
   useOwnerPagesActivity,
   type OwnerPagesActivity,
 } from './use-owner-pages-activity';
-import { deriveTodayState } from './today-state';
+import {
+  deriveTodayState,
+  previewTodayView,
+  type TodayState,
+} from './today-state';
+import { useTodaySeamSignals } from './use-today-seam-signals';
 
 /**
  * DASHBOARD_HOME_V2 — the progressive operating home (Pass 1).
@@ -48,6 +53,18 @@ interface DashboardHomeV2Props {
   dateEyebrow: string;
   /** Pre-resolved 'Social content' skills (for the Social Studio marquee). */
   visibilitySkills: CallableSkill[];
+  /**
+   * DASHBOARD_TODAY_SEAM (Pass 3) — server-resolved. When false (default), the
+   * Today card derives only the Pass-1 new/returning states and renders
+   * byte-identical to today. When true, it reflects the full onboarding state
+   * set (adds sample-only + partial). Only the Today card changes.
+   */
+  todaySeam?: boolean;
+  /**
+   * QA display override (preview/dev only) — forces which Today-card state
+   * renders, or null for normal derivation. Already gated server-side.
+   */
+  todaySeamPreview?: TodayState | null;
 }
 
 export function DashboardHomeV2({
@@ -55,6 +72,8 @@ export function DashboardHomeV2({
   welcomeSubtitle,
   dateEyebrow,
   visibilitySkills,
+  todaySeam = false,
+  todaySeamPreview = null,
 }: DashboardHomeV2Props) {
   const activity = useOwnerPagesActivity();
   const flagship = flagshipTool();
@@ -84,7 +103,11 @@ export function DashboardHomeV2({
       </section>
 
       {/* TIER 1 — TODAY (dynamic top card; replaces the brand-kit hero) */}
-      <TodayCard activity={activity} />
+      <TodayCard
+        activity={activity}
+        seamEnabled={todaySeam}
+        previewState={todaySeamPreview}
+      />
 
       {/* TIER 2 — FLAGSHIP (Seller Presentation, live activity) */}
       {flagship && (
@@ -160,30 +183,93 @@ export function DashboardHomeV2({
 /* TIER 1 — Today card                                                        */
 
 const SELLER_PRESENTATION_HREF = '/seller-presentation';
+/** The real onboarding path entry (address-start flow). */
+const ONBOARDING_HREF = '/welcome';
 
 function plural(n: number, one: string, many: string): string {
   return n === 1 ? one : many;
 }
 
 /**
- * Today card — the single dynamic "what to do now" surface. Pass-1 scope:
- * returning vs basic-empty only (the richer new/sample/partial onboarding
- * states are the Pass-2 seam). The needs-attention line POINTS INTO Your
- * pages (it is not a second follow-up inbox), so the count + Review link
- * both resolve from the one owner-scoped source.
+ * Today card — the single dynamic "what to do now" surface.
+ *
+ * Pass 1 derived `returning` vs `new` only. Pass 3 (DASHBOARD_TODAY_SEAM,
+ * `seamEnabled`) adds the two mid-onboarding states an agent can now be in, so
+ * the dashboard continues onboarding instead of cold-starting it:
+ *   - `partial`      — an in-progress, never-published draft → RESUME that
+ *                      exact page (deep-link `?id=`), per the converged-instance
+ *                      resume-on-open pattern.
+ *   - `sample-only`  — walked the sample, made nothing → a prominent convert
+ *                      card into the real onboarding path.
+ * Precedence (most-advanced actionable state): returning > partial >
+ * sample-only > new. When the seam is OFF the card derives only new/returning
+ * and is byte-identical to Pass 1.
+ *
+ * The card stays a thin POINTER, never a second inbox: the needs-attention
+ * line and the count both resolve from the one owner-scoped pages source, and
+ * the resume deep-links into the draft the wizard already owns.
  */
-function TodayCard({ activity }: { activity: OwnerPagesActivity }) {
-  const { state, needsAttention, worthFollowUpCount } = deriveTodayState(activity);
+function TodayCard({
+  activity,
+  seamEnabled,
+  previewState = null,
+}: {
+  activity: OwnerPagesActivity;
+  seamEnabled: boolean;
+  /**
+   * QA display override (preview/dev only, already gated server-side). When
+   * set, the card renders this state from a fully synthetic view instead of
+   * the derived one — no real page/draft is read. null in production.
+   */
+  previewState?: TodayState | null;
+}) {
+  // undefined when the seam is off (or still resolving) → the deriver produces
+  // the byte-identical Pass-1 state set.
+  const seamSignals = useTodaySeamSignals(seamEnabled);
+  const derived = deriveTodayState(activity, seamSignals);
+  // The QA override wins when present (synthetic display data); otherwise the
+  // real derivation drives the card.
+  const { state, needsAttention, worthFollowUpCount, partialInstanceId, partialLabel } =
+    previewState ? previewTodayView(previewState) : derived;
+
   const isNew = state === 'new';
   const isReturning = state === 'returning';
+  const isPartial = state === 'partial';
+  const isSampleOnly = state === 'sample-only';
 
-  const headline = isNew
-    ? 'Create your first seller page.'
-    : 'Pick up where you left off.';
-  const ctaLabel = isNew ? 'Create your first seller page' : 'Create seller page';
+  let headline: string;
+  if (isPartial) {
+    headline = partialLabel
+      ? `Pick up where you left off on ${partialLabel}.`
+      : 'Pick up where you left off.';
+  } else if (isSampleOnly) {
+    headline = 'You have seen what it does. Now make one for your listing.';
+  } else if (isNew) {
+    headline = 'Create your first seller page.';
+  } else {
+    headline = 'Pick up where you left off.';
+  }
+
+  // The primary action. Non-seam states keep the Pass-1 target (the cockpit)
+  // so flag-off stays byte-identical; partial deep-links the exact draft and
+  // sample-only opens the real onboarding path.
+  let primaryHref = SELLER_PRESENTATION_HREF;
+  let ctaLabel = isNew ? 'Create your first seller page' : 'Create seller page';
+  if (isPartial) {
+    primaryHref = `${SELLER_PRESENTATION_HREF}?id=${partialInstanceId}`;
+    ctaLabel = 'Resume your page';
+  } else if (isSampleOnly) {
+    primaryHref = ONBOARDING_HREF;
+    ctaLabel = 'Make one for your listing';
+  }
 
   return (
-    <section className="today" data-testid="sep-today" data-today-state={state}>
+    <section
+      className="today"
+      data-testid="sep-today"
+      data-today-state={state}
+      data-today-preview={previewState ? '1' : undefined}
+    >
       <div className="today-eyebrow">
         <span className="today-dot" />
         TODAY
@@ -211,6 +297,18 @@ function TodayCard({ activity }: { activity: OwnerPagesActivity }) {
         </p>
       )}
 
+      {isPartial && (
+        <p className="today-sub" data-testid="sep-today-sub">
+          Your in-progress page is saved. Finish it whenever you are ready.
+        </p>
+      )}
+
+      {isSampleOnly && (
+        <p className="today-sub" data-testid="sep-today-sub">
+          Start with your address and build the page for your real listing.
+        </p>
+      )}
+
       {isNew && (
         <p className="today-sub" data-testid="sep-today-sub">
           Win your next listing appointment with a premium seller-facing page.
@@ -219,7 +317,7 @@ function TodayCard({ activity }: { activity: OwnerPagesActivity }) {
 
       <div className="today-actions">
         <Link
-          href={SELLER_PRESENTATION_HREF}
+          href={primaryHref}
           className="btn btn-primary"
           data-testid="sep-today-primary"
         >
