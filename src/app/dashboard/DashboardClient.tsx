@@ -29,6 +29,7 @@ import { Tile, type TileStage } from './components/Tile';
 import { posterForSkillId } from './components/posters/posterForSkillId';
 import { SocialStudioTile } from './components/SocialStudio';
 import { DashboardHomeV2 } from './DashboardHomeV2';
+import type { TodayState } from './today-state';
 
 /**
  * Dashboard client island (v1.47 Lane A re-brand — SEP-S Studio shell).
@@ -172,6 +173,8 @@ function readWelcomeSnapshot(): WelcomeSnapshot {
 export function DashboardClient({
   agentProfile,
   dashboardV2 = false,
+  todaySeam = false,
+  todaySeamPreview = null,
 }: {
   agentProfile: AgentProfile;
   /**
@@ -180,6 +183,17 @@ export function DashboardClient({
    * When true, the four-tier registry-driven home renders instead.
    */
   dashboardV2?: boolean;
+  /**
+   * DASHBOARD_TODAY_SEAM (Pass 3) — server-resolved. Forwarded to the V2
+   * home so the Today card can derive the full onboarding state set. Inert
+   * unless dashboardV2 is also on (the Today card lives in V2).
+   */
+  todaySeam?: boolean;
+  /**
+   * QA display override (preview/dev only) — the forced Today-card state, or
+   * null. Already gated server-side; forwarded to the V2 home.
+   */
+  todaySeamPreview?: TodayState | null;
 }) {
   const [activeStates, setActiveStates] = useState<WorkflowState[]>([]);
   const [brandConfigured, setBrandConfigured] = useState<boolean | null>(null);
@@ -295,6 +309,8 @@ export function DashboardClient({
         welcomeSubtitle={welcome.subtitle}
         dateEyebrow={dateEyebrow}
         visibilitySkills={visibilitySkills}
+        todaySeam={todaySeam}
+        todaySeamPreview={todaySeamPreview}
       />
     );
   }

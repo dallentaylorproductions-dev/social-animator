@@ -23,7 +23,7 @@ import {
   type AgentBranding,
 } from '@/tools/seller-presentation/output/public-payload';
 import { emitOnboardingEvent, ONBOARDING_EVENTS } from '@/lib/onboarding/funnel';
-import { markOnboardingSeen } from '@/lib/onboarding/seen';
+import { markOnboardingSeen, markSampleWalked } from '@/lib/onboarding/seen';
 import { ONBOARDING_V2_SPOTLIGHTS } from '@/lib/onboarding/v2-spotlights';
 import {
   LEAD_EMPHASIS_LABELS,
@@ -401,6 +401,12 @@ export function WelcomeFlowV2({
   // ── SAMPLE (secondary link) ─────────────────────────────────────────────
   const openSample = useCallback(() => {
     setIsSample(true);
+    // DASHBOARD_TODAY_SEAM (Pass 3): persist a sample-walked marker so the
+    // dashboard Today card can later show the `sample-only` convert state
+    // instead of cold-starting this agent at `new`. Local + advisory; the
+    // generic `socanim_onboarding_seen` can't distinguish a sample walk from
+    // a pure skip, this can.
+    markSampleWalked();
     emitOnboardingEvent(ONBOARDING_EVENTS.pathChosen, { path: 'sample' });
     emitOnboardingEvent(ONBOARDING_EVENTS.previewReached, { path: 'sample' });
   }, []);

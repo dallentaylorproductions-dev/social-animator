@@ -3,6 +3,7 @@
 import { useEffect, useState } from 'react';
 import { useRouter } from 'next/navigation';
 import type { AgentProfile } from '@/lib/entitlements/types';
+import type { TodayState } from './today-state';
 import { DashboardClient } from './DashboardClient';
 import { useOwnerPagesActivity } from './use-owner-pages-activity';
 import { hasSeenOnboarding } from '@/lib/onboarding/seen';
@@ -26,18 +27,39 @@ export function DashboardEntry({
   onboardingFirstRun,
   agentProfile,
   dashboardV2,
+  todaySeam = false,
+  todaySeamPreview = null,
 }: {
   onboardingFirstRun: boolean;
   agentProfile: AgentProfile;
   dashboardV2: boolean;
+  /** DASHBOARD_TODAY_SEAM (Pass 3) — server-resolved; forwarded untouched. */
+  todaySeam?: boolean;
+  /**
+   * QA display override (preview/dev only) — the forced Today-card state, or
+   * null. Already gated server-side; forwarded untouched.
+   */
+  todaySeamPreview?: TodayState | null;
 }) {
   if (!onboardingFirstRun) {
-    return <DashboardClient agentProfile={agentProfile} dashboardV2={dashboardV2} />;
+    return (
+      <DashboardClient
+        agentProfile={agentProfile}
+        dashboardV2={dashboardV2}
+        todaySeam={todaySeam}
+        todaySeamPreview={todaySeamPreview}
+      />
+    );
   }
   return (
     <OnboardingEntryGate
       dashboard={
-        <DashboardClient agentProfile={agentProfile} dashboardV2={dashboardV2} />
+        <DashboardClient
+          agentProfile={agentProfile}
+          dashboardV2={dashboardV2}
+          todaySeam={todaySeam}
+          todaySeamPreview={todaySeamPreview}
+        />
       }
     />
   );
