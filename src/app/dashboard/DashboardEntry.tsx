@@ -1,12 +1,24 @@
 'use client';
 
-import { useEffect, useState } from 'react';
+import { useEffect, useLayoutEffect, useState } from 'react';
 import { useRouter } from 'next/navigation';
 import type { AgentProfile } from '@/lib/entitlements/types';
 import type { TodayState } from './today-state';
 import { DashboardClient } from './DashboardClient';
 import { useOwnerPagesActivity } from './use-owner-pages-activity';
 import { hasSeenOnboarding } from '@/lib/onboarding/seen';
+import { reconcileAccountOwnership } from '@/lib/account-storage';
+
+/**
+ * useLayoutEffect runs before the browser paints AND before child components'
+ * passive (useEffect) hydration — so the account-cache reconcile clears a
+ * prior agent's blobs before DashboardClient / the onboarding gate read them,
+ * with no stale-data flash. It's a no-op during SSR (React skips layout
+ * effects server-side), so fall back to useEffect there to avoid the dev
+ * warning without changing client behavior.
+ */
+const useIsomorphicLayoutEffect =
+  typeof window !== 'undefined' ? useLayoutEffect : useEffect;
 
 /**
  * Dashboard entry (ONBOARDING_FIRST_RUN, Pass 2) - the first-run gate.
@@ -24,12 +36,20 @@ import { hasSeenOnboarding } from '@/lib/onboarding/seen';
  * DashboardClient untouched - no first-run code reaches the flag-off path.
  */
 export function DashboardEntry({
+  ownerEmail,
   onboardingFirstRun,
   agentProfile,
   dashboardV2,
   todaySeam = false,
   todaySeamPreview = null,
 }: {
+  /**
+   * The authenticated email (server-resolved). Account-cache isolation: if
+   * this browser's per-account blobs belong to a DIFFERENT agent, they're
+   * wiped before any child hydrates — so signing in as a new email never
+   * shows the prior agent's name/listing/draft. Not flag-gated (correctness).
+   */
+  ownerEmail: string;
   onboardingFirstRun: boolean;
   agentProfile: AgentProfile;
   dashboardV2: boolean;
@@ -41,6 +61,14 @@ export function DashboardEntry({
    */
   todaySeamPreview?: TodayState | null;
 }) {
+  // Reconcile the local cache against the authenticated identity BEFORE
+  // children read it (layout effect fires before child passive effects).
+  // A same-agent round-trip matches and keeps everything; a different agent
+  // (account switch / reused incognito / shared device) gets a clean slate.
+  useIsomorphicLayoutEffect(() => {
+    reconcileAccountOwnership(ownerEmail);
+  }, [ownerEmail]);
+
   if (!onboardingFirstRun) {
     return (
       <DashboardClient

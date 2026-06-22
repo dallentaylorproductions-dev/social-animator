@@ -3,6 +3,7 @@
 import { Suspense, useState } from "react";
 import { useRouter, useSearchParams } from "next/navigation";
 import { signIn } from "next-auth/react";
+import { reconcileAccountOwnership } from "@/lib/account-storage";
 
 /**
  * Unified sign-in (v1.47).
@@ -63,6 +64,14 @@ function LoginForm() {
         // returned URL). `result.ok` is therefore true in both cases —
         // `result.error` is the real discriminator.
         if (result && !result.error) {
+          // Account-cache isolation: this browser may hold a PRIOR agent's
+          // per-account blobs (the credentials provider replaces the JWT
+          // session in-place, so a stale local cache would otherwise render
+          // for the new email). Reconcile against the just-authenticated
+          // email before navigating — a different email wipes the cache and
+          // re-stamps; the same email keeps it. The dashboard load reconciles
+          // again as a catch-all (and covers the magic-link path).
+          reconcileAccountOwnership(email.trim().toLowerCase());
           router.push(callbackUrl);
           return; // keep submitting=true during navigation
         }

@@ -135,6 +135,7 @@ export default async function DashboardPage({
         </header>
 
         <DashboardEntry
+          ownerEmail={email}
           onboardingFirstRun={onboardingFirstRun}
           agentProfile={agentProfile}
           dashboardV2={dashboardHomeV2}
