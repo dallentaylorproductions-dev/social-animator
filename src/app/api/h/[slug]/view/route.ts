@@ -1,11 +1,14 @@
 import { NextResponse } from "next/server";
+import { auth } from "@/lib/auth";
 import { fetchHandout } from "@/lib/share-urls";
 import {
   isViewedSignalEnabled,
   isViewedSignalEngagementEnabled,
+  isViewedSignalOwnerExcludeEnabled,
 } from "@/lib/seller-presentation/viewed-signal";
 import {
   isBotUserAgent,
+  isOwnerSelfView,
   recordEngagement,
   recordView,
 } from "@/lib/seller-presentation/views-store";
@@ -107,6 +110,20 @@ export async function POST(req: Request, { params }: RouteContext) {
   // the before/after-reveal classification. A dead page records nothing.
   const record = await fetchHandout(slug);
   if (!record) return noContent();
+
+  // Owner self-view exclusion (Phase 1 correctness, default-on). The beacon
+  // is same-origin, so sendBeacon/fetch carries the signed-in agent's session
+  // cookie: when the OWNER opens their own published page we recognize the
+  // session and record NOTHING — their own preview must never read as seller
+  // engagement (it would pollute the "real seller engaged" follow-up signal).
+  // An anonymous seller has no session, so `auth()` returns null and a real
+  // (non-owner) view still counts. Rollback: VIEWED_SIGNAL_OWNER_EXCLUDE=false.
+  if (isViewedSignalOwnerExcludeEnabled()) {
+    const session = await auth();
+    if (isOwnerSelfView(session?.user?.email, record.ownerEmail)) {
+      return noContent();
+    }
+  }
 
   try {
     if (engagement && isViewedSignalEngagementEnabled()) {

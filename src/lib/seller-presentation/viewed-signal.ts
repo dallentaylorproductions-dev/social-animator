@@ -61,6 +61,26 @@ export function isViewedSignalNudgeEnabled(): boolean {
 }
 
 /**
+ * Owner self-view exclusion (Phase 1 correctness) — DEFAULT-ON guard.
+ *
+ * Unlike the kill switches above, this is ON by default: when the signed-in
+ * OWNER opens their own published page, the POST /api/h/[slug]/view route
+ * recognizes the session (the beacon carries the agent's cookie) and records
+ * NOTHING, so an agent previewing their own live page never pollutes the
+ * "real seller engaged" signal the follow-up wedge depends on. Non-owner /
+ * anonymous-seller views are unaffected and still count.
+ *
+ * Default-on with a rollback escape hatch: set VIEWED_SIGNAL_OWNER_EXCLUDE
+ * to the string "false" to disable the exclusion (every view counts again).
+ * Only meaningful when VIEWED_SIGNAL_ENABLED is also on — the route already
+ * no-ops the whole layer when Phase 1 is off. Lazy per-call env read, same
+ * shape as the siblings.
+ */
+export function isViewedSignalOwnerExcludeEnabled(): boolean {
+  return process.env.VIEWED_SIGNAL_OWNER_EXCLUDE !== "false";
+}
+
+/**
  * The slug to hand the seller page's beacon island, or undefined when no beacon
  * should fire. Returns the slug only when the flag is on; the three seller render
  * arms (v1 / flagship / State A) all call this so the gate lives in ONE place and
