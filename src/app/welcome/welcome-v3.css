@@ -99,6 +99,38 @@
   transition: none !important;
 }
 
+/* Coverflow (Zone 5) entrance — one level deeper than the section `.reveal`
+ * above. The container `.sa-cf.reveal` is caught by that rule, but the PER-CARD
+ * entrance (`.sa-cf.reveal:not(.in) .sa-cf__card`) and the aggregate number
+ * (`.sa-cf__aggnum`, itself a `.sa-proof__num`) carry their OWN opacity:0
+ * pre-pose, released only when the motion island adds `.in` — which never fires
+ * in the preview's nested scroll context, so they sit invisible. Land them at
+ * their FINAL visible state.
+ *
+ * The preview's `page` container (the `.fs-frame`) is narrow (< 720px), so the
+ * cards render in the flat peek-carousel arm whose RESTING transform is `none`
+ * (the 3D `rotateY` fan is a SEPARATE >=720px arm the preview never reaches) —
+ * so resetting the card transform here only neutralizes the opacity:0 +
+ * translateY(26px) ENTRANCE, never a fan pose. Opacity is forced visible
+ * regardless of arm; the card transform reset is scoped to the narrow arm so the
+ * >=720px fan's rotateY/scale resting angles are never clobbered. Live
+ * /h/<slug> pages (real scroll root → observer fires) keep their entrance
+ * animation, byte-identical. */
+.onbv3__preview-page .sa-cf__card,
+.onbv3__preview-page .sa-cf__aggnum {
+  opacity: 1 !important;
+}
+.onbv3__preview-page .sa-cf__aggnum {
+  transform: none !important;
+  transition: none !important;
+}
+@container page (max-width: 719.98px) {
+  .onbv3__preview-page .sa-cf__card {
+    transform: none !important;
+    transition: none !important;
+  }
+}
+
 /* ─────────────────── Path A capture chrome (Phase 4b) ───────────────────
  * A calm LIGHT card framing the one active ghosted slot. Light so the reused
  * Settings field (HeadshotField) renders legibly as designed; the onboarding
