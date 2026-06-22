@@ -6,6 +6,7 @@ import { isOnboardingHybridV3Enabled } from "@/lib/config/onboarding-first-run-v
 import { WelcomeFlow } from "./WelcomeFlow";
 import { WelcomeFlowV2 } from "./WelcomeFlowV2";
 import { WelcomeFlowV3 } from "./WelcomeFlowV3";
+import { WelcomeAccountReconcile } from "./WelcomeAccountReconcile";
 import "./welcome.css";
 import "./welcome-v2.css";
 import "./welcome-v3.css";
@@ -47,28 +48,42 @@ export default async function WelcomePage() {
   const ownerEmail = session?.user?.email ?? null;
   const serverDraftsEnabled = process.env.SERVER_DRAFTS_ENABLED === "true";
 
+  // Account-cache reconcile runs on EVERY /welcome entry, ahead of the flow, so
+  // a foreign brand left in this browser is cleared before any flow hydrates,
+  // renders, or pushes it (the brand-contamination fix). Rendered first so its
+  // mount effect fires before the flow subtree's effects; the flow only mounts
+  // a brand-reading surface after a user path-click, well after this runs.
   if (v3) {
     return (
-      <WelcomeFlowV3
-        ownerEmail={ownerEmail}
-        serverDraftsEnabled={serverDraftsEnabled}
-      />
+      <>
+        <WelcomeAccountReconcile email={ownerEmail} />
+        <WelcomeFlowV3
+          ownerEmail={ownerEmail}
+          serverDraftsEnabled={serverDraftsEnabled}
+        />
+      </>
     );
   }
 
   if (v2) {
     return (
-      <WelcomeFlowV2
-        ownerEmail={ownerEmail}
-        serverDraftsEnabled={serverDraftsEnabled}
-      />
+      <>
+        <WelcomeAccountReconcile email={ownerEmail} />
+        <WelcomeFlowV2
+          ownerEmail={ownerEmail}
+          serverDraftsEnabled={serverDraftsEnabled}
+        />
+      </>
     );
   }
 
   return (
-    <WelcomeFlow
-      ownerEmail={ownerEmail}
-      serverDraftsEnabled={serverDraftsEnabled}
-    />
+    <>
+      <WelcomeAccountReconcile email={ownerEmail} />
+      <WelcomeFlow
+        ownerEmail={ownerEmail}
+        serverDraftsEnabled={serverDraftsEnabled}
+      />
+    </>
   );
 }

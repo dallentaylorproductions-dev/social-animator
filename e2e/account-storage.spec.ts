@@ -1,4 +1,6 @@
 import { test, expect } from '@playwright/test';
+import { readFileSync } from 'node:fs';
+import path from 'node:path';
 
 /**
  * Account-cache isolation (v1.6x auth fix) — node-context unit coverage.
@@ -223,5 +225,119 @@ test.describe('brand-settings-migration — cross-account contamination guard', 
       sessionEmail: 'blake@y.com',
     });
     expect(plan).toEqual({ shouldPush: false, reason: 'server-wins' });
+  });
+});
+
+/**
+ * /welcome brand-contamination regression (v1.6x).
+ *
+ * The reported breach: a NEW account, on a browser holding ANOTHER account's
+ * full brand (name/contact/reviews/bio), saw that foreign profile because the
+ * /welcome entry never reconciled. These tests pin the END STATE the new
+ * /welcome reconcile gate must produce — for all three ways the foreign brand
+ * can be stamped — so account B always lands CLEAN and B's migration has
+ * nothing foreign to push up.
+ */
+test.describe('account-storage — /welcome contamination scenario (B inherits A)', () => {
+  test.beforeEach(installLocalStorageShim);
+  test.afterEach(uninstallLocalStorageShim);
+
+  // Account A's FULL brand, as it sat in the device owner's localStorage.
+  const FOREIGN_A = {
+    agentName: 'Dallen Taylor',
+    contactEmail: 'aaron@aaronthomashometeam.com',
+    agentBioShort: 'Working in the PNW for the last 20+ years.',
+    agentReviews: [{ body: 'What a guy, heck of a realtor.' }],
+    ownerEmail: 'dallen@atht.com',
+  };
+  const B = 'dallentaylorproductions+onbprodsmoke@gmail.com';
+
+  function seedForeignA(opts: { stampOwnerEmail?: string; withBrandOwner: boolean }) {
+    const blob: Record<string, unknown> = { ...FOREIGN_A };
+    if (!opts.withBrandOwner) delete blob.ownerEmail;
+    ls().setItem('socanim_brand_settings', JSON.stringify(blob));
+    ls().setItem('socanim_listing_profile', JSON.stringify({ address: 'A St' }));
+    if (opts.stampOwnerEmail) stampOwner(opts.stampOwnerEmail);
+  }
+
+  function assertBclean() {
+    expect(ls().getItem('socanim_brand_settings'), 'foreign brand cleared').toBeNull();
+    expect(ls().getItem('socanim_listing_profile'), 'foreign listing cleared').toBeNull();
+    expect(readOwnerStamp()).toBe(B.toLowerCase());
+    // And the cross-account guard: with the foreign blob gone, B's migration has
+    // nothing to push — so A's brand can never reach B's server record.
+    const plan = planBrandMigration({
+      localSettings: null, // local was cleared
+      serverPresent: false,
+      sessionEmail: B,
+    });
+    expect(plan.shouldPush).toBe(false);
+  }
+
+  test('STAMPED to A (global stamp = A) → B clears, re-stamps, nothing pushes', () => {
+    seedForeignA({ stampOwnerEmail: 'dallen@atht.com', withBrandOwner: true });
+    const r = reconcileAccountOwnership(B);
+    expect(r.cleared).toBe(true);
+    expect(r.reason).toBe('switch');
+    assertBclean();
+  });
+
+  test('UNSTAMPED but brand owned by A → B clears via the foreign-brand signal', () => {
+    seedForeignA({ withBrandOwner: true });
+    const r = reconcileAccountOwnership(B);
+    expect(r.cleared).toBe(true);
+    expect(r.reason).toBe('foreign-brand');
+    assertBclean();
+  });
+
+  test('MISMATCHED (stamp = some third account) → B clears as a switch', () => {
+    seedForeignA({ stampOwnerEmail: 'someone-else@z.com', withBrandOwner: false });
+    const r = reconcileAccountOwnership(B);
+    expect(r.cleared).toBe(true);
+    expect(r.reason).toBe('switch');
+    assertBclean();
+  });
+
+  test('even a foreign blob re-stamped to B (the post-edit state) never re-pushes once cleared', () => {
+    // After the bug, the foreign brand had been re-stamped ownerEmail=B by the
+    // edit. Proves the migration guard alone is NOT what saves us — the CLEAR
+    // (now run on /welcome) is. With local cleared, there is nothing to push.
+    ls().setItem(
+      'socanim_brand_settings',
+      JSON.stringify({ ...FOREIGN_A, ownerEmail: B.toLowerCase() }),
+    );
+    // The clean-entry reconcile (stamp already B) is a match/adopt; the real
+    // protection is that on a FRESH browser the blob is cleared before any edit.
+    // Here we assert the guard end-state: a B-owned foreign blob would push, which
+    // is exactly why clearing-before-render matters.
+    const wouldPush = planBrandMigration({
+      localSettings: { ...FOREIGN_A, ownerEmail: B.toLowerCase() },
+      serverPresent: false,
+      sessionEmail: B,
+    });
+    expect(wouldPush.shouldPush).toBe(true); // ← the danger the reconcile prevents
+  });
+});
+
+/**
+ * Source-contract: the /welcome shell wires the reconcile gate (the hole the
+ * fix closes). DashboardEntry + the login form already reconcile; this asserts
+ * /welcome now does too, ahead of the flow.
+ */
+test.describe('account-storage — /welcome reconcile wiring (source contract)', () => {
+  function readSrc(rel: string): string {
+    return readFileSync(path.resolve(__dirname, '..', rel), 'utf8');
+  }
+
+  test('the /welcome shell renders the reconcile gate', () => {
+    const src = readSrc('src/app/welcome/page.tsx');
+    expect(src).toContain('WelcomeAccountReconcile');
+    expect(src).toContain('email={ownerEmail}');
+  });
+
+  test('the gate calls reconcileAccountOwnership on mount', () => {
+    const src = readSrc('src/app/welcome/WelcomeAccountReconcile.tsx');
+    expect(src).toContain('reconcileAccountOwnership(email)');
+    expect(src).toContain('useEffect');
   });
 });
