@@ -72,7 +72,8 @@ test.describe('onboarding V3 no-mint guarantee (G1) - source contract', () => {
 
   test('"See an example" targets the read-only fixture route (mints nothing)', () => {
     const src = readSrc('src/app/welcome/WelcomeFlowV3.tsx');
-    expect(src).toContain("'/seller-presentation-preview?fixture=full'");
+    // State-A variant so the example matches the inline preview's home + state.
+    expect(src).toContain("'/seller-presentation-preview?fixture=state-a'");
     // The example link is an anchor navigation, not a mint.
     expect(src).toContain('data-testid="onbv3-cta-example"');
   });

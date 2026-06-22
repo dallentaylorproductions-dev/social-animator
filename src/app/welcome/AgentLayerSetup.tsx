@@ -39,8 +39,11 @@ import { AgentLayerCapture } from './AgentLayerCapture';
  */
 const PREVIEW_PREPARED_AT = '2026-06-21T00:00:00.000Z';
 
-/** Read-only fixture route — the canonical example page. Mints nothing. */
-const EXAMPLE_HREF = '/seller-presentation-preview?fixture=full';
+/**
+ * Read-only fixture route — the canonical example page. Mints nothing. State-A
+ * variant so "See an example" matches the home + state of this inline preview.
+ */
+const EXAMPLE_HREF = '/seller-presentation-preview?fixture=state-a';
 
 export function AgentLayerSetup({
   onBack,

@@ -8,6 +8,7 @@ import {
   type SellerPresentationDraft,
 } from '@/tools/seller-presentation/engine/types';
 import { putServerDraft } from '@/tools/seller-presentation/hooks/server-draft-client';
+import { saveListingProfile } from '@/lib/listing-profile';
 import { emitOnboardingEvent, ONBOARDING_EVENTS } from '@/lib/onboarding/funnel';
 import { markOnboardingSeen } from '@/lib/onboarding/seen';
 import { AgentLayerSetup } from './AgentLayerSetup';
@@ -42,8 +43,12 @@ interface AddressFields {
 
 const EMPTY_ADDRESS: AddressFields = { street: '', city: '', state: '', zip: '' };
 
-/** Read-only fixture route — the canonical example page. Mints nothing. */
-const EXAMPLE_HREF = '/seller-presentation-preview?fixture=full';
+/**
+ * Read-only fixture route — the canonical example page. Mints nothing. Points at
+ * the State-A (prepared-invitation) variant so "See an example" shows the SAME
+ * home and state as the Path A inline preview, not the revealed State-B page.
+ */
+const EXAMPLE_HREF = '/seller-presentation-preview?fixture=state-a';
 
 type Screen = 'first' | 'address' | 'agent-layer';
 
@@ -106,12 +111,41 @@ export function WelcomeFlowV3({
     setBusy(true);
     setError(null);
 
+    const city = address.city.trim();
+    const stateAbbr = address.state.trim();
+    const zip = address.zip.trim();
+
+    // Seed the listing-profile Property primitive FIRST — the SAME store the
+    // wizard's StepProperty reads (and mirrors into the draft). Without this the
+    // wizard mounts, finds the primitive empty, and the mirror effect clobbers
+    // the seeded draft address back to undefined (the field shows empty). The
+    // returned record carries the backfilled propertyId, which we stamp onto the
+    // draft so the two agree and the mirror sees a match (no clobber). This is
+    // the owner-scoped local listing store the wizard already writes — NOT a
+    // page mint (G1/G8 hold: still a private draft, no slug/publish/beacon).
+    const cityState =
+      [city, stateAbbr].filter(Boolean).join(', ') + (zip ? ` ${zip}` : '');
+    const profile = saveListingProfile({
+      heroPhoto: '',
+      status: 'Just Listed',
+      address: street,
+      cityState: cityState.trim(),
+      city: city || undefined,
+      state: stateAbbr || undefined,
+      zip: zip || undefined,
+      price: '',
+      beds: '',
+      baths: '',
+      sqft: '',
+    });
+
     const draft: SellerPresentationDraft = {
       ...EMPTY_DRAFT,
+      propertyId: profile.propertyId,
       propertyAddress: street,
-      propertyCity: address.city.trim() || undefined,
-      propertyState: address.state.trim() || undefined,
-      propertyZip: address.zip.trim() || undefined,
+      propertyCity: city || undefined,
+      propertyState: stateAbbr || undefined,
+      propertyZip: zip || undefined,
     };
 
     let created;
