@@ -68,7 +68,11 @@ const PREVIEW_BASE = "/seller-presentation-preview";
 /** Build the preview query string for the current (possibly unsaved) values. */
 function previewParams(v: BrandKitFormValues, embed: boolean): string {
   const p = new URLSearchParams();
-  p.set("fixture", "full");
+  // `full-coverflow` = the full State-B payload (v2 → flagship) WITH the sample
+  // recent listings, so the brand-kit live preview shows the exposure coverflow
+  // (recent listings, real reach) in the agent's brand color. Demo data only —
+  // the preview route fixture, never a real published page.
+  p.set("fixture", "full-coverflow");
   if (embed) p.set("embed", "1");
   // F3 — new publishes are flagship (v2), so the live preview renders the
   // FLAGSHIP template (the read-time override the preview route exposes).

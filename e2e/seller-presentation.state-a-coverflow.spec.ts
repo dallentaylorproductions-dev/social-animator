@@ -249,8 +249,15 @@ test.describe("State A · Zone 5 — listings coverflow", () => {
     await expect(flank.locator(".sa-photo-ph")).toHaveCount(0);
   });
 
-  test("State B (full) never renders the coverflow", async ({ page }) => {
+  test("State B (full) with NO listings flexes the coverflow out entirely", async ({
+    page,
+  }) => {
+    // State B now CAN carry the exposure coverflow (see state-b-coverflow.spec),
+    // but with no recentListings the whole zone flexes out — no empty band on a
+    // flag-off / no-data State-B page. (State B with data is covered separately.)
     await page.goto("/seller-presentation-preview?fixture=full&template=flagship");
+    await expect(page.getByTestId("seller-presentation-flagship")).toBeVisible();
     await expect(page.getByTestId("fs-sa-cf")).toHaveCount(0);
+    await expect(page.getByTestId("fs-sa-spread")).toHaveCount(0);
   });
 });

@@ -1551,8 +1551,11 @@ test.describe('toPublicPayload — recentListings coverflow (Zone 5 allowlist)',
     expect(JSON.stringify(payload)).not.toContain(L.addr);
   });
 
-  test('gated: revealed status → no recentListings even with the flag on', () => {
-    // maxedDraft() is revealed (no invitation status), so the State A gate is shut.
+  test('State B (revealed) + flag on → recentListings PRESENT (coverflow shows post-meeting too)', () => {
+    // The exposure coverflow is now a TOP-LEVEL field (no longer State-A-gated),
+    // so a revealed/full publish carries it too — "here's the reach your home
+    // will get" is at least as persuasive at the close as in the invitation.
+    // maxedDraft() is revealed (no invitation status); the flag is the only gate.
     const payload = toPublicPayload(
       maxedDraft(),
       FIXTURE_AGENT_CONTACT,
@@ -1562,7 +1565,23 @@ test.describe('toPublicPayload — recentListings coverflow (Zone 5 allowlist)',
       { recentListings: FIXTURE_RECENT_LISTINGS } as unknown as BrandWhyUsInput,
       false,
       true,
+      true, // listingsCoverflow ON
+    );
+    expect(payload.recentListings?.length).toBeGreaterThan(0);
+    expect(JSON.stringify(payload)).toContain(L.addr);
+  });
+
+  test('gated: revealed status + flag OFF → no recentListings (byte-identical State B)', () => {
+    const payload = toPublicPayload(
+      maxedDraft(),
+      FIXTURE_AGENT_CONTACT,
+      FIXTURE_BRAND_REVIEWS,
+      {},
+      false,
+      { recentListings: FIXTURE_RECENT_LISTINGS } as unknown as BrandWhyUsInput,
+      false,
       true,
+      false, // listingsCoverflow OFF
     );
     expect(payload.recentListings).toBeUndefined();
     expect(JSON.stringify(payload)).not.toContain('"recentListings":');
@@ -1571,7 +1590,7 @@ test.describe('toPublicPayload — recentListings coverflow (Zone 5 allowlist)',
   test('read clamp: a hand-edited KV record re-runs the same allowlist', () => {
     // A tampered stored record glues a private key onto a listing and rides a
     // fractional count + an over-cap list. The read clamp must drop them exactly
-    // as the write projector does — and only alongside an invitation status.
+    // as the write projector does — for ANY status now (top-level, not State-A-gated).
     const clamped = clampPublicPayload({
       templateVersion: 2,
       propertyAddress: '1 Main',
@@ -1587,12 +1606,17 @@ test.describe('toPublicPayload — recentListings coverflow (Zone 5 allowlist)',
     expect(clamped.recentListings?.length).toBe(RECENT_LISTINGS_CAP);
     expect(clamped.recentListings?.[0]).toEqual({ address: L.addr, viewCount: 7 });
 
-    // A recentListings array on a REVEALED record is dropped entirely.
+    // A recentListings array on a REVEALED (State-B) record now SURVIVES the read
+    // clamp (so the full presentation can show the coverflow), still re-run
+    // through the SAME field-by-field projection (cap, integer counts, key drop).
     const revealed = clampPublicPayload({
       templateVersion: 2,
       propertyAddress: '1 Main',
-      recentListings: [{ address: L.addr, viewCount: 5 }],
+      recentListings: [
+        { address: L.addr, viewCount: 5, secretLeadEmail: L.rogueNested },
+      ],
     });
-    expect(revealed.recentListings).toBeUndefined();
+    expect(revealed.recentListings).toEqual([{ address: L.addr, viewCount: 5 }]);
+    expect(JSON.stringify(revealed)).not.toContain(L.rogueNested);
   });
 });

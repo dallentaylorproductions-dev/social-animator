@@ -20,6 +20,13 @@ import {
   EXPOSURE_LINE,
 } from "./state-a-copy";
 import { isLeadEmphasisKey } from "@/lib/seller-presentation/lead-emphasis";
+// Co-load the spread/coverflow styles with the component so they are present
+// wherever it is composed — State A (StateAPage already imports state-a.css) AND
+// State B (FlagshipPage, which imports only flagship.css). The `.sa-spread` /
+// `.sa-frame` / `.sa-cf` rules are scoped to `.fs-page` (not `.fs-page.state-a`),
+// so they apply under the flagship root too. Without this the coverflow would
+// render UNSTYLED on State B (the "invisible cards" failure this guards against).
+import "./state-a.css";
 
 /**
  * Seller State A · Signature B - "How I'll get your home seen" (campaign spread).
@@ -48,7 +55,26 @@ type Frame = {
   kind: "photo" | "asset";
 };
 
-export function CampaignSpread({ payload }: { payload: PublicPayload }) {
+/**
+ * `variant`:
+ *   - "full" (default, State A) — the complete spread: capability frames +
+ *     marketing items + the exposure coverflow + reach line. Byte-identical to
+ *     what State A has always rendered.
+ *   - "coverflow-only" (State B / FlagshipPage) — JUST the reach-proof exposure:
+ *     the headline + the listings coverflow + the reach line, with NO capability
+ *     frames and NO emphasis ghost. State B already tells the marketing story in
+ *     its own "How we market" (WhyUs) section, so re-rendering the capability
+ *     frames there would duplicate it; the coverflow (recent listings, real
+ *     reach) is the piece State B genuinely lacks. Same component, same coverflow
+ *     — no fork. Flexes out entirely (renders null) when there are no listings.
+ */
+export function CampaignSpread({
+  payload,
+  variant = "full",
+}: {
+  payload: PublicPayload;
+  variant?: "full" | "coverflow-only";
+}) {
   const frames: Frame[] = [];
 
   // Set-once capability PHOTO: the agent's best listing photography (NOT this
@@ -106,6 +132,36 @@ export function CampaignSpread({ payload }: { payload: PublicPayload }) {
   const headline = emphasis
     ? CAMPAIGN_HEADLINE_BY_EMPHASIS[emphasis]
     : CAMPAIGN_HEADLINE_DEFAULT;
+
+  // State B (coverflow-only): render ONLY the reach-proof exposure — the headline
+  // + the listings coverflow + the reach line. NO capability frames / emphasis
+  // ghost (State B's WhyUs already tells the marketing story). Honesty gate:
+  // with no listings the whole zone flexes out (renders null), so a real State-B
+  // page with no recent-listings data looks complete, never an empty band.
+  if (variant === "coverflow-only") {
+    if (listings.length === 0) return null;
+    return (
+      <section
+        className="section sa-spread z-offwhite"
+        data-testid="fs-sa-spread"
+        data-variant="coverflow-only"
+      >
+        <div className="reveal">
+          <div className="eyebrow">
+            How I&apos;ll Get Your Home Seen{" "}
+            <span className="rule" aria-hidden="true" />
+          </div>
+          <h2 className="head">
+            {headline.lead} <em>{headline.em}</em>.
+          </h2>
+        </div>
+        <ListingsCoverflow listings={listings} />
+        <p className="sa-spread__reach reveal" data-testid="fs-sa-spread-reach">
+          {EXPOSURE_LINE}
+        </p>
+      </section>
+    );
+  }
 
   // Byte-identical guarantee: with no frames AND no listings, the section still
   // flexes out EXCEPT when the agent has picked a lead emphasis - then the chosen

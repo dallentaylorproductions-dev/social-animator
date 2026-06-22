@@ -23,6 +23,7 @@ import {
   STATE_A_NO_VIDEO_PAYLOAD,
   STATE_A_TREND_ONLY_PAYLOAD,
 } from "@/tools/seller-presentation/output/__fixtures__/sample-payload";
+import { SAMPLE_RECENT_LISTINGS } from "@/lib/onboarding/sample-listing-draft";
 import { EmbedBridge } from "./EmbedBridge";
 
 /**
@@ -159,6 +160,12 @@ export default async function SellerPresentationPreview({ searchParams }: PagePr
     // Zone 5 broken-photo guard: a card whose non-empty photoUrl 404s (no Street
     // View coverage) must fall back to the neutral placeholder, never a blank.
     "state-a-coverflow-broken",
+    // Zone 5 on STATE B (the full presentation): the full payload, stamped v2 so
+    // it renders through the flagship (the real State-B template), with the
+    // SAMPLE recent listings fed in so the exposure coverflow is VISIBLE in the
+    // preview. Demo/QA only — real published State-B pages carry recentListings
+    // only when the agent has data AND the coverflow flag is on (never sample).
+    "full-coverflow",
   ] as const;
   type Variant = (typeof VARIANTS)[number];
   const variant = (VARIANTS as readonly string[]).includes(fixture ?? "")
@@ -189,6 +196,12 @@ export default async function SellerPresentationPreview({ searchParams }: PagePr
                   ? FLAGSHIP_PRIVACY_PAYLOAD
                   : variant === "full-v2"
                     ? { ...FULL_PAYLOAD, templateVersion: 2 }
+                    : variant === "full-coverflow"
+                    ? {
+                        ...FULL_PAYLOAD,
+                        templateVersion: 2,
+                        recentListings: SAMPLE_RECENT_LISTINGS,
+                      }
                     : variant === "full-google"
                       ? {
                           ...FULL_PAYLOAD,
