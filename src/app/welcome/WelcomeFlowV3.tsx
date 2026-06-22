@@ -176,7 +176,10 @@ export function WelcomeFlowV3({
             />
           )}
           {screen === 'agent-layer' && (
-            <AgentLayerSetup onBack={() => setScreen('first')} />
+            <AgentLayerSetup
+              onBack={() => setScreen('first')}
+              ownerEmail={ownerEmail}
+            />
           )}
         </div>
       </div>

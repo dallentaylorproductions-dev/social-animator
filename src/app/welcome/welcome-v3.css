@@ -29,3 +29,47 @@
   font-size: 14px;
   color: #f0a98c;
 }
+
+/* ─────────────────── Path A preview ("sample home, real you") ───────────────
+ * The Agent-Layer mirror (Phase 4a). The genuine seller page (StateAPage in
+ * preview mode) renders inside a calm framed card with a persistent "Sample
+ * property" truth label. No new page styling — only the outer frame + label.
+ */
+.onbv3__setup-head {
+  /* keep the explainer left-aligned and readable above the framed preview */
+  text-align: left;
+}
+
+.onbv3__preview {
+  position: relative;
+  margin-top: 16px;
+  border-radius: 16px;
+  border: 1px solid var(--onb-line);
+  overflow: hidden;
+  background: #fff;
+}
+
+/* The persistent, calm truth label — pinned over the preview, never a warning. */
+.onbv3__sample-badge {
+  position: absolute;
+  top: 12px;
+  left: 12px;
+  z-index: 2;
+  display: inline-flex;
+  align-items: center;
+  padding: 5px 11px;
+  border-radius: 999px;
+  font-size: 12px;
+  font-weight: 600;
+  letter-spacing: 0.02em;
+  color: var(--onb-accent-ink);
+  background: var(--onb-accent);
+  box-shadow: 0 2px 8px rgba(0, 0, 0, 0.18);
+}
+
+/* Let the embedded real page size to its CONTENT inside the card instead of
+ * forcing its full-viewport minimum. The sections render identically; only the
+ * page shell's 100vh fill is relaxed for the in-card preview. */
+.onbv3__preview-page .fs-page {
+  min-height: auto;
+}
