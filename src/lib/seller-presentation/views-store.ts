@@ -135,6 +135,27 @@ export function isBotUserAgent(userAgent: string | null | undefined): boolean {
 }
 
 /**
+ * Owner self-view guard (Phase 1 correctness). True when the signed-in viewer
+ * IS the page owner — the agent opening their OWN published page must never
+ * count as seller engagement, since that pollutes the "real seller engaged"
+ * signal the follow-up wedge depends on. Case-insensitive.
+ *
+ * A blank / absent viewer email — the anonymous seller, which is the normal
+ * case — is NEVER a self-view, so genuine (non-owner) views still count.
+ * Pure, like `isBotUserAgent`: the route resolves the session email + the page
+ * owner email and asks this for the verdict.
+ */
+export function isOwnerSelfView(
+  viewerEmail: string | null | undefined,
+  ownerEmail: string | null | undefined,
+): boolean {
+  const viewer = viewerEmail?.trim().toLowerCase();
+  const owner = ownerEmail?.trim().toLowerCase();
+  if (!viewer || !owner) return false;
+  return viewer === owner;
+}
+
+/**
  * Append one open to a page's views, PURELY. Returns the next record, or `null`
  * when the open should be DROPPED (no write needed):
  *   - per-session de-dupe: a `sid` already present in the retained tail is an
