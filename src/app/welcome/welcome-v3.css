@@ -1,0 +1,31 @@
+/*
+ * Onboarding hybrid SHELL (ONBOARDING_HYBRID_V3, Phase 3) — scoped styles.
+ *
+ * V3 reuses the V1 `.onb` chrome verbatim (the root element is `.onb onbv3`),
+ * so the warm-dark palette, full-screen takeover, headline/sub/button/field
+ * classes all come from welcome.css — zero visual reinvention. This file adds
+ * only the two bits the shell needs beyond V1's vocabulary: the quiet tertiary
+ * "See an example" link and the Path B inline error. Both anchor under `.onbv3`
+ * and read the variables `.onb` already defines, so nothing leaks.
+ */
+
+.onbv3__example {
+  align-self: center;
+  margin-top: 18px;
+  color: var(--onb-muted);
+  font-size: 14px;
+  text-decoration: none;
+  border-bottom: 1px solid transparent;
+  padding-bottom: 1px;
+  cursor: pointer;
+}
+.onbv3__example:hover {
+  color: var(--onb-ink);
+  border-bottom-color: var(--onb-line);
+}
+
+.onbv3__error {
+  margin: 0;
+  font-size: 14px;
+  color: #f0a98c;
+}
