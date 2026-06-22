@@ -3,7 +3,10 @@ import {
   type SellerPresentationDraft,
 } from "@/tools/seller-presentation/engine/types";
 import type { BrandSettings } from "@/lib/brand";
-import type { PublicPayload } from "@/tools/seller-presentation/output/public-payload";
+import type {
+  PublicPayload,
+  PublicRecentListing,
+} from "@/tools/seller-presentation/output/public-payload";
 import { buildOnboardingStateAPayload } from "@/lib/onboarding/state-a-payload";
 
 /**
@@ -132,6 +135,61 @@ export const SAMPLE_LISTING_DRAFT: SellerPresentationDraft = {
 };
 
 /**
+ * Seller State A · Zone 5 — the representative "recent listings" the EXISTING
+ * exposure coverflow (`CampaignSpread` → `ListingsCoverflow`) renders in the
+ * Path A sample preview. This is labeled-demo data for the "Sample property"
+ * surface — the approved ATHT sample set — so a brand-new agent sees what the
+ * "RECENT LISTINGS · REAL REACH" view-count cards look like before they have
+ * any of their own.
+ *
+ * Honesty gate (same principle as the sample review + the sample listing): these
+ * numbers are representative DEMO data shown only on the labeled sample preview.
+ * REAL/published pages NEVER carry these — they project the agent's OWN listings
+ * from Settings (`brandWhyUs.recentListings`, behind SELLER_LISTINGS_COVERFLOW_
+ * ENABLED). `buildSamplePreviewPayload` has a single consumer (AgentLayerSetup,
+ * the read-only preview that mints nothing), so this never reaches a publish.
+ *
+ * Photos reuse the committed `/sample-assets/*.webp` images — the SAME source
+ * the sibling `STATE_A_COVERFLOW_PAYLOAD` fixtures use — so cards are NEVER
+ * blank in any environment (no Google key needed; Street View is the real-page
+ * fallback, and per Google's terms we never store/rehost Street View imagery).
+ *
+ * Order is the fan layout: with four cards the component centers index 2 (the
+ * teal-keyline hero) and the outer-left card (index 0) is a label-less peek —
+ * its count still folds into the aggregate. Sum = 28,560 + 32,246 + 41,184 +
+ * 37,610 = 139,600 buyer views across recent listings.
+ */
+export const SAMPLE_RECENT_LISTINGS: PublicRecentListing[] = [
+  {
+    // Outer-left peek (no band/number shown), but its count still sums into the
+    // aggregate below.
+    address: "9825 Glory Dr SE",
+    city: "Olympia",
+    viewCount: 28560,
+    photoUrl: "/sample-assets/exterior.webp",
+  },
+  {
+    address: "3642 22nd Ave NE",
+    city: "Olympia",
+    viewCount: 32246,
+    photoUrl: "/sample-assets/backyard.webp",
+  },
+  {
+    // Center card — the teal-keyline hero (highest count forward).
+    address: "6706 83rd Ln SE",
+    city: "Olympia",
+    viewCount: 41184,
+    photoUrl: "/sample-assets/living-room.webp",
+  },
+  {
+    address: "15117 Prescott Lp SE",
+    city: "Yelm",
+    viewCount: 37610,
+    photoUrl: "/sample-assets/kitchen.webp",
+  },
+];
+
+/**
  * The onboarding preview accent when the agent's brand accent is unset — the
  * studio cockpit mint. Mirrors the `STUDIO_MINT` substitution `StateASlice`
  * applies for the V2 onboarding reveal (and `--o2-accent` in welcome-v2.css), so
@@ -155,11 +213,22 @@ export function buildSamplePreviewPayload(
   brand: BrandSettings,
   accountEmail: string = "",
 ): PublicPayload {
-  const payload = buildOnboardingStateAPayload(
+  const base = buildOnboardingStateAPayload(
     SAMPLE_LISTING_DRAFT,
     brand,
     accountEmail,
   );
+  // Zone 5 exposure coverflow — overlay the representative demo listings so the
+  // already-built coverflow renders in the labeled "Sample property" preview.
+  // Injected here (post-projection) rather than via the publish flag so it stays
+  // scoped to this onboarding-only builder: live publishes, the flag-off path,
+  // and State B are untouched, and a real page still shows ONLY the agent's own
+  // listings. (When the team decides to surface the agent's REAL recent listings
+  // in onboarding, switch this to "real wins, else sample".)
+  const payload: PublicPayload = {
+    ...base,
+    recentListings: SAMPLE_RECENT_LISTINGS,
+  };
   // Onboarding accent rule: an unset brand accent resolves to studio mint (the
   // builder omits brandColors when the agent has no accent, which would derive
   // the brand-system blue). A real accent already on the payload wins.
