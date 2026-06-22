@@ -7,6 +7,7 @@ import type { TodayState } from './today-state';
 import { DashboardClient } from './DashboardClient';
 import { useOwnerPagesActivity } from './use-owner-pages-activity';
 import { hasSeenOnboarding } from '@/lib/onboarding/seen';
+import { decideOnboardingEntry } from '@/lib/onboarding/entry-gate';
 import { reconcileAccountOwnership } from '@/lib/account-storage';
 
 /**
@@ -111,20 +112,25 @@ function OnboardingEntryGate({ dashboard }: { dashboard: React.ReactNode }) {
   const [decision, setDecision] = useState<GateDecision>('deciding');
 
   useEffect(() => {
-    // Already seen / skipped - stick to the dashboard, never re-nag.
-    if (hasSeenOnboarding()) {
-      setDecision('stay');
-      return;
-    }
-    // Still resolving owned pages - keep showing the calm placeholder.
-    if (activity.status === 'loading') return;
-    // Brand-new agent: route into the first-run flow. Stay in 'deciding'
-    // (placeholder) until the client nav lands so the dashboard never flashes.
-    if (activity.status === 'ready' && activity.totalPages === 0) {
+    // The new-vs-returning contract lives in one pure, unit-tested place
+    // (decideOnboardingEntry) so the gate can't drift from what the smoke pins.
+    // `hasSeenOnboarding` reads the marker for the CURRENT account — the parent
+    // reconcile (layout effect) has already cleared any prior account's marker
+    // before this passive effect runs, so a stale "seen" can't leak in here.
+    const next = decideOnboardingEntry({
+      seen: hasSeenOnboarding(),
+      activityStatus: activity.status,
+      totalPages: activity.totalPages,
+    });
+    // 'wait' — owned pages still resolving; hold the calm placeholder (no flash).
+    if (next === 'wait') return;
+    // 'welcome' — brand-new agent; stay in 'deciding' (placeholder) until the
+    // client nav lands so the cold dashboard never flashes before the redirect.
+    if (next === 'welcome') {
       router.replace('/welcome');
       return;
     }
-    // Returning agent or unavailable source - fall through to the dashboard.
+    // 'stay' — returning, already-seen, or unavailable source → the dashboard.
     setDecision('stay');
   }, [activity, router]);
 
