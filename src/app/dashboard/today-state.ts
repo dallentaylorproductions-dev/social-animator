@@ -16,8 +16,10 @@
  * byte-identical.
  *
  * Precedence when more than one state could apply (most-advanced actionable
- * state wins): returning > partial > sample-only > new. `returning` and `new`
- * keep their Pass-1 behavior exactly.
+ * state wins): returning > partial > profile-ready > sample-only > new.
+ * `returning` and `new` keep their Pass-1 behavior exactly. `profile-ready`
+ * (Phase 5, hybrid only) sits above sample-only — a finished Agent Layer is
+ * more advanced than a sample walk.
  */
 
 import type { OwnerPagesActivity } from './use-owner-pages-activity';
@@ -26,6 +28,7 @@ export type TodayState =
   | 'loading'
   | 'new'
   | 'sample-only'
+  | 'profile-ready'
   | 'partial'
   | 'returning'
   | 'unavailable';
@@ -52,6 +55,14 @@ export interface OnboardingSignals {
    * `socanim_onboarding_sample_walked` marker — NOT the generic seen flag.
    */
   hasWalkedSample: boolean;
+  /**
+   * The agent finished the hybrid Path A (Agent Layer captured) and took the
+   * dashboard handoff with NO page yet. Drives `profile-ready`. From the
+   * `socanim_onboarding_path_a_complete` marker, which ONLY the hybrid sets, so
+   * flag-off never produces this state. Optional so pre-Phase-5 callers and the
+   * flag-off deriver are unchanged.
+   */
+  hasCompletedPathA?: boolean;
 }
 
 export interface TodayView {
@@ -92,6 +103,10 @@ export function deriveTodayState(
     state = 'partial';
     partialInstanceId = onboarding.partialInstanceId;
     partialLabel = onboarding.partialLabel;
+  } else if (onboarding?.hasCompletedPathA) {
+    // PROFILE-READY — finished hybrid Path A, Agent Layer captured, no page yet.
+    // More advanced than a sample walk: their first real page is half-built.
+    state = 'profile-ready';
   } else if (onboarding?.hasWalkedSample) {
     // SAMPLE-ONLY — walked the sample, made nothing. Convert them.
     state = 'sample-only';
@@ -112,8 +127,13 @@ export function deriveTodayState(
 
 /* ── QA display override (preview/dev only — see isTodaySeamPreviewAllowed) ── */
 
-/** The four states the `?todaySeam=` query param can force, for QA display. */
-export type TodaySeamPreview = 'new' | 'sample' | 'partial' | 'returning';
+/** The states the `?todaySeam=` query param can force, for QA display. */
+export type TodaySeamPreview =
+  | 'new'
+  | 'sample'
+  | 'profile-ready'
+  | 'partial'
+  | 'returning';
 
 /**
  * Map a raw `?todaySeam=` query value to the TodayState it forces, or null if
@@ -130,6 +150,8 @@ export function parseSeamPreview(
       return 'new';
     case 'sample':
       return 'sample-only';
+    case 'profile-ready':
+      return 'profile-ready';
     case 'partial':
       return 'partial';
     case 'returning':
@@ -167,6 +189,15 @@ export function previewTodayView(state: TodayState): TodayView {
         partialLabel: '123 Sample Avenue',
       };
     case 'sample-only':
+      return {
+        state,
+        needsAttention: false,
+        worthFollowUpCount: 0,
+        activeCount: 0,
+        partialInstanceId: null,
+        partialLabel: null,
+      };
+    case 'profile-ready':
       return {
         state,
         needsAttention: false,

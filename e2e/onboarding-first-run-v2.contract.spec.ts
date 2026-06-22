@@ -144,9 +144,10 @@ test.describe('onboarding V2 routing - source contract', () => {
 
   test('the funnel route stays dark unless EITHER flag is on', () => {
     const src = readSrc('src/app/api/onboarding/event/route.ts');
-    expect(src).toContain(
-      '!isOnboardingFirstRunEnabled() && !isOnboardingFirstRunV2Enabled()',
-    );
+    // Formatting-agnostic: the gate negates both flags (Phase 5 appended a third,
+    // V3, on its own line — asserted in the V3 dashboard contract spec).
+    expect(src).toContain('!isOnboardingFirstRunEnabled()');
+    expect(src).toContain('!isOnboardingFirstRunV2Enabled()');
   });
 
   test('the V1 flow is untouched (parallel dark path)', () => {

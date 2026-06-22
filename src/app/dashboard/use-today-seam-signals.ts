@@ -2,7 +2,7 @@
 
 import { useEffect, useState } from 'react';
 import { findLatestInProgress } from '@/skills/workflow-instance-storage';
-import { hasWalkedSample } from '@/lib/onboarding/seen';
+import { hasCompletedPathA, hasWalkedSample } from '@/lib/onboarding/seen';
 import type { SellerPresentationDraft } from '@/tools/seller-presentation/engine/types';
 import type { OnboardingSignals } from './today-state';
 
@@ -52,6 +52,7 @@ export function useTodaySeamSignals(
       partialInstanceId: partial ? partial.instanceId : null,
       partialLabel: partial ? deriveLabel(partial.draft) : null,
       hasWalkedSample: hasWalkedSample(),
+      hasCompletedPathA: hasCompletedPathA(),
     });
   }, [enabled]);
 

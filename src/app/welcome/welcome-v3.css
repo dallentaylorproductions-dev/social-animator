@@ -1,0 +1,206 @@
+/*
+ * Onboarding hybrid SHELL (ONBOARDING_HYBRID_V3, Phase 3) — scoped styles.
+ *
+ * V3 reuses the V1 `.onb` chrome verbatim (the root element is `.onb onbv3`),
+ * so the warm-dark palette, full-screen takeover, headline/sub/button/field
+ * classes all come from welcome.css — zero visual reinvention. This file adds
+ * only the bits the shell needs beyond V1's vocabulary, plus two scoped
+ * overrides: the studio-mint accent and the preview reveal fix.
+ */
+
+/* Accent override — V1's `.onb` defines `--onb-accent: #d9a86c` (gold/tan). The
+ * hybrid is studio chrome, so re-point it to the studio cockpit mint (#5BF5C9,
+ * the same `--accent` the dashboard/wizard/sign-in and welcome-v2 use). Scoped to
+ * `.onbv3` so V1's `.onb` flows are untouched. Mint is light → dark ink sits on
+ * the accent fill (the primary buttons), matching sep-studio's `.btn-primary`. */
+.onbv3 {
+  --onb-accent: #5bf5c9;
+  --onb-accent-ink: oklch(0.18 0.02 175);
+}
+
+.onbv3__example {
+  align-self: center;
+  margin-top: 18px;
+  color: var(--onb-muted);
+  font-size: 14px;
+  text-decoration: none;
+  border-bottom: 1px solid transparent;
+  padding-bottom: 1px;
+  cursor: pointer;
+}
+.onbv3__example:hover {
+  color: var(--onb-ink);
+  border-bottom-color: var(--onb-line);
+}
+
+.onbv3__error {
+  margin: 0;
+  font-size: 14px;
+  color: #f0a98c;
+}
+
+/* ─────────────────── Path A preview ("sample home, real you") ───────────────
+ * The Agent-Layer mirror (Phase 4a). The genuine seller page (StateAPage in
+ * preview mode) renders inside a calm framed card with a persistent "Sample
+ * property" truth label. No new page styling — only the outer frame + label.
+ */
+.onbv3__setup-head {
+  /* keep the explainer left-aligned and readable above the framed preview */
+  text-align: left;
+}
+
+.onbv3__preview {
+  position: relative;
+  margin-top: 16px;
+  border-radius: 16px;
+  border: 1px solid var(--onb-line);
+  overflow: hidden;
+  background: #fff;
+}
+
+/* The persistent, calm truth label — pinned over the preview, never a warning. */
+.onbv3__sample-badge {
+  position: absolute;
+  top: 12px;
+  left: 12px;
+  z-index: 2;
+  display: inline-flex;
+  align-items: center;
+  padding: 5px 11px;
+  border-radius: 999px;
+  font-size: 12px;
+  font-weight: 600;
+  letter-spacing: 0.02em;
+  color: var(--onb-accent-ink);
+  background: var(--onb-accent);
+  box-shadow: 0 2px 8px rgba(0, 0, 0, 0.18);
+}
+
+/* Let the embedded real page size to its CONTENT inside the card instead of
+ * forcing its full-viewport minimum. The sections render identically; only the
+ * page shell's 100vh fill is relaxed for the in-card preview. */
+.onbv3__preview-page .fs-page {
+  min-height: auto;
+}
+
+/* Land every reveal-on-scroll section at its FINAL (visible) state. StateAPage
+ * sections start at opacity:0 and are faded in by the motion island's
+ * IntersectionObserver (it adds `.in`). The preview renders with `preview` (no
+ * motion island, so no engagement beacon — G1), so nothing ever adds `.in` and
+ * the content sits invisible despite being in the DOM. This is the SAME override
+ * the flagship's prefers-reduced-motion / print rules use and that welcome-v2.css
+ * applies to its slices — scoped to the preview so nothing leaks, and pure CSS so
+ * the beacon stays absent. */
+.onbv3__preview-page .reveal,
+.onbv3__preview-page .rev-source-note,
+.onbv3__preview-page .rev-source-g {
+  opacity: 1 !important;
+  transform: none !important;
+  transition: none !important;
+}
+
+/* ─────────────────── Path A capture chrome (Phase 4b) ───────────────────
+ * A calm LIGHT card framing the one active ghosted slot. Light so the reused
+ * Settings field (HeadshotField) renders legibly as designed; the onboarding
+ * `.onb__*` helpers are re-inked to dark only inside this card. Frames the
+ * input — never restyles a seller-page component (G7).
+ */
+.onbv3__capture {
+  margin-top: 16px;
+  padding: 18px 16px 16px;
+  border-radius: 16px;
+  border: 1px solid rgba(0, 0, 0, 0.08);
+  background: #fbf9f6;
+  color: #1d1915;
+}
+.onbv3__capture .onb__eyebrow {
+  color: #8a7f73;
+  margin-bottom: 10px;
+}
+.onbv3__capture .onb__label {
+  color: #1d1915;
+}
+.onbv3__capture .onb__sub {
+  color: #5c544b;
+}
+.onbv3__capture .onb__input {
+  background: #fff;
+  color: #1d1915;
+  border: 1px solid #ddd5cb;
+}
+.onbv3__capture .onb__input:focus {
+  border-color: var(--onb-accent);
+}
+.onbv3__capture .onb__btn--ghost {
+  color: #5c544b;
+  border: 1px solid #ddd5cb;
+  background: transparent;
+}
+
+.onbv3__capture-title {
+  font-size: 22px;
+  font-weight: 650;
+  margin: 0 0 8px;
+  line-height: 1.2;
+}
+
+.onbv3__field {
+  display: flex;
+  flex-direction: column;
+  gap: 10px;
+}
+.onbv3__hint {
+  margin: -2px 0 2px;
+  font-size: 13px;
+  color: #8a7f73;
+}
+.onbv3__textarea {
+  resize: vertical;
+  min-height: 76px;
+  font: inherit;
+}
+
+/* Exposure levers — pill chips (reuse the leadEmphasis constants). */
+.onbv3__levers {
+  display: flex;
+  flex-wrap: wrap;
+  gap: 8px;
+}
+.onbv3__lever {
+  padding: 8px 13px;
+  border-radius: 999px;
+  border: 1px solid #ddd5cb;
+  background: #fff;
+  color: #1d1915;
+  font-size: 14px;
+  cursor: pointer;
+}
+.onbv3__lever:hover {
+  border-color: var(--onb-accent);
+}
+.onbv3__lever--active {
+  background: var(--onb-accent);
+  border-color: var(--onb-accent);
+  color: var(--onb-accent-ink);
+  font-weight: 600;
+}
+.onbv3__lever--more {
+  color: #8a7f73;
+}
+
+/* Quiet ghosted slots — the pieces still to come, visible but not active. */
+.onbv3__ghosts {
+  list-style: none;
+  margin: 14px 0 0;
+  padding: 0;
+  display: flex;
+  flex-direction: column;
+  gap: 6px;
+}
+.onbv3__ghost {
+  font-size: 13px;
+  color: #b3a99d;
+  padding: 7px 11px;
+  border: 1px dashed #ddd5cb;
+  border-radius: 10px;
+}

@@ -2,10 +2,13 @@ import { redirect } from "next/navigation";
 import { auth } from "@/lib/auth";
 import { isOnboardingFirstRunEnabled } from "@/lib/config/onboarding-first-run";
 import { isOnboardingFirstRunV2Enabled } from "@/lib/config/onboarding-first-run-v2";
+import { isOnboardingHybridV3Enabled } from "@/lib/config/onboarding-first-run-v3";
 import { WelcomeFlow } from "./WelcomeFlow";
 import { WelcomeFlowV2 } from "./WelcomeFlowV2";
+import { WelcomeFlowV3 } from "./WelcomeFlowV3";
 import "./welcome.css";
 import "./welcome-v2.css";
+import "./welcome-v3.css";
 
 /**
  * /welcome - the output-first first-run flow (ONBOARDING_FIRST_RUN, Pass 2).
@@ -31,16 +34,27 @@ import "./welcome-v2.css";
 export const dynamic = "force-dynamic";
 
 export default async function WelcomePage() {
-  // V2 supersedes V1 at /welcome when on; with BOTH flags off the flow does not
-  // exist (redirect to /dashboard), so entry stays byte-identical to today.
+  // Precedence at /welcome is strict: V3 > V2 > V1. With ALL THREE flags off the
+  // flow does not exist (redirect to /dashboard), so entry stays byte-identical
+  // to today. V3 is the dark hybrid SHELL (Phase 3); V2/V1 stay as fallbacks.
+  const v3 = isOnboardingHybridV3Enabled();
   const v2 = isOnboardingFirstRunV2Enabled();
-  if (!isOnboardingFirstRunEnabled() && !v2) {
+  if (!isOnboardingFirstRunEnabled() && !v2 && !v3) {
     redirect("/dashboard");
   }
 
   const session = await auth();
   const ownerEmail = session?.user?.email ?? null;
   const serverDraftsEnabled = process.env.SERVER_DRAFTS_ENABLED === "true";
+
+  if (v3) {
+    return (
+      <WelcomeFlowV3
+        ownerEmail={ownerEmail}
+        serverDraftsEnabled={serverDraftsEnabled}
+      />
+    );
+  }
 
   if (v2) {
     return (

@@ -2,6 +2,7 @@ import { NextResponse } from "next/server";
 import { auth } from "@/lib/auth";
 import { isOnboardingFirstRunEnabled } from "@/lib/config/onboarding-first-run";
 import { isOnboardingFirstRunV2Enabled } from "@/lib/config/onboarding-first-run-v2";
+import { isOnboardingHybridV3Enabled } from "@/lib/config/onboarding-first-run-v3";
 import { appendOnboardingEvent } from "@/lib/onboarding/funnel-store";
 import {
   ONBOARDING_EVENT_NAMES,
@@ -62,9 +63,13 @@ function sanitizeProps(
 }
 
 export async function POST(req: Request): Promise<NextResponse> {
-  // Flag-off: dark. No KV touch, byte-identical to today. Honors EITHER flag so
-  // a V2-only preview still captures the funnel.
-  if (!isOnboardingFirstRunEnabled() && !isOnboardingFirstRunV2Enabled()) {
+  // Flag-off: dark. No KV touch, byte-identical to today. Honors ANY of the
+  // three flags so a V3-only (or V2-only) preview still captures the funnel.
+  if (
+    !isOnboardingFirstRunEnabled() &&
+    !isOnboardingFirstRunV2Enabled() &&
+    !isOnboardingHybridV3Enabled()
+  ) {
     return noContent();
   }
 

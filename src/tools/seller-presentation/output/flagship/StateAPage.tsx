@@ -44,9 +44,20 @@ import "./state-a.css";
 export function StateAPage({
   handout,
   reviewSourceLogos = false,
+  preview = false,
 }: {
   handout: HandoutRecord;
   reviewSourceLogos?: boolean;
+  /**
+   * Read-only preview discriminator (ONBOARDING_HYBRID_V3, Phase 4a). When true
+   * the page renders identically EXCEPT the {@link PresentationPageMotion} island
+   * is not mounted — so the engagement beacon (and any view-signal write) is
+   * structurally unreachable, not merely gated by a missing slug. Lets the
+   * onboarding "sample home, real you" mirror render the genuine page with ZERO
+   * side effects (G1). Defaults false, so every live caller (/h/[slug] via
+   * SellerPresentationPage, the fixture preview route) is byte-identical to today.
+   */
+  preview?: boolean;
 }) {
   const payload = clampPublicPayload(handout.data);
   const roles = deriveConsumerRoles(payload.brandColors?.accent);
@@ -89,10 +100,15 @@ export function StateAPage({
           showCtas={false}
         />
       </div>
-      <PresentationPageMotion
-        viewSignalSlug={viewSignalSlugFor(handout)}
-        engagementEnabled={isViewedSignalEngagementEnabled()}
-      />
+      {/* The ONLY side-effecting island on the page. Omitted in preview mode so
+          the onboarding mirror has no write path at all (G1) — the beacon import
+          is never reached. Live renders (preview=false) mount it exactly as before. */}
+      {!preview && (
+        <PresentationPageMotion
+          viewSignalSlug={viewSignalSlugFor(handout)}
+          engagementEnabled={isViewedSignalEngagementEnabled()}
+        />
+      )}
     </div>
   );
 }

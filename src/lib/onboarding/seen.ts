@@ -68,3 +68,36 @@ export function markSampleWalked(): void {
     // ignore quota / storage-disabled - the card degrades to `new`.
   }
 }
+
+/**
+ * Path-A-completed marker (ONBOARDING_HYBRID_V3, Phase 5).
+ *
+ * Set when a hybrid Path A agent finishes Agent-Layer setup and takes the
+ * handoff to the dashboard. It is the ONLY clean signal that distinguishes a
+ * "profile ready, no page yet" agent (Agent Layer captured, zero pages) from a
+ * returning agent who deleted all their pages — both otherwise read as
+ * `agentName set + totalPages 0`. Written ONLY by the hybrid flow, so flag-off
+ * (and V1/V2) never set it and the dashboard stays byte-identical.
+ *
+ * Local + advisory like the other onboarding markers: worst case (storage
+ * disabled / cleared) the Today card degrades to `new`, never breaks.
+ */
+const PATH_A_COMPLETE_KEY = "socanim_onboarding_path_a_complete";
+
+export function hasCompletedPathA(): boolean {
+  if (typeof window === "undefined") return false;
+  try {
+    return window.localStorage.getItem(PATH_A_COMPLETE_KEY) === "1";
+  } catch {
+    return false;
+  }
+}
+
+export function markPathAComplete(): void {
+  if (typeof window === "undefined") return;
+  try {
+    window.localStorage.setItem(PATH_A_COMPLETE_KEY, "1");
+  } catch {
+    // ignore quota / storage-disabled - the card degrades to `new`.
+  }
+}
