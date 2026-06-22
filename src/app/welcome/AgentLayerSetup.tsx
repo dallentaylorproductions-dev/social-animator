@@ -1,37 +1,36 @@
 'use client';
 
 import { useMemo } from 'react';
+import { useRouter } from 'next/navigation';
 import { useBrandSettings } from '@/lib/brand';
 import type { HandoutRecord } from '@/lib/share-urls';
 import { StateAPage } from '@/tools/seller-presentation/output/flagship/StateAPage';
 import { buildSamplePreviewPayload } from '@/lib/onboarding/sample-listing-draft';
+import { emitOnboardingEvent, ONBOARDING_EVENTS } from '@/lib/onboarding/funnel';
+import { markOnboardingSeen } from '@/lib/onboarding/seen';
+import { AgentLayerCapture } from './AgentLayerCapture';
 
 /**
  * AgentLayerSetup — the Path A container (ONBOARDING_HYBRID_V3).
  *
- * Phase 4a — the read-only "sample home, real you" MIRROR. It renders the
- * genuine seller page from { the sample listing (SAMPLE_LISTING_DRAFT) + the
- * agent's REAL Agent Layer (via useBrandSettings) } through the SAME publish
- * pipeline the seller receives — so the listing is sample but the hero, agent
- * band, reviews, contact, and marketing reflect the real profile (with the
- * existing graceful fallbacks when sparse: monogram headshot, ghosted reviews,
- * account-email contact). A mirror, not a fake page.
+ * Phase 4a — the read-only "sample home, real you" MIRROR (StateAPage in preview
+ * mode, fed by { SAMPLE_LISTING_DRAFT + the real Agent Layer }).
+ * Phase 4b — the preview-led CAPTURE around it (AgentLayerCapture): each input
+ * writes the real brand via `useBrandSettings().update`, and because the preview
+ * derives from the same `settings`, the matching section updates on screen
+ * immediately (G3). Payoff-gated, one ghosted slot at a time, ending COMPLETED
+ * (G6) with a route to the dashboard (Phase 5 builds the Today-card it lands on).
  *
- * G1 — NO write path. The render is pure: `buildSamplePreviewPayload` only
- * derives a PublicPayload (no instance, no slug, no publish state), and
- * `StateAPage` is rendered with `preview` so its engagement-beacon island is
- * never mounted. This surface imports none of the draft-creation, server-draft,
- * publish, slug, or view-beacon functions — enforced structurally and asserted
- * in the spec (the no-mint/no-track grep).
+ * G1 — NO mint. The only writes are to the owner-scoped brand record (via
+ * `update`); the render is pure (`buildSamplePreviewPayload`) and `StateAPage` is
+ * rendered with `preview` so its engagement-beacon island is never mounted. This
+ * surface imports none of the draft-creation, server-draft, publish, slug, or
+ * view-beacon functions — enforced structurally and asserted in the spec.
  *
- * G7 — no new renderer / no new seller-page component: the page IS `StateAPage`
- * (the real consumer page) and the listing data is a fixture draft; the only new
- * UI is this framing + the "Sample property" truth label.
- *
- * Phase 4b (next) makes the Agent-Layer slots fillable and live-updating
- * (payoff-gated capture). 4a only renders the mirror. The seam 4b drives:
- * `useBrandSettings().update` writes the real brand and this preview re-derives
- * from `settings` automatically.
+ * G7 — no new renderer / no new seller-page component / no new uploader: the page
+ * IS `StateAPage`, the headshot IS the Settings `HeadshotField`, the exposure
+ * lever reuses the `leadEmphasis` constants, the review reuses `reviewsOutlinkUrl`.
+ * The only new UI is this framing + the ghosted-slot capture chrome.
  */
 
 /**
@@ -40,6 +39,9 @@ import { buildSamplePreviewPayload } from '@/lib/onboarding/sample-listing-draft
  */
 const PREVIEW_PREPARED_AT = '2026-06-21T00:00:00.000Z';
 
+/** Read-only fixture route — the canonical example page. Mints nothing. */
+const EXAMPLE_HREF = '/seller-presentation-preview?fixture=full';
+
 export function AgentLayerSetup({
   onBack,
   ownerEmail,
@@ -47,10 +49,15 @@ export function AgentLayerSetup({
   onBack: () => void;
   ownerEmail: string | null;
 }) {
-  // The real Agent Layer (server-backed when SERVER_BRAND_SETTINGS_ENABLED is
-  // on; localStorage otherwise). Read-only here — 4a never calls `update`.
-  const { settings } = useBrandSettings();
+  const router = useRouter();
 
+  // The real Agent Layer (server-backed when SERVER_BRAND_SETTINGS_ENABLED is
+  // on; localStorage otherwise). `update` writes a single field's change back —
+  // the only write this surface performs (G1: brand record only, never a mint).
+  const { settings, update } = useBrandSettings();
+
+  // The live preview re-derives from `settings`, so every capture write updates
+  // the matching section on screen immediately (G3).
   const handout = useMemo<HandoutRecord>(() => {
     const data = buildSamplePreviewPayload(settings, ownerEmail ?? '');
     return {
@@ -63,6 +70,17 @@ export function AgentLayerSetup({
     };
   }, [settings, ownerEmail]);
 
+  const onCreatePage = () => {
+    emitOnboardingEvent(ONBOARDING_EVENTS.reachedCockpit);
+    markOnboardingSeen();
+    router.replace('/dashboard');
+  };
+
+  const onSeeExample = () => {
+    emitOnboardingEvent(ONBOARDING_EVENTS.previewReached, { path: 'example' });
+    window.location.assign(EXAMPLE_HREF);
+  };
+
   return (
     <div data-testid="onbv3-agent-layer">
       <div className="onbv3__setup-head">
@@ -74,6 +92,13 @@ export function AgentLayerSetup({
           experience before you have an address.
         </p>
       </div>
+
+      <AgentLayerCapture
+        settings={settings}
+        update={update}
+        onCreatePage={onCreatePage}
+        onSeeExample={onSeeExample}
+      />
 
       <div className="onbv3__preview" data-testid="onbv3-preview">
         <span className="onbv3__sample-badge" data-testid="onbv3-sample-badge">
