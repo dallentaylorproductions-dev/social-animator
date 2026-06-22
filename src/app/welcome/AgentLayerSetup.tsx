@@ -1,8 +1,8 @@
 'use client';
 
-import { useMemo } from 'react';
+import { useEffect, useMemo, useRef, useState } from 'react';
 import { useRouter } from 'next/navigation';
-import { useBrandSettings } from '@/lib/brand';
+import { useBrandSettings, type BrandSettings } from '@/lib/brand';
 import type { HandoutRecord } from '@/lib/share-urls';
 import { StateAPage } from '@/tools/seller-presentation/output/flagship/StateAPage';
 import { buildSamplePreviewPayload } from '@/lib/onboarding/sample-listing-draft';
@@ -48,16 +48,45 @@ const EXAMPLE_HREF = '/seller-presentation-preview?fixture=state-a';
 export function AgentLayerSetup({
   onBack,
   ownerEmail,
+  replay = false,
 }: {
   onBack: () => void;
   ownerEmail: string | null;
+  /**
+   * REPLAY — non-destructive demo/re-smoke mode. When on, capture writes are
+   * SANDBOXED to local state instead of the real owner-scoped brand record, so
+   * a demo (e.g. to Aaron, on his own account) re-shows the live-preview flow
+   * without overwriting his real photo/contact/review/marketing approach. The
+   * preview still derives from the sandboxed `settings`, so the on-screen
+   * live-update demo is identical — just non-persistent.
+   */
+  replay?: boolean;
 }) {
   const router = useRouter();
 
   // The real Agent Layer (server-backed when SERVER_BRAND_SETTINGS_ENABLED is
-  // on; localStorage otherwise). `update` writes a single field's change back —
-  // the only write this surface performs (G1: brand record only, never a mint).
-  const { settings, update } = useBrandSettings();
+  // on; localStorage otherwise). `realUpdate` writes a single field's change
+  // back — the only write this surface performs (G1: brand record only).
+  const { settings: realSettings, update: realUpdate } = useBrandSettings();
+
+  // Replay sandbox: mirror the REAL brand into local state until the demoer's
+  // first edit, then freeze to their sandbox so the preview reflects the agent's
+  // actual brand (a better demo than a cold/empty preview) while NEVER writing
+  // it back. `realSettings` hydrates async (DEFAULT_BRAND → real), so re-sync
+  // until the first sandbox write captures the hydrated value.
+  const [replayDraft, setReplayDraft] = useState<BrandSettings | null>(null);
+  const replayTouched = useRef(false);
+  useEffect(() => {
+    if (replay && !replayTouched.current) setReplayDraft(realSettings);
+  }, [replay, realSettings]);
+
+  const settings = replay ? replayDraft ?? realSettings : realSettings;
+  const update = replay
+    ? (next: BrandSettings) => {
+        replayTouched.current = true;
+        setReplayDraft(next);
+      }
+    : realUpdate;
 
   // The live preview re-derives from `settings`, so every capture write updates
   // the matching section on screen immediately (G3).
@@ -74,6 +103,13 @@ export function AgentLayerSetup({
   }, [settings, ownerEmail]);
 
   const onCreatePage = () => {
+    // Replay is non-destructive: no funnel write, and crucially no marker writes
+    // (markOnboardingSeen / markPathAComplete change the live gate + Today-card
+    // state for a returning agent). Just return them to the dashboard.
+    if (replay) {
+      router.replace('/dashboard');
+      return;
+    }
     emitOnboardingEvent(ONBOARDING_EVENTS.reachedCockpit);
     markOnboardingSeen();
     // The "profile ready, no page yet" signal the dashboard Today card reads
@@ -84,7 +120,9 @@ export function AgentLayerSetup({
   };
 
   const onSeeExample = () => {
-    emitOnboardingEvent(ONBOARDING_EVENTS.previewReached, { path: 'example' });
+    if (!replay) {
+      emitOnboardingEvent(ONBOARDING_EVENTS.previewReached, { path: 'example' });
+    }
     window.location.assign(EXAMPLE_HREF);
   };
 

@@ -55,9 +55,19 @@ type Screen = 'first' | 'address' | 'agent-layer';
 export function WelcomeFlowV3({
   ownerEmail,
   serverDraftsEnabled,
+  replay = false,
 }: {
   ownerEmail: string | null;
   serverDraftsEnabled: boolean;
+  /**
+   * REPLAY — non-destructive demo/re-smoke mode (`/welcome?replay=1`). When on,
+   * the flow re-shows for a returning account WITHOUT touching real data: funnel
+   * events are suppressed (so a demo never pollutes real onboarding metrics), the
+   * "seen"/path-A markers are NOT written (so the live gate is unaffected), Path B
+   * does NOT mint a draft / seed the listing profile (it routes to the read-only
+   * example instead), and Path A sandboxes every brand write (see AgentLayerSetup).
+   */
+  replay?: boolean;
 }) {
   const router = useRouter();
   const [screen, setScreen] = useState<Screen>('first');
@@ -65,38 +75,48 @@ export function WelcomeFlowV3({
   const [busy, setBusy] = useState(false);
   const [error, setError] = useState<string | null>(null);
 
+  // In replay, funnel emits are suppressed (a demo must not write real metrics).
+  const track = useCallback(
+    (event: Parameters<typeof emitOnboardingEvent>[0], props?: Parameters<typeof emitOnboardingEvent>[1]) => {
+      if (replay) return;
+      emitOnboardingEvent(event, props);
+    },
+    [replay],
+  );
+
   // started — once on mount (mirrors V2's funnel instrumentation).
   useEffect(() => {
-    emitOnboardingEvent(ONBOARDING_EVENTS.started);
-  }, []);
+    track(ONBOARDING_EVENTS.started);
+  }, [track]);
   // per-screen drop-off.
   useEffect(() => {
-    emitOnboardingEvent(ONBOARDING_EVENTS.stepEntered, { step: screen });
-  }, [screen]);
+    track(ONBOARDING_EVENTS.stepEntered, { step: screen });
+  }, [screen, track]);
 
   const exitToDashboard = useCallback(() => {
-    emitOnboardingEvent(ONBOARDING_EVENTS.dismissed, { step: screen });
-    markOnboardingSeen();
+    track(ONBOARDING_EVENTS.dismissed, { step: screen });
+    // Replay must not flip the live gate's "seen" marker for a returning agent.
+    if (!replay) markOnboardingSeen();
     router.replace('/dashboard');
-  }, [router, screen]);
+  }, [router, screen, replay, track]);
 
   // Path A — route to the Agent-Layer container. Preview/none: mints nothing.
   const goPathA = useCallback(() => {
-    emitOnboardingEvent(ONBOARDING_EVENTS.pathChosen, { path: 'agent-layer' });
+    track(ONBOARDING_EVENTS.pathChosen, { path: 'agent-layer' });
     setScreen('agent-layer');
-  }, []);
+  }, [track]);
 
   // Path B — reveal address entry. The draft is minted only on submit.
   const goPathB = useCallback(() => {
-    emitOnboardingEvent(ONBOARDING_EVENTS.pathChosen, { path: 'address-first' });
+    track(ONBOARDING_EVENTS.pathChosen, { path: 'address-first' });
     setScreen('address');
-  }, []);
+  }, [track]);
 
   // "See an example" — read-only fixture route; mints nothing (G1). The anchor
   // navigates; this only records the intent for the funnel.
   const seeExample = useCallback(() => {
-    emitOnboardingEvent(ONBOARDING_EVENTS.previewReached, { path: 'example' });
-  }, []);
+    track(ONBOARDING_EVENTS.previewReached, { path: 'example' });
+  }, [track]);
 
   // Path B submit — the ONLY mint in this flow. Reuses the EXISTING wizard
   // draft-creation call (`createInstance`) verbatim, seeds the address into the
@@ -108,6 +128,17 @@ export function WelcomeFlowV3({
     if (busy) return;
     const street = address.street.trim();
     if (!street) return;
+
+    // REPLAY: Path B must NOT mint a draft or overwrite the agent's listing
+    // profile. Show the finished experience non-destructively by routing to the
+    // read-only example fixture instead of creating a real page. (Demo fidelity
+    // for Path B is intentionally traded for the load-bearing no-data-loss
+    // guarantee; Path A's live preview is the primary thing replay showcases.)
+    if (replay) {
+      window.location.assign(EXAMPLE_HREF);
+      return;
+    }
+
     setBusy(true);
     setError(null);
 
@@ -173,10 +204,19 @@ export function WelcomeFlowV3({
     emitOnboardingEvent(ONBOARDING_EVENTS.stepEntered, { step: 'wizard-handoff' });
     markOnboardingSeen();
     router.replace(`/seller-presentation?id=${created.instanceId}`);
-  }, [address, busy, ownerEmail, serverDraftsEnabled, router]);
+  }, [address, busy, ownerEmail, serverDraftsEnabled, router, replay]);
 
   return (
-    <main className="onb onbv3" data-testid="onbv3-root">
+    <main
+      className="onb onbv3"
+      data-testid="onbv3-root"
+      data-replay={replay ? '1' : undefined}
+    >
+      {replay && (
+        <div className="onbv3__replay-banner" data-testid="onbv3-replay-banner" role="status">
+          Preview only. Nothing here changes your saved details.
+        </div>
+      )}
       <div className="onb__inner">
         <div className="onb__top">
           <span className="onb__brand">Simply Edit</span>
@@ -186,7 +226,7 @@ export function WelcomeFlowV3({
             data-testid="onbv3-skip"
             onClick={exitToDashboard}
           >
-            Skip for now
+            {replay ? 'Close preview' : 'Skip for now'}
           </button>
         </div>
 
@@ -213,6 +253,7 @@ export function WelcomeFlowV3({
             <AgentLayerSetup
               onBack={() => setScreen('first')}
               ownerEmail={ownerEmail}
+              replay={replay}
             />
           )}
         </div>

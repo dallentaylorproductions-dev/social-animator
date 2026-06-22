@@ -18,6 +18,23 @@
   --onb-accent-ink: oklch(0.18 0.02 175);
 }
 
+/* Replay (demo/re-smoke) banner — a quiet, fixed strip making it unmistakable
+ * that this is a non-committal PREVIEW (nothing here writes the agent's saved
+ * data). Only rendered when /welcome?replay=1, so a normal first-run never sees
+ * it. Scoped to `.onbv3` like the rest of the shell. */
+.onbv3__replay-banner {
+  position: sticky;
+  top: 0;
+  z-index: 10;
+  padding: 8px 16px;
+  text-align: center;
+  font-size: 13px;
+  font-weight: 500;
+  letter-spacing: 0.01em;
+  color: var(--onb-accent-ink);
+  background: var(--onb-accent);
+}
+
 .onbv3__example {
   align-self: center;
   margin-top: 18px;
