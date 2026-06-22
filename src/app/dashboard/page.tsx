@@ -9,6 +9,7 @@ import {
 import { parseSeamPreview } from "./today-state";
 import { isOnboardingFirstRunEnabled } from "@/lib/config/onboarding-first-run";
 import { isOnboardingFirstRunV2Enabled } from "@/lib/config/onboarding-first-run-v2";
+import { isOnboardingHybridV3Enabled } from "@/lib/config/onboarding-first-run-v3";
 import { DashboardEntry } from "./DashboardEntry";
 import "./sep-studio.css";
 
@@ -71,14 +72,16 @@ export default async function DashboardPage({
     ? parseSeamPreview(sp.todaySeam)
     : null;
 
-  // ONBOARDING_FIRST_RUN (Pass 2) / _V2 (Pass 2b) - read server-side, threaded
-  // as a prop the same way. The entry gate fires for EITHER flag (V2 supersedes
-  // V1 at /welcome), so a V2-only preview still routes a brand-new agent into
-  // the flow. With BOTH off, DashboardEntry is a pure pass-through to
-  // DashboardClient (no markup, no fetch, no redirect), so the first-run entry
-  // stays byte-identical to today.
+  // ONBOARDING_FIRST_RUN (Pass 2) / _V2 (Pass 2b) / _HYBRID_V3 (Phase 3-5) -
+  // read server-side, threaded as a prop the same way. The entry gate fires for
+  // ANY of the three flags (precedence V3 > V2 > V1 at /welcome), so a V3-only
+  // preview still routes a brand-new agent into the hybrid flow. With ALL three
+  // off, DashboardEntry is a pure pass-through to DashboardClient (no markup, no
+  // fetch, no redirect), so the first-run entry stays byte-identical to today.
   const onboardingFirstRun =
-    isOnboardingFirstRunEnabled() || isOnboardingFirstRunV2Enabled();
+    isOnboardingFirstRunEnabled() ||
+    isOnboardingFirstRunV2Enabled() ||
+    isOnboardingHybridV3Enabled();
 
   return (
     <main

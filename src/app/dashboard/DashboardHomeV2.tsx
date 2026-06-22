@@ -185,6 +185,8 @@ export function DashboardHomeV2({
 const SELLER_PRESENTATION_HREF = '/seller-presentation';
 /** The real onboarding path entry (address-start flow). */
 const ONBOARDING_HREF = '/welcome';
+/** Read-only example page (the "View an example" target). Mints nothing. */
+const EXAMPLE_HREF = '/seller-presentation-preview?fixture=full';
 
 function plural(n: number, one: string, many: string): string {
   return n === 1 ? one : many;
@@ -236,12 +238,15 @@ function TodayCard({
   const isReturning = state === 'returning';
   const isPartial = state === 'partial';
   const isSampleOnly = state === 'sample-only';
+  const isProfileReady = state === 'profile-ready';
 
   let headline: string;
   if (isPartial) {
     headline = partialLabel
       ? `Pick up where you left off on ${partialLabel}.`
       : 'Pick up where you left off.';
+  } else if (isProfileReady) {
+    headline = 'Your seller page details are ready.';
   } else if (isSampleOnly) {
     headline = 'You have seen what it does. Now make one for your listing.';
   } else if (isNew) {
@@ -258,6 +263,12 @@ function TodayCard({
   if (isPartial) {
     primaryHref = `${SELLER_PRESENTATION_HREF}?id=${partialInstanceId}`;
     ctaLabel = 'Resume your page';
+  } else if (isProfileReady) {
+    // The §10 climax: the Agent Layer is already populated, so the wizard opens
+    // with the hero/agent band/marketing pre-filled — the first real page is
+    // genuinely half-built.
+    primaryHref = SELLER_PRESENTATION_HREF;
+    ctaLabel = 'Create your first seller page';
   } else if (isSampleOnly) {
     primaryHref = ONBOARDING_HREF;
     ctaLabel = 'Make one for your listing';
@@ -303,6 +314,13 @@ function TodayCard({
         </p>
       )}
 
+      {isProfileReady && (
+        <p className="today-sub" data-testid="sep-today-sub">
+          When you have an address, Studio uses your photo, contact, review, and
+          marketing approach automatically.
+        </p>
+      )}
+
       {isSampleOnly && (
         <p className="today-sub" data-testid="sep-today-sub">
           Start with your address and build the page for your real listing.
@@ -324,13 +342,23 @@ function TodayCard({
           {ctaLabel}
           <span className="btn-arrow">→</span>
         </Link>
-        <Link
-          href="/settings"
-          className="today-setup"
-          data-testid="sep-today-setup"
-        >
-          Personalize your brand kit →
-        </Link>
+        {isProfileReady ? (
+          <Link
+            href={EXAMPLE_HREF}
+            className="today-setup"
+            data-testid="sep-today-setup"
+          >
+            View an example →
+          </Link>
+        ) : (
+          <Link
+            href="/settings"
+            className="today-setup"
+            data-testid="sep-today-setup"
+          >
+            Personalize your brand kit →
+          </Link>
+        )}
       </div>
     </section>
   );

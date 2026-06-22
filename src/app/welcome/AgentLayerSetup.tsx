@@ -7,7 +7,7 @@ import type { HandoutRecord } from '@/lib/share-urls';
 import { StateAPage } from '@/tools/seller-presentation/output/flagship/StateAPage';
 import { buildSamplePreviewPayload } from '@/lib/onboarding/sample-listing-draft';
 import { emitOnboardingEvent, ONBOARDING_EVENTS } from '@/lib/onboarding/funnel';
-import { markOnboardingSeen } from '@/lib/onboarding/seen';
+import { markOnboardingSeen, markPathAComplete } from '@/lib/onboarding/seen';
 import { AgentLayerCapture } from './AgentLayerCapture';
 
 /**
@@ -73,6 +73,10 @@ export function AgentLayerSetup({
   const onCreatePage = () => {
     emitOnboardingEvent(ONBOARDING_EVENTS.reachedCockpit);
     markOnboardingSeen();
+    // The "profile ready, no page yet" signal the dashboard Today card reads
+    // (Phase 5) — the only thing that tells a completed Path A agent apart from
+    // a returning agent who deleted all their pages.
+    markPathAComplete();
     router.replace('/dashboard');
   };
 
