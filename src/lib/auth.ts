@@ -5,14 +5,17 @@ import { UpstashRedisAdapter } from "@auth/upstash-redis-adapter";
 import { Redis } from "@upstash/redis";
 import { kv } from "@vercel/kv";
 import { consumeDevAccessPending, grantDevAccess } from "@/lib/dev-access";
+import {
+  ACCESS_CODE_RATE_LIMIT_MAX,
+  ACCESS_CODE_RATE_LIMIT_WINDOW_SECONDS,
+  accessCodeRateLimitKey,
+} from "@/lib/auth-rate-limit";
 
 const resendKey = process.env.AUTH_RESEND_KEY;
 const fromAddress =
   process.env.AUTH_EMAIL_FROM ?? "login@send.simplyeditpro.com";
 
 const DEV_ACCESS_CODE = process.env.DEV_ACCESS_CODE;
-const RATE_LIMIT_MAX = 10;
-const RATE_LIMIT_WINDOW_SECONDS = 60 * 60; // 1 hour
 const EMAIL_RE = /^[^\s@]+@[^\s@]+\.[^\s@]+$/;
 
 // Constant-time string compare. Cheap mitigation against timing-oracle
@@ -32,17 +35,17 @@ function getClientIp(headers: Headers): string {
   return headers.get("x-real-ip") ?? "unknown";
 }
 
-// Same key shape + budget as the retired /api/access/grant. 10 attempts
-// per IP per hour against `rate_limit_access:<ip>`. The cohort-code
-// surface stays non-brute-forceable even though the code is
-// shared-secret-strong.
+// Per-IP budget against `rate_limit_access:<ip>` (see auth-rate-limit.ts
+// for the values + rationale). Raised 10 → 40/hr in v1.6x L1 so a cohort
+// behind one shared office IP isn't throttled; the shared-secret code
+// keeps the surface non-brute-forceable even at the higher cap.
 async function checkAccessRateLimit(ip: string): Promise<boolean> {
-  const key = `rate_limit_access:${ip}`;
+  const key = accessCodeRateLimitKey(ip);
   const count = (await kv.incr(key)) as number;
   if (count === 1) {
-    await kv.expire(key, RATE_LIMIT_WINDOW_SECONDS);
+    await kv.expire(key, ACCESS_CODE_RATE_LIMIT_WINDOW_SECONDS);
   }
-  return count <= RATE_LIMIT_MAX;
+  return count <= ACCESS_CODE_RATE_LIMIT_MAX;
 }
 
 // Custom CredentialsSignin subclass so the client `signIn(..., { redirect: false })`
@@ -84,9 +87,10 @@ export const { handlers, signIn, signOut, auth } = NextAuth({
     //
     // Mirrors the validation primitives the retired POST /api/access/grant
     // used: same EMAIL_RE shape, same timing-safe code compare, same
-    // `rate_limit_access:<ip>` 10/hr budget, same `dev_access:<email>` KV
-    // key (via grantDevAccess) so the entitlement resolver and middleware
-    // recognize the agent identically.
+    // `rate_limit_access:<ip>` per-IP budget (raised to 40/hr in v1.6x L1
+    // for shared-office cohorts), same `dev_access:<email>` KV key (via
+    // grantDevAccess) so the entitlement resolver and middleware recognize
+    // the agent identically.
     Credentials({
       id: "beta-code",
       name: "Beta access code",
