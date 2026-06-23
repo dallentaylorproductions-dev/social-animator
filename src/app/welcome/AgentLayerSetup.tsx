@@ -48,9 +48,15 @@ const EXAMPLE_HREF = '/seller-presentation-preview?fixture=state-a';
 export function AgentLayerSetup({
   onBack,
   ownerEmail,
+  // MARKETING_ZONE_REDESIGN (v1.7 Packet C) — resolved on the server welcome
+  // shell and threaded here so the inline "sample home, real you" mirror renders
+  // the redesigned marketing zone exactly when a flag-on publish would. Default
+  // false keeps a flag-off session byte-identical to today's grid.
+  marketingZoneRedesignEnabled = false,
 }: {
   onBack: () => void;
   ownerEmail: string | null;
+  marketingZoneRedesignEnabled?: boolean;
 }) {
   const router = useRouter();
 
@@ -59,10 +65,21 @@ export function AgentLayerSetup({
   // the only write this surface performs (G1: brand record only, never a mint).
   const { settings, update } = useBrandSettings();
 
+  // The full-page "See an example" link mirrors this inline preview, so it must
+  // carry the SAME redesign state — `&redesign=1` flips the fixture route's zone
+  // on when the flag is live, otherwise it stays the plain state-a fixture.
+  const exampleHref = marketingZoneRedesignEnabled
+    ? `${EXAMPLE_HREF}&redesign=1`
+    : EXAMPLE_HREF;
+
   // The live preview re-derives from `settings`, so every capture write updates
   // the matching section on screen immediately (G3).
   const handout = useMemo<HandoutRecord>(() => {
-    const data = buildSamplePreviewPayload(settings, ownerEmail ?? '');
+    const data = buildSamplePreviewPayload(
+      settings,
+      ownerEmail ?? '',
+      marketingZoneRedesignEnabled,
+    );
     return {
       slug: '', // empty: no public URL, and the beacon is omitted in preview anyway
       type: 'seller-presentation',
@@ -71,7 +88,7 @@ export function AgentLayerSetup({
       updatedAt: PREVIEW_PREPARED_AT,
       data: data as unknown as Record<string, unknown>,
     };
-  }, [settings, ownerEmail]);
+  }, [settings, ownerEmail, marketingZoneRedesignEnabled]);
 
   const onCreatePage = () => {
     emitOnboardingEvent(ONBOARDING_EVENTS.reachedCockpit);
@@ -85,7 +102,7 @@ export function AgentLayerSetup({
 
   const onSeeExample = () => {
     emitOnboardingEvent(ONBOARDING_EVENTS.previewReached, { path: 'example' });
-    window.location.assign(EXAMPLE_HREF);
+    window.location.assign(exampleHref);
   };
 
   return (

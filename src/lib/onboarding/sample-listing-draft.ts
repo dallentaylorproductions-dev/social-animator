@@ -212,11 +212,17 @@ export const ONBOARDING_PREVIEW_ACCENT = "#5BF5C9";
 export function buildSamplePreviewPayload(
   brand: BrandSettings,
   accountEmail: string = "",
+  // MARKETING_ZONE_REDESIGN (v1.7 Packet C) — mirror the publish-time flag so the
+  // Path A "sample home, real you" mirror shows the redesigned marketing zone
+  // exactly when a flag-on publish would. Defaults false so the flag-off mirror
+  // is byte-identical to today's grid; threaded into the shared State-A builder.
+  marketingZoneRedesign: boolean = false,
 ): PublicPayload {
   const base = buildOnboardingStateAPayload(
     SAMPLE_LISTING_DRAFT,
     brand,
     accountEmail,
+    marketingZoneRedesign,
   );
   // Zone 5 exposure coverflow — overlay the representative demo listings so the
   // already-built coverflow renders in the labeled "Sample property" preview.

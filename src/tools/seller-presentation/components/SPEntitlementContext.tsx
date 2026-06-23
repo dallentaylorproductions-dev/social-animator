@@ -74,6 +74,11 @@ interface SPEntitlement {
    *  page state. `null` while loading; `false` ⇒ the wizard never shows the mode
    *  toggle / appointment input and the preview renders today's full presentation. */
   sellerStateAEnabled: boolean | null;
+  /** MARKETING_ZONE_REDESIGN feature-flag state for the redesigned "How I'll get
+   *  your home seen" zone. `null` while loading; `false` ⇒ the live/example
+   *  preview renders today's capability-frames grid (byte-identical), matching a
+   *  flag-off publish. Mirrors the publish-time env flag. */
+  marketingZoneRedesignEnabled: boolean | null;
 }
 
 const Ctx = createContext<SPEntitlement>({
@@ -88,6 +93,7 @@ const Ctx = createContext<SPEntitlement>({
   sellerPagesLibraryEnabled: null,
   reviewSourceLogosEnabled: null,
   sellerStateAEnabled: null,
+  marketingZoneRedesignEnabled: null,
 });
 
 export function useSPEntitlement(): SPEntitlement {
@@ -107,6 +113,7 @@ export function SPEntitlementProvider({ children }: { children: ReactNode }) {
     sellerPagesLibraryEnabled: null,
     reviewSourceLogosEnabled: null,
     sellerStateAEnabled: null,
+    marketingZoneRedesignEnabled: null,
   });
 
   useEffect(() => {
@@ -138,6 +145,8 @@ export function SPEntitlementProvider({ children }: { children: ReactNode }) {
           reviewSourceLogosEnabled:
             !!data.features?.reviewSourceLogosEnabled,
           sellerStateAEnabled: !!data.features?.sellerStateAEnabled,
+          marketingZoneRedesignEnabled:
+            !!data.features?.marketingZoneRedesignEnabled,
         });
       })
       .catch(() => {

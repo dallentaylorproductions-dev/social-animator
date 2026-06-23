@@ -55,9 +55,15 @@ type Screen = 'first' | 'address' | 'agent-layer';
 export function WelcomeFlowV3({
   ownerEmail,
   serverDraftsEnabled,
+  // MARKETING_ZONE_REDESIGN (v1.7 Packet C) — resolved on the server welcome
+  // shell and threaded to the Path A mirror so its inline State-A preview shows
+  // the redesigned marketing zone exactly when a flag-on publish would. Default
+  // false keeps a flag-off session byte-identical to today's grid.
+  marketingZoneRedesignEnabled = false,
 }: {
   ownerEmail: string | null;
   serverDraftsEnabled: boolean;
+  marketingZoneRedesignEnabled?: boolean;
 }) {
   const router = useRouter();
   const [screen, setScreen] = useState<Screen>('first');
@@ -213,6 +219,7 @@ export function WelcomeFlowV3({
             <AgentLayerSetup
               onBack={() => setScreen('first')}
               ownerEmail={ownerEmail}
+              marketingZoneRedesignEnabled={marketingZoneRedesignEnabled}
             />
           )}
         </div>

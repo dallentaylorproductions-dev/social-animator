@@ -149,6 +149,12 @@ export function samplePayload(brand: BrandSettings): PublicPayload {
 export function sampleStateAPayload(
   brand: BrandSettings,
   appointmentAt?: string,
+  // MARKETING_ZONE_REDESIGN (v1.7 Packet C) — mirror the publish-time flag so the
+  // wizard's State-A EXAMPLE preview shows the redesigned marketing zone exactly
+  // when a flag-on publish would. Defaults false so existing callers (and a
+  // flag-off session) render the current grid, byte-identical. Render-only: it
+  // only sets the top-level discriminator CampaignSpread branches on.
+  marketingZoneRedesign: boolean = false,
 ): PublicPayload {
   const accent = brand.brandAccent;
   return {
@@ -157,6 +163,9 @@ export function sampleStateAPayload(
     appointmentAt: appointmentAt?.trim()
       ? appointmentAt
       : STATE_A_FULL_PAYLOAD.appointmentAt,
+    // Only a literal true sets the key; false leaves it undefined (omitted), so
+    // the flag-off EXAMPLE preview is byte-identical to today's grid.
+    marketingZoneRedesign: marketingZoneRedesign ? true : undefined,
   } as PublicPayload;
 }
 
@@ -176,6 +185,11 @@ export function draftPreviewPayload(
   // to the prepared-invitation render exactly when the published page would.
   // Defaults false so existing callers (and a flag-off session) are unchanged.
   sellerStateA: boolean = false,
+  // MARKETING_ZONE_REDESIGN (v1.7 Packet C) — mirror the publish-time flag so the
+  // live preview shows the redesigned "How I'll get your home seen" zone exactly
+  // when a flag-on publish would. Defaults false so existing callers (and a
+  // flag-off session) render the current grid, byte-identical.
+  marketingZoneRedesign: boolean = false,
 ): PublicPayload {
   const { agentContact, brandReviews, brandColors, brandWhyUs } =
     brandToPublishInputs(brand);
@@ -191,6 +205,12 @@ export function draftPreviewPayload(
     brandWhyUs,
     compPhotos,
     sellerStateA,
+    // listingsCoverflow: the live preview never seeds the agent's recent
+    // listings here (the publish path projects them), so leave the existing
+    // default-false behavior untouched — pass it through positionally so the
+    // redesign flag lands in the correct (9th) slot.
+    false,
+    marketingZoneRedesign,
   );
 
   // Honest preview: the By-the-numbers band looks good, so Dallen wants it to

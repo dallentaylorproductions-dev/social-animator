@@ -3,6 +3,7 @@ import { auth } from "@/lib/auth";
 import { isOnboardingFirstRunEnabled } from "@/lib/config/onboarding-first-run";
 import { isOnboardingFirstRunV2Enabled } from "@/lib/config/onboarding-first-run-v2";
 import { isOnboardingHybridV3Enabled } from "@/lib/config/onboarding-first-run-v3";
+import { isMarketingZoneRedesignEnabled } from "@/lib/seller-presentation/marketing-zone-redesign";
 import { WelcomeFlow } from "./WelcomeFlow";
 import { WelcomeFlowV2 } from "./WelcomeFlowV2";
 import { WelcomeFlowV3 } from "./WelcomeFlowV3";
@@ -47,6 +48,11 @@ export default async function WelcomePage() {
   const session = await auth();
   const ownerEmail = session?.user?.email ?? null;
   const serverDraftsEnabled = process.env.SERVER_DRAFTS_ENABLED === "true";
+  // MARKETING_ZONE_REDESIGN (v1.7 Packet C) — resolved here on the SERVER (the
+  // env flag is not NEXT_PUBLIC) and threaded down so the onboarding State-A
+  // preview surfaces render the redesigned marketing zone exactly when a flag-on
+  // publish would. Flag off → the flows pass false → today's grid, byte-identical.
+  const marketingZoneRedesignEnabled = isMarketingZoneRedesignEnabled();
 
   // Account-cache reconcile runs on EVERY /welcome entry, ahead of the flow, so
   // a foreign brand left in this browser is cleared before any flow hydrates,
@@ -60,6 +66,7 @@ export default async function WelcomePage() {
         <WelcomeFlowV3
           ownerEmail={ownerEmail}
           serverDraftsEnabled={serverDraftsEnabled}
+          marketingZoneRedesignEnabled={marketingZoneRedesignEnabled}
         />
       </>
     );
@@ -72,6 +79,7 @@ export default async function WelcomePage() {
         <WelcomeFlowV2
           ownerEmail={ownerEmail}
           serverDraftsEnabled={serverDraftsEnabled}
+          marketingZoneRedesignEnabled={marketingZoneRedesignEnabled}
         />
       </>
     );
