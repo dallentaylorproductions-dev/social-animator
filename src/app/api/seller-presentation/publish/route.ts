@@ -11,6 +11,7 @@ import { resolveEntitlements } from "@/lib/entitlements/resolver";
 import { isCompPhotosEnabled } from "@/lib/seller-presentation/street-view";
 import { isSellerStateAEnabled } from "@/lib/seller-presentation/state-a";
 import { isSellerListingsCoverflowEnabled } from "@/lib/seller-presentation/listings-coverflow";
+import { isMarketingZoneRedesignEnabled } from "@/lib/seller-presentation/marketing-zone-redesign";
 import {
   clampDraft,
   describeMissingRequiredInputs,
@@ -210,6 +211,11 @@ export async function POST(req: Request) {
     // reaches KV (byte-identical); the Zone 5 coverflow flexes out. Merges dark
     // until the agent-facing Settings input ships (the deferred next slice).
     isSellerListingsCoverflowEnabled(),
+    // MARKETING_ZONE_REDESIGN kill switch (v1.7 Packet C). OFF => no
+    // `marketingZoneRedesign` key reaches KV (byte-identical) and CampaignSpread
+    // renders the current grid. Render-only: it reshuffles data already in the
+    // payload, so flipping it changes no stored data, only the State-A render.
+    isMarketingZoneRedesignEnabled(),
   );
 
   const data = publicPayload as unknown as Record<string, unknown>;

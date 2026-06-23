@@ -811,6 +811,33 @@ export const STATE_A_COVERFLOW_SINGLE_PAYLOAD: PublicPayload = {
  * neutral house-glyph placeholder, never a blank white photo area. The flanking
  * cards carry working photos (the valid-photo path stays intact alongside it).
  */
+/**
+ * Seller State A · v1.7 Packet C — the redesigned-zone FLEX case: a full
+ * invitation WITH the capability list (whyUs.marketingApproach) AND the coverflow,
+ * but NO showcase media (sampleListingPhotoUrl / sampleVideoUrl cleared). Proves
+ * the redesigned zone still reads complete with ZERO "THE WORK" frames — header +
+ * WHAT'S INCLUDED list + lead-in + coverflow, never an empty showcase shell. Pair
+ * with `&redesign=1`.
+ */
+export const STATE_A_COVERFLOW_NO_MEDIA_PAYLOAD: PublicPayload = {
+  ...STATE_A_COVERFLOW_PAYLOAD,
+  sampleListingPhotoUrl: undefined,
+  sampleVideoUrl: undefined,
+  sampleVideoPosterUrl: undefined,
+};
+
+/**
+ * Seller State A · v1.7 Packet C — the redesigned-zone ONE-FRAME showcase case:
+ * a capability PHOTO but NO capability video, so "THE WORK" shows a single static
+ * still (no dots / cue / chip). Pairs with `&redesign=1` to verify the 1-frame
+ * fallback (the honesty rule: one photo → a single frame, no fake peeks).
+ */
+export const STATE_A_COVERFLOW_PHOTO_ONLY_PAYLOAD: PublicPayload = {
+  ...STATE_A_COVERFLOW_PAYLOAD,
+  sampleVideoUrl: undefined,
+  sampleVideoPosterUrl: undefined,
+};
+
 export const STATE_A_COVERFLOW_BROKEN_PHOTO_PAYLOAD: PublicPayload = {
   ...STATE_A_FULL_PAYLOAD,
   recentListings: [

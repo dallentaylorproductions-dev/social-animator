@@ -15,6 +15,8 @@ import {
   STATE_A_COVERFLOW_PAIR_PAYLOAD,
   STATE_A_COVERFLOW_TRIO_PAYLOAD,
   STATE_A_COVERFLOW_SINGLE_PAYLOAD,
+  STATE_A_COVERFLOW_NO_MEDIA_PAYLOAD,
+  STATE_A_COVERFLOW_PHOTO_ONLY_PAYLOAD,
   STATE_A_COVERFLOW_BROKEN_PHOTO_PAYLOAD,
   STATE_A_FULL_PAYLOAD,
   STATE_A_MINIMAL_PAYLOAD,
@@ -80,6 +82,14 @@ interface PageProps {
      * mark without flipping a global env. Any other value falls back to the env default.
      */
     reviewSourceLogos?: string;
+    /**
+     * MARKETING_ZONE_REDESIGN (v1.7 Packet C) — `?redesign=1` merges
+     * `marketingZoneRedesign: true` onto the fixture payload (routed through the
+     * same clamp as a real publish), so the suite + Dallen's smoke can see the
+     * redesigned "How I'll get your home seen" zone on any state-a fixture without
+     * flipping the server env flag. Any other value → the current grid renders.
+     */
+    redesign?: string;
   }>;
 }
 
@@ -94,6 +104,7 @@ export default async function SellerPresentationPreview({ searchParams }: PagePr
     template,
     suppressWordmark,
     reviewSourceLogos,
+    redesign,
   } = await searchParams;
   // `?reviewSourceLogos=1` forces the chip on; otherwise leave undefined so
   // SellerPresentationPage falls back to the server env flag (off in tests).
@@ -157,6 +168,10 @@ export default async function SellerPresentationPreview({ searchParams }: PagePr
     "state-a-coverflow-pair",
     "state-a-coverflow-trio",
     "state-a-coverflow-single",
+    // v1.7 Packet C — redesigned-zone flex case: list + coverflow, NO showcase
+    // media (pair with `&redesign=1` to see the zone read complete with 0 frames).
+    "state-a-coverflow-no-media",
+    "state-a-coverflow-photo-only",
     // Zone 5 broken-photo guard: a card whose non-empty photoUrl 404s (no Street
     // View coverage) must fall back to the neutral placeholder, never a blank.
     "state-a-coverflow-broken",
@@ -230,6 +245,10 @@ export default async function SellerPresentationPreview({ searchParams }: PagePr
                                         ? STATE_A_COVERFLOW_TRIO_PAYLOAD
                                         : variant === "state-a-coverflow-single"
                                           ? STATE_A_COVERFLOW_SINGLE_PAYLOAD
+                                        : variant === "state-a-coverflow-no-media"
+                                          ? STATE_A_COVERFLOW_NO_MEDIA_PAYLOAD
+                                        : variant === "state-a-coverflow-photo-only"
+                                          ? STATE_A_COVERFLOW_PHOTO_ONLY_PAYLOAD
                                         : variant === "state-a-coverflow-broken"
                                           ? STATE_A_COVERFLOW_BROKEN_PHOTO_PAYLOAD
                                         : FULL_PAYLOAD;
@@ -253,6 +272,9 @@ export default async function SellerPresentationPreview({ searchParams }: PagePr
   const merged: Record<string, unknown> = { ...payload };
   if (Object.keys(brandColors).length > 0) merged.brandColors = brandColors;
   if (suppressWordmark === "1") merged.suppressWordmark = true;
+  // MARKETING_ZONE_REDESIGN — `?redesign=1` flips the redesigned marketing zone
+  // on for this preview render (re-clamped like a real publish). Render-only.
+  if (redesign === "1") merged.marketingZoneRedesign = true;
   const data = merged as Record<string, unknown>;
 
   // Wrap the fixture payload in a HandoutRecord so the renderer's

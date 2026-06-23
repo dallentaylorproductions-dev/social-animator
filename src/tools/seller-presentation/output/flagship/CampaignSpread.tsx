@@ -18,6 +18,11 @@ import {
   COVERFLOW_EYEBROW,
   COVERFLOW_VIEWS_LABEL,
   EXPOSURE_LINE,
+  CAMPAIGN_LEADIN,
+  INCLUDED_EYEBROW,
+  WORK_EYEBROW,
+  WORK_NEXT_CHIP,
+  WORK_SWIPE_CUE,
 } from "./state-a-copy";
 import { isLeadEmphasisKey } from "@/lib/seller-presentation/lead-emphasis";
 // Co-load the spread/coverflow styles with the component so they are present
@@ -156,6 +161,106 @@ export function CampaignSpread({
           </h2>
         </div>
         <ListingsCoverflow listings={listings} />
+        <p className="sa-spread__reach reveal" data-testid="fs-sa-spread-reach">
+          {EXPOSURE_LINE}
+        </p>
+      </section>
+    );
+  }
+
+  // v1.7 Packet C — the redesigned marketing zone (MARKETING_ZONE_REDESIGN, full
+  // variant only). The same data, recomposed into the locked three parts: a flat
+  // "THE WORK" swipe showcase (the agent's craft media), a "WHAT'S INCLUDED"
+  // editorial capabilities list (substance inline, no accordion), and a tinted
+  // lead-in into the existing exposure coverflow — deliberately distinct from the
+  // 3D coverflow (flat slide vs. perspective bend; "the craft" vs. "real reach";
+  // the list + lead-in buffer between them). Flag-off renders the grid below,
+  // byte-identical. The coverflow-only (State B) variant returned above ignores it.
+  if (payload.marketingZoneRedesign === true) {
+    const workFrames: Frame[] = [];
+    if (samplePhoto) {
+      workFrames.push({
+        key: "photo",
+        label: CAPABILITY_PHOTO_LABEL,
+        sub: CAPABILITY_PHOTO_SUB,
+        image: samplePhoto,
+        kind: "photo",
+      });
+    }
+    if (sampleVideo) {
+      const poster = payload.sampleVideoPosterUrl?.trim();
+      workFrames.push({
+        key: "video",
+        label: CAPABILITY_VIDEO_LABEL,
+        sub: CAPABILITY_VIDEO_SUB,
+        image: poster,
+        kind: poster ? "photo" : "asset",
+      });
+    }
+    // The capability list reuses the agent's authored marketing items verbatim
+    // (whyUs.marketingApproach) — substance always visible, never behind a tap.
+    const included = marketing.slice(0, 3).filter((m) => m.title?.trim());
+    const hasCraftAbove = workFrames.length > 0 || included.length > 0;
+
+    // Honesty: the whole zone flexes out only when nothing backs it AND no lead
+    // emphasis is set — same gate as the legacy render, so an empty page is empty
+    // here too (never an empty showcase shell or a bare header).
+    if (!hasCraftAbove && listings.length === 0 && !emphasis) return null;
+
+    return (
+      <section
+        className="section sa-spread z-offwhite"
+        data-testid="fs-sa-spread"
+        data-redesign="1"
+      >
+        <div className="reveal">
+          <div className="eyebrow">
+            How I&apos;ll Get Your Home Seen{" "}
+            <span className="rule" aria-hidden="true" />
+          </div>
+          <h2 className="head">
+            {headline.lead} <em>{headline.em}</em>.
+          </h2>
+        </div>
+
+        {hasCraftAbove ? (
+          <div className="sa-spread__editorial">
+            {workFrames.length > 0 && <WorkShowcase frames={workFrames} />}
+            {included.length > 0 && <IncludedList items={included} />}
+          </div>
+        ) : (
+          // No craft media or capability copy yet, but a lead emphasis is set:
+          // the same calm ghost the legacy render shows, so the headline has a
+          // body to sit over (honest — it names the plan, fabricates nothing).
+          emphasis && (
+            <div className="sa-spread__grid reveal">
+              <div
+                className="sa-frame sa-frame--lead sa-frame--ghost"
+                data-testid="fs-sa-spread-ghost"
+              >
+                <div className="sa-frame__cap">
+                  <span className="sa-frame__label">{headline.em}</span>
+                  <span className="sa-frame__sub">{CAMPAIGN_GHOST_SUB}</span>
+                </div>
+              </div>
+            </div>
+          )
+        )}
+
+        {listings.length > 0 && (
+          <div className="sa-spread__proof">
+            {hasCraftAbove && (
+              <p
+                className="sa-spread__leadin reveal"
+                data-testid="fs-sa-spread-leadin"
+              >
+                {CAMPAIGN_LEADIN}
+              </p>
+            )}
+            <ListingsCoverflow listings={listings} />
+          </div>
+        )}
+
         <p className="sa-spread__reach reveal" data-testid="fs-sa-spread-reach">
           {EXPOSURE_LINE}
         </p>
@@ -424,5 +529,169 @@ function SpreadFrame({ frame, lead = false }: { frame: Frame; lead?: boolean }) 
         {frame.sub && <span className="sa-frame__sub">{frame.sub}</span>}
       </div>
     </div>
+  );
+}
+
+/**
+ * v1.7 Packet C · Part 1 — "THE WORK" flat swipe showcase. ONE frame the seller
+ * swipes through the agent's craft (photography still → video tour → …). The
+ * caption rides a SOLID dark band (legibility never on the raw photo); a dot
+ * indicator + a "swipe the craft" micro-cue + a tappable "See the work" chip make
+ * it read as clearly swipeable (the fix for "flat, nothing feels clickable").
+ *
+ * Motion is a FLAT horizontal slide (CSS scroll-snap), deliberately distinct from
+ * the coverflow's 3D bend. No auto-advance: the motion island only wires the
+ * chip + the active-dot tracking, and reduced-motion collapses to a single static
+ * frame (CSS). One frame → a single static still, no dots / chip / cue.
+ */
+function WorkShowcase({ frames }: { frames: Frame[] }) {
+  const single = frames.length === 1;
+  return (
+    <div
+      className="sa-work reveal"
+      data-testid="fs-sa-work"
+      data-count={frames.length}
+    >
+      <div className="sa-work__head">
+        <span className="sa-work__eyebrow">{WORK_EYEBROW}</span>
+        {!single && (
+          <span className="sa-work__cue" data-testid="fs-sa-work-cue">
+            {WORK_SWIPE_CUE}
+          </span>
+        )}
+      </div>
+      <div className="sa-work__viewport">
+        <div className="sa-work__track" data-work-track>
+          {frames.map((f) => (
+            <figure
+              key={f.key}
+              className={`sa-work__slide${f.image ? " has-photo" : ""}`}
+              data-work-slide
+              data-testid={`fs-sa-work-${f.key}`}
+            >
+              {f.image && (
+                <span
+                  className="sa-work__photo"
+                  aria-hidden="true"
+                  style={{
+                    backgroundImage: `url("${f.image.replace(/"/g, '\\"')}")`,
+                  }}
+                />
+              )}
+              <figcaption className="sa-work__band">
+                <div className="sa-work__cap">
+                  <span className="sa-work__label">{f.label}</span>
+                  {f.sub && <span className="sa-work__sub">{f.sub}</span>}
+                </div>
+                {!single && (
+                  <button
+                    type="button"
+                    className="sa-work__chip"
+                    data-work-next
+                    aria-label={WORK_NEXT_CHIP}
+                  >
+                    {WORK_NEXT_CHIP}
+                    <span className="sa-work__chip-arrow" aria-hidden="true">
+                      →
+                    </span>
+                  </button>
+                )}
+              </figcaption>
+            </figure>
+          ))}
+        </div>
+      </div>
+      {!single && (
+        <div className="sa-work__dots" data-work-dots data-testid="fs-sa-work-dots">
+          {frames.map((f, i) => (
+            <span
+              key={f.key}
+              className={`sa-work__dot${i === 0 ? " is-active" : ""}`}
+              data-work-dot
+              aria-hidden="true"
+            />
+          ))}
+        </div>
+      )}
+    </div>
+  );
+}
+
+/**
+ * v1.7 Packet C · Part 2 — "WHAT'S INCLUDED" editorial capabilities list. The
+ * three flat tiles become editorial rows: a teal icon chip + title + the agent's
+ * one-line proof sentence shown INLINE (no tap-to-expand — the substance is the
+ * thoughtful part, never hidden behind a chevron). Copy is the agent's authored
+ * `whyUs.marketingApproach` (with the shipped Settings defaults when unset).
+ */
+function IncludedList({
+  items,
+}: {
+  items: ReadonlyArray<{ title: string; detail?: string }>;
+}) {
+  return (
+    <div className="sa-incl reveal" data-testid="fs-sa-incl">
+      <span className="sa-incl__eyebrow">{INCLUDED_EYEBROW}</span>
+      <ul className="sa-incl__list">
+        {items.map((m, i) => (
+          <li className="sa-incl__row" key={i} data-testid={`fs-sa-incl-${i}`}>
+            <span className="sa-incl__icon" aria-hidden="true">
+              <IncludedIcon index={i} />
+            </span>
+            <div className="sa-incl__text">
+              <span className="sa-incl__title">{m.title}</span>
+              {m.detail?.trim() && (
+                <span className="sa-incl__proof">{m.detail}</span>
+              )}
+            </div>
+          </li>
+        ))}
+      </ul>
+    </div>
+  );
+}
+
+/**
+ * Decorative teal icon for a WHAT'S INCLUDED row, by position. The three default
+ * capabilities map to camera (photography & video) · broadcast (ad funnel) · badge
+ * (featured placement); a 4th+ falls back to the badge. Stroke uses currentColor
+ * so the teal is set once on `.sa-incl__icon`. Aria-hidden — purely ornamental.
+ */
+function IncludedIcon({ index }: { index: number }) {
+  const common = {
+    width: 18,
+    height: 18,
+    viewBox: "0 0 24 24",
+    fill: "none",
+    stroke: "currentColor",
+    strokeWidth: 1.7,
+    strokeLinecap: "round" as const,
+    strokeLinejoin: "round" as const,
+  };
+  if (index === 0) {
+    // camera — photography & video
+    return (
+      <svg {...common}>
+        <path d="M3 8.5A1.5 1.5 0 0 1 4.5 7h2l1.2-1.8A1 1 0 0 1 8.5 5h7a1 1 0 0 1 .8.4L17.5 7h2A1.5 1.5 0 0 1 21 8.5v9A1.5 1.5 0 0 1 19.5 19h-15A1.5 1.5 0 0 1 3 17.5z" />
+        <circle cx="12" cy="13" r="3.2" />
+      </svg>
+    );
+  }
+  if (index === 1) {
+    // broadcast — targeted digital ad funnel
+    return (
+      <svg {...common}>
+        <path d="M4 9v6l11 4V5z" />
+        <path d="M15 8a4 4 0 0 1 0 8" />
+        <path d="M4 12H3" />
+      </svg>
+    );
+  }
+  // badge — featured placement & syndication
+  return (
+    <svg {...common}>
+      <path d="M12 3l2.4 1.8 3 .2.2 3L19.4 11.4 18 14l1.6 2.6-2.8 1.2-1 2.8-3-1.2-3 1.2-1-2.8-2.8-1.2L5.6 14 4.2 11.4 5.4 8.2l.2-3 3-.2z" />
+      <path d="M9.5 12l1.8 1.8L15 10" />
+    </svg>
   );
 }
