@@ -339,9 +339,6 @@ function ListingCard({
   pos: CoverflowPos;
   index: number;
 }) {
-  // Outer peeks carry no band/label at all — they only signal "there's more".
-  const isPeek = pos === "out-left" || pos === "out-right";
-
   // Photo candidates, in priority order: the hosted upload first, then the
   // Street View fallback (requested fresh from Google at view time, same pattern
   // as the comp thumbs — no bytes stored). The card renders the first that
@@ -377,20 +374,26 @@ function ListingCard({
           testId={`fs-sa-cf-photo-${index}`}
         />
       )}
-      {!isPeek && (
-        <div className="sa-cf__band">
-          {hasViews && (
-            <div className="sa-cf__views" data-testid={`fs-sa-cf-views-${index}`}>
-              <span className="sa-cf__num">
-                {listing.viewCount!.toLocaleString("en-US")}
-              </span>
-              <span className="sa-cf__vlabel">{COVERFLOW_VIEWS_LABEL}</span>
-            </div>
-          )}
-          <div className="sa-cf__addr">{listing.address}</div>
-          {listing.city && <div className="sa-cf__city">{listing.city}</div>}
-        </div>
-      )}
+      {/* The legibility band is rendered on EVERY card so each is a self-contained
+          listing card (image + dark band + count/address/city) — required on the
+          mobile scroll-snap carousel, where every card is a full listing the
+          agent swipes through. The DESKTOP fan's depth trick (the outer
+          `out-left`/`out-right` peeks stay BARE to focus the eye on center) is now
+          a CSS concern: `@container page (min-width:720px)` hides the band for
+          those two positions, so the desktop look is byte-identical while mobile
+          never shows a bare, identity-less card. */}
+      <div className="sa-cf__band">
+        {hasViews && (
+          <div className="sa-cf__views" data-testid={`fs-sa-cf-views-${index}`}>
+            <span className="sa-cf__num">
+              {listing.viewCount!.toLocaleString("en-US")}
+            </span>
+            <span className="sa-cf__vlabel">{COVERFLOW_VIEWS_LABEL}</span>
+          </div>
+        )}
+        <div className="sa-cf__addr">{listing.address}</div>
+        {listing.city && <div className="sa-cf__city">{listing.city}</div>}
+      </div>
     </div>
   );
 }

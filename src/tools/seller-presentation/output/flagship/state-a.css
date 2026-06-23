@@ -1560,6 +1560,16 @@
     opacity: 0.4;
     filter: saturate(0.55) brightness(0.98);
   }
+  /* DESKTOP fan depth trick: the outer peeks stay BARE (no band/number/address)
+     so the eye lands on the center card. The band is in the DOM on every card
+     (for the mobile carousel); here it is hidden ONLY for the two outer-peek
+     positions, ONLY in the fan arm — so the desktop look is byte-identical to
+     before, while the mobile arm (no min-width match) shows the band on all
+     cards. data-pos drives this exactly as it drives the fan transforms. */
+  .fs-page .sa-cf__card[data-pos="out-left"] .sa-cf__band,
+  .fs-page .sa-cf__card[data-pos="out-right"] .sa-cf__band {
+    display: none;
+  }
   /* Few-card "gently dimensional" states — separated so cards never overlap or
      clip an address (the old ±30% pair overlapped ~118px and clipped it).
      1 → centered single (keeps the keyline); 2 → balanced pair pushed to ±54%
@@ -1633,6 +1643,28 @@
    fragment); the peek-swipe carousel entrance fades cards up in sequence. The
    swipe/snap interaction itself is unchanged. */
 @container page (max-width: 719.98px) {
+  /* Mobile is its OWN module, not the desktop fan reflowed: a clean horizontal
+     scroll-snap carousel where every card is a complete listing (the band shows
+     on all of them — the fan's outer-peek band suppression is desktop-only), and
+     the header + aggregate center over the cards so the section reads as one
+     coherent unit framed around the swipeable row. */
+  .fs-page .sa-cf__eyebrow,
+  .fs-page .sa-cf__agg {
+    text-align: center;
+  }
+  /* Even, clearly-separated cards with a deliberate peek of the next one (the
+     swipe affordance). Each card snaps to the start so the leading listing lands
+     fully visible (its number reachable immediately), the next peeking at the
+     right edge. scroll-padding keeps the snapped card off the hard edge. */
+  .fs-page .sa-cf__fan {
+    gap: 16px;
+    scroll-padding-left: 4px;
+  }
+  .fs-page .sa-cf__card {
+    flex-basis: 76%;
+    scroll-snap-align: start;
+    transition: opacity 0.5s var(--ease), transform 0.5s var(--ease);
+  }
   .fs-page .sa-cf__fan--n1 {
     overflow: visible;
     justify-content: center;
@@ -1640,9 +1672,7 @@
   .fs-page .sa-cf__fan--n1 .sa-cf__card {
     flex: 0 0 86%;
     max-width: 320px;
-  }
-  .fs-page .sa-cf__card {
-    transition: opacity 0.5s var(--ease), transform 0.5s var(--ease);
+    scroll-snap-align: center;
   }
   .fs-page .sa-cf.reveal:not(.in) .sa-cf__card {
     opacity: 0;

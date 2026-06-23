@@ -163,4 +163,75 @@ test.describe("State B · Zone 5 — exposure coverflow", () => {
     await expect(page.getByTestId("fs-sa-cf")).toHaveCount(0);
     await expect(page.getByTestId("fs-sa-spread")).toHaveCount(0);
   });
+
+  test("MOBILE: every card is a COMPLETE listing — incl. the first card, which used to be a bare image", async ({
+    page,
+  }) => {
+    // ≤719px container → the mobile scroll-snap carousel arm. Every card must show
+    // its band (count + address), the first listing included: it sits at the
+    // `out-left` data-pos and previously had its band suppressed component-side, so
+    // on mobile it read as a stray cover photo and its number was never shown.
+    await page.setViewportSize({ width: 390, height: 1800 });
+    await page.goto(WITH_DATA);
+    await page.getByTestId("fs-sa-cf").scrollIntoViewIfNeeded();
+
+    // Confirm we're on the mobile arm (flat carousel, not the 3D fan).
+    const persp = await page
+      .getByTestId("fs-sa-cf")
+      .locator(".sa-cf__fan")
+      .evaluate((el) => getComputedStyle(el).perspective);
+    expect(persp).toBe("none");
+
+    // EVERY card (0..3) carries a band with its address + view count — none bare.
+    const expected = [
+      { i: 0, addr: "9825 Glory Dr SE", views: "28,560" },
+      { i: 1, addr: "3642 22nd Ave NE", views: "32,246" },
+      { i: 2, addr: "6706 83rd Ln SE", views: "41,184" },
+      { i: 3, addr: "15117 Prescott Lp SE", views: "37,610" },
+    ];
+    for (const { i, addr, views } of expected) {
+      const band = page.getByTestId(`fs-sa-cf-card-${i}`).locator(".sa-cf__band");
+      await expect(band, `card ${i} must have a band element`).toHaveCount(1);
+      await expect(band).toContainText(addr);
+      await expect(band).toContainText(views);
+      // The band paints its dark legibility surface (not display:none) on mobile.
+      const display = await band.evaluate((el) => getComputedStyle(el).display);
+      expect(display).not.toBe("none");
+    }
+
+    // The first card's band is on-screen and dark (the headline regression fix).
+    const firstBand = page.getByTestId("fs-sa-cf-card-0").locator(".sa-cf__band");
+    await expect(firstBand).toBeVisible();
+    const bg = await firstBand.evaluate(
+      (el) => getComputedStyle(el).backgroundColor,
+    );
+    const ch = bg.match(/\d+/g)!.map(Number);
+    expect(ch[0] + ch[1] + ch[2]).toBeLessThan(120);
+  });
+
+  test("DESKTOP fan UNCHANGED: the outer peek cards stay bare (band suppressed in the fan arm)", async ({
+    page,
+  }) => {
+    // Regression guard for the desktop depth trick: the band is now in the DOM on
+    // every card (for mobile), but the ≥720px fan arm hides it for the two outer
+    // peeks so the desktop look is byte-identical. 5-card fan → card 0 = out-left,
+    // card 4 = out-right are the bare peeks; the center keeps its band.
+    await page.setViewportSize({ width: 1280, height: 1400 });
+    await page.goto("/seller-presentation-preview?fixture=state-a-coverflow");
+    await page.getByTestId("fs-sa-cf").scrollIntoViewIfNeeded();
+
+    for (const i of [0, 4]) {
+      const band = page.getByTestId(`fs-sa-cf-card-${i}`).locator(".sa-cf__band");
+      const display = await band.evaluate((el) => getComputedStyle(el).display);
+      expect(display, `outer peek card ${i} band must be hidden on desktop`).toBe(
+        "none",
+      );
+    }
+    // The center card's band still shows (depth trick only touches the outer peeks).
+    const centerDisplay = await page
+      .getByTestId("fs-sa-cf-card-2")
+      .locator(".sa-cf__band")
+      .evaluate((el) => getComputedStyle(el).display);
+    expect(centerDisplay).not.toBe("none");
+  });
 });
