@@ -114,6 +114,31 @@ test.describe("State B · Zone 5 — exposure coverflow", () => {
     await expect(aggnum).toContainText("139,600");
   });
 
+  test("the card legibility BAND paints a dark background (text never sits on the bare photo)", async ({
+    page,
+  }) => {
+    // Legibility must NEVER depend on the photo: the dark band (background:
+    // var(--sa-proof-dark)) is the guarantee. --sa-proof-dark was defined only
+    // under .fs-page.state-a, so on the flagship State-B root it was undefined
+    // and the band painted transparent — the count/address/city sat on the bare
+    // (often bright) photo. The token is now hoisted to .fs-page.
+    await page.setViewportSize({ width: 1280, height: 1600 });
+    await page.goto(WITH_DATA);
+    await page.getByTestId("fs-sa-cf").scrollIntoViewIfNeeded();
+
+    // The center card (index 2) carries a band behind its number + address + city.
+    const band = page.getByTestId("fs-sa-cf-card-2").locator(".sa-cf__band");
+    await expect(band).toBeVisible();
+    const bg = await band.evaluate((el) => getComputedStyle(el).backgroundColor);
+    // Non-transparent...
+    expect(bg).not.toBe("rgba(0, 0, 0, 0)");
+    expect(bg).not.toBe("transparent");
+    // ...and genuinely DARK (low channel sum) — the legibility surface, not a
+    // faint tint. #12171a → rgb(18, 23, 26), sum 67.
+    const ch = bg.match(/\d+/g)!.map(Number);
+    expect(ch[0] + ch[1] + ch[2]).toBeLessThan(120);
+  });
+
   test("coverflow-only: State B shows NO capability frames (no duplication of its 'how we market')", async ({
     page,
   }) => {

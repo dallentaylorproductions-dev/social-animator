@@ -17,7 +17,18 @@
    (light = --teal-700, dark = --teal-500, the same ramp the sparkline + stars
    use), so the panels re-hue per agent; the cream + dark fills are fixed
    editorial neutrals. Each zone owns only its surrounding layout. */
-.fs-page.state-a {
+/* Token scope is `.fs-page` (NOT `.fs-page.state-a`) because the proof-fill
+   tokens are consumed by SHARED coverflow rules that now also render on the
+   flagship State-B root (`.sa-cf__card` → --sa-proof-cream, `.sa-cf__band` →
+   --sa-proof-dark, the center card shadow → --sa-proof-shadow-light). Defining
+   them only on `.state-a` left `var(--sa-proof-dark)` undefined on State B, so
+   the card legibility band painted transparent and the text sat on the bare
+   photo. Hoisting is purely additive — these are custom-property declarations
+   that paint nothing on their own; only the rules that reference them paint, and
+   the State-A-only consumers (proof panels, quote/review panels) still only
+   match State-A elements. Kills the var-undefined-on-State-B class wholesale
+   rather than patching one consumer at a time. */
+.fs-page {
   --sa-proof-cream: #fbf8f2;   /* light panel fill (Z2) */
   --sa-proof-inset: #f4eee3;   /* the Z4 stat-rail inset fill */
   --sa-proof-dark: #12171a;    /* dark panel fill (Z3) */
