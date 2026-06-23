@@ -1139,9 +1139,13 @@ export function toPublicPayload(
   const projectedSampleVideoPosterUrl = projectPublicWhyUsText(
     brandWhyUs.sampleVideoPosterUrl,
   );
-  // Seller State A · Zone 5 — project the recent listings ONLY behind the
-  // coverflow flag (the State A invitation gate is applied below, with the other
-  // State A fields). Field-by-field, capped, view counts clamped to integers.
+  // Zone 5 — project the recent listings ONLY behind the coverflow flag.
+  // Field-by-field, capped, view counts clamped to integers. Emitted at the TOP
+  // level of the payload (see the main return), NOT inside the State-A gate, so
+  // BOTH the prepared invitation (State A) AND the full presentation (State B)
+  // carry the exposure coverflow — the reach proof is at least as persuasive at
+  // the close as in the invitation. A flag-off publish emits no key (byte-
+  // identical); a no-data publish projects to undefined and the zone flexes out.
   const projectedRecentListings = listingsCoverflow
     ? projectRecentListings(brandWhyUs.recentListings)
     : undefined;
@@ -1169,10 +1173,9 @@ export function toPublicPayload(
           // the key via JSON.stringify, so an agent who never picked one publishes
           // the shipped default headline, byte-identical).
           leadEmphasis: clampLeadEmphasis(brandWhyUs.leadEmphasis),
-          // Zone 5 coverflow — already flag-gated above (undefined when the
-          // coverflow flag is off OR no listings survived), so it drops out via
-          // JSON.stringify and a State-A-but-flag-off publish stays byte-identical.
-          recentListings: projectedRecentListings,
+          // NOTE: recentListings is NO LONGER emitted here — it moved to the TOP
+          // level of the return (below) so State B carries it too. A State-A page
+          // still gets it (same top-level key, same flag gate).
         }
       : {};
 
@@ -1238,6 +1241,12 @@ export function toPublicPayload(
     whyUs: projectedWhyUs,
     agentTagline: projectedTagline,
     reviewsHeadline: projectedReviewsHeadline,
+
+    // Zone 5 exposure coverflow — TOP-LEVEL (not State-A-gated) so BOTH State A
+    // and the full presentation (State B) carry it. Already flag-gated above
+    // (undefined when the coverflow flag is off OR no listings survived), so it
+    // drops out via JSON.stringify and a flag-off publish stays byte-identical.
+    recentListings: projectedRecentListings,
 
     // Seller State A — spread last; `{}` for every revealed / flag-off publish.
     // Carries the state discriminator + appointment AND the State A copy/asset
@@ -1329,6 +1338,14 @@ export function clampPublicPayload(raw: unknown): PublicPayload {
     reviewsHeadline: projectPublicWhyUsText(r.reviewsHeadline),
     reviewsAsOf: projectPublicWhyUsText(r.reviewsAsOf),
 
+    // Zone 5 exposure coverflow — re-run the SAME field-by-field projection on
+    // read at the TOP level (not inside the State-A gate) so the coverflow
+    // survives for BOTH State A and the revealed State-B page. Still hardened:
+    // projectRecentListings caps the count, drops fabricated/non-integer view
+    // counts, and strips private keys, so a hand-edited KV record can't smuggle
+    // an unbounded or rogue list to the renderer. Absent ⇒ undefined ⇒ flex-out.
+    recentListings: projectRecentListings(r.recentListings),
+
     // Seller State A — coerce the discriminator at the trust boundary. An
     // absent / unknown / tampered value reads as `revealed` so the consumer
     // dispatch resolves to the existing full presentation (every pre-State-A
@@ -1357,7 +1374,6 @@ function clampStateAFields(r: Record<string, unknown>): {
   sampleVideoUrl?: string;
   sampleVideoPosterUrl?: string;
   leadEmphasis?: LeadEmphasisKey;
-  recentListings?: PublicRecentListing[];
 } {
   const valuationStatus = clampValuationStatus(r.valuationStatus);
   if (!isInvitationStatus(valuationStatus)) return { valuationStatus };
@@ -1373,11 +1389,8 @@ function clampStateAFields(r: Record<string, unknown>): {
     // Pass 2b — re-clamp the lead emphasis to a known key on read; survives ONLY
     // alongside an invitation status (a stray value on a revealed record drops).
     leadEmphasis: clampLeadEmphasis(r.leadEmphasis),
-    // Zone 5 coverflow — re-run the SAME field-by-field projection on read, so a
-    // hand-edited KV record can't smuggle an unbounded list, a fabricated /
-    // non-integer view count, or a private key into the renderer. Survives ONLY
-    // alongside an invitation status (a stray array on a revealed record drops).
-    recentListings: projectRecentListings(r.recentListings),
+    // NOTE: recentListings is clamped at the TOP level of clampPublicPayload now
+    // (so State B carries it too) — no longer re-clamped here.
   };
 }
 

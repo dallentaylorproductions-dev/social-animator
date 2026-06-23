@@ -34,6 +34,7 @@ import {
   FULL_PAYLOAD,
   STATE_A_FULL_PAYLOAD,
 } from "../../output/__fixtures__/sample-payload";
+import { SAMPLE_RECENT_LISTINGS } from "@/lib/onboarding/sample-listing-draft";
 
 /**
  * The three publish-input objects, built from BrandSettings exactly as
@@ -128,6 +129,11 @@ export function samplePayload(brand: BrandSettings): PublicPayload {
   return {
     ...FULL_PAYLOAD,
     brandColors: accent ? { accent } : undefined,
+    // Seed the SAMPLE recent listings so the wizard's full (State-B) EXAMPLE
+    // preview shows the exposure coverflow. Sample/demo data only — this helper
+    // builds the EXAMPLE-badged preview, never a real published payload (the
+    // publish path goes through toPublicPayload directly, flag-gated).
+    recentListings: SAMPLE_RECENT_LISTINGS,
   } as PublicPayload;
 }
 

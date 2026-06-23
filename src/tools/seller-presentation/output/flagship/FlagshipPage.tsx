@@ -13,6 +13,7 @@ import { Price } from "./Price";
 import { AgentNote } from "./AgentNote";
 import { WhyPrice } from "./WhyPrice";
 import { WhyUs } from "./WhyUs";
+import { CampaignSpread } from "./CampaignSpread";
 import { Reviews } from "./Reviews";
 import { AreaStats } from "./AreaStats";
 import { AgentBand } from "./AgentBand";
@@ -112,6 +113,15 @@ export function FlagshipPage({
             joins "How we market" (cap 4); the guarantee moves to the Agent block.
             Flexes out entirely when nothing renderable is present. */}
         <WhyUs payload={payload} variant="seller" />
+        {/* Zone 5 exposure proof — the reach-proof coverflow (recent listings,
+            real reach), placed right after the "how we market" story and before
+            the social proof, mirroring State A's Zone-5 position. `coverflow-only`
+            so it shows ONLY the listings coverflow + reach line (State B already
+            tells the marketing story above) — the same CampaignSpread component
+            State A uses, no fork. Flexes out entirely when the page carries no
+            recentListings (flag-off / no agent data), so it's byte-identical to
+            today's State B until the coverflow flag is on AND data exists. */}
+        <CampaignSpread payload={payload} variant="coverflow-only" />
         <Reviews
           payload={payload}
           sourceLogos={reviewSourceLogos}

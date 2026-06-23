@@ -17,7 +17,18 @@
    (light = --teal-700, dark = --teal-500, the same ramp the sparkline + stars
    use), so the panels re-hue per agent; the cream + dark fills are fixed
    editorial neutrals. Each zone owns only its surrounding layout. */
-.fs-page.state-a {
+/* Token scope is `.fs-page` (NOT `.fs-page.state-a`) because the proof-fill
+   tokens are consumed by SHARED coverflow rules that now also render on the
+   flagship State-B root (`.sa-cf__card` → --sa-proof-cream, `.sa-cf__band` →
+   --sa-proof-dark, the center card shadow → --sa-proof-shadow-light). Defining
+   them only on `.state-a` left `var(--sa-proof-dark)` undefined on State B, so
+   the card legibility band painted transparent and the text sat on the bare
+   photo. Hoisting is purely additive — these are custom-property declarations
+   that paint nothing on their own; only the rules that reference them paint, and
+   the State-A-only consumers (proof panels, quote/review panels) still only
+   match State-A elements. Kills the var-undefined-on-State-B class wholesale
+   rather than patching one consumer at a time. */
+.fs-page {
   --sa-proof-cream: #fbf8f2;   /* light panel fill (Z2) */
   --sa-proof-inset: #f4eee3;   /* the Z4 stat-rail inset fill */
   --sa-proof-dark: #12171a;    /* dark panel fill (Z3) */
@@ -29,7 +40,7 @@
   --sa-proof-shadow-light: 0 1px 0 rgba(255, 255, 255, 0.7) inset, 0 22px 50px -30px rgba(60, 44, 27, 0.5);
   --sa-proof-shadow-dark: 0 1px 0 rgba(255, 255, 255, 0.06) inset, 0 30px 48px -28px rgba(0, 0, 0, 0.5);
 }
-.fs-page.state-a .sa-proof {
+.fs-page .sa-proof {
   border-radius: 18px;
   border-left: 2px solid var(--sa-keyline);
   padding: clamp(20px, 3.6cqi, 40px);
@@ -37,18 +48,18 @@
   flex-direction: column;
   gap: 12px;
 }
-.fs-page.state-a .sa-proof--light {
+.fs-page .sa-proof--light {
   --sa-keyline: var(--teal-700);
   background: var(--sa-proof-cream);
   box-shadow: var(--sa-proof-shadow-light);
 }
-.fs-page.state-a .sa-proof--dark {
+.fs-page .sa-proof--dark {
   --sa-keyline: var(--teal-500);
   background: var(--sa-proof-dark);
   border-radius: 16px;
   box-shadow: var(--sa-proof-shadow-dark);
 }
-.fs-page.state-a .sa-proof__label {
+.fs-page .sa-proof__label {
   font-family: var(--f-mono);
   font-size: 11px;
   letter-spacing: 0.18em;
@@ -56,10 +67,10 @@
   line-height: 1.5;
   color: var(--t-mute);
 }
-.fs-page.state-a .sa-proof--dark .sa-proof__label {
+.fs-page .sa-proof--dark .sa-proof__label {
   color: var(--t-pap-mute);
 }
-.fs-page.state-a .sa-proof__num {
+.fs-page .sa-proof__num {
   font-family: var(--f-display);
   font-weight: 500;
   font-size: clamp(38px, 7cqi, 66px);
@@ -68,10 +79,10 @@
   color: var(--teal-700);
   font-variant-numeric: lining-nums tabular-nums;
 }
-.fs-page.state-a .sa-proof--dark .sa-proof__num {
+.fs-page .sa-proof--dark .sa-proof__num {
   color: var(--teal-500);
 }
-.fs-page.state-a .sa-proof__cap {
+.fs-page .sa-proof__cap {
   font-family: var(--f-mono);
   font-size: 10px;
   letter-spacing: 0.12em;
@@ -118,13 +129,23 @@
    PresentationPageMotion driver adds `.in` (and adds it immediately under
    reduced motion). Reduced motion + no-JS land everything at its final state:
    the number sits drawn, the sparkline renders already-drawn. No hover states. */
-.fs-page.state-a .sa-proof__num {
+.fs-page .sa-proof__num {
   opacity: 0;
   transform: translateY(8px);
   transition: opacity 0.5s var(--ease), transform 0.5s var(--ease);
   will-change: opacity, transform;
 }
-.fs-page.state-a .reveal.in .sa-proof__num {
+/* The `.sa-proof__num` reveal RELEASE is scoped to `.fs-page` (NOT
+   `.fs-page.state-a`) so it fires on the flagship State-B root too. Its pre-pose
+   above (`.fs-page .sa-proof__num { opacity:0 }`) and the reduced-motion
+   fallback are already `.fs-page`-wide; this matches them, so the proof numbers
+   — including the coverflow aggregate (`.sa-cf__aggnum`, a `.sa-proof__num`) —
+   release to opacity 1 when their containing `.reveal` (the `.sa-cf` section)
+   gets `.in` on State B exactly as on State A. Without the match the aggnum sat
+   stuck at its opacity:0 pre-pose on State B (the only `.sa-proof__num` there).
+   State A is unchanged — `.fs-page .reveal.in` still matches under
+   `.fs-page.state-a`, so ProofPanel's stat reveals as before. */
+.fs-page .reveal.in .sa-proof__num {
   opacity: 1;
   transform: none;
 }
@@ -207,7 +228,7 @@
   opacity: 0;
 }
 @media (prefers-reduced-motion: reduce) {
-  .fs-page.state-a .sa-proof__num {
+  .fs-page .sa-proof__num {
     opacity: 1 !important;
     transform: none !important;
     transition: none !important;
@@ -1101,20 +1122,20 @@
 }
 
 /* 4 · Campaign spread (Signature B) ---------------------------------------- */
-.fs-page.state-a .sa-spread {
+.fs-page .sa-spread {
   background: var(--offwhite);
 }
-.fs-page.state-a .sa-spread__grid {
+.fs-page .sa-spread__grid {
   margin-top: clamp(28px, 5cqi, 48px);
   display: grid;
   gap: 12px;
 }
-.fs-page.state-a .sa-spread__rest {
+.fs-page .sa-spread__rest {
   display: grid;
   grid-template-columns: 1fr 1fr;
   gap: 12px;
 }
-.fs-page.state-a .sa-frame {
+.fs-page .sa-frame {
   position: relative;
   border-radius: var(--r-md);
   overflow: hidden;
@@ -1125,19 +1146,19 @@
   display: flex;
   align-items: flex-end;
 }
-.fs-page.state-a .sa-frame--lead {
+.fs-page .sa-frame--lead {
   min-height: 260px;
 }
 /* Pass 2b — the calm ghost frame shown when the agent has picked a lead emphasis
    but has no capability sample yet (onboarding BEAT 5 climax, or a live page in
    the same state). A quiet dashed placeholder: no teal fill, no lift, so the
    headline + chosen-lever label carry it and it never reads as a broken photo. */
-.fs-page.state-a .sa-frame--ghost {
+.fs-page .sa-frame--ghost {
   background: var(--white);
   border-style: dashed;
   box-shadow: none;
 }
-.fs-page.state-a .sa-frame__photo {
+.fs-page .sa-frame__photo {
   position: absolute;
   inset: 0;
   z-index: 0;
@@ -1147,14 +1168,14 @@
      hello lives in the hero, not this spread, so no face-bias crop is needed. */
   background-position: center;
 }
-.fs-page.state-a .sa-frame.has-photo::after {
+.fs-page .sa-frame.has-photo::after {
   content: "";
   position: absolute;
   inset: 0;
   z-index: 1;
   background: linear-gradient(to top, rgba(8, 15, 18, 0.64), rgba(8, 15, 18, 0) 58%);
 }
-.fs-page.state-a .sa-frame__cap {
+.fs-page .sa-frame__cap {
   position: relative;
   z-index: 2;
   padding: clamp(14px, 2cqi, 18px);
@@ -1162,26 +1183,26 @@
   flex-direction: column;
   gap: 5px;
 }
-.fs-page.state-a .sa-frame__label {
+.fs-page .sa-frame__label {
   font-family: var(--f-display);
   font-size: clamp(17px, 2.4cqi, 22px);
   line-height: 1.1;
   color: var(--t-ink);
 }
-.fs-page.state-a .sa-frame__sub {
+.fs-page .sa-frame__sub {
   font-family: var(--f-mono);
   font-size: 10px;
   letter-spacing: 0.12em;
   text-transform: uppercase;
   color: var(--t-mute);
 }
-.fs-page.state-a .sa-frame.has-photo .sa-frame__label {
+.fs-page .sa-frame.has-photo .sa-frame__label {
   color: var(--white);
 }
-.fs-page.state-a .sa-frame.has-photo .sa-frame__sub {
+.fs-page .sa-frame.has-photo .sa-frame__sub {
   color: rgba(255, 255, 255, 0.82);
 }
-.fs-page.state-a .sa-spread__reach {
+.fs-page .sa-spread__reach {
   margin: clamp(20px, 3cqi, 28px) 0 0;
   font-family: var(--f-mono);
   font-size: clamp(11px, 1.5cqi, 12.5px);
@@ -1197,12 +1218,12 @@
    The view NUMBER is the hero (white, on the solid dark band); teal is reserved
    for the center keyline + the aggregate total. Legibility never rides on the
    raw photo (the band is solid). No autoplay; the entrance reuses `.reveal`. */
-.fs-page.state-a .sa-cf {
+.fs-page .sa-cf {
   margin-top: clamp(28px, 5cqi, 44px);
   padding-top: 4px;
   border-top: 1px solid var(--line);
 }
-.fs-page.state-a .sa-cf__eyebrow {
+.fs-page .sa-cf__eyebrow {
   font-family: var(--f-mono);
   font-size: 10.5px;
   letter-spacing: 0.2em;
@@ -1212,7 +1233,7 @@
 }
 /* Base: horizontal scroll-snap peek carousel. `.sa-cf__track` collapses (display:
    contents) so the cards become the scroll container's flex items. */
-.fs-page.state-a .sa-cf__fan {
+.fs-page .sa-cf__fan {
   margin-top: 14px;
   display: flex;
   gap: 14px;
@@ -1222,13 +1243,13 @@
   padding: 14px 4px 18px;
   scrollbar-width: none;
 }
-.fs-page.state-a .sa-cf__fan::-webkit-scrollbar {
+.fs-page .sa-cf__fan::-webkit-scrollbar {
   display: none;
 }
-.fs-page.state-a .sa-cf__track {
+.fs-page .sa-cf__track {
   display: contents;
 }
-.fs-page.state-a .sa-cf__card {
+.fs-page .sa-cf__card {
   position: relative;
   flex: 0 0 78%;
   max-width: 300px;
@@ -1239,7 +1260,7 @@
   scroll-snap-align: center;
   box-shadow: var(--lift-1);
 }
-.fs-page.state-a .sa-cf__photo {
+.fs-page .sa-cf__photo {
   position: absolute;
   inset: 0;
   z-index: 0;
@@ -1249,7 +1270,7 @@
   object-position: center;
 }
 /* The center card earns the one teal keyline (all surfaces). */
-.fs-page.state-a .sa-cf__card--center::after {
+.fs-page .sa-cf__card--center::after {
   content: "";
   position: absolute;
   inset: 0;
@@ -1258,7 +1279,7 @@
   border: 2px solid var(--teal-700);
   pointer-events: none;
 }
-.fs-page.state-a .sa-cf__band {
+.fs-page .sa-cf__band {
   position: absolute;
   left: 0;
   right: 0;
@@ -1271,13 +1292,13 @@
   flex-direction: column;
   gap: 5px;
 }
-.fs-page.state-a .sa-cf__views {
+.fs-page .sa-cf__views {
   display: flex;
   align-items: baseline;
   gap: 8px;
 }
 /* THE HERO — big Newsreader number, WHITE, tabular so 5–6 digits sit cleanly. */
-.fs-page.state-a .sa-cf__num {
+.fs-page .sa-cf__num {
   font-family: var(--f-display);
   font-size: clamp(30px, 9cqi, 38px);
   line-height: 0.92;
@@ -1285,20 +1306,20 @@
   color: var(--white);
   font-variant-numeric: tabular-nums;
 }
-.fs-page.state-a .sa-cf__vlabel {
+.fs-page .sa-cf__vlabel {
   font-family: var(--f-mono);
   font-size: 10px;
   letter-spacing: 0.2em;
   text-transform: uppercase;
   color: var(--t-pap-mute);
 }
-.fs-page.state-a .sa-cf__addr {
+.fs-page .sa-cf__addr {
   font-family: var(--f-display);
   font-size: 14.5px;
   line-height: 1.15;
   color: var(--white);
 }
-.fs-page.state-a .sa-cf__city {
+.fs-page .sa-cf__city {
   font-family: var(--f-mono);
   font-size: 9px;
   letter-spacing: 0.14em;
@@ -1309,13 +1330,13 @@
    teal number · mono caption), centered beneath the fan. Reuses .sa-proof__*
    so it reads as one system with the brief's stat panels; the number is a touch
    smaller than a proof panel for the placement, and counts up once on view. */
-.fs-page.state-a .sa-cf__agg {
+.fs-page .sa-cf__agg {
   margin: clamp(16px, 2.4cqi, 22px) 0 0;
   display: flex;
   flex-direction: column;
   gap: 4px;
 }
-.fs-page.state-a .sa-cf__agg .sa-proof__num {
+.fs-page .sa-cf__agg .sa-proof__num {
   font-size: clamp(26px, 5cqi, 40px);
   font-variant-numeric: lining-nums tabular-nums;
 }
@@ -1417,19 +1438,19 @@
      rather than cramming into thin, misaligned half-frames; the text-only
      capability items sit beneath as compact full-width chips. Reads as
      considered as desktop, never scattered. */
-  .fs-page.state-a .sa-spread__rest {
+  .fs-page .sa-spread__rest {
     grid-template-columns: 1fr;
   }
-  .fs-page.state-a .sa-frame {
+  .fs-page .sa-frame {
     min-height: 104px;
   }
-  .fs-page.state-a .sa-frame--lead {
+  .fs-page .sa-frame--lead {
     min-height: 220px;
   }
-  .fs-page.state-a .sa-frame.has-photo {
+  .fs-page .sa-frame.has-photo {
     min-height: 208px;
   }
-  .fs-page.state-a .sa-frame--lead.has-photo {
+  .fs-page .sa-frame--lead.has-photo {
     min-height: 240px;
   }
 }
@@ -1465,7 +1486,7 @@
   .fs-page.state-a .sa-trend--solo {
     grid-template-columns: 1fr;
   }
-  .fs-page.state-a .sa-spread__grid {
+  .fs-page .sa-spread__grid {
     grid-template-columns: 1.4fr 1fr;
     align-items: stretch;
   }
@@ -1473,11 +1494,11 @@
   /* Zone 5 — the restrained 3D coverflow. The peek-swipe base is replaced by a
      perspective stage with absolutely-positioned cards; the bend + depth recede
      saturation outward (restrained cinematic, not dark drama). */
-  .fs-page.state-a .sa-cf__eyebrow,
-  .fs-page.state-a .sa-cf__agg {
+  .fs-page .sa-cf__eyebrow,
+  .fs-page .sa-cf__agg {
     text-align: center;
   }
-  .fs-page.state-a .sa-cf__fan {
+  .fs-page .sa-cf__fan {
     display: block;
     overflow: visible;
     padding: 0;
@@ -1487,13 +1508,13 @@
     perspective: 1700px;
     perspective-origin: 50% 42%;
   }
-  .fs-page.state-a .sa-cf__track {
+  .fs-page .sa-cf__track {
     display: block;
     position: absolute;
     inset: 0;
     transform-style: preserve-3d;
   }
-  .fs-page.state-a .sa-cf__card {
+  .fs-page .sa-cf__card {
     position: absolute;
     left: 50%;
     top: 50%;
@@ -1511,62 +1532,72 @@
       filter 0.55s var(--ease);
     will-change: transform;
   }
-  .fs-page.state-a .sa-cf__card[data-pos="center"] {
+  .fs-page .sa-cf__card[data-pos="center"] {
     transform: translateZ(70px) rotateY(0deg) scale(1);
     z-index: 6;
     box-shadow: var(--sa-proof-shadow-light);
     filter: saturate(1.04);
   }
-  .fs-page.state-a .sa-cf__card[data-pos="in-left"] {
+  .fs-page .sa-cf__card[data-pos="in-left"] {
     transform: translateX(-44%) rotateY(23deg) scale(0.92);
     z-index: 5;
     opacity: 0.82;
   }
-  .fs-page.state-a .sa-cf__card[data-pos="in-right"] {
+  .fs-page .sa-cf__card[data-pos="in-right"] {
     transform: translateX(44%) rotateY(-23deg) scale(0.92);
     z-index: 5;
     opacity: 0.82;
   }
-  .fs-page.state-a .sa-cf__card[data-pos="out-left"] {
+  .fs-page .sa-cf__card[data-pos="out-left"] {
     transform: translateX(-82%) translateZ(-50px) rotateY(36deg) scale(0.82);
     z-index: 4;
     opacity: 0.4;
     filter: saturate(0.55) brightness(0.98);
   }
-  .fs-page.state-a .sa-cf__card[data-pos="out-right"] {
+  .fs-page .sa-cf__card[data-pos="out-right"] {
     transform: translateX(82%) translateZ(-50px) rotateY(-36deg) scale(0.82);
     z-index: 4;
     opacity: 0.4;
     filter: saturate(0.55) brightness(0.98);
+  }
+  /* DESKTOP fan depth trick: the outer peeks stay BARE (no band/number/address)
+     so the eye lands on the center card. The band is in the DOM on every card
+     (for the mobile carousel); here it is hidden ONLY for the two outer-peek
+     positions, ONLY in the fan arm — so the desktop look is byte-identical to
+     before, while the mobile arm (no min-width match) shows the band on all
+     cards. data-pos drives this exactly as it drives the fan transforms. */
+  .fs-page .sa-cf__card[data-pos="out-left"] .sa-cf__band,
+  .fs-page .sa-cf__card[data-pos="out-right"] .sa-cf__band {
+    display: none;
   }
   /* Few-card "gently dimensional" states — separated so cards never overlap or
      clip an address (the old ±30% pair overlapped ~118px and clipped it).
      1 → centered single (keeps the keyline); 2 → balanced pair pushed to ±54%
      (no keyline — a pair has no single focal card); 3 → trio with the inner pair
      pushed out to ±52% so edges never cross. */
-  .fs-page.state-a .sa-cf__fan--n1 .sa-cf__card[data-pos="center"] {
+  .fs-page .sa-cf__fan--n1 .sa-cf__card[data-pos="center"] {
     transform: translateZ(40px) rotateY(0deg) scale(1);
   }
-  .fs-page.state-a .sa-cf__fan--n2 .sa-cf__card[data-pos="pair-left"] {
+  .fs-page .sa-cf__fan--n2 .sa-cf__card[data-pos="pair-left"] {
     transform: translateX(-54%) rotateY(13deg) scale(0.96);
     z-index: 5;
   }
-  .fs-page.state-a .sa-cf__fan--n2 .sa-cf__card[data-pos="pair-right"] {
+  .fs-page .sa-cf__fan--n2 .sa-cf__card[data-pos="pair-right"] {
     transform: translateX(54%) rotateY(-13deg) scale(0.96);
     z-index: 5;
   }
-  .fs-page.state-a .sa-cf__fan--n3 .sa-cf__card[data-pos="center"] {
+  .fs-page .sa-cf__fan--n3 .sa-cf__card[data-pos="center"] {
     transform: translateZ(56px) rotateY(0deg) scale(1);
   }
-  .fs-page.state-a .sa-cf__fan--n3 .sa-cf__card[data-pos="in-left"] {
+  .fs-page .sa-cf__fan--n3 .sa-cf__card[data-pos="in-left"] {
     transform: translateX(-52%) translateZ(-6px) rotateY(15deg) scale(0.93);
     opacity: 0.95;
   }
-  .fs-page.state-a .sa-cf__fan--n3 .sa-cf__card[data-pos="in-right"] {
+  .fs-page .sa-cf__fan--n3 .sa-cf__card[data-pos="in-right"] {
     transform: translateX(52%) translateZ(-6px) rotateY(-15deg) scale(0.93);
     opacity: 0.95;
   }
-  .fs-page.state-a .sa-cf__num {
+  .fs-page .sa-cf__num {
     font-size: 40px;
   }
 
@@ -1576,34 +1607,34 @@
      inner/pair next, center lands last. The pre-pose outspecifies the per-position
      finals so it holds until `.in`, then the base card transition animates the
      change. */
-  .fs-page.state-a .sa-cf.reveal:not(.in) .sa-cf__card {
+  .fs-page .sa-cf.reveal:not(.in) .sa-cf__card {
     opacity: 0;
     transform: translateY(42px) translateZ(-140px) scale(0.9);
   }
-  .fs-page.state-a .sa-cf.reveal.in .sa-cf__card[data-pos="out-left"],
-  .fs-page.state-a .sa-cf.reveal.in .sa-cf__card[data-pos="out-right"] {
+  .fs-page .sa-cf.reveal.in .sa-cf__card[data-pos="out-left"],
+  .fs-page .sa-cf.reveal.in .sa-cf__card[data-pos="out-right"] {
     transition-delay: 0s;
   }
-  .fs-page.state-a .sa-cf.reveal.in .sa-cf__card[data-pos="in-left"],
-  .fs-page.state-a .sa-cf.reveal.in .sa-cf__card[data-pos="in-right"],
-  .fs-page.state-a .sa-cf.reveal.in .sa-cf__card[data-pos="pair-left"] {
+  .fs-page .sa-cf.reveal.in .sa-cf__card[data-pos="in-left"],
+  .fs-page .sa-cf.reveal.in .sa-cf__card[data-pos="in-right"],
+  .fs-page .sa-cf.reveal.in .sa-cf__card[data-pos="pair-left"] {
     transition-delay: 0.08s;
   }
-  .fs-page.state-a .sa-cf.reveal.in .sa-cf__card[data-pos="pair-right"] {
+  .fs-page .sa-cf.reveal.in .sa-cf__card[data-pos="pair-right"] {
     transition-delay: 0.14s;
   }
-  .fs-page.state-a .sa-cf.reveal.in .sa-cf__card[data-pos="center"] {
+  .fs-page .sa-cf.reveal.in .sa-cf__card[data-pos="center"] {
     transition-delay: 0.18s;
   }
   /* Keyline draws/settles in just after the center card lands. */
-  .fs-page.state-a .sa-cf__card--center::after {
+  .fs-page .sa-cf__card--center::after {
     transition: opacity 0.5s var(--ease), transform 0.5s var(--ease);
   }
-  .fs-page.state-a .sa-cf.reveal:not(.in) .sa-cf__card--center::after {
+  .fs-page .sa-cf.reveal:not(.in) .sa-cf__card--center::after {
     opacity: 0;
     transform: scale(1.04);
   }
-  .fs-page.state-a .sa-cf.reveal.in .sa-cf__card--center::after {
+  .fs-page .sa-cf.reveal.in .sa-cf__card--center::after {
     transition-delay: 0.42s;
   }
 }
@@ -1612,31 +1643,51 @@
    fragment); the peek-swipe carousel entrance fades cards up in sequence. The
    swipe/snap interaction itself is unchanged. */
 @container page (max-width: 719.98px) {
-  .fs-page.state-a .sa-cf__fan--n1 {
+  /* Mobile is its OWN module, not the desktop fan reflowed: a clean horizontal
+     scroll-snap carousel where every card is a complete listing (the band shows
+     on all of them — the fan's outer-peek band suppression is desktop-only), and
+     the header + aggregate center over the cards so the section reads as one
+     coherent unit framed around the swipeable row. */
+  .fs-page .sa-cf__eyebrow,
+  .fs-page .sa-cf__agg {
+    text-align: center;
+  }
+  /* Even, clearly-separated cards with a deliberate peek of the next one (the
+     swipe affordance). Each card snaps to the start so the leading listing lands
+     fully visible (its number reachable immediately), the next peeking at the
+     right edge. scroll-padding keeps the snapped card off the hard edge. */
+  .fs-page .sa-cf__fan {
+    gap: 16px;
+    scroll-padding-left: 4px;
+  }
+  .fs-page .sa-cf__card {
+    flex-basis: 76%;
+    scroll-snap-align: start;
+    transition: opacity 0.5s var(--ease), transform 0.5s var(--ease);
+  }
+  .fs-page .sa-cf__fan--n1 {
     overflow: visible;
     justify-content: center;
   }
-  .fs-page.state-a .sa-cf__fan--n1 .sa-cf__card {
+  .fs-page .sa-cf__fan--n1 .sa-cf__card {
     flex: 0 0 86%;
     max-width: 320px;
+    scroll-snap-align: center;
   }
-  .fs-page.state-a .sa-cf__card {
-    transition: opacity 0.5s var(--ease), transform 0.5s var(--ease);
-  }
-  .fs-page.state-a .sa-cf.reveal:not(.in) .sa-cf__card {
+  .fs-page .sa-cf.reveal:not(.in) .sa-cf__card {
     opacity: 0;
     transform: translateY(26px);
   }
-  .fs-page.state-a .sa-cf.reveal.in .sa-cf__track .sa-cf__card:nth-child(1) {
+  .fs-page .sa-cf.reveal.in .sa-cf__track .sa-cf__card:nth-child(1) {
     transition-delay: 0.04s;
   }
-  .fs-page.state-a .sa-cf.reveal.in .sa-cf__track .sa-cf__card:nth-child(2) {
+  .fs-page .sa-cf.reveal.in .sa-cf__track .sa-cf__card:nth-child(2) {
     transition-delay: 0.12s;
   }
-  .fs-page.state-a .sa-cf.reveal.in .sa-cf__track .sa-cf__card:nth-child(3) {
+  .fs-page .sa-cf.reveal.in .sa-cf__track .sa-cf__card:nth-child(3) {
     transition-delay: 0.2s;
   }
-  .fs-page.state-a .sa-cf.reveal.in .sa-cf__track .sa-cf__card:nth-child(4) {
+  .fs-page .sa-cf.reveal.in .sa-cf__track .sa-cf__card:nth-child(4) {
     transition-delay: 0.28s;
   }
 }
@@ -1645,7 +1696,7 @@
    perspective, no transitions). The mobile base is already near-flat, so this
    applies cleanly at every width. */
 @media (prefers-reduced-motion: reduce) {
-  .fs-page.state-a .sa-cf__fan {
+  .fs-page .sa-cf__fan {
     perspective: none;
     height: auto;
     display: flex;
@@ -1655,10 +1706,10 @@
     overflow: visible;
     padding: 14px 0 0;
   }
-  .fs-page.state-a .sa-cf__track {
+  .fs-page .sa-cf__track {
     display: contents;
   }
-  .fs-page.state-a .sa-cf__card {
+  .fs-page .sa-cf__card {
     position: static;
     margin: 0;
     width: 200px;
