@@ -169,6 +169,41 @@
   background: transparent;
 }
 
+/* HeadshotField (the reused Settings field) ships DARK-surface button styling —
+ * text-text-primary (#ededed) labels, neutral-700 borders, a neutral-500 Remove
+ * and a hover:bg-neutral-800 — all of which vanish on this light card, so the
+ * three controls read as disabled (the bug). The author re-inked the .onb__*
+ * helpers above but these Tailwind-styled buttons were missed. Re-ink them to the
+ * card's warm-light vocabulary (matching .onb__input / .onbv3__lever) so they
+ * read as clearly tappable, with a 44px tap target. Scoped to .onbv3__capture →
+ * the Settings (dark) surface, which shares this component, stays correct. */
+.onbv3__capture [data-testid="brand-headshot-adjust"],
+.onbv3__capture [data-testid="brand-headshot-replace"] {
+  min-height: 44px;
+  border: 1px solid #ddd5cb;
+  background: #fff;
+  color: #1d1915;
+}
+.onbv3__capture [data-testid="brand-headshot-adjust"]:hover,
+.onbv3__capture [data-testid="brand-headshot-replace"]:hover {
+  border-color: var(--onb-accent);
+  background: #fff;
+}
+/* Remove stays the quieter, secondary/destructive action — bordered so it reads
+ * as a real control (not disabled), but visually subordinate, with a clear
+ * danger hover instead of a primary fill. */
+.onbv3__capture [data-testid="brand-headshot-remove"] {
+  min-height: 44px;
+  border: 1px solid #e7e0d6;
+  border-radius: 0.25rem;
+  background: transparent;
+  color: #7a6f63;
+}
+.onbv3__capture [data-testid="brand-headshot-remove"]:hover {
+  border-color: #d9b4ab;
+  color: #b23c2a;
+}
+
 .onbv3__capture-title {
   font-size: 22px;
   font-weight: 650;
