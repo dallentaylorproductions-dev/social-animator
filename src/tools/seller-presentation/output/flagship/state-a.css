@@ -124,7 +124,17 @@
   transition: opacity 0.5s var(--ease), transform 0.5s var(--ease);
   will-change: opacity, transform;
 }
-.fs-page.state-a .reveal.in .sa-proof__num {
+/* The `.sa-proof__num` reveal RELEASE is scoped to `.fs-page` (NOT
+   `.fs-page.state-a`) so it fires on the flagship State-B root too. Its pre-pose
+   above (`.fs-page .sa-proof__num { opacity:0 }`) and the reduced-motion
+   fallback are already `.fs-page`-wide; this matches them, so the proof numbers
+   — including the coverflow aggregate (`.sa-cf__aggnum`, a `.sa-proof__num`) —
+   release to opacity 1 when their containing `.reveal` (the `.sa-cf` section)
+   gets `.in` on State B exactly as on State A. Without the match the aggnum sat
+   stuck at its opacity:0 pre-pose on State B (the only `.sa-proof__num` there).
+   State A is unchanged — `.fs-page .reveal.in` still matches under
+   `.fs-page.state-a`, so ProofPanel's stat reveals as before. */
+.fs-page .reveal.in .sa-proof__num {
   opacity: 1;
   transform: none;
 }

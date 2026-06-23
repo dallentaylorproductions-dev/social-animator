@@ -88,6 +88,32 @@ test.describe("State B · Zone 5 — exposure coverflow", () => {
     expect(box!.height).toBeGreaterThan(40);
   });
 
+  test("the aggregate NUMBER settles to opacity 1 (regression: it was stuck at 0 on State B)", async ({
+    page,
+  }) => {
+    // The aggregate `.sa-cf__aggnum` is a `.sa-proof__num`: it poses at opacity:0
+    // and releases via `.fs-page .reveal.in .sa-proof__num` when the `.sa-cf`
+    // section gets `.in`. That release rule used to be `.fs-page.state-a`-scoped,
+    // so on the flagship State-B root it never matched and the number sat as an
+    // invisible gap between the "ACROSS RECENT LISTINGS" / "BUYER VIEWS" labels.
+    await page.setViewportSize({ width: 1280, height: 1600 });
+    await page.goto(WITH_DATA);
+
+    const aggnum = page.getByTestId("fs-sa-cf-aggregate").locator(".sa-cf__aggnum");
+    await aggnum.scrollIntoViewIfNeeded();
+    // The reveal island promotes the coverflow section to `.in`.
+    await expect(page.locator(".sa-cf.reveal.in")).toHaveCount(1);
+    // Let the .5s number reveal settle before sampling computed opacity.
+    await page.waitForTimeout(900);
+
+    const opacity = await aggnum.evaluate((el) =>
+      parseFloat(getComputedStyle(el).opacity),
+    );
+    expect(opacity).toBeGreaterThan(0.9);
+    // It still carries the true total (no fabrication / alteration).
+    await expect(aggnum).toContainText("139,600");
+  });
+
   test("coverflow-only: State B shows NO capability frames (no duplication of its 'how we market')", async ({
     page,
   }) => {
