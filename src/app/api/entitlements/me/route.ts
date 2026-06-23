@@ -94,6 +94,13 @@ export async function GET(req: Request) {
       // the consumer page + live preview render today's full presentation
       // (byte-identical).
       sellerStateAEnabled: process.env.SELLER_STATE_A_ENABLED === "true",
+      // MARKETING_ZONE_REDESIGN (v1.7 Packet C) — the redesigned "How I'll get
+      // your home seen" zone. OFF by default; when false the wizard live preview
+      // renders today's capability-frames grid (byte-identical). Mirrors the
+      // publish-time env flag the publish route reads, so the live/example
+      // preview matches what a flag-on publish projects.
+      marketingZoneRedesignEnabled:
+        process.env.MARKETING_ZONE_REDESIGN_ENABLED === "true",
     },
   });
 }

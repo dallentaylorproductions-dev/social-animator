@@ -129,9 +129,15 @@ function fullAddress(a: AddressFields): string {
 export function WelcomeFlowV2({
   ownerEmail,
   serverDraftsEnabled,
+  // MARKETING_ZONE_REDESIGN (v1.7 Packet C) — resolved on the server welcome
+  // shell and threaded here so the 9-beat reveal's campaign slice renders the
+  // redesigned marketing zone exactly when a flag-on publish would. Default
+  // false keeps a flag-off session byte-identical to today's grid.
+  marketingZoneRedesignEnabled = false,
 }: {
   ownerEmail: string | null;
   serverDraftsEnabled: boolean;
+  marketingZoneRedesignEnabled?: boolean;
 }) {
   const router = useRouter();
 
@@ -209,9 +215,19 @@ export function WelcomeFlowV2({
   // The live payload the real slices render. Sample path swaps in the fixture.
   const payload = useMemo(() => {
     if (!brand) return null;
-    if (isSample) return sampleStateAPayload(brand);
-    return buildOnboardingStateAPayload(draftSeed, brand, ownerEmail ?? '');
-  }, [brand, isSample, draftSeed, ownerEmail]);
+    if (isSample)
+      return sampleStateAPayload(
+        brand,
+        undefined,
+        marketingZoneRedesignEnabled,
+      );
+    return buildOnboardingStateAPayload(
+      draftSeed,
+      brand,
+      ownerEmail ?? '',
+      marketingZoneRedesignEnabled,
+    );
+  }, [brand, isSample, draftSeed, ownerEmail, marketingZoneRedesignEnabled]);
 
   const exitToDashboard = useCallback(() => {
     emitOnboardingEvent(ONBOARDING_EVENTS.dismissed, { step: beat });

@@ -40,6 +40,13 @@ export function buildOnboardingStateAPayload(
   // reach the agent before they type a direct line, matching what a live publish
   // carries. The agent's own brand email/phone still wins. Empty -> no fallback.
   accountEmail: string = "",
+  // MARKETING_ZONE_REDESIGN (v1.7 Packet C) — mirror the publish-time flag so the
+  // onboarding reveal + the "sample home, real you" mirror show the redesigned
+  // marketing zone exactly when a flag-on publish would. Defaults false so every
+  // existing caller (and a flag-off session) renders the current grid, byte-
+  // identical. Resolved by the SERVER welcome shell and threaded down as a prop,
+  // since this client builder can't read the non-NEXT_PUBLIC env flag itself.
+  marketingZoneRedesign: boolean = false,
 ): PublicPayload {
   const { agentContact, brandReviews, brandColors, brandWhyUs } =
     brandToPublishInputs(brand);
@@ -57,5 +64,12 @@ export function buildOnboardingStateAPayload(
     // sellerStateA: resolve to the prepared-invitation render (the before-the-
     // appointment dossier), which is the whole onboarding premise.
     true,
+    // listingsCoverflow: OFF here — buildSamplePreviewPayload injects the sample
+    // recentListings post-projection (scoped to that onboarding-only builder), so
+    // the publish-flag projection stays off and a real onboarding publish carries
+    // no listings unless the agent has their own. Pass it positionally so the
+    // redesign flag lands in the correct (10th) slot.
+    false,
+    marketingZoneRedesign,
   );
 }

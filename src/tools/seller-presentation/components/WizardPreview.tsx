@@ -280,8 +280,12 @@ export function WizardPreview({
   currentStep: StepId;
 }) {
   const { settings: brand } = useBrandSettings();
-  const { compPhotosEnabled, reviewSourceLogosEnabled, sellerStateAEnabled } =
-    useSPEntitlement();
+  const {
+    compPhotosEnabled,
+    reviewSourceLogosEnabled,
+    sellerStateAEnabled,
+    marketingZoneRedesignEnabled,
+  } = useSPEntitlement();
   const debouncedDraft = useDebounced(draft, DEBOUNCE_MS);
 
   const [mounted, setMounted] = useState(false);
@@ -368,13 +372,18 @@ export function WizardPreview({
   const sparse = isDraftSparse(debouncedDraft);
   const payload = sparse
     ? invitationMode
-      ? sampleStateAPayload(brand, debouncedDraft.appointmentAt)
+      ? sampleStateAPayload(
+          brand,
+          debouncedDraft.appointmentAt,
+          marketingZoneRedesignEnabled === true,
+        )
       : samplePayload(brand)
     : draftPreviewPayload(
         debouncedDraft,
         brand,
         compPhotosEnabled === true,
         sellerStateAEnabled === true,
+        marketingZoneRedesignEnabled === true,
       );
   // State A renders whenever the resolved payload carries an invitation status —
   // true for the State A sample (sparse + invitation mode) AND for a real
