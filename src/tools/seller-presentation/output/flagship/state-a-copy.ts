@@ -145,6 +145,28 @@ export const CAPABILITY_VIDEO_LABEL = "A recent video tour";
 export const CAPABILITY_VIDEO_SUB = "From a recent listing of mine";
 
 /**
+ * v1.7 Packet C — the redesigned marketing zone (MARKETING_ZONE_REDESIGN flag).
+ * "THE WORK" is a flat swipe showcase of the agent's craft (photo · video ·
+ * more); "WHAT'S INCLUDED" is the editorial capabilities list. The micro-cue and
+ * affordance chip make the showcase read as clearly swipeable (the fix for "flat,
+ * nothing feels clickable"). Reserved sentence-case display; mono eyebrows match
+ * the rest of the State-A vocabulary.
+ */
+export const WORK_EYEBROW = "The work";
+export const WORK_SWIPE_CUE = "swipe the craft";
+export const WORK_NEXT_CHIP = "See the work";
+export const INCLUDED_EYEBROW = "What's included";
+
+/**
+ * The quiet tinted lead-in that reframes from craft to proof, sitting between the
+ * "WHAT'S INCLUDED" list and the existing exposure coverflow so the showcase and
+ * the coverflow never read as one continuous swipe region (the differentiation
+ * buffer). Renders only when there is craft above AND a coverflow below.
+ */
+export const CAMPAIGN_LEADIN =
+  "That's the craft. Here's the proof it reaches buyers.";
+
+/**
  * Zone 5 listings coverflow ("Put in front of buyers"). Evergreen, source-
  * agnostic, no em-dash. The per-card label is a plain "Views" (never a named
  * portal — the honesty gate: no specific-portal claim on a number we don't

@@ -455,6 +455,17 @@ export interface PublicPayload {
    */
   recentListings?: PublicRecentListing[];
   /**
+   * v1.7 Packet C — render the "How I'll get your home seen" zone in its
+   * redesigned form (THE WORK swipe showcase + WHAT'S INCLUDED editorial list +
+   * lead-in into the coverflow). Render-only: it reshuffles data already in the
+   * payload (capability samples + `whyUs.marketingApproach` + `recentListings`),
+   * adds no new input. Emitted ONLY behind the MARKETING_ZONE_REDESIGN flag;
+   * absent on a flag-off publish, so CampaignSpread renders the current grid and
+   * those publishes stay byte-identical. Only the `full` (State A) variant reads
+   * it; the coverflow-only (State B) variant ignores it.
+   */
+  marketingZoneRedesign?: boolean;
+  /**
    * Optional "as of <Mon YYYY>" stamp for the reviews aggregate rating (e.g.
    * "Jun 2026"). Surfaced by the v2 review card for a Google source, where
    * Google's attribution guidance requires an as-of date alongside the rating.
@@ -1051,6 +1062,12 @@ export function toPublicPayload(
   // false, NO `recentListings` key is emitted and CampaignSpread renders the
   // capability cards alone. Only ever emits in a State A invitation publish.
   listingsCoverflow: boolean = false,
+  // MARKETING_ZONE_REDESIGN (v1.7 Packet C) — render-only kill switch for the
+  // "How I'll get your home seen" zone redesign. OFF by default so every existing
+  // call site (and every flag-off publish) stays byte-identical: when false, no
+  // `marketingZoneRedesign` key is emitted and CampaignSpread renders the current
+  // capability-frames grid. Append-last so existing positional call sites stay valid.
+  marketingZoneRedesign: boolean = false,
 ): PublicPayload {
   const propertyAddress = draft.propertyAddress ?? "";
   const recommendedPrice = draft.recommendedPrice ?? "";
@@ -1248,6 +1265,12 @@ export function toPublicPayload(
     // drops out via JSON.stringify and a flag-off publish stays byte-identical.
     recentListings: projectedRecentListings,
 
+    // v1.7 Packet C — emit the redesign discriminator ONLY when the flag is on,
+    // so it drops out via JSON.stringify on a flag-off publish (byte-identical)
+    // and CampaignSpread renders the current grid. Render-only; top-level so the
+    // pure render reads it the same whether built at publish or re-clamped on read.
+    marketingZoneRedesign: marketingZoneRedesign ? true : undefined,
+
     // Seller State A — spread last; `{}` for every revealed / flag-off publish.
     // Carries the state discriminator + appointment AND the State A copy/asset
     // fields (signature, valuation/welcome voice lines, capability samples).
@@ -1345,6 +1368,12 @@ export function clampPublicPayload(raw: unknown): PublicPayload {
     // counts, and strips private keys, so a hand-edited KV record can't smuggle
     // an unbounded or rogue list to the renderer. Absent ⇒ undefined ⇒ flex-out.
     recentListings: projectRecentListings(r.recentListings),
+
+    // v1.7 Packet C — coerce the redesign discriminator at the read boundary.
+    // Only a literal `true` survives; anything else (absent on every flag-off
+    // record, or a tampered value) reads as undefined so CampaignSpread renders
+    // the current grid. Render-only flag, so no further hardening is needed.
+    marketingZoneRedesign: r.marketingZoneRedesign === true ? true : undefined,
 
     // Seller State A — coerce the discriminator at the trust boundary. An
     // absent / unknown / tampered value reads as `revealed` so the consumer

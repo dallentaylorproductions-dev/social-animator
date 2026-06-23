@@ -219,6 +219,72 @@ function wireWaveformPlay(root: Document): Array<() => void> {
   return teardowns;
 }
 
+/**
+ * v1.7 Packet C — THE WORK swipe showcase controller (MARKETING_ZONE_REDESIGN).
+ * Interaction, not animation (wired regardless of reduced motion, like the
+ * waveform): tracks the active dot from the flat scroll-snap track's position and
+ * advances the track when the "See the work" chip is tapped (wrapping at the
+ * end). CSS-first — the slide motion is the native scroll-snap; this only mirrors
+ * position into the dots and gives the chip a target. No-op on single-frame
+ * showcases (no dots/chip rendered) and on any page without the zone.
+ */
+function wireWorkShowcases(root: Document): Array<() => void> {
+  const teardowns: Array<() => void> = [];
+  root.querySelectorAll<HTMLElement>("[data-work-track]").forEach((track) => {
+    const showcase = track.closest<HTMLElement>(".sa-work");
+    if (!showcase) return;
+    const slides = Array.from(
+      track.querySelectorAll<HTMLElement>("[data-work-slide]"),
+    );
+    const dots = Array.from(
+      showcase.querySelectorAll<HTMLElement>("[data-work-dot]"),
+    );
+    if (slides.length <= 1) return;
+
+    const currentIndex = (): number => {
+      const w = track.clientWidth || 1;
+      return Math.max(
+        0,
+        Math.min(slides.length - 1, Math.round(track.scrollLeft / w)),
+      );
+    };
+    const syncDots = () => {
+      const idx = currentIndex();
+      dots.forEach((d, i) => d.classList.toggle("is-active", i === idx));
+    };
+    let raf = 0;
+    const onScroll = () => {
+      if (raf) return;
+      raf = requestAnimationFrame(() => {
+        raf = 0;
+        syncDots();
+      });
+    };
+    track.addEventListener("scroll", onScroll, { passive: true });
+
+    const chips = Array.from(
+      showcase.querySelectorAll<HTMLElement>("[data-work-next]"),
+    );
+    const onNext = (e: Event) => {
+      e.preventDefault();
+      const next = (currentIndex() + 1) % slides.length;
+      if (typeof track.scrollTo === "function") {
+        track.scrollTo({ left: next * track.clientWidth, behavior: "smooth" });
+      } else {
+        track.scrollLeft = next * track.clientWidth;
+      }
+    };
+    chips.forEach((c) => c.addEventListener("click", onNext));
+
+    teardowns.push(() => {
+      track.removeEventListener("scroll", onScroll);
+      chips.forEach((c) => c.removeEventListener("click", onNext));
+      if (raf) cancelAnimationFrame(raf);
+    });
+  });
+  return teardowns;
+}
+
 // ---- Viewed signal (Phase 1): one beacon per session on open --------------
 /** sessionStorage key for the opaque per-session view token. */
 const VIEW_SID_KEY = "sa-view-sid";
@@ -515,6 +581,10 @@ export function PresentationPageMotion({
     // animation — wired regardless of reduced motion). No-op on the revealed page.
     const waveTeardowns = wireWaveformPlay(root);
 
+    // v1.7 Packet C — THE WORK showcase (active dot + chip-advance). No-op on any
+    // page without the redesigned zone or on a single-frame showcase.
+    const workTeardowns = wireWorkShowcases(root);
+
     return () => {
       observer?.disconnect();
       priceObserver?.disconnect();
@@ -524,6 +594,7 @@ export function PresentationPageMotion({
         btn.removeEventListener("click", onShare),
       );
       waveTeardowns.forEach((fn) => fn());
+      workTeardowns.forEach((fn) => fn());
     };
   }, []);
 

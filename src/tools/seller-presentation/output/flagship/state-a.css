@@ -1723,3 +1723,351 @@
     transition: none !important;
   }
 }
+
+/* =========================================================================
+   v1.7 Packet C — "How I'll get your home seen" marketing zone REDESIGN
+   (MARKETING_ZONE_REDESIGN). Every selector below is NET-NEW and used ONLY by
+   the flag-on render (data-redesign="1" + the .sa-work / .sa-incl /
+   .sa-spread__editorial|__proof|__leadin classes), so the legacy capability grid
+   (flag-off) and the State-B coverflow-only variant are untouched — no existing
+   .sa-* rule or --sa-* var is widened. ONE teal accent (#037290, the locked
+   color), defined once here and reused for every accent on the zone.
+   ========================================================================= */
+.fs-page .sa-spread[data-redesign="1"] {
+  --sa-mz-teal: #037290;
+}
+
+/* Mobile (primary): single column, the v3 order (showcase → list). The desktop
+   @container rule below turns this into the two-column editorial. */
+.fs-page .sa-spread__editorial {
+  margin-top: clamp(28px, 5cqi, 48px);
+  display: grid;
+  gap: clamp(22px, 4cqi, 30px);
+}
+/* min-width:0 so the showcase column (which contains a horizontal scroll track)
+   can't blow its grid track out past the content width — the classic grid/flex
+   overflow that otherwise pushes THE WORK head + "swipe the craft" cue off the
+   right edge (mobile) / past the column (desktop). */
+.fs-page .sa-spread__editorial > * {
+  min-width: 0;
+}
+
+/* ---- Part 1 · THE WORK flat swipe showcase ----------------------------- */
+.fs-page .sa-work__head {
+  display: flex;
+  align-items: baseline;
+  justify-content: space-between;
+  gap: 12px;
+  margin-bottom: 10px;
+}
+.fs-page .sa-work__eyebrow {
+  font-family: var(--f-mono);
+  font-size: 10.5px;
+  letter-spacing: 0.2em;
+  text-transform: uppercase;
+  color: var(--t-mute);
+}
+.fs-page .sa-work__cue {
+  display: inline-flex;
+  align-items: center;
+  gap: 6px;
+  font-family: var(--f-mono);
+  font-size: 10px;
+  letter-spacing: 0.12em;
+  text-transform: uppercase;
+  color: var(--sa-mz-teal);
+}
+.fs-page .sa-work__cue::before {
+  content: "";
+  width: 14px;
+  height: 1px;
+  background: currentColor;
+  opacity: 0.6;
+}
+
+.fs-page .sa-work__viewport {
+  border-radius: var(--r-md);
+  overflow: hidden;
+  border: 1px solid var(--line);
+  /* C2 polish — a HEAVY, grounded drop shadow (heavier than --lift-2) so the
+     showcase reads as a premium, liftable object (the strong beat). Calmly deep. */
+  box-shadow:
+    0 24px 50px -12px rgba(16, 28, 30, 0.5),
+    0 8px 18px -8px rgba(16, 28, 30, 0.3);
+  transition: box-shadow 220ms ease, transform 220ms ease;
+}
+/* Press/hover (reduced-motion safe — nulled in the @media block below): a gentle
+   lift + deepened shadow on hover marks the tile as an interactive object. */
+@media (hover: hover) {
+  .fs-page .sa-work:hover .sa-work__viewport {
+    transform: translateY(-2px);
+    box-shadow:
+      0 30px 60px -12px rgba(16, 28, 30, 0.55),
+      0 10px 22px -8px rgba(16, 28, 30, 0.34);
+  }
+}
+/* The flat slide track — horizontal scroll-snap, NO perspective (deliberately
+   distinct from the coverflow's 3D bend). Each slide is one full-width frame. */
+.fs-page .sa-work__track {
+  display: flex;
+  overflow-x: auto;
+  scroll-snap-type: x mandatory;
+  -webkit-overflow-scrolling: touch;
+  scrollbar-width: none;
+  scroll-behavior: smooth;
+}
+.fs-page .sa-work__track::-webkit-scrollbar {
+  display: none;
+}
+.fs-page .sa-work__slide {
+  position: relative;
+  flex: 0 0 100%;
+  scroll-snap-align: center;
+  margin: 0;
+  /* The before tile: a more compact/landscape frame (Dallen's on-device pick). */
+  min-height: 300px;
+  display: flex;
+  align-items: flex-end;
+  background: linear-gradient(165deg, var(--teal-100), var(--white));
+}
+.fs-page .sa-work__photo {
+  position: absolute;
+  inset: 0;
+  z-index: 0;
+  background-size: cover;
+  background-position: center;
+}
+/* The caption rides a SOLID dark band — legibility never on the raw photo. */
+.fs-page .sa-work__band {
+  position: relative;
+  z-index: 1;
+  width: 100%;
+  margin: 0;
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+  gap: 12px;
+  /* The before band proportions (restored with the before tile). */
+  padding: 13px 15px 14px;
+  background: var(--sa-proof-dark);
+  color: var(--t-pap);
+}
+.fs-page .sa-work__cap {
+  display: flex;
+  flex-direction: column;
+  gap: 4px;
+  min-width: 0;
+}
+.fs-page .sa-work__label {
+  font-family: var(--f-display);
+  font-size: clamp(17px, 2.4cqi, 21px);
+  line-height: 1.1;
+  color: #fff;
+}
+.fs-page .sa-work__sub {
+  font-family: var(--f-mono);
+  font-size: 10px;
+  letter-spacing: 0.12em;
+  text-transform: uppercase;
+  /* The locked teal lifted toward white for AA legibility on the dark band. */
+  color: color-mix(in oklab, var(--sa-mz-teal), #ffffff 40%);
+}
+/* The affordance chip — clearly tappable (the fix for "nothing feels
+   clickable"): a teal-keyed pill on the dark band. */
+.fs-page .sa-work__chip {
+  flex: none;
+  appearance: none;
+  display: inline-flex;
+  align-items: center;
+  gap: 7px;
+  min-height: 36px;
+  padding: 8px 12px;
+  border-radius: 999px;
+  border: 1px solid color-mix(in oklab, var(--sa-mz-teal), #ffffff 30%);
+  background: color-mix(in oklab, var(--sa-mz-teal) 26%, transparent);
+  color: #fff;
+  font-family: var(--f-mono);
+  font-size: 10.5px;
+  letter-spacing: 0.1em;
+  text-transform: uppercase;
+  cursor: pointer;
+  transition: background 160ms ease, border-color 160ms ease, transform 120ms ease;
+}
+/* Press/hover (reduced-motion safe — nulled below). */
+.fs-page .sa-work__chip:hover {
+  background: color-mix(in oklab, var(--sa-mz-teal) 40%, transparent);
+  border-color: color-mix(in oklab, var(--sa-mz-teal), #ffffff 14%);
+}
+.fs-page .sa-work__chip:active {
+  transform: translateY(1px) scale(0.98);
+}
+.fs-page .sa-work__chip-arrow {
+  font-size: 13px;
+  line-height: 1;
+}
+
+.fs-page .sa-work__dots {
+  display: flex;
+  justify-content: center;
+  gap: 7px;
+  margin-top: 12px;
+}
+.fs-page .sa-work__dot {
+  width: 7px;
+  height: 7px;
+  border-radius: 999px;
+  background: color-mix(in oklab, var(--t-mute) 45%, transparent);
+  transition: background 160ms ease, transform 160ms ease;
+}
+.fs-page .sa-work__dot.is-active {
+  background: var(--sa-mz-teal);
+  transform: scale(1.18);
+}
+
+/* ---- Part 2 · WHAT'S INCLUDED editorial list (substance always inline) -- */
+.fs-page .sa-incl__eyebrow {
+  display: block;
+  margin-bottom: 12px;
+  font-family: var(--f-mono);
+  font-size: 10.5px;
+  letter-spacing: 0.2em;
+  text-transform: uppercase;
+  color: var(--t-mute);
+}
+.fs-page .sa-incl__list {
+  list-style: none;
+  margin: 0;
+  padding: 0;
+  display: flex;
+  flex-direction: column;
+  /* C2 polish — space between the soft cards (was hairline-separated rows). */
+  gap: 10px;
+}
+/* C2 polish — each capability is a soft card (light fill + hairline + gentle
+   lift), so the list reads as thoughtful, tappable-looking objects rather than a
+   flat ruled list. Substance still inline (no accordion). */
+.fs-page .sa-incl__row {
+  display: flex;
+  gap: 13px;
+  align-items: flex-start;
+  padding: 14px;
+  background: var(--white);
+  border: 1px solid var(--line);
+  border-radius: var(--r-sm);
+  box-shadow: var(--lift-1);
+}
+.fs-page .sa-incl__icon {
+  flex: none;
+  width: 36px;
+  height: 36px;
+  border-radius: 10px;
+  display: grid;
+  place-items: center;
+  color: var(--sa-mz-teal);
+  background: color-mix(in oklab, var(--sa-mz-teal) 12%, var(--white));
+  border: 1px solid color-mix(in oklab, var(--sa-mz-teal) 22%, var(--line));
+}
+.fs-page .sa-incl__text {
+  display: flex;
+  flex-direction: column;
+  gap: 3px;
+  min-width: 0;
+}
+.fs-page .sa-incl__title {
+  font-family: var(--f-display);
+  font-size: clamp(16px, 2.2cqi, 18px);
+  line-height: 1.2;
+  color: var(--t-ink);
+}
+.fs-page .sa-incl__proof {
+  font-size: clamp(13px, 1.7cqi, 14px);
+  line-height: 1.4;
+  color: var(--t-soft);
+}
+
+/* ---- Part 3 · the quiet tinted lead-in into the existing coverflow ------ */
+.fs-page .sa-spread__proof {
+  margin-top: clamp(26px, 4.5cqi, 40px);
+}
+/* C2 polish — an EDITORIAL lead-in (magazine standfirst), not a utilitarian
+   bordered note: a short teal rule above an italic serif line, set on a tight
+   measure with breathing room, transitioning from the craft to the proof. */
+.fs-page .sa-spread__leadin {
+  margin: 0 0 6px;
+  font-family: var(--f-display);
+  font-style: italic;
+  font-size: clamp(16px, 2.5cqi, 20px);
+  line-height: 1.32;
+  color: var(--t-ink);
+  max-width: 34ch;
+}
+.fs-page .sa-spread__leadin::before {
+  content: "";
+  display: block;
+  width: 34px;
+  height: 2px;
+  margin-bottom: 12px;
+  background: var(--sa-mz-teal);
+}
+
+/* Desktop: two-column editorial (THE WORK beside WHAT'S INCLUDED); the lead-in +
+   coverflow stay FULL-WIDTH below (.sa-spread__proof is outside __editorial), so
+   the full-width drama is reserved for the proof — not a reflowed mobile stack. */
+@container page (min-width: 720px) {
+  .fs-page .sa-spread__editorial {
+    grid-template-columns: 1fr 1fr;
+    gap: clamp(28px, 4cqi, 44px);
+    align-items: start;
+  }
+  /* If only one of showcase/list is present, let it span the full row rather
+     than sit lonely in one column. */
+  .fs-page .sa-spread__editorial > :only-child {
+    grid-column: 1 / -1;
+  }
+  .fs-page .sa-work__slide {
+    min-height: 360px;
+  }
+}
+
+/* Mobile (the peek/swipe arm): collapse the affordance chip to ICON-ONLY (just
+   the arrow) so the caption keeps its full width and the sublabel stays on ONE
+   line at ~390px (the text chip otherwise squeezes the caption to ~169px and the
+   sublabel wraps). The chip's aria-label ("See the work") preserves the meaning
+   for assistive tech, and the "swipe the craft" cue + dots still signal the swipe. */
+@container page (max-width: 719.98px) {
+  .fs-page .sa-work__chip {
+    font-size: 0; /* hides the bare "See the work" text node; arrow keeps its own size */
+    gap: 0;
+    padding: 0 9px;
+    min-width: 36px;
+    justify-content: center;
+  }
+  .fs-page .sa-work__chip-arrow {
+    font-size: 15px;
+  }
+}
+
+/* Reduced motion: the showcase collapses to a SINGLE static frame — no swipe
+   track, no auto-advance, no dot/cue/chip affordances. (The coverflow has its
+   own reduced-motion rule above.) */
+@media (prefers-reduced-motion: reduce) {
+  .fs-page .sa-work__track {
+    overflow-x: hidden;
+    scroll-snap-type: none;
+  }
+  .fs-page .sa-work__slide:not(:first-child) {
+    display: none;
+  }
+  .fs-page .sa-work__dots,
+  .fs-page .sa-work__cue,
+  .fs-page .sa-work__chip {
+    display: none;
+  }
+  /* Null the press/hover motion (the heavy shadow stays — it's static depth). */
+  .fs-page .sa-work__viewport {
+    transition: none;
+  }
+  .fs-page .sa-work:hover .sa-work__viewport {
+    transform: none;
+  }
+}
