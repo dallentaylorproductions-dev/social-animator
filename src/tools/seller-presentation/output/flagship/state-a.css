@@ -1789,7 +1789,9 @@
   border-radius: var(--r-md);
   overflow: hidden;
   border: 1px solid var(--line);
-  box-shadow: var(--lift-1);
+  /* C2 polish — a deeper tile shadow so the showcase reads as a premium,
+     liftable object (the strong beat), not a flat inline image. */
+  box-shadow: var(--lift-2);
 }
 /* The flat slide track — horizontal scroll-snap, NO perspective (deliberately
    distinct from the coverflow's 3D bend). Each slide is one full-width frame. */
@@ -1809,7 +1811,8 @@
   flex: 0 0 100%;
   scroll-snap-align: center;
   margin: 0;
-  min-height: 300px;
+  /* C2 polish — taller frame so the photo dominates over the slimmed band. */
+  min-height: 340px;
   display: flex;
   align-items: flex-end;
   background: linear-gradient(165deg, var(--teal-100), var(--white));
@@ -1831,19 +1834,20 @@
   align-items: center;
   justify-content: space-between;
   gap: 12px;
-  padding: 13px 15px 14px;
+  /* C2 polish — slimmed band so the photo, not the caption, owns the tile. */
+  padding: 9px 14px 10px;
   background: var(--sa-proof-dark);
   color: var(--t-pap);
 }
 .fs-page .sa-work__cap {
   display: flex;
   flex-direction: column;
-  gap: 4px;
+  gap: 2px;
   min-width: 0;
 }
 .fs-page .sa-work__label {
   font-family: var(--f-display);
-  font-size: clamp(17px, 2.4cqi, 21px);
+  font-size: clamp(15px, 2.1cqi, 19px);
   line-height: 1.1;
   color: #fff;
 }
@@ -1863,8 +1867,8 @@
   display: inline-flex;
   align-items: center;
   gap: 7px;
-  min-height: 36px;
-  padding: 8px 12px;
+  min-height: 32px;
+  padding: 6px 12px;
   border-radius: 999px;
   border: 1px solid color-mix(in oklab, var(--sa-mz-teal), #ffffff 30%);
   background: color-mix(in oklab, var(--sa-mz-teal) 26%, transparent);
@@ -1914,16 +1918,21 @@
   padding: 0;
   display: flex;
   flex-direction: column;
+  /* C2 polish — space between the soft cards (was hairline-separated rows). */
+  gap: 10px;
 }
+/* C2 polish — each capability is a soft card (light fill + hairline + gentle
+   lift), so the list reads as thoughtful, tappable-looking objects rather than a
+   flat ruled list. Substance still inline (no accordion). */
 .fs-page .sa-incl__row {
   display: flex;
   gap: 13px;
   align-items: flex-start;
-  padding: 13px 0;
-  border-top: 1px solid var(--line);
-}
-.fs-page .sa-incl__row:first-child {
-  border-top: none;
+  padding: 14px;
+  background: var(--white);
+  border: 1px solid var(--line);
+  border-radius: var(--r-sm);
+  box-shadow: var(--lift-1);
 }
 .fs-page .sa-incl__icon {
   flex: none;
@@ -1958,15 +1967,25 @@
 .fs-page .sa-spread__proof {
   margin-top: clamp(26px, 4.5cqi, 40px);
 }
+/* C2 polish — an EDITORIAL lead-in (magazine standfirst), not a utilitarian
+   bordered note: a short teal rule above an italic serif line, set on a tight
+   measure with breathing room, transitioning from the craft to the proof. */
 .fs-page .sa-spread__leadin {
-  margin: 0 0 2px;
-  padding-left: 13px;
-  border-left: 2px solid var(--sa-mz-teal);
+  margin: 0 0 6px;
   font-family: var(--f-display);
   font-style: italic;
-  font-size: clamp(15px, 2.2cqi, 18px);
-  line-height: 1.35;
+  font-size: clamp(16px, 2.5cqi, 20px);
+  line-height: 1.32;
   color: var(--t-ink);
+  max-width: 34ch;
+}
+.fs-page .sa-spread__leadin::before {
+  content: "";
+  display: block;
+  width: 34px;
+  height: 2px;
+  margin-bottom: 12px;
+  background: var(--sa-mz-teal);
 }
 
 /* Desktop: two-column editorial (THE WORK beside WHAT'S INCLUDED); the lead-in +
@@ -1984,7 +2003,7 @@
     grid-column: 1 / -1;
   }
   .fs-page .sa-work__slide {
-    min-height: 360px;
+    min-height: 380px;
   }
 }
 
