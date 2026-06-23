@@ -1789,9 +1789,22 @@
   border-radius: var(--r-md);
   overflow: hidden;
   border: 1px solid var(--line);
-  /* C2 polish — a deeper tile shadow so the showcase reads as a premium,
-     liftable object (the strong beat), not a flat inline image. */
-  box-shadow: var(--lift-2);
+  /* C2 polish — a HEAVY, grounded drop shadow (heavier than --lift-2) so the
+     showcase reads as a premium, liftable object (the strong beat). Calmly deep. */
+  box-shadow:
+    0 24px 50px -12px rgba(16, 28, 30, 0.5),
+    0 8px 18px -8px rgba(16, 28, 30, 0.3);
+  transition: box-shadow 220ms ease, transform 220ms ease;
+}
+/* Press/hover (reduced-motion safe — nulled in the @media block below): a gentle
+   lift + deepened shadow on hover marks the tile as an interactive object. */
+@media (hover: hover) {
+  .fs-page .sa-work:hover .sa-work__viewport {
+    transform: translateY(-2px);
+    box-shadow:
+      0 30px 60px -12px rgba(16, 28, 30, 0.55),
+      0 10px 22px -8px rgba(16, 28, 30, 0.34);
+  }
 }
 /* The flat slide track — horizontal scroll-snap, NO perspective (deliberately
    distinct from the coverflow's 3D bend). Each slide is one full-width frame. */
@@ -1811,8 +1824,8 @@
   flex: 0 0 100%;
   scroll-snap-align: center;
   margin: 0;
-  /* C2 polish — taller frame so the photo dominates over the slimmed band. */
-  min-height: 340px;
+  /* The before tile: a more compact/landscape frame (Dallen's on-device pick). */
+  min-height: 300px;
   display: flex;
   align-items: flex-end;
   background: linear-gradient(165deg, var(--teal-100), var(--white));
@@ -1834,20 +1847,20 @@
   align-items: center;
   justify-content: space-between;
   gap: 12px;
-  /* C2 polish — slimmed band so the photo, not the caption, owns the tile. */
-  padding: 9px 14px 10px;
+  /* The before band proportions (restored with the before tile). */
+  padding: 13px 15px 14px;
   background: var(--sa-proof-dark);
   color: var(--t-pap);
 }
 .fs-page .sa-work__cap {
   display: flex;
   flex-direction: column;
-  gap: 2px;
+  gap: 4px;
   min-width: 0;
 }
 .fs-page .sa-work__label {
   font-family: var(--f-display);
-  font-size: clamp(15px, 2.1cqi, 19px);
+  font-size: clamp(17px, 2.4cqi, 21px);
   line-height: 1.1;
   color: #fff;
 }
@@ -1867,8 +1880,8 @@
   display: inline-flex;
   align-items: center;
   gap: 7px;
-  min-height: 32px;
-  padding: 6px 12px;
+  min-height: 36px;
+  padding: 8px 12px;
   border-radius: 999px;
   border: 1px solid color-mix(in oklab, var(--sa-mz-teal), #ffffff 30%);
   background: color-mix(in oklab, var(--sa-mz-teal) 26%, transparent);
@@ -1878,6 +1891,15 @@
   letter-spacing: 0.1em;
   text-transform: uppercase;
   cursor: pointer;
+  transition: background 160ms ease, border-color 160ms ease, transform 120ms ease;
+}
+/* Press/hover (reduced-motion safe — nulled below). */
+.fs-page .sa-work__chip:hover {
+  background: color-mix(in oklab, var(--sa-mz-teal) 40%, transparent);
+  border-color: color-mix(in oklab, var(--sa-mz-teal), #ffffff 14%);
+}
+.fs-page .sa-work__chip:active {
+  transform: translateY(1px) scale(0.98);
 }
 .fs-page .sa-work__chip-arrow {
   font-size: 13px;
@@ -2003,7 +2025,25 @@
     grid-column: 1 / -1;
   }
   .fs-page .sa-work__slide {
-    min-height: 380px;
+    min-height: 360px;
+  }
+}
+
+/* Mobile (the peek/swipe arm): collapse the affordance chip to ICON-ONLY (just
+   the arrow) so the caption keeps its full width and the sublabel stays on ONE
+   line at ~390px (the text chip otherwise squeezes the caption to ~169px and the
+   sublabel wraps). The chip's aria-label ("See the work") preserves the meaning
+   for assistive tech, and the "swipe the craft" cue + dots still signal the swipe. */
+@container page (max-width: 719.98px) {
+  .fs-page .sa-work__chip {
+    font-size: 0; /* hides the bare "See the work" text node; arrow keeps its own size */
+    gap: 0;
+    padding: 0 9px;
+    min-width: 36px;
+    justify-content: center;
+  }
+  .fs-page .sa-work__chip-arrow {
+    font-size: 15px;
   }
 }
 
@@ -2022,5 +2062,12 @@
   .fs-page .sa-work__cue,
   .fs-page .sa-work__chip {
     display: none;
+  }
+  /* Null the press/hover motion (the heavy shadow stays — it's static depth). */
+  .fs-page .sa-work__viewport {
+    transition: none;
+  }
+  .fs-page .sa-work:hover .sa-work__viewport {
+    transform: none;
   }
 }
