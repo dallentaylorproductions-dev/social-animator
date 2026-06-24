@@ -79,6 +79,13 @@ export const config = {
     "/social-animator/:path*",
     "/listing-flyer/:path*",
     "/settings/:path*",
+    // Studio Profile guided setup writes to the signed-in agent's BrandSettings
+    // and uploads to their Blob store (auth-gated), so it must require auth:
+    // unauthenticated → /login?callbackUrl=/studio, then the whole flow has
+    // account context and never bounces mid-flow. (Flag-off still redirects to
+    // /dashboard inside the page; the matcher only adds the identity gate.)
+    "/studio/:path*",
+    "/studio",
     "/paywall/:path*",
     "/api/checkout",
     "/api/checkout/:path*",

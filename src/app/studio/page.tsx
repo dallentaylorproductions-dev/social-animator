@@ -2,6 +2,7 @@ import { redirect } from "next/navigation";
 import { auth } from "@/lib/auth";
 import { isStudioProfileSetupEnabled } from "@/lib/config/studio-profile";
 import { WelcomeAccountReconcile } from "@/app/welcome/WelcomeAccountReconcile";
+import { SPEntitlementProvider } from "@/tools/seller-presentation/components/SPEntitlementContext";
 import { StudioProfileSetup } from "./StudioProfileSetup";
 
 /**
@@ -37,7 +38,12 @@ export default async function StudioPage() {
   return (
     <>
       <WelcomeAccountReconcile email={ownerEmail} />
-      <StudioProfileSetup ownerEmail={ownerEmail} />
+      {/* RecentListingsEditor (Recent work step) reads compPhotosEnabled from this
+          context for its Street View fallback; the provider self-fetches the
+          authed agent's entitlements (/api/entitlements/me). */}
+      <SPEntitlementProvider>
+        <StudioProfileSetup ownerEmail={ownerEmail} />
+      </SPEntitlementProvider>
     </>
   );
 }

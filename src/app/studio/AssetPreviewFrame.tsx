@@ -9,6 +9,7 @@ import {
 import { formatAppointment } from "@/tools/seller-presentation/engine/appointment";
 import { newsreader } from "@/tools/seller-presentation/output/flagship/fonts";
 import { StateAHero } from "@/tools/seller-presentation/output/flagship/StateAHero";
+import { CampaignSpread } from "@/tools/seller-presentation/output/flagship/CampaignSpread";
 import {
   ConfirmTime,
   TrustStrip,
@@ -39,6 +40,9 @@ import type { SegmentKey } from "@/lib/studio-profile/setup-state";
  *   You   → StateAHero (the real hero / agent identity area)
  *   Reach → ConfirmTime (the real contact / CTA block)
  *   Proof → TrustStrip (the real cream testimonial)
+ *   Sell  → CampaignSpread (the real redesigned "How I'll get your home seen")
+ *   Work  → CampaignSpread coverflow-only (the real recent-listings coverflow)
+ *   Brand → StateAHero (the real hero, re-hued by the agent's signature accent)
  *
  * When a section has nothing to render yet (no contact / no proof), it flexes
  * out to null on the real page — here we show a calm ghost so the stage is never
@@ -74,6 +78,15 @@ export function AssetPreviewFrame({
     const hasProof = !!(payload.reviews?.length || payload.reviewsOutlink);
     if (hasProof) body = <TrustStrip payload={payload} sourceLogos={false} />;
     else ghost = "The proof a seller can trust appears here once you add a review.";
+  } else if (asset === "sell") {
+    // The redesigned marketing zone (payload carries marketingZoneRedesign).
+    body = <CampaignSpread payload={payload} />;
+  } else if (asset === "work") {
+    // Just the exposure coverflow (recent listings, real reach).
+    body = <CampaignSpread payload={payload} variant="coverflow-only" />;
+  } else if (asset === "brand") {
+    // The hero, re-hued by the agent's signature accent.
+    body = <StateAHero payload={payload} appt={appt} />;
   }
 
   const animate = saved && !reducedMotion;

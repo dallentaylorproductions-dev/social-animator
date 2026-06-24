@@ -184,6 +184,83 @@
   color: var(--sp-muted);
 }
 
+/* ── constant reassurance (set once, reused everywhere) ────────────────── */
+.sp-reassure {
+  margin: 22px 0 0;
+  font-size: 12px;
+  line-height: 1.5;
+  color: var(--sp-muted);
+  border-top: 1px solid var(--sp-hairline);
+  padding-top: 14px;
+}
+.sp-reassure--bar {
+  margin: 8px 0 0;
+  border-top: none;
+  padding-top: 6px;
+}
+.sp-card .sp-reassure {
+  margin-top: 22px;
+}
+
+/* ── lead-emphasis levers (How you sell) ───────────────────────────────── */
+.sp-levers {
+  display: flex;
+  flex-wrap: wrap;
+  gap: 8px;
+}
+.sp-lever {
+  appearance: none;
+  cursor: pointer;
+  font-size: 13px;
+  font-weight: 500;
+  padding: 8px 13px;
+  border-radius: 999px;
+  border: 1px solid var(--sp-input-border);
+  background: var(--sp-input-bg);
+  color: var(--sp-ink);
+  transition: border-color 0.12s ease, background 0.12s ease;
+}
+.sp-lever--active {
+  border-color: var(--sp-mint);
+  color: var(--sp-mint);
+  background: var(--sp-mint-soft);
+}
+
+/* ── brand color input ─────────────────────────────────────────────────── */
+.sp-color {
+  display: flex;
+  gap: 10px;
+  align-items: center;
+}
+.sp-color__swatch {
+  appearance: none;
+  -webkit-appearance: none;
+  width: 48px;
+  height: 44px;
+  padding: 0;
+  border: 1px solid var(--sp-input-border);
+  border-radius: 10px;
+  background: var(--sp-input-bg);
+  cursor: pointer;
+  flex: none;
+}
+.sp-color__swatch::-webkit-color-swatch-wrapper {
+  padding: 4px;
+}
+.sp-color__swatch::-webkit-color-swatch {
+  border: none;
+  border-radius: 6px;
+}
+.sp-color__hex {
+  max-width: 160px;
+  text-transform: lowercase;
+}
+
+/* ── embedded Settings editors (WhyUsSection / RecentListingsEditor) ─────── */
+.sp-embed {
+  margin-top: 4px;
+}
+
 /* ── fields ────────────────────────────────────────────────────────────── */
 .sp-fields {
   display: flex;
@@ -414,6 +491,30 @@
   opacity: 1 !important;
   transform: none !important;
   transition: none !important;
+}
+/*
+ * The 3D recent-listings coverflow positions its cards via `data-pos`
+ * attributes set by the motion island (which the preview omits), so on desktop
+ * viewports the fan's cards become position:absolute with no transform and the
+ * fan collapses blank. Inside the preview, force the pure-CSS peek-carousel
+ * (the base/mobile layout) so the real cards always render statically — no JS,
+ * no side effects. Real seller pages keep the JS-driven 3D fan.
+ */
+.sp-asset .fs-page .sa-cf__fan {
+  display: flex !important;
+  overflow-x: auto !important;
+  gap: 14px !important;
+  height: auto !important;
+  perspective: none !important;
+}
+.sp-asset .fs-page .sa-cf__track {
+  display: contents !important;
+}
+.sp-asset .fs-page .sa-cf__card {
+  position: relative !important;
+  flex: 0 0 70% !important;
+  transform: none !important;
+  opacity: 1 !important;
 }
 .sp-asset__ghost {
   padding: 48px 28px;

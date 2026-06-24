@@ -4,15 +4,26 @@ import { useEffect, useMemo, useRef, useState } from "react";
 import { useRouter } from "next/navigation";
 import { useBrandSettings, extractPhoneDigits, formatPhone } from "@/lib/brand";
 import type { BrandSettings } from "@/lib/brand";
-import type { WhyUs } from "@/lib/whyus";
+import { type WhyUs, defaultWhyUs } from "@/lib/whyus";
+import { recentListingsToPublishInput } from "@/lib/seller-presentation/recent-listings";
+import type { PublicRecentListing } from "@/tools/seller-presentation/output/public-payload";
+import {
+  LEAD_EMPHASIS_LABELS,
+  LEAD_EMPHASIS_PRIMARY,
+  type LeadEmphasisKey,
+} from "@/lib/seller-presentation/lead-emphasis";
 import { HeadshotField } from "@/app/settings/HeadshotField";
 import type { HeadshotCropValue } from "@/app/settings/HeadshotCropEditor";
+import { WhyUsSection } from "@/app/settings/WhyUsSection";
+import { RecentListingsEditor } from "@/app/settings/RecentListingsEditor";
 import { PhoneInput } from "@/components/inputs/PhoneInput";
+import { ImageUploadField } from "@/components/ImageUploadField";
 import { buildSamplePreviewPayload } from "@/lib/onboarding/sample-listing-draft";
 import { emitStudioEvent, STUDIO_EVENTS } from "@/lib/studio-profile/funnel";
 import {
   completedSegments,
   isClientReady,
+  isFullyComplete,
   isProofDone,
   EMPTY_WHYUS,
   type SegmentKey,
@@ -27,41 +38,53 @@ import { AssetPreviewFrame } from "./AssetPreviewFrame";
 import "./studio.css";
 
 /**
- * StudioProfileSetup — the guided one-time activation (Studio Profile, Slice 1).
+ * StudioProfileSetup — the complete guided activation (Studio Profile).
  *
- * Phase 1 only: intro → You → Reach → Proof → client-ready checkpoint, with the
- * live asset-preview stage for the three steps. Desktop renders a three-panel
- * console (rail · capture · preview); mobile stacks (progress · field · preview
- * beneath). Phase 2 steps are stubbed as upcoming in the rail; "Finish setup"
- * routes to a Phase-2 placeholder.
+ * The full 6-step flow: intro → You → Reach → Proof → (client-ready continue
+ * beat) → How you sell → Recent work → Brand → launch. Desktop renders a
+ * three-panel console (rail · capture · live asset-preview); mobile stacks
+ * (progress · field · preview beneath).
  *
- * Save model (the agreed shape): each field edits a LOCAL overlay that feeds the
- * live preview (calm updates while typing); "Save & continue" is the reward
- * COMMIT — it writes the brand record via useBrandSettings().update, then plays
- * the dedicated save animation + the reuse-teaching confirmation + the rail
- * check, then advances. A quiet background buffer (socanim_studio_setup) holds
- * the unsaved overlay for crash-safety only; there is no ambient "saves
- * automatically" label that could swallow the save moment.
+ * MOMENTUM (the core revision): there is NO mid-flow exit. "I'll do this later"
+ * lives ONLY on the intro. Client-ready is a brief calm CONTINUE beat (one
+ * forward action), never a fork — the sparse-page off-ramp is gone. A constant
+ * reassurance line keeps the "set once, reused everywhere" frame present at every
+ * step. The ONLY "Create your first seller page" CTA is at TRUE completion (after
+ * Brand) — the launch moment.
+ *
+ * Save model: each field edits a LOCAL overlay that feeds the live preview;
+ * "Save & continue" is the reward COMMIT — it writes the brand record via
+ * useBrandSettings().update, plays the save animation + the reuse-teaching
+ * confirmation + the rail check, then advances. A quiet background buffer
+ * (socanim_studio_setup) holds the unsaved overlay for crash-safety only.
  */
 
-type Screen = "intro" | "you" | "reach" | "proof" | "checkpoint" | "phase2";
-/** The three Phase-1 step screens, in order (a subset of both Screen and SegmentKey). */
-type StepScreen = "you" | "reach" | "proof";
-const STEP_ORDER: StepScreen[] = ["you", "reach", "proof"];
+type Screen = "intro" | SegmentKey | "clientready" | "launch";
+const STEP_ORDER: SegmentKey[] = ["you", "reach", "proof", "sell", "work", "brand"];
 const SAVE_ANIM_MS = 1100;
+
+/** Where each step advances after its commit. */
+const NEXT_SCREEN: Record<SegmentKey, Screen> = {
+  you: "reach",
+  reach: "proof",
+  proof: "clientready", // the calm continue beat, not a fork
+  sell: "work",
+  work: "brand",
+  brand: "launch", // true completion → the launch moment
+};
 
 /** The reuse-teaching confirmation per step (the "thankful" moment). */
 const SAVE_TOAST: Record<SegmentKey, string> = {
   you: "Saved. Your pages will now open with your face and name.",
   reach: "Saved. Every page now has a clear way to reach you.",
   proof: "Saved. Studio will reuse this on every seller page and follow-up.",
-  sell: "Saved.",
-  work: "Saved.",
-  brand: "Saved.",
+  sell: "Studio can now explain how you get homes seen.",
+  work: "Your showcase now shows real reach.",
+  brand: "Your brand color now carries every page.",
 };
 
 const STEP_FRAME: Record<
-  "you" | "reach" | "proof",
+  SegmentKey,
   { eyebrow: string; title: string; sub: string }
 > = {
   you: {
@@ -79,15 +102,30 @@ const STEP_FRAME: Record<
     title: "Add one piece of proof sellers can trust.",
     sub: "A review is best. If you can't paste one, a credential still makes the page read credible.",
   },
+  sell: {
+    eyebrow: "How you sell",
+    title: "Show how you get homes seen.",
+    sub: "Your marketing approach and edge — reused in every page's marketing section.",
+  },
+  work: {
+    eyebrow: "Recent work",
+    title: "Prove your reach.",
+    sub: "Recent listings with real view counts power your showcase coverflow.",
+  },
+  brand: {
+    eyebrow: "Brand",
+    title: "Make it unmistakably yours.",
+    sub: "Your signature color carries across every page, promo, and follow-up.",
+  },
 };
+
+const REASSURANCE =
+  "Your one-time Studio setup · saved once, reused on every page, promo & follow-up.";
 
 export function StudioProfileSetup({ ownerEmail }: { ownerEmail: string | null }) {
   const router = useRouter();
   const { settings, update } = useBrandSettings();
 
-  // Unsaved edits overlay the live brand record; the preview + done-gates read
-  // the EFFECTIVE merge, so async server brand loads flow in naturally and the
-  // overlay only ever holds what the agent has typed-but-not-committed.
   const [overlay, setOverlay] = useState<Partial<BrandSettings>>({});
   const effective = useMemo<BrandSettings>(
     () => ({ ...settings, ...overlay }),
@@ -101,8 +139,7 @@ export function StudioProfileSetup({ ownerEmail }: { ownerEmail: string | null }
   const startedAtRef = useRef<number>(0);
   const hydratedRef = useRef(false);
 
-  // One-time hydrate: restore an unsaved overlay + screen + start time from the
-  // crash-safety buffer, then announce the flow started.
+  // One-time hydrate from the crash-safety buffer, then announce start.
   useEffect(() => {
     if (hydratedRef.current) return;
     hydratedRef.current = true;
@@ -113,8 +150,7 @@ export function StudioProfileSetup({ ownerEmail }: { ownerEmail: string | null }
     emitStudioEvent(STUDIO_EVENTS.setupStarted);
   }, []);
 
-  // Quiet background safety net (debounced). NOT the commit — just so a refresh
-  // mid-typing doesn't lose work.
+  // Quiet background safety net (debounced) — NOT the commit.
   useEffect(() => {
     if (!hydratedRef.current) return;
     const id = window.setTimeout(() => {
@@ -123,12 +159,14 @@ export function StudioProfileSetup({ ownerEmail }: { ownerEmail: string | null }
     return () => window.clearTimeout(id);
   }, [screen, overlay]);
 
+  const activeStep: SegmentKey | null = (STEP_ORDER as string[]).includes(screen)
+    ? (screen as SegmentKey)
+    : null;
+
   // Per-step entry instrumentation.
   useEffect(() => {
-    if (screen === "you" || screen === "reach" || screen === "proof") {
-      emitStudioEvent(STUDIO_EVENTS.stepEntered, { step: screen });
-    }
-  }, [screen]);
+    if (activeStep) emitStudioEvent(STUDIO_EVENTS.stepEntered, { step: activeStep });
+  }, [activeStep]);
 
   const setField = (patch: Partial<BrandSettings>) =>
     setOverlay((o) => ({ ...o, ...patch }));
@@ -140,18 +178,27 @@ export function StudioProfileSetup({ ownerEmail }: { ownerEmail: string | null }
     [effective],
   );
 
-  const previewPayload = useMemo(
-    () => buildSamplePreviewPayload(effective, ownerEmail ?? ""),
+  // Live preview payload. marketingZoneRedesign=true so the How-you-sell preview
+  // shows the v1.7 redesigned marketing zone; for the Recent-work step, overlay
+  // the agent's OWN listings (the sample seeds the rest so nothing is empty).
+  const basePayload = useMemo(
+    () => buildSamplePreviewPayload(effective, ownerEmail ?? "", true),
     [effective, ownerEmail],
   );
+  const previewPayload = useMemo(() => {
+    if (activeStep === "work") {
+      // Preview-only: the agent's own listings as the public shape (the publish
+      // projector remains the real clamp/cap boundary; this mapper's objects
+      // match PublicRecentListing structurally — address + optional fields).
+      const own = recentListingsToPublishInput(effective.recentListings ?? []) as
+        | PublicRecentListing[]
+        | undefined;
+      if (own?.length) return { ...basePayload, recentListings: own };
+    }
+    return basePayload;
+  }, [basePayload, activeStep, effective.recentListings]);
 
-  const goNext = (step: StepScreen) => {
-    const i = STEP_ORDER.indexOf(step);
-    if (i >= 0 && i < STEP_ORDER.length - 1) setScreen(STEP_ORDER[i + 1]);
-    else setScreen("checkpoint");
-  };
-
-  const commitAndAdvance = (step: StepScreen) => {
+  const commitAndAdvance = (step: SegmentKey) => {
     const wasReady = isClientReady(settings);
     const merged = { ...settings, ...overlay };
     update(merged); // the reward commit → brand record (+ server autosave)
@@ -160,36 +207,36 @@ export function StudioProfileSetup({ ownerEmail }: { ownerEmail: string | null }
     if (!wasReady && isClientReady(merged)) {
       emitStudioEvent(STUDIO_EVENTS.clientReadyReached, { ms: elapsed() });
     }
-    // Reward: play the dedicated save animation + reuse confirmation, then advance.
+    if (step === "brand" && isFullyComplete(merged)) {
+      emitStudioEvent(STUDIO_EVENTS.fullSetupCompleted, { ms: elapsed() });
+    }
     setSavedAsset(step);
     setToast(SAVE_TOAST[step]);
     window.setTimeout(
       () => {
         setSavedAsset(null);
         setToast(null);
-        goNext(step);
+        setScreen(NEXT_SCREEN[step]);
       },
       reducedMotion ? 60 : SAVE_ANIM_MS,
     );
   };
 
-  const skip = (step: StepScreen) => {
-    emitStudioEvent(STUDIO_EVENTS.stepSkipped, { step });
-    goNext(step);
+  const onLater = () => {
+    // The ONLY defer/exit — intro screen only. Keep the buffer so a return resumes.
+    router.push("/dashboard");
   };
-
-  const onCreatePage = (from: "checkpoint" | "intro") => {
-    emitStudioEvent(STUDIO_EVENTS.createPageClicked, { from });
+  const onCreatePage = () => {
+    emitStudioEvent(STUDIO_EVENTS.createPageClicked, { from: "launch" });
     clearStudioBuffer();
     router.push("/dashboard");
   };
-
-  const onFinishSetup = () => {
-    emitStudioEvent(STUDIO_EVENTS.finishSetupClicked);
-    setScreen("phase2");
+  const onReview = () => {
+    clearStudioBuffer();
+    router.push("/settings");
   };
 
-  /* ───────────────────────── intro / checkpoint / phase2 ──────────────────── */
+  /* ───────────────────────── intro / continue / launch ───────────────────── */
 
   if (screen === "intro") {
     return (
@@ -224,7 +271,7 @@ export function StudioProfileSetup({ ownerEmail }: { ownerEmail: string | null }
             type="button"
             className="sp-btn sp-btn--ghost"
             data-testid="sp-intro-later"
-            onClick={() => onCreatePage("intro")}
+            onClick={onLater}
           >
             I&rsquo;ll do this later
           </button>
@@ -233,61 +280,57 @@ export function StudioProfileSetup({ ownerEmail }: { ownerEmail: string | null }
     );
   }
 
-  if (screen === "checkpoint") {
+  if (screen === "clientready") {
+    // A brief calm CONTINUE beat — ONE forward action, no fork, no off-ramp.
     return (
-      <CenteredScreen testid="sp-checkpoint">
-        <p className="sp-eyebrow">Phase 1 complete</p>
-        <h1 className="sp-title">You&rsquo;re client-ready.</h1>
+      <CenteredScreen testid="sp-clientready">
+        <p className="sp-eyebrow">You&rsquo;re client-ready</p>
+        <h1 className="sp-title">Nice — you&rsquo;re client-ready.</h1>
         <p className="sp-sub">
-          Your first seller page will have you, a way to reach you, and proof
-          sellers can trust. Finish the next 3 steps so every tool starts richer.
+          Now let&rsquo;s make every page stronger. Three quick steps add your
+          marketing approach, recent work, and brand — the parts that fill a
+          page&rsquo;s biggest sections.
         </p>
         <div className="sp-actions">
           <button
             type="button"
             className="sp-btn sp-btn--primary"
-            data-testid="sp-checkpoint-finish"
-            onClick={onFinishSetup}
+            data-testid="sp-clientready-continue"
+            onClick={() => setScreen("sell")}
           >
-            Finish setup
-            <span className="sp-btn__hint">about 3 min left</span>
-          </button>
-          <button
-            type="button"
-            className="sp-btn sp-btn--ghost"
-            data-testid="sp-checkpoint-create"
-            onClick={() => onCreatePage("checkpoint")}
-          >
-            Create a seller page now
+            Keep going
           </button>
         </div>
+        <p className="sp-reassure">{REASSURANCE}</p>
       </CenteredScreen>
     );
   }
 
-  if (screen === "phase2") {
+  if (screen === "launch") {
     return (
-      <CenteredScreen testid="sp-phase2">
-        <p className="sp-eyebrow">Phase 2 · Finish your reusable profile</p>
-        <h1 className="sp-title">Coming next.</h1>
+      <CenteredScreen testid="sp-launch">
+        <p className="sp-eyebrow">Studio is ready</p>
+        <h1 className="sp-title">Studio is ready to carry your brand.</h1>
         <p className="sp-sub">
-          How you sell, your recent work, and your brand round out the profile so
-          every tool — not just seller pages — starts richer. We&rsquo;re putting
-          the finishing touches on these steps.
+          Your pages, promos, follow-ups, and future tools now start with your
+          identity, proof, selling approach, recent work, and brand built in.
         </p>
-        <ul className="sp-upcoming" data-testid="sp-phase2-list">
-          <li>How you sell — your marketing approach</li>
-          <li>Recent work — listings with real reach</li>
-          <li>Brand — your signature color &amp; logo</li>
-        </ul>
         <div className="sp-actions">
           <button
             type="button"
             className="sp-btn sp-btn--primary"
-            data-testid="sp-phase2-dashboard"
-            onClick={() => onCreatePage("checkpoint")}
+            data-testid="sp-launch-create"
+            onClick={onCreatePage}
           >
-            Go to your dashboard
+            Create your first seller page
+          </button>
+          <button
+            type="button"
+            className="sp-btn sp-btn--ghost"
+            data-testid="sp-launch-review"
+            onClick={onReview}
+          >
+            Review my Studio Profile
           </button>
         </div>
       </CenteredScreen>
@@ -296,24 +339,31 @@ export function StudioProfileSetup({ ownerEmail }: { ownerEmail: string | null }
 
   /* ─────────────────────────── the step console ──────────────────────────── */
 
-  const step = screen; // "you" | "reach" | "proof"
+  const step = activeStep as SegmentKey;
   const frame = STEP_FRAME[step];
+  // Phase-1 essentials gate to client-ready (required, no skip); Phase-2
+  // enrichment can always continue (encouraged via reassurance, never forced).
   const canSave =
     step === "you"
       ? !!effective.agentName?.trim()
       : step === "reach"
         ? !!(effective.contactEmail?.trim() || effective.contactPhone?.trim())
-        : isProofDone(effective);
-  const canSkip = step === "reach" || step === "proof";
+        : step === "proof"
+          ? isProofDone(effective)
+          : true;
 
   return (
     <div className="sp" data-testid="sp-console">
       <aside className="sp__rail">
         <SegmentedProgress done={done} active={step} layout="rail" />
+        <p className="sp-reassure" data-testid="sp-reassure">
+          {REASSURANCE}
+        </p>
       </aside>
 
       <div className="sp__bar">
         <SegmentedProgress done={done} active={step} layout="bar" />
+        <p className="sp-reassure sp-reassure--bar">{REASSURANCE}</p>
       </div>
 
       <main className="sp__center" data-testid={`sp-step-${step}`}>
@@ -329,6 +379,9 @@ export function StudioProfileSetup({ ownerEmail }: { ownerEmail: string | null }
           {step === "proof" && (
             <ProofFields effective={effective} setField={setField} />
           )}
+          {step === "sell" && <SellFields effective={effective} setField={setField} />}
+          {step === "work" && <WorkFields effective={effective} setField={setField} />}
+          {step === "brand" && <BrandFields effective={effective} setField={setField} />}
         </div>
 
         {toast && (
@@ -347,23 +400,7 @@ export function StudioProfileSetup({ ownerEmail }: { ownerEmail: string | null }
           >
             Save &amp; continue
           </button>
-          {canSkip && (
-            <button
-              type="button"
-              className="sp-btn sp-btn--ghost"
-              data-testid="sp-skip"
-              disabled={savedAsset !== null}
-              onClick={() => skip(step)}
-            >
-              I&rsquo;ll add this later
-            </button>
-          )}
         </div>
-        {canSkip && (
-          <p className="sp-skip-note" data-testid="sp-skip-note">
-            Studio will keep this section simple until you add it.
-          </p>
-        )}
       </main>
 
       <section className="sp__preview" data-testid="sp-preview">
@@ -590,6 +627,103 @@ function ProofFields({
           />
         </label>
       </details>
+    </>
+  );
+}
+
+function SellFields({
+  effective,
+  setField,
+}: {
+  effective: BrandSettings;
+  setField: (patch: Partial<BrandSettings>) => void;
+}) {
+  const whyUs = effective.whyUs ?? defaultWhyUs();
+  return (
+    <>
+      <div className="sp-field">
+        <span className="sp-label">What gets buyers in?</span>
+        <p className="sp-hint">Pick the angle you lead with — it shapes your campaign headline.</p>
+        <div className="sp-levers" data-testid="sp-levers">
+          {LEAD_EMPHASIS_PRIMARY.map((k) => (
+            <button
+              key={k}
+              type="button"
+              className={`sp-lever${effective.leadEmphasis === k ? " sp-lever--active" : ""}`}
+              data-testid={`sp-lever-${k}`}
+              onClick={() => setField({ leadEmphasis: k as LeadEmphasisKey })}
+            >
+              {LEAD_EMPHASIS_LABELS[k]}
+            </button>
+          ))}
+        </div>
+      </div>
+      <div className="sp-embed" data-testid="sp-whyus">
+        <WhyUsSection whyUs={whyUs} onChange={(next) => setField({ whyUs: next })} />
+      </div>
+    </>
+  );
+}
+
+function WorkFields({
+  effective,
+  setField,
+}: {
+  effective: BrandSettings;
+  setField: (patch: Partial<BrandSettings>) => void;
+}) {
+  return (
+    <div className="sp-embed" data-testid="sp-recent-listings">
+      <RecentListingsEditor
+        listings={effective.recentListings ?? []}
+        onChange={(next) => setField({ recentListings: next })}
+      />
+    </div>
+  );
+}
+
+function BrandFields({
+  effective,
+  setField,
+}: {
+  effective: BrandSettings;
+  setField: (patch: Partial<BrandSettings>) => void;
+}) {
+  const accent = effective.brandAccent ?? "#037290";
+  return (
+    <>
+      <div className="sp-field">
+        <span className="sp-label">Signature color</span>
+        <p className="sp-hint">Carries across every page, promo, and follow-up.</p>
+        <div className="sp-color">
+          <input
+            type="color"
+            className="sp-color__swatch"
+            data-testid="sp-input-brand-color"
+            value={accent}
+            aria-label="Signature color"
+            onChange={(e) => setField({ brandAccent: e.target.value })}
+          />
+          <input
+            type="text"
+            className="sp-input sp-color__hex"
+            value={accent}
+            aria-label="Signature color hex"
+            onChange={(e) => setField({ brandAccent: e.target.value })}
+          />
+        </div>
+      </div>
+      <div className="sp-field">
+        <span className="sp-label">Logo (optional)</span>
+        <ImageUploadField
+          label="Logo"
+          value={effective.logoDataUrl ?? ""}
+          onChange={(url) => setField({ logoDataUrl: url || null })}
+          folder="brand-logo"
+          testIdPrefix="sp-logo"
+          previewAspect="aspect-[3/1]"
+        />
+      </div>
     </>
   );
 }
