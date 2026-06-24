@@ -45,7 +45,9 @@ import "./studio.css";
  */
 
 type Screen = "intro" | "you" | "reach" | "proof" | "checkpoint" | "phase2";
-const STEP_ORDER: SegmentKey[] = ["you", "reach", "proof"];
+/** The three Phase-1 step screens, in order (a subset of both Screen and SegmentKey). */
+type StepScreen = "you" | "reach" | "proof";
+const STEP_ORDER: StepScreen[] = ["you", "reach", "proof"];
 const SAVE_ANIM_MS = 1100;
 
 /** The reuse-teaching confirmation per step (the "thankful" moment). */
@@ -143,13 +145,13 @@ export function StudioProfileSetup({ ownerEmail }: { ownerEmail: string | null }
     [effective, ownerEmail],
   );
 
-  const goNext = (step: SegmentKey) => {
+  const goNext = (step: StepScreen) => {
     const i = STEP_ORDER.indexOf(step);
     if (i >= 0 && i < STEP_ORDER.length - 1) setScreen(STEP_ORDER[i + 1]);
     else setScreen("checkpoint");
   };
 
-  const commitAndAdvance = (step: "you" | "reach" | "proof") => {
+  const commitAndAdvance = (step: StepScreen) => {
     const wasReady = isClientReady(settings);
     const merged = { ...settings, ...overlay };
     update(merged); // the reward commit → brand record (+ server autosave)
@@ -171,7 +173,7 @@ export function StudioProfileSetup({ ownerEmail }: { ownerEmail: string | null }
     );
   };
 
-  const skip = (step: "reach" | "proof") => {
+  const skip = (step: StepScreen) => {
     emitStudioEvent(STUDIO_EVENTS.stepSkipped, { step });
     goNext(step);
   };
