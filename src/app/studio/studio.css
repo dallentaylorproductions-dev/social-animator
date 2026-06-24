@@ -1,24 +1,37 @@
 /*
- * Studio Profile — guided activation chrome (Slice 1).
+ * Studio Profile — guided activation chrome (Slice 1), DARK Studio theme.
  *
  * Scoped under `.sp` so it never touches the seller-page styles it previews
- * (those stay `.fs-page`-scoped) or today's /settings. Two shapes from one
- * markup: a desktop three-panel console (rail · capture · preview) and a mobile
- * stack (progress · field · preview beneath). The dedicated save animation is
- * wrapper-level (not the seller page's `.reveal`) so we own it and can honor
- * prefers-reduced-motion.
+ * (those stay `.fs-page`-scoped) or today's /settings. Re-skinned to the dark
+ * Studio chrome to match the seller-presentation wizard + onboarding console
+ * (v8 mock). Two shapes from one markup: a desktop three-panel console
+ * (rail · capture · preview) and a mobile stack (progress · field · preview
+ * beneath). The dedicated save animation is wrapper-level (not the seller page's
+ * `.reveal`) so we own it and can honor prefers-reduced-motion.
+ *
+ * DELIBERATE EXCEPTION — the asset-preview card (`.sp-asset*`) stays LIGHT/cream:
+ * it renders the REAL seller-page components (StateAHero/ConfirmTime/TrustStrip,
+ * which are cream), so it must POP against the dark console like the "what
+ * sellers see" card in the v8 desktop mock — never get a dark skin.
  */
 
 .sp {
-  --sp-ink: #16201f;
-  --sp-ink-soft: #5a6a68;
-  --sp-line: #e3ddd0;
-  --sp-paper: #f6f2ea;
-  --sp-card: #fffdf8;
-  --sp-mint: #0f8c79;
-  --sp-mint-soft: #e4f4f0;
+  --sp-page: #0c120f; /* console / page bg */
+  --sp-panel: #151c18; /* rail + cards */
+  --sp-panel-active: #13201b; /* active step / segment */
+  --sp-hairline: rgba(255, 255, 255, 0.07);
+  --sp-hairline-strong: rgba(255, 255, 255, 0.14);
+  --sp-input-bg: #101713;
+  --sp-input-border: rgba(255, 255, 255, 0.1);
+  --sp-ink: #eaefeb; /* primary text */
+  --sp-header: #f4f8f5; /* headings */
+  --sp-muted: #8b968f; /* secondary / muted */
+  --sp-mint: #46dec2;
+  --sp-on-mint: #06231c;
+  --sp-mint-soft: rgba(70, 222, 194, 0.12);
+  --sp-mint-line: rgba(70, 222, 194, 0.35);
   min-height: 100vh;
-  background: var(--sp-paper);
+  background: var(--sp-page);
   color: var(--sp-ink);
   font-family: var(--font-inter, system-ui, sans-serif);
 }
@@ -56,7 +69,7 @@
     position: sticky;
     top: 0;
     padding: 40px 24px;
-    border-right: 1px solid var(--sp-line);
+    border-right: 1px solid var(--sp-hairline);
     height: 100vh;
   }
 }
@@ -104,15 +117,17 @@
   line-height: 1.08;
   margin: 0 0 14px;
   font-weight: 600;
+  color: var(--sp-header);
 }
 .sp-step-title {
   font-size: clamp(22px, 4vw, 30px);
   line-height: 1.12;
   margin: 0 0 10px;
   font-weight: 600;
+  color: var(--sp-header);
 }
 .sp-sub {
-  color: var(--sp-ink-soft);
+  color: var(--sp-muted);
   font-size: 15px;
   line-height: 1.55;
   margin: 0 0 22px;
@@ -140,12 +155,12 @@
   transition: transform 0.12s ease, background 0.15s ease, opacity 0.15s ease;
 }
 .sp-btn:disabled {
-  opacity: 0.45;
+  opacity: 0.4;
   cursor: not-allowed;
 }
 .sp-btn--primary {
   background: var(--sp-mint);
-  color: #fff;
+  color: var(--sp-on-mint);
 }
 .sp-btn--primary:not(:disabled):hover {
   transform: translateY(-1px);
@@ -153,7 +168,10 @@
 .sp-btn--ghost {
   background: transparent;
   color: var(--sp-ink);
-  border-color: var(--sp-line);
+  border-color: var(--sp-hairline-strong);
+}
+.sp-btn--ghost:not(:disabled):hover {
+  background: rgba(255, 255, 255, 0.04);
 }
 .sp-btn__hint {
   font-size: 12px;
@@ -163,7 +181,7 @@
 .sp-skip-note {
   margin: 10px 0 0;
   font-size: 13px;
-  color: var(--sp-ink-soft);
+  color: var(--sp-muted);
 }
 
 /* ── fields ────────────────────────────────────────────────────────────── */
@@ -181,22 +199,27 @@
   font-size: 13px;
   font-weight: 600;
   letter-spacing: 0.01em;
+  color: var(--sp-header);
 }
 .sp-hint {
   font-size: 13px;
-  color: var(--sp-ink-soft);
+  color: var(--sp-muted);
   margin: -2px 0 4px;
 }
 .sp-input {
   width: 100%;
   box-sizing: border-box;
-  background: var(--sp-card);
-  border: 1px solid var(--sp-line);
+  background: var(--sp-input-bg);
+  border: 1px solid var(--sp-input-border);
   border-radius: 10px;
   padding: 12px 14px;
   font-size: 16px;
   color: var(--sp-ink);
   font-family: inherit;
+}
+.sp-input::placeholder {
+  color: var(--sp-muted);
+  opacity: 0.7;
 }
 .sp-input:focus {
   outline: none;
@@ -210,7 +233,7 @@
 }
 .sp-fallback {
   margin-top: 6px;
-  border-top: 1px solid var(--sp-line);
+  border-top: 1px solid var(--sp-hairline);
   padding-top: 14px;
 }
 .sp-fallback > summary {
@@ -231,8 +254,8 @@
 .sp-toast {
   margin: 18px 0 0;
   background: var(--sp-mint-soft);
-  border: 1px solid #bfe6dd;
-  color: #0c5f52;
+  border: 1px solid var(--sp-mint-line);
+  color: #cff7ee;
   border-radius: 10px;
   padding: 12px 14px;
   font-size: 14px;
@@ -248,13 +271,13 @@
   padding: 40px 20px;
 }
 .sp-card {
-  background: var(--sp-card);
-  border: 1px solid var(--sp-line);
+  background: var(--sp-panel);
+  border: 1px solid var(--sp-hairline);
   border-radius: 20px;
   padding: 40px 32px;
   max-width: 560px;
   width: 100%;
-  box-shadow: 0 18px 50px -28px rgba(20, 30, 28, 0.4);
+  box-shadow: 0 24px 60px -30px rgba(0, 0, 0, 0.7);
 }
 .sp-map {
   list-style: none;
@@ -288,7 +311,7 @@
 .sp-upcoming {
   margin: 6px 0 4px;
   padding-left: 18px;
-  color: var(--sp-ink-soft);
+  color: var(--sp-muted);
   font-size: 14px;
   line-height: 1.8;
 }
@@ -301,7 +324,7 @@
   font-size: 11px;
   text-transform: uppercase;
   letter-spacing: 0.1em;
-  color: var(--sp-ink-soft);
+  color: var(--sp-muted);
   margin: 0 0 10px;
   font-weight: 600;
 }
@@ -335,13 +358,13 @@
   font-size: 14px;
   padding: 6px 8px;
   border-radius: 8px;
-  color: var(--sp-ink-soft);
+  color: var(--sp-muted);
 }
 .sp-seg__mark {
   width: 18px;
   height: 18px;
   border-radius: 50%;
-  border: 1.5px solid var(--sp-line);
+  border: 1.5px solid var(--sp-hairline-strong);
   display: inline-flex;
   align-items: center;
   justify-content: center;
@@ -354,25 +377,25 @@
 .sp-seg--done .sp-seg__mark {
   background: var(--sp-mint);
   border-color: var(--sp-mint);
-  color: #fff;
+  color: var(--sp-on-mint);
 }
 .sp-seg--active {
-  color: var(--sp-ink);
+  color: var(--sp-header);
   font-weight: 600;
-  background: var(--sp-mint-soft);
+  background: var(--sp-panel-active);
 }
 .sp-seg--active .sp-seg__mark {
   border-color: var(--sp-mint);
   color: var(--sp-mint);
 }
 
-/* ── the live asset-preview stage ──────────────────────────────────────── */
+/* ── the live asset-preview stage — LIGHT/cream ON PURPOSE (see header) ──── */
 .sp-asset {
   border-radius: 16px;
   overflow: hidden;
-  border: 1px solid var(--sp-line);
-  background: #0c1518;
-  box-shadow: 0 20px 60px -34px rgba(12, 21, 24, 0.6);
+  border: 1px solid rgba(255, 255, 255, 0.08);
+  background: #fcfaf4; /* cream frame so the real cream components pop on dark */
+  box-shadow: 0 26px 70px -34px rgba(0, 0, 0, 0.8);
 }
 .sp-asset__page {
   /* the real .fs-page renders its own register; just give it a clean frame */
@@ -381,10 +404,10 @@
 .sp-asset__ghost {
   padding: 48px 28px;
   text-align: center;
-  color: #7c8d90;
+  color: #74858a; /* muted DARK text — the ghost reads as a cream empty card */
   font-size: 14px;
   line-height: 1.5;
-  background: #0c1518;
+  background: #fcfaf4;
 }
 .sp-asset--saved {
   animation: sp-asset-pop 1s ease both;
@@ -400,9 +423,9 @@
   font-weight: 600;
   padding: 5px 11px;
   border-radius: 999px;
-  border: 1px solid var(--sp-line);
-  color: var(--sp-ink-soft);
-  background: var(--sp-card);
+  border: 1px solid var(--sp-hairline-strong);
+  color: var(--sp-muted);
+  background: var(--sp-panel);
 }
 .sp-dest__chip--active {
   border-color: var(--sp-mint);
@@ -412,7 +435,7 @@
 .sp-dest__note {
   margin: 8px 0 0;
   font-size: 12px;
-  color: var(--sp-ink-soft);
+  color: var(--sp-muted);
 }
 
 /* ── motion ────────────────────────────────────────────────────────────── */
@@ -428,13 +451,13 @@
 }
 @keyframes sp-asset-pop {
   0% {
-    box-shadow: 0 0 0 0 rgba(15, 140, 121, 0);
+    box-shadow: 0 0 0 0 rgba(70, 222, 194, 0);
   }
   35% {
-    box-shadow: 0 0 0 4px rgba(15, 140, 121, 0.5);
+    box-shadow: 0 0 0 4px rgba(70, 222, 194, 0.55);
   }
   100% {
-    box-shadow: 0 20px 60px -34px rgba(12, 21, 24, 0.6);
+    box-shadow: 0 26px 70px -34px rgba(0, 0, 0, 0.8);
   }
 }
 
