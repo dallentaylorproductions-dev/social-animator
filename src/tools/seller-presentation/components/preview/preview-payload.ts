@@ -27,6 +27,7 @@ import {
 } from "../../engine/types";
 import { isPriceRangeActive } from "../../engine/price-range";
 import {
+  computeValuationRange,
   toPublicPayload,
   type PublicPayload,
 } from "../../output/public-payload";
@@ -155,6 +156,14 @@ export function sampleStateAPayload(
   // flag-off session) render the current grid, byte-identical. Render-only: it
   // only sets the top-level discriminator CampaignSpread branches on.
   marketingZoneRedesign: boolean = false,
+  // VALUATION_REDESIGN (v1.7 Packet B) — mirror the publish-time flag so the
+  // wizard's State-A EXAMPLE preview shows the redesigned valuation section
+  // exactly when a flag-on publish would. Defaults false so existing callers
+  // (and a flag-off session) render the current block, byte-identical. This is
+  // the fixture path (no `toPublicPayload`), so the range is computed here from
+  // the fixture's own comps with the SAME `computeValuationRange` the projector
+  // uses — never a second, skewable derivation.
+  valuationRedesign: boolean = false,
 ): PublicPayload {
   const accent = brand.brandAccent;
   return {
@@ -166,6 +175,12 @@ export function sampleStateAPayload(
     // Only a literal true sets the key; false leaves it undefined (omitted), so
     // the flag-off EXAMPLE preview is byte-identical to today's grid.
     marketingZoneRedesign: marketingZoneRedesign ? true : undefined,
+    // v1.7 Packet B — set the discriminator + compute the range from the
+    // fixture's comps when the flag is on; both left undefined when off.
+    valuationRedesign: valuationRedesign ? true : undefined,
+    valuationRange: valuationRedesign
+      ? computeValuationRange(STATE_A_FULL_PAYLOAD.comps)
+      : undefined,
   } as PublicPayload;
 }
 
@@ -190,6 +205,11 @@ export function draftPreviewPayload(
   // when a flag-on publish would. Defaults false so existing callers (and a
   // flag-off session) render the current grid, byte-identical.
   marketingZoneRedesign: boolean = false,
+  // VALUATION_REDESIGN (v1.7 Packet B) — mirror the publish-time flag so the
+  // live preview shows the redesigned valuation section (and its comp-derived
+  // range) exactly when a flag-on publish would. Defaults false so existing
+  // callers (and a flag-off session) render the current block, byte-identical.
+  valuationRedesign: boolean = false,
 ): PublicPayload {
   const { agentContact, brandReviews, brandColors, brandWhyUs } =
     brandToPublishInputs(brand);
@@ -211,6 +231,9 @@ export function draftPreviewPayload(
     // redesign flag lands in the correct (9th) slot.
     false,
     marketingZoneRedesign,
+    // VALUATION_REDESIGN — 11th positional slot; the projector computes the
+    // comp-derived range from the draft's (price-bearing) comps when on.
+    valuationRedesign,
   );
 
   // Honest preview: the By-the-numbers band looks good, so Dallen wants it to

@@ -285,6 +285,7 @@ export function WizardPreview({
     reviewSourceLogosEnabled,
     sellerStateAEnabled,
     marketingZoneRedesignEnabled,
+    valuationRedesignEnabled,
   } = useSPEntitlement();
   const debouncedDraft = useDebounced(draft, DEBOUNCE_MS);
 
@@ -376,6 +377,7 @@ export function WizardPreview({
           brand,
           debouncedDraft.appointmentAt,
           marketingZoneRedesignEnabled === true,
+          valuationRedesignEnabled === true,
         )
       : samplePayload(brand)
     : draftPreviewPayload(
@@ -384,6 +386,7 @@ export function WizardPreview({
         compPhotosEnabled === true,
         sellerStateAEnabled === true,
         marketingZoneRedesignEnabled === true,
+        valuationRedesignEnabled === true,
       );
   // State A renders whenever the resolved payload carries an invitation status —
   // true for the State A sample (sparse + invitation mode) AND for a real

@@ -16,7 +16,15 @@ import { AppointmentBrief } from "./AppointmentBrief";
 import { CampaignSpread } from "./CampaignSpread";
 import { AgentBand } from "./AgentBand";
 import { ProofPanel } from "./ProofPanel";
-import { defaultValuationMessage, PROOF_RANGE_LABEL } from "./state-a-copy";
+import {
+  defaultValuationMessage,
+  PROOF_RANGE_LABEL,
+  VALUATION_HONESTY_LINE,
+  VALUATION_LEAD_LINE,
+  VALUATION_NO_RANGE_LINE,
+  VALUATION_RANGE_LABEL,
+  valuationTieLine,
+} from "./state-a-copy";
 import "./flagship.css";
 import "./state-a.css";
 
@@ -82,8 +90,15 @@ export function StateAPage({
         <AppointmentBrief payload={payload} preparedAt={handout.createdAt} />
         {/* 3 · Your valuation is being prepared (quiet, paced). NO price, no
             lock, no countdown, and NO stat - the value moment stays purely about
-            "your number is being prepared". */}
-        <ValuationPrepared payload={payload} appt={appt} />
+            "your number is being prepared". VALUATION_REDESIGN (v1.7 Packet B):
+            flag-on invitation publishes carry the `valuationRedesign`
+            discriminator and render the v3 open-editorial range; every flag-off /
+            revealed payload omits it and renders the legacy block (byte-identical). */}
+        {payload.valuationRedesign ? (
+          <ValuationPreparedV3 payload={payload} appt={appt} />
+        ) : (
+          <ValuationPrepared payload={payload} appt={appt} />
+        )}
         {/* Trust band: the one compact testimonial strip paired with the agent's
             track-record stat (relocated out of the valuation block), so all
             trust-proof lives in one small band. */}
@@ -187,6 +202,116 @@ export function ValuationPrepared({
             Homes near you recently sold between {range.low} and {range.high}.
           </p>
         )}
+      </div>
+    </section>
+  );
+}
+
+/**
+ * 3 (v1.7 Packet B) · "Being prepared for {date}." The redesigned valuation
+ * moment (VALUATION_REDESIGN). Open-editorial on warm cream (NOT a boxed card):
+ * the comp-derived RANGE is the whole moment — a small "LIKELY RANGE" label over
+ * the serif low–high, a thin meter (light track + a teal band + minimal dots at
+ * the nearby sales' sold prices), a tie line back to the photo-comp brief above,
+ * and ONE italic honesty line (teal left rule) that replaces the old pills.
+ *
+ * HONESTY GATE (load-bearing): the range is derived from comps only; there is
+ * never a fabricated firm number before the walkthrough. The range data
+ * ({@link PublicPayload.valuationRange}) carries only anonymized endpoints +
+ * normalized dot positions, computed at projection time from the agent's private
+ * comps (a real publish strips public comp prices), so no per-comp dollar figure
+ * or subject number is ever shown.
+ *
+ * FLEX: too few comps to ground a real range → `valuationRange` is absent, the
+ * meter + range numbers drop entirely (no lonely dot, no invented range), and the
+ * section reads complete on the headline + lead + a reassurance honesty line. No
+ * appointment → the headline goes dateless. The whole block is gated by the
+ * `valuationRedesign` discriminator, so a flag-off payload never reaches here.
+ */
+export function ValuationPreparedV3({
+  payload,
+  appt,
+}: {
+  payload: PublicPayload;
+  appt: Appt;
+}) {
+  const dayLabel = appt ? `${appt.weekday}, ${appt.date}` : null;
+  const range = payload.valuationRange;
+  const hasRange = !!range && range.high > range.low;
+
+  return (
+    <section
+      className="section z-offwhite sa-val sa-val--v3"
+      data-testid="fs-sa-valuation"
+      data-valuation-variant="v3"
+    >
+      <div className="reveal sa-valr" data-has-range={hasRange ? "true" : "false"}>
+        <div className="eyebrow">
+          Your Valuation <span className="rule" aria-hidden="true" />
+        </div>
+        <h2 className="head">
+          Being <em>prepared</em>
+          {dayLabel ? <> for {dayLabel}.</> : "."}
+        </h2>
+        <p className="sa-valr__lead" data-testid="fs-sa-valuation-lead">
+          {VALUATION_LEAD_LINE}
+        </p>
+
+        {hasRange && (
+          <>
+            {/* The range IS the moment: small label, serif low–high, thin meter.
+                The dash sits between dollar values (digit-flanked), so the
+                no-em-dash copy gate never trips on it. */}
+            <div className="sa-valr__range" data-testid="fs-sa-valuation-range">
+              <span className="sa-valr__range-label">{VALUATION_RANGE_LABEL}</span>
+              <div
+                className="sa-valr__nums"
+                aria-label={`${formatDollarsAbbrev(range!.low)} to ${formatDollarsAbbrev(range!.high)}`}
+                role="text"
+              >
+                <span className="sa-valr__num">
+                  {formatDollarsAbbrev(range!.low)}
+                </span>
+                <span className="sa-valr__dash" aria-hidden="true">
+                  –
+                </span>
+                <span className="sa-valr__num">
+                  {formatDollarsAbbrev(range!.high)}
+                </span>
+              </div>
+              {/* Thin meter: a light full-width track, the teal band (low→high,
+                  stretches in on reveal), and the nearby sales as minimal dots at
+                  their sold positions (no labels, no tap). aria-hidden — the range
+                  is already announced by the numbers above. */}
+              <div className="sa-valr__meter" aria-hidden="true">
+                <span className="sa-valr__track" />
+                <span className="sa-valr__band" />
+                {range!.points.map((p, i) => (
+                  <span
+                    className="sa-valr__dot"
+                    key={i}
+                    style={
+                      {
+                        left: `${(p * 100).toFixed(2)}%`,
+                        "--dot-i": i,
+                      } as CSSProperties
+                    }
+                  />
+                ))}
+              </div>
+            </div>
+            <p className="sa-valr__tie" data-testid="fs-sa-valuation-tie">
+              {valuationTieLine(range!.points.length)}
+            </p>
+          </>
+        )}
+
+        {/* ONE italic honesty line with a teal left rule, replacing the pills. The
+            with-range copy is the load-bearing gate statement; the no-range flex
+            case keeps reassurance framing without inventing a range. */}
+        <p className="sa-valr__honesty" data-testid="fs-sa-valuation-honesty">
+          <em>{hasRange ? VALUATION_HONESTY_LINE : VALUATION_NO_RANGE_LINE}</em>
+        </p>
       </div>
     </section>
   );

@@ -358,6 +358,28 @@ export interface PublicRecentListing {
 /** Seller State A · Zone 5 — coverflow card cap (full fan is 4–5; extra rows drop). */
 export const RECENT_LISTINGS_CAP = 5;
 
+/** v1.7 Packet B — the redesigned valuation meter caps to a clean few dots. */
+export const VALUATION_RANGE_DOT_CAP = 5;
+
+/**
+ * v1.7 Packet B — the comp-derived valuation range for the redesigned State-A
+ * valuation section. ANONYMIZED by construction: only the low/high endpoints
+ * (whole dollars) and the normalized 0..1 dot positions ride the public payload,
+ * never a per-comp dollar figure and never the subject home's number.
+ */
+export interface PublicValuationRange {
+  /** Lowest nearby sold price (whole dollars) — the range floor, shown abbreviated. */
+  low: number;
+  /** Highest nearby sold price (whole dollars) — the range ceiling. */
+  high: number;
+  /**
+   * Each grounding nearby sale's position WITHIN [low, high], normalized to 0..1
+   * and sorted ascending, for the meter dots. Capped to {@link VALUATION_RANGE_DOT_CAP}.
+   * Endpoints are always 0 and 1 (the low/high comps); interior values fall between.
+   */
+  points: number[];
+}
+
 export interface PublicPayload {
   /**
    * Flagship-rollout discriminator (F1). Absent on every already-published
@@ -465,6 +487,31 @@ export interface PublicPayload {
    * it; the coverflow-only (State B) variant ignores it.
    */
   marketingZoneRedesign?: boolean;
+  /**
+   * v1.7 Packet B — render the State-A valuation section in its redesigned v3
+   * form (open-editorial serif range + thin dotted meter + tie line + one italic
+   * honesty line, replacing the body-copy + pills + one-line range). Emitted ONLY
+   * behind the VALUATION_REDESIGN flag in a State-A invitation publish; absent on
+   * a revealed / flag-off publish, so `ValuationPrepared` renders the current
+   * block and those publishes stay byte-identical. The pure render branches on
+   * this discriminator; the actual range data rides {@link valuationRange} (which
+   * may be absent even when this is set, e.g. too few comps to ground a range).
+   */
+  valuationRedesign?: boolean;
+  /**
+   * v1.7 Packet B — the comp-derived valuation RANGE for the redesigned section.
+   * Computed at projection time from the agent's PRIVATE draft comps (the prices
+   * the agent reviewed), because a real invitation publish strips every public
+   * comp `soldPrice` (the honesty gate) — so the public payload otherwise carries
+   * no price to ground the range. Carries ONLY the anonymized endpoints + the
+   * normalized 0..1 dot positions; never a per-comp dollar figure and never the
+   * subject home's number, so the honesty gate holds (a range from comps, never a
+   * fabricated firm number). Emitted ONLY behind the VALUATION_REDESIGN flag in a
+   * State-A invitation publish AND only when at least two comps yield a real
+   * spread; absent otherwise, so the v3 render flexes the meter out (numbers +
+   * honesty framing only, no lonely dot) and a flag-off publish is byte-identical.
+   */
+  valuationRange?: PublicValuationRange;
   /**
    * Optional "as of <Mon YYYY>" stamp for the reviews aggregate rating (e.g.
    * "Jun 2026"). Surfaced by the v2 review card for a Google source, where
@@ -1019,6 +1066,68 @@ function projectPublicWhyUsText(v: unknown): string | undefined {
   return typeof v === "string" && v.trim() ? v : undefined;
 }
 
+/** "$695,000" / "$695k" / "0.6m" / "695000" → 695000; non-numeric → null. */
+function parseCompDollars(raw: unknown): number | null {
+  if (typeof raw !== "string") return null;
+  const s = raw.trim().toLowerCase();
+  if (!s) return null;
+  const k = /k$/.test(s);
+  const m = /m$/.test(s);
+  const n = parseFloat(s.replace(/[^0-9.]/g, ""));
+  if (!Number.isFinite(n) || n <= 0) return null;
+  if (m) return Math.round(n * 1_000_000);
+  if (k) return Math.round(n * 1000);
+  return Math.round(n);
+}
+
+/**
+ * v1.7 Packet B — derive the anonymized {@link PublicValuationRange} from a set
+ * of comps (the agent's reviewed nearby sales). Pure + exported so BOTH the
+ * publish projector (`toPublicPayload`, from the PRIVATE draft comps) and the
+ * fixture-based wizard EXAMPLE preview (`sampleStateAPayload`, from the fixture
+ * comps) compute the SAME range — never two that can skew.
+ *
+ * HONESTY: returns ONLY the low/high endpoints (whole dollars) + the normalized
+ * 0..1 dot positions; the caller never persists a per-comp dollar figure or the
+ * subject's number. Returns undefined when fewer than two parseable comp prices
+ * exist OR they collapse to a single value (no real spread) — so the redesigned
+ * render flexes the meter out entirely (numbers + honesty framing only, never a
+ * lonely dot, never an invented range). Counted-only: a set-aside comp
+ * (`counted === false`) is excluded, matching the rest of the projection.
+ */
+export function computeValuationRange(
+  comps: ReadonlyArray<{ soldPrice?: string; counted?: boolean }>,
+): PublicValuationRange | undefined {
+  const prices = comps
+    .filter((c) => c.counted !== false)
+    .map((c) => parseCompDollars(c.soldPrice))
+    .filter((n): n is number => n != null)
+    .sort((a, b) => a - b);
+  if (prices.length < 2) return undefined;
+  const low = prices[0];
+  const high = prices[prices.length - 1];
+  const span = high - low;
+  if (span <= 0) return undefined; // all comps the same price → no groundable spread
+  // Cap to a clean few dots, keeping the two endpoints and spreading the
+  // interior picks evenly so the plotted distribution still reads true.
+  const dots =
+    prices.length <= VALUATION_RANGE_DOT_CAP
+      ? prices
+      : Array.from({ length: VALUATION_RANGE_DOT_CAP }, (_, i) => {
+          const idx = Math.round(
+            (i / (VALUATION_RANGE_DOT_CAP - 1)) * (prices.length - 1),
+          );
+          return prices[idx];
+        });
+  // Normalize each grounding sale to its 0..1 position (dots already ascending,
+  // sampled from the sorted prices). Duplicates are KEPT — two homes that sold at
+  // the same price are two real sales, so `points.length` stays the honest count
+  // the tie line reads ("Plotted from the {N} recent sales"); coincident dots
+  // simply overlay on the meter. Endpoints are always 0 (low) and 1 (high).
+  const points = dots.map((p) => Math.round(((p - low) / span) * 1000) / 1000);
+  return { low, high, points };
+}
+
 /**
  * Build the public payload from a raw draft + the agent's contact
  * card + the agent's curated reviews. Pure — same inputs always
@@ -1068,6 +1177,15 @@ export function toPublicPayload(
   // `marketingZoneRedesign` key is emitted and CampaignSpread renders the current
   // capability-frames grid. Append-last so existing positional call sites stay valid.
   marketingZoneRedesign: boolean = false,
+  // VALUATION_REDESIGN (v1.7 Packet B) — the State-A valuation v3 kill switch.
+  // OFF by default so every existing call site (and every flag-off publish) stays
+  // byte-identical: when false, neither `valuationRedesign` nor `valuationRange`
+  // is emitted and `ValuationPrepared` renders the current block. When on AND this
+  // is a State-A invitation publish, the discriminator is set and a comp-derived
+  // range is computed from the (price-bearing) DRAFT comps before the public strip,
+  // so the redesigned section has a real range to show on a live page. Append-last
+  // so existing positional call sites stay valid.
+  valuationRedesign: boolean = false,
 ): PublicPayload {
   const propertyAddress = draft.propertyAddress ?? "";
   const recommendedPrice = draft.recommendedPrice ?? "";
@@ -1271,6 +1389,19 @@ export function toPublicPayload(
     // pure render reads it the same whether built at publish or re-clamped on read.
     marketingZoneRedesign: marketingZoneRedesign ? true : undefined,
 
+    // v1.7 Packet B — the valuation v3 discriminator + its comp-derived range.
+    // Both emit ONLY behind the flag in a State-A invitation publish, so they
+    // drop out via JSON.stringify on a revealed / flag-off publish (byte-
+    // identical). The range is computed from the PRIVATE `draft.comps` (which
+    // still carry prices) BEFORE the public strip blanked `soldPrice`, and
+    // returns undefined when fewer than two comps ground a real spread (the v3
+    // render then flexes the meter out, numbers + honesty framing only).
+    valuationRedesign: valuationRedesign && invitationPublish ? true : undefined,
+    valuationRange:
+      valuationRedesign && invitationPublish
+        ? computeValuationRange(draft.comps)
+        : undefined,
+
     // Seller State A — spread last; `{}` for every revealed / flag-off publish.
     // Carries the state discriminator + appointment AND the State A copy/asset
     // fields (signature, valuation/welcome voice lines, capability samples).
@@ -1375,6 +1506,17 @@ export function clampPublicPayload(raw: unknown): PublicPayload {
     // the current grid. Render-only flag, so no further hardening is needed.
     marketingZoneRedesign: r.marketingZoneRedesign === true ? true : undefined,
 
+    // v1.7 Packet B — coerce the valuation v3 discriminator + re-validate the
+    // range at the read boundary. Only a literal `true` survives the
+    // discriminator; the range is rebuilt field-by-field (finite endpoints with a
+    // real low<high spread, dot positions clamped to [0,1] and capped), so a
+    // hand-edited KV record can't smuggle a malformed range or a rogue dollar
+    // figure to the renderer. Absent / invalid ⇒ undefined ⇒ the v3 meter flexes
+    // out (or the whole section falls back to the legacy block when the
+    // discriminator is absent), byte-identical for every flag-off record.
+    valuationRedesign: r.valuationRedesign === true ? true : undefined,
+    valuationRange: clampValuationRange(r.valuationRange),
+
     // Seller State A — coerce the discriminator at the trust boundary. An
     // absent / unknown / tampered value reads as `revealed` so the consumer
     // dispatch resolves to the existing full presentation (every pre-State-A
@@ -1384,6 +1526,31 @@ export function clampPublicPayload(raw: unknown): PublicPayload {
     // trim-or-undefined the projector used.
     ...clampStateAFields(r),
   };
+}
+
+/**
+ * v1.7 Packet B — read-boundary clamp for {@link PublicValuationRange}. Rebuilds
+ * the range field-by-field: finite positive endpoints with a real low < high
+ * spread, and dot positions coerced to finite numbers in [0, 1], de-duped,
+ * sorted, and capped. Returns undefined for anything malformed (or absent), so a
+ * tampered KV record can never paint a broken meter or smuggle an out-of-band
+ * dollar figure. The endpoints + positions are the only datum that ride through.
+ */
+function clampValuationRange(raw: unknown): PublicValuationRange | undefined {
+  if (!raw || typeof raw !== "object") return undefined;
+  const r = raw as Record<string, unknown>;
+  const low = typeof r.low === "number" && Number.isFinite(r.low) ? r.low : null;
+  const high =
+    typeof r.high === "number" && Number.isFinite(r.high) ? r.high : null;
+  if (low == null || high == null || low <= 0 || high <= low) return undefined;
+  const points = Array.isArray(r.points)
+    ? r.points
+        .filter((p): p is number => typeof p === "number" && Number.isFinite(p))
+        .map((p) => Math.min(1, Math.max(0, p)))
+        .sort((a, b) => a - b)
+        .slice(0, VALUATION_RANGE_DOT_CAP)
+    : [];
+  return { low, high, points };
 }
 
 /**

@@ -53,10 +53,16 @@ export function AgentLayerSetup({
   // the redesigned marketing zone exactly when a flag-on publish would. Default
   // false keeps a flag-off session byte-identical to today's grid.
   marketingZoneRedesignEnabled = false,
+  // VALUATION_REDESIGN (v1.7 Packet B) — resolved on the server welcome shell and
+  // threaded here so the inline "sample home, real you" mirror renders the
+  // redesigned valuation section exactly when a flag-on publish would. Default
+  // false keeps a flag-off session byte-identical.
+  valuationRedesignEnabled = false,
 }: {
   onBack: () => void;
   ownerEmail: string | null;
   marketingZoneRedesignEnabled?: boolean;
+  valuationRedesignEnabled?: boolean;
 }) {
   const router = useRouter();
 
@@ -66,11 +72,13 @@ export function AgentLayerSetup({
   const { settings, update } = useBrandSettings();
 
   // The full-page "See an example" link mirrors this inline preview, so it must
-  // carry the SAME redesign state — `&redesign=1` flips the fixture route's zone
-  // on when the flag is live, otherwise it stays the plain state-a fixture.
-  const exampleHref = marketingZoneRedesignEnabled
-    ? `${EXAMPLE_HREF}&redesign=1`
-    : EXAMPLE_HREF;
+  // carry the SAME redesign state — `&redesign=1` flips the fixture route's
+  // marketing zone, `&valrange=1` flips its valuation section; either is added
+  // only when its flag is live, otherwise it stays the plain state-a fixture.
+  const exampleHref =
+    EXAMPLE_HREF +
+    (marketingZoneRedesignEnabled ? '&redesign=1' : '') +
+    (valuationRedesignEnabled ? '&valrange=1' : '');
 
   // The live preview re-derives from `settings`, so every capture write updates
   // the matching section on screen immediately (G3).
@@ -79,6 +87,7 @@ export function AgentLayerSetup({
       settings,
       ownerEmail ?? '',
       marketingZoneRedesignEnabled,
+      valuationRedesignEnabled,
     );
     return {
       slug: '', // empty: no public URL, and the beacon is omitted in preview anyway
@@ -88,7 +97,7 @@ export function AgentLayerSetup({
       updatedAt: PREVIEW_PREPARED_AT,
       data: data as unknown as Record<string, unknown>,
     };
-  }, [settings, ownerEmail, marketingZoneRedesignEnabled]);
+  }, [settings, ownerEmail, marketingZoneRedesignEnabled, valuationRedesignEnabled]);
 
   const onCreatePage = () => {
     emitOnboardingEvent(ONBOARDING_EVENTS.reachedCockpit);

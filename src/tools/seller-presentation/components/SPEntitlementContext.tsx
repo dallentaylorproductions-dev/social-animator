@@ -79,6 +79,11 @@ interface SPEntitlement {
    *  preview renders today's capability-frames grid (byte-identical), matching a
    *  flag-off publish. Mirrors the publish-time env flag. */
   marketingZoneRedesignEnabled: boolean | null;
+  /** VALUATION_REDESIGN feature-flag state for the redesigned State-A valuation
+   *  section. `null` while loading; `false` ⇒ the live/EXAMPLE preview renders
+   *  today's valuation block (byte-identical), matching a flag-off publish.
+   *  Mirrors the publish-time env flag. */
+  valuationRedesignEnabled: boolean | null;
 }
 
 const Ctx = createContext<SPEntitlement>({
@@ -94,6 +99,7 @@ const Ctx = createContext<SPEntitlement>({
   reviewSourceLogosEnabled: null,
   sellerStateAEnabled: null,
   marketingZoneRedesignEnabled: null,
+  valuationRedesignEnabled: null,
 });
 
 export function useSPEntitlement(): SPEntitlement {
@@ -114,6 +120,7 @@ export function SPEntitlementProvider({ children }: { children: ReactNode }) {
     reviewSourceLogosEnabled: null,
     sellerStateAEnabled: null,
     marketingZoneRedesignEnabled: null,
+    valuationRedesignEnabled: null,
   });
 
   useEffect(() => {
@@ -145,6 +152,8 @@ export function SPEntitlementProvider({ children }: { children: ReactNode }) {
           reviewSourceLogosEnabled:
             !!data.features?.reviewSourceLogosEnabled,
           sellerStateAEnabled: !!data.features?.sellerStateAEnabled,
+          valuationRedesignEnabled:
+            !!data.features?.valuationRedesignEnabled,
           marketingZoneRedesignEnabled:
             !!data.features?.marketingZoneRedesignEnabled,
         });
