@@ -999,13 +999,35 @@
    the brief above, and one italic honesty line with a teal left rule. The whole
    block lives in a single `.reveal`, with the band stretch + dot settle + tie
    fade sequenced off `.reveal.in` (reduced motion lands every piece at rest). */
+/* The v3 valuation is now a DARK zone so it stands apart from the cream sections
+   above and below, with the range as a bright focal panel inside it. The base
+   tone is the brand TEAL family (built from the page's own `--ink` + `--teal-700`
+   tokens so it reads native, never green) near #0A2A36; the raised panel a step
+   lighter near #0E3543. All accents stay on `--teal-500` / `--teal-700`. */
 .fs-page.state-a .sa-val--v3 {
-  /* The legacy `.sa-val` is z-ink (dark); the v3 variant is cream + ink text, so
-     neutralize the inherited dark text color the shared class would carry. */
-  color: var(--t-body);
+  --sav-bg: color-mix(in oklab, var(--ink) 72%, var(--teal-700));
+  --sav-panel: color-mix(in oklab, var(--ink-2) 66%, var(--teal-700));
+  --sav-key: color-mix(in oklab, var(--teal-500) 38%, transparent);
+  --sav-cyan: color-mix(in oklab, var(--teal-500) 50%, var(--white));
+  --sav-glow: color-mix(in oklab, var(--teal-500) 55%, transparent);
+  background: var(--sav-bg);
+  color: var(--t-pap-soft);
 }
 .fs-page.state-a .sa-valr {
   max-width: 60ch;
+}
+/* Header on dark: light blue-teal eyebrow with a short teal accent rule, the
+   serif headline in warm cream, the lead in muted light. */
+.fs-page.state-a .sa-valr__eyebrow {
+  color: var(--sav-cyan);
+}
+.fs-page.state-a .sa-valr__eyebrow .rule {
+  flex: 0 0 clamp(28px, 6cqi, 56px);
+  height: 2px;
+  background: linear-gradient(90deg, var(--teal-500), transparent);
+}
+.fs-page.state-a .sa-valr__head {
+  color: var(--t-pap);
 }
 .fs-page.state-a .sa-valr__lead {
   margin: clamp(18px, 2.6cqi, 26px) 0 0;
@@ -1014,46 +1036,70 @@
   font-size: clamp(19px, 2.6cqi, 24px);
   line-height: 1.42;
   letter-spacing: -0.005em;
-  color: var(--t-soft);
+  color: var(--t-pap-soft);
   text-wrap: pretty;
 }
-/* The range is the moment: label · serif low–high · meter. Generous space above
-   so it reads as the section's centerpiece, not a stat tucked under the lead. */
-.fs-page.state-a .sa-valr__range {
-  margin-top: clamp(30px, 4.6cqi, 52px);
+/* The range gets its OWN raised panel inside the dark section so it pops: a
+   step-lighter blue-teal fill, a 1px blue keyline + a faint top highlight, and a
+   soft shadow to lift it off the base. */
+.fs-page.state-a .sa-valr__panel {
+  margin-top: clamp(28px, 4.4cqi, 50px);
+  padding: clamp(20px, 3.6cqi, 32px);
+  background: var(--sav-panel);
+  border: 1px solid var(--sav-key);
+  border-radius: 16px;
+  box-shadow:
+    0 24px 50px -28px rgba(0, 0, 0, 0.62),
+    inset 0 1px 0 rgba(255, 255, 255, 0.07);
+}
+/* Eyebrow row: the "Likely range" label (light cyan) left, the muted grounding
+   count right, on one baseline. */
+.fs-page.state-a .sa-valr__rangehead {
+  display: flex;
+  align-items: baseline;
+  justify-content: space-between;
+  gap: 12px;
 }
 .fs-page.state-a .sa-valr__range-label {
-  display: block;
   font-family: var(--f-mono);
   font-size: 11px;
   letter-spacing: 0.18em;
   text-transform: uppercase;
-  color: var(--t-mute);
+  color: var(--sav-cyan);
 }
+.fs-page.state-a .sa-valr__count {
+  font-family: var(--f-mono);
+  font-size: 11px;
+  letter-spacing: 0.1em;
+  text-transform: uppercase;
+  color: var(--t-pap-mute);
+  white-space: nowrap;
+}
+/* The range numbers SIDE-BY-SIDE on ONE line, bright white serif. `nowrap` is
+   the fix for the prior wrap/stack bug; the size is tuned so "$580K – $700K"
+   stays on one line at the 390px frame width. */
 .fs-page.state-a .sa-valr__nums {
   margin-top: clamp(10px, 1.6cqi, 16px);
-  display: flex;
-  align-items: baseline;
-  gap: clamp(12px, 2.2cqi, 22px);
+  white-space: nowrap;
   font-family: var(--f-display);
   font-weight: 500;
-  font-size: clamp(34px, 7.2cqi, 50px);
+  font-size: clamp(30px, 9.5cqi, 40px);
   line-height: 1;
   letter-spacing: -0.02em;
-  color: var(--teal-700);
+  color: #ffffff;
   font-variant-numeric: lining-nums tabular-nums;
 }
 .fs-page.state-a .sa-valr__dash {
-  color: color-mix(in oklab, var(--teal-700) 42%, transparent);
+  margin: 0 clamp(10px, 2.4cqi, 18px);
+  color: color-mix(in oklab, var(--sav-cyan) 60%, transparent);
   font-weight: 400;
 }
-/* Thin meter: a light full-width rail; the teal band overlays it low→high (which
-   is the full track, since low/high ARE the endpoints) and stretches in on
-   reveal; the dots sit centered on the rail at their sold positions. overflow is
-   visible so the 0% / 100% endpoint dots ride the band ends cleanly. */
+/* Thin meter: a dark recessed rail; the blue-teal band overlays it low→high
+   (which is the full track, since low/high ARE the endpoints) and stretches in on
+   reveal; the dots sit centered on the rail at their sold positions. */
 .fs-page.state-a .sa-valr__meter {
   position: relative;
-  margin-top: clamp(22px, 3.4cqi, 34px);
+  margin-top: clamp(20px, 3.2cqi, 30px);
   height: 14px;
 }
 .fs-page.state-a .sa-valr__track,
@@ -1067,10 +1113,10 @@
   transform: translateY(-50%);
 }
 .fs-page.state-a .sa-valr__track {
-  background: color-mix(in oklab, var(--ink) 14%, var(--offwhite));
+  background: rgba(0, 0, 0, 0.34);
 }
 .fs-page.state-a .sa-valr__band {
-  background: var(--teal-700);
+  background: var(--teal-500);
   transform: translateY(-50%) scaleX(1);
   transform-origin: left center;
 }
@@ -1080,9 +1126,9 @@
   width: 11px;
   height: 11px;
   border-radius: 50%;
-  background: var(--offwhite);
-  border: 2px solid var(--teal-700);
-  box-shadow: 0 1px 4px rgba(20, 40, 44, 0.18);
+  background: var(--sav-cyan);
+  border: 2px solid var(--sav-panel);
+  box-shadow: 0 1px 4px rgba(0, 0, 0, 0.45);
   transform: translate(-50%, -50%) scale(1);
 }
 .fs-page.state-a .sa-valr__tie {
@@ -1091,57 +1137,103 @@
   font-size: 11px;
   letter-spacing: 0.1em;
   text-transform: uppercase;
-  color: var(--t-mute);
+  color: var(--t-pap-mute);
 }
-/* The one italic honesty line: a teal left rule, editorial serif italic. Replaces
-   the legacy pills + body two-step entirely. */
+/* The one italic honesty line: a teal left rule, editorial serif italic, on the
+   dark section base BELOW the panel. Replaces the legacy pills entirely. */
 .fs-page.state-a .sa-valr__honesty {
-  margin: clamp(30px, 4.4cqi, 48px) 0 0;
+  margin: clamp(28px, 4.2cqi, 46px) 0 0;
   padding-left: clamp(16px, 2.2cqi, 22px);
-  border-left: 2px solid var(--teal-700);
+  border-left: 2px solid var(--teal-500);
   max-width: 52ch;
   font-family: var(--f-display);
   font-style: italic;
   font-size: clamp(18px, 2.5cqi, 23px);
   line-height: 1.45;
-  color: var(--t-ink);
+  color: var(--t-pap-soft);
   text-wrap: pretty;
 }
 
-/* Motion · the one motivated reveal, sequenced off the block's `.reveal.in`:
-   the container fades the label + headline + lead + numbers up (base `.reveal`),
-   then the band stretches low→high, then the dots settle in with a slight
-   overshoot, then the tie line fades. CSS-only; the shared PresentationPageMotion
-   driver adds `.in` (immediately under reduced motion). */
+/* Motion · the one motivated reveal, sequenced off the block's `.reveal.in`: the
+   panel lifts in → the numbers fade up → the band stretches low→high → the dots
+   settle with a slight overshoot → the band glows (soft teal) then eases back.
+   CSS-only; the shared PresentationPageMotion driver adds `.in` (immediately
+   under reduced motion, which lands every piece at its static final state). */
+.fs-page.state-a .sa-valr__panel {
+  transition:
+    transform 0.6s var(--ease) 0.15s,
+    opacity 0.6s var(--ease) 0.15s;
+}
+.fs-page.state-a .reveal:not(.in) .sa-valr__panel {
+  opacity: 0;
+  transform: translateY(18px);
+}
+.fs-page.state-a .sa-valr__nums {
+  transition:
+    opacity 0.5s var(--ease) 0.45s,
+    transform 0.5s var(--ease) 0.45s;
+}
+.fs-page.state-a .reveal:not(.in) .sa-valr__nums {
+  opacity: 0;
+  transform: translateY(10px);
+}
 .fs-page.state-a .sa-valr__band {
-  transition: transform 0.7s var(--ease) 0.3s;
+  transition: transform 0.7s var(--ease) 0.65s;
 }
 .fs-page.state-a .reveal:not(.in) .sa-valr__band {
   transform: translateY(-50%) scaleX(0);
+}
+/* Once the band has stretched, a one-shot soft teal glow that eases back out. */
+.fs-page.state-a .reveal.in .sa-valr__band {
+  animation: savBandGlow 1.1s var(--ease) 1.5s both;
+}
+@keyframes savBandGlow {
+  0% {
+    box-shadow: 0 0 0 0 color-mix(in oklab, var(--sav-glow) 0%, transparent);
+  }
+  45% {
+    box-shadow: 0 0 18px 2px var(--sav-glow);
+  }
+  100% {
+    box-shadow: 0 0 0 0 color-mix(in oklab, var(--sav-glow) 0%, transparent);
+  }
 }
 /* backOut-style overshoot easing for the dots settling onto the rail. */
 .fs-page.state-a .sa-valr__dot {
   transition:
     transform 0.5s cubic-bezier(0.34, 1.56, 0.64, 1)
-      calc(0.72s + var(--dot-i, 0) * 0.06s),
-    opacity 0.4s var(--ease) calc(0.72s + var(--dot-i, 0) * 0.06s);
+      calc(1.15s + var(--dot-i, 0) * 0.06s),
+    opacity 0.4s var(--ease) calc(1.15s + var(--dot-i, 0) * 0.06s);
 }
 .fs-page.state-a .reveal:not(.in) .sa-valr__dot {
   transform: translate(-50%, -50%) scale(0);
   opacity: 0;
 }
 .fs-page.state-a .sa-valr__tie {
-  transition: opacity 0.5s var(--ease) 1.1s, transform 0.5s var(--ease) 1.1s;
+  transition: opacity 0.5s var(--ease) 1.0s, transform 0.5s var(--ease) 1.0s;
 }
 .fs-page.state-a .reveal:not(.in) .sa-valr__tie {
   opacity: 0;
   transform: translateY(6px);
 }
 @media (prefers-reduced-motion: reduce) {
+  .fs-page.state-a .sa-valr__panel,
+  .fs-page.state-a .reveal:not(.in) .sa-valr__panel {
+    opacity: 1 !important;
+    transform: none !important;
+    transition: none !important;
+  }
+  .fs-page.state-a .sa-valr__nums,
+  .fs-page.state-a .reveal:not(.in) .sa-valr__nums {
+    opacity: 1 !important;
+    transform: none !important;
+    transition: none !important;
+  }
   .fs-page.state-a .sa-valr__band,
   .fs-page.state-a .reveal:not(.in) .sa-valr__band {
     transform: translateY(-50%) scaleX(1) !important;
     transition: none !important;
+    animation: none !important;
   }
   .fs-page.state-a .sa-valr__dot,
   .fs-page.state-a .reveal:not(.in) .sa-valr__dot {
