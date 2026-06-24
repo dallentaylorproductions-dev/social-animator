@@ -1,0 +1,448 @@
+/*
+ * Studio Profile — guided activation chrome (Slice 1).
+ *
+ * Scoped under `.sp` so it never touches the seller-page styles it previews
+ * (those stay `.fs-page`-scoped) or today's /settings. Two shapes from one
+ * markup: a desktop three-panel console (rail · capture · preview) and a mobile
+ * stack (progress · field · preview beneath). The dedicated save animation is
+ * wrapper-level (not the seller page's `.reveal`) so we own it and can honor
+ * prefers-reduced-motion.
+ */
+
+.sp {
+  --sp-ink: #16201f;
+  --sp-ink-soft: #5a6a68;
+  --sp-line: #e3ddd0;
+  --sp-paper: #f6f2ea;
+  --sp-card: #fffdf8;
+  --sp-mint: #0f8c79;
+  --sp-mint-soft: #e4f4f0;
+  min-height: 100vh;
+  background: var(--sp-paper);
+  color: var(--sp-ink);
+  font-family: var(--font-inter, system-ui, sans-serif);
+}
+
+/* ── desktop three-panel console ───────────────────────────────────────── */
+.sp__console,
+.sp {
+  box-sizing: border-box;
+}
+.sp[data-testid="sp-console"] {
+  display: grid;
+  grid-template-columns: 1fr;
+  gap: 0;
+}
+
+@media (min-width: 960px) {
+  .sp[data-testid="sp-console"] {
+    grid-template-columns: 260px minmax(0, 1fr) minmax(0, 46%);
+    align-items: start;
+    max-width: 1320px;
+    margin: 0 auto;
+    min-height: 100vh;
+  }
+  .sp__bar {
+    display: none;
+  }
+}
+
+.sp__rail {
+  display: none;
+}
+@media (min-width: 960px) {
+  .sp__rail {
+    display: block;
+    position: sticky;
+    top: 0;
+    padding: 40px 24px;
+    border-right: 1px solid var(--sp-line);
+    height: 100vh;
+  }
+}
+
+.sp__bar {
+  padding: 16px 18px 4px;
+}
+
+.sp__center {
+  padding: 32px 20px 48px;
+  max-width: 560px;
+}
+@media (min-width: 960px) {
+  .sp__center {
+    padding: 56px 40px;
+    justify-self: center;
+    width: 100%;
+  }
+}
+
+.sp__preview {
+  padding: 8px 18px 40px;
+}
+@media (min-width: 960px) {
+  .sp__preview {
+    position: sticky;
+    top: 0;
+    padding: 40px 32px;
+    max-height: 100vh;
+    overflow: auto;
+  }
+}
+
+/* ── typography + actions ──────────────────────────────────────────────── */
+.sp-eyebrow {
+  text-transform: uppercase;
+  letter-spacing: 0.14em;
+  font-size: 12px;
+  font-weight: 600;
+  color: var(--sp-mint);
+  margin: 0 0 10px;
+}
+.sp-title {
+  font-size: clamp(26px, 5vw, 38px);
+  line-height: 1.08;
+  margin: 0 0 14px;
+  font-weight: 600;
+}
+.sp-step-title {
+  font-size: clamp(22px, 4vw, 30px);
+  line-height: 1.12;
+  margin: 0 0 10px;
+  font-weight: 600;
+}
+.sp-sub {
+  color: var(--sp-ink-soft);
+  font-size: 15px;
+  line-height: 1.55;
+  margin: 0 0 22px;
+  max-width: 46ch;
+}
+
+.sp-actions {
+  display: flex;
+  flex-wrap: wrap;
+  gap: 12px;
+  margin-top: 24px;
+  align-items: center;
+}
+.sp-btn {
+  appearance: none;
+  border: 1px solid transparent;
+  border-radius: 12px;
+  padding: 13px 22px;
+  font-size: 15px;
+  font-weight: 600;
+  cursor: pointer;
+  display: inline-flex;
+  align-items: baseline;
+  gap: 10px;
+  transition: transform 0.12s ease, background 0.15s ease, opacity 0.15s ease;
+}
+.sp-btn:disabled {
+  opacity: 0.45;
+  cursor: not-allowed;
+}
+.sp-btn--primary {
+  background: var(--sp-mint);
+  color: #fff;
+}
+.sp-btn--primary:not(:disabled):hover {
+  transform: translateY(-1px);
+}
+.sp-btn--ghost {
+  background: transparent;
+  color: var(--sp-ink);
+  border-color: var(--sp-line);
+}
+.sp-btn__hint {
+  font-size: 12px;
+  font-weight: 500;
+  opacity: 0.8;
+}
+.sp-skip-note {
+  margin: 10px 0 0;
+  font-size: 13px;
+  color: var(--sp-ink-soft);
+}
+
+/* ── fields ────────────────────────────────────────────────────────────── */
+.sp-fields {
+  display: flex;
+  flex-direction: column;
+  gap: 20px;
+}
+.sp-field {
+  display: flex;
+  flex-direction: column;
+  gap: 7px;
+}
+.sp-label {
+  font-size: 13px;
+  font-weight: 600;
+  letter-spacing: 0.01em;
+}
+.sp-hint {
+  font-size: 13px;
+  color: var(--sp-ink-soft);
+  margin: -2px 0 4px;
+}
+.sp-input {
+  width: 100%;
+  box-sizing: border-box;
+  background: var(--sp-card);
+  border: 1px solid var(--sp-line);
+  border-radius: 10px;
+  padding: 12px 14px;
+  font-size: 16px;
+  color: var(--sp-ink);
+  font-family: inherit;
+}
+.sp-input:focus {
+  outline: none;
+  border-color: var(--sp-mint);
+  box-shadow: 0 0 0 3px var(--sp-mint-soft);
+}
+.sp-textarea {
+  resize: vertical;
+  min-height: 84px;
+  line-height: 1.5;
+}
+.sp-fallback {
+  margin-top: 6px;
+  border-top: 1px solid var(--sp-line);
+  padding-top: 14px;
+}
+.sp-fallback > summary {
+  cursor: pointer;
+  font-size: 14px;
+  font-weight: 600;
+  color: var(--sp-mint);
+  list-style: none;
+}
+.sp-fallback[open] > summary {
+  margin-bottom: 14px;
+}
+.sp-fallback .sp-field + .sp-field {
+  margin-top: 14px;
+}
+
+/* ── reuse-teaching toast (the "thankful" moment) ──────────────────────── */
+.sp-toast {
+  margin: 18px 0 0;
+  background: var(--sp-mint-soft);
+  border: 1px solid #bfe6dd;
+  color: #0c5f52;
+  border-radius: 10px;
+  padding: 12px 14px;
+  font-size: 14px;
+  font-weight: 500;
+  animation: sp-toast-in 0.3s ease both;
+}
+
+/* ── centered screens (intro / checkpoint / phase2) ────────────────────── */
+.sp--centered {
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  padding: 40px 20px;
+}
+.sp-card {
+  background: var(--sp-card);
+  border: 1px solid var(--sp-line);
+  border-radius: 20px;
+  padding: 40px 32px;
+  max-width: 560px;
+  width: 100%;
+  box-shadow: 0 18px 50px -28px rgba(20, 30, 28, 0.4);
+}
+.sp-map {
+  list-style: none;
+  margin: 8px 0 4px;
+  padding: 0;
+  display: grid;
+  grid-template-columns: repeat(2, minmax(0, 1fr));
+  gap: 10px 18px;
+}
+.sp-map__item {
+  display: flex;
+  align-items: center;
+  gap: 10px;
+  font-size: 14px;
+  font-weight: 500;
+  color: var(--sp-ink);
+}
+.sp-map__num {
+  width: 22px;
+  height: 22px;
+  border-radius: 50%;
+  background: var(--sp-mint-soft);
+  color: var(--sp-mint);
+  font-size: 12px;
+  font-weight: 700;
+  display: inline-flex;
+  align-items: center;
+  justify-content: center;
+  flex: none;
+}
+.sp-upcoming {
+  margin: 6px 0 4px;
+  padding-left: 18px;
+  color: var(--sp-ink-soft);
+  font-size: 14px;
+  line-height: 1.8;
+}
+
+/* ── segmented progress ────────────────────────────────────────────────── */
+.sp-progress__phase + .sp-progress__phase {
+  margin-top: 22px;
+}
+.sp-progress__phase-label {
+  font-size: 11px;
+  text-transform: uppercase;
+  letter-spacing: 0.1em;
+  color: var(--sp-ink-soft);
+  margin: 0 0 10px;
+  font-weight: 600;
+}
+.sp-progress__list {
+  list-style: none;
+  margin: 0;
+  padding: 0;
+  display: flex;
+  flex-direction: column;
+  gap: 4px;
+}
+.sp-progress--bar .sp-progress {
+  display: block;
+}
+.sp-progress--bar {
+  display: flex;
+  gap: 18px;
+}
+.sp-progress--bar .sp-progress__phase + .sp-progress__phase {
+  margin-top: 0;
+}
+.sp-progress--bar .sp-progress__list {
+  flex-direction: row;
+  flex-wrap: wrap;
+  gap: 6px 12px;
+}
+.sp-seg {
+  display: flex;
+  align-items: center;
+  gap: 8px;
+  font-size: 14px;
+  padding: 6px 8px;
+  border-radius: 8px;
+  color: var(--sp-ink-soft);
+}
+.sp-seg__mark {
+  width: 18px;
+  height: 18px;
+  border-radius: 50%;
+  border: 1.5px solid var(--sp-line);
+  display: inline-flex;
+  align-items: center;
+  justify-content: center;
+  font-size: 11px;
+  flex: none;
+}
+.sp-seg--done {
+  color: var(--sp-ink);
+}
+.sp-seg--done .sp-seg__mark {
+  background: var(--sp-mint);
+  border-color: var(--sp-mint);
+  color: #fff;
+}
+.sp-seg--active {
+  color: var(--sp-ink);
+  font-weight: 600;
+  background: var(--sp-mint-soft);
+}
+.sp-seg--active .sp-seg__mark {
+  border-color: var(--sp-mint);
+  color: var(--sp-mint);
+}
+
+/* ── the live asset-preview stage ──────────────────────────────────────── */
+.sp-asset {
+  border-radius: 16px;
+  overflow: hidden;
+  border: 1px solid var(--sp-line);
+  background: #0c1518;
+  box-shadow: 0 20px 60px -34px rgba(12, 21, 24, 0.6);
+}
+.sp-asset__page {
+  /* the real .fs-page renders its own register; just give it a clean frame */
+  min-height: 120px;
+}
+.sp-asset__ghost {
+  padding: 48px 28px;
+  text-align: center;
+  color: #7c8d90;
+  font-size: 14px;
+  line-height: 1.5;
+  background: #0c1518;
+}
+.sp-asset--saved {
+  animation: sp-asset-pop 1s ease both;
+}
+.sp-dest {
+  display: flex;
+  gap: 8px;
+  margin-top: 16px;
+  flex-wrap: wrap;
+}
+.sp-dest__chip {
+  font-size: 12px;
+  font-weight: 600;
+  padding: 5px 11px;
+  border-radius: 999px;
+  border: 1px solid var(--sp-line);
+  color: var(--sp-ink-soft);
+  background: var(--sp-card);
+}
+.sp-dest__chip--active {
+  border-color: var(--sp-mint);
+  color: var(--sp-mint);
+  background: var(--sp-mint-soft);
+}
+.sp-dest__note {
+  margin: 8px 0 0;
+  font-size: 12px;
+  color: var(--sp-ink-soft);
+}
+
+/* ── motion ────────────────────────────────────────────────────────────── */
+@keyframes sp-toast-in {
+  from {
+    opacity: 0;
+    transform: translateY(6px);
+  }
+  to {
+    opacity: 1;
+    transform: none;
+  }
+}
+@keyframes sp-asset-pop {
+  0% {
+    box-shadow: 0 0 0 0 rgba(15, 140, 121, 0);
+  }
+  35% {
+    box-shadow: 0 0 0 4px rgba(15, 140, 121, 0.5);
+  }
+  100% {
+    box-shadow: 0 20px 60px -34px rgba(12, 21, 24, 0.6);
+  }
+}
+
+@media (prefers-reduced-motion: reduce) {
+  .sp-asset--saved,
+  .sp-toast,
+  .sp-btn {
+    animation: none !important;
+    transition: none !important;
+  }
+}

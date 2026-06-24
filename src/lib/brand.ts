@@ -61,6 +61,15 @@ export interface BrandSettings {
   agentYearsInArea?: string;
   agentCtaReassurance?: string;
   /**
+   * Studio Profile (Slice 1) — the agent's scheduling link (Calendly/Cal.com/
+   * etc.), captured in the guided "Reach" step. AGENT-CONSTANT, set once,
+   * reusable. DATA-IN ONLY this slice: it is NOT yet enumerated by
+   * `brandToPublishInputs`, so it never reaches a public seller page — a
+   * follow-on wires it to the contact/CTA block. Optional; a non-string / empty
+   * value drops to undefined on load, so a flag-off blob is byte-identical.
+   */
+  schedulingUrl?: string;
+  /**
    * A7d.2 — curated reviews. AGENT-CONSTANT: entered once in Settings,
    * surfaced on every Seller Presentation. The wizard's editorial step
    * no longer captures per-presentation reviews; the projector reads
@@ -453,6 +462,12 @@ export function loadBrandSettings(): BrandSettings {
         typeof parsed.agentCtaReassurance === "string" &&
         parsed.agentCtaReassurance.length > 0
           ? parsed.agentCtaReassurance
+          : undefined,
+      // Studio Profile (Slice 1) — scheduling link; data-in only (see type doc).
+      schedulingUrl:
+        typeof parsed.schedulingUrl === "string" &&
+        parsed.schedulingUrl.length > 0
+          ? parsed.schedulingUrl
           : undefined,
       agentReviews: clampStoredReviews(parsed.agentReviews),
       reviewsOutlinkUrl:

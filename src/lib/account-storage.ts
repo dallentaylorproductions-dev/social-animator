@@ -47,6 +47,7 @@ const OWNER_STAMP_KEY = "socanim_owner_email";
  *   - socanim_listing_profile           (src/lib/listing-profile.ts — LOCAL-ONLY)
  *   - socanim_clients                   (src/lib/client-profile.ts — LOCAL-ONLY)
  *   - socanim_onboarding_*              (src/lib/onboarding/seen.ts — advisory)
+ *   - socanim_studio_setup             (src/lib/studio-profile/setup-storage.ts — crash-safety buffer)
  *   - workflowInstance:index            (the draft index; records swept by prefix)
  *   - sep-pages-order                   (cache of THIS agent's page order)
  *   - <tool>:draft                      (per-tool in-progress drafts — LOCAL-ONLY)
@@ -61,6 +62,7 @@ const ACCOUNT_SCOPED_KEYS: readonly string[] = [
   "socanim_onboarding_seen",
   "socanim_onboarding_sample_walked",
   "socanim_onboarding_path_a_complete",
+  "socanim_studio_setup",
   "workflowInstance:index",
   "sep-pages-order",
   "listingFlyer:draft",
