@@ -477,6 +477,9 @@ function ListingCard({
         <ListingCardPhoto
           sources={photoSources}
           testId={`fs-sa-cf-photo-${index}`}
+          focalX={listing.photoFocalX}
+          focalY={listing.photoFocalY}
+          scale={listing.photoScale}
         />
       )}
       {/* The legibility band is rendered on EVERY card so each is a self-contained

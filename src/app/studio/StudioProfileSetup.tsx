@@ -73,6 +73,16 @@ const NEXT_SCREEN: Record<SegmentKey, Screen> = {
   brand: "launch", // true completion → the launch moment
 };
 
+/** Where "Back" returns to (so a saved step can be revisited to fix a typo). */
+const PREV_SCREEN: Record<SegmentKey, Screen> = {
+  you: "intro",
+  reach: "you",
+  proof: "reach",
+  sell: "clientready",
+  work: "sell",
+  brand: "work",
+};
+
 /** The reuse-teaching confirmation per step (the "thankful" moment). */
 const SAVE_TOAST: Record<SegmentKey, string> = {
   you: "Saved. Your pages will now open with your face and name.",
@@ -201,6 +211,15 @@ export function StudioProfileSetup({ ownerEmail }: { ownerEmail: string | null }
   const commitAndAdvance = (step: SegmentKey) => {
     const wasReady = isClientReady(settings);
     const merged = { ...settings, ...overlay };
+    // Normalize the proof review at commit: trim the raw-stored text and apply
+    // the empty-name default (kept raw during editing so spaces type normally).
+    if (step === "proof" && merged.agentReviews?.[0]) {
+      const r = merged.agentReviews[0];
+      const body = r.body.trim();
+      merged.agentReviews = body
+        ? [{ ...r, body, attributionName: r.attributionName.trim() || "A recent seller" }]
+        : undefined;
+    }
     update(merged); // the reward commit → brand record (+ server autosave)
     setOverlay({});
     emitStudioEvent(STUDIO_EVENTS.stepSaved, { step });
@@ -220,6 +239,15 @@ export function StudioProfileSetup({ ownerEmail }: { ownerEmail: string | null }
       },
       reducedMotion ? 60 : SAVE_ANIM_MS,
     );
+  };
+
+  // Re-edit navigation: Back returns to the previous screen; the rail lets the
+  // agent jump back into any step they've already reached. Overlay edits are
+  // never cleared on navigation (only an explicit commit clears them) and
+  // committed values live in `settings`, so no entered data is lost going back.
+  const goTo = (next: Screen) => {
+    if (savedAsset) return; // ignore mid-save-animation
+    setScreen(next);
   };
 
   const onLater = () => {
@@ -300,6 +328,14 @@ export function StudioProfileSetup({ ownerEmail }: { ownerEmail: string | null }
           >
             Keep going
           </button>
+          <button
+            type="button"
+            className="sp-btn sp-btn--ghost"
+            data-testid="sp-clientready-back"
+            onClick={() => goTo("proof")}
+          >
+            Back
+          </button>
         </div>
         <p className="sp-reassure">{REASSURANCE}</p>
       </CenteredScreen>
@@ -351,18 +387,36 @@ export function StudioProfileSetup({ ownerEmail }: { ownerEmail: string | null }
         : step === "proof"
           ? isProofDone(effective)
           : true;
+  // Any step at or before the current one is reachable for re-editing via the
+  // rail (jump back to fix a typo); forward jumps stay gated behind Save.
+  const curIdx = STEP_ORDER.indexOf(step);
+  const reachable = new Set<SegmentKey>(
+    STEP_ORDER.filter((_, i) => i <= curIdx),
+  );
 
   return (
     <div className="sp" data-testid="sp-console">
       <aside className="sp__rail">
-        <SegmentedProgress done={done} active={step} layout="rail" />
+        <SegmentedProgress
+          done={done}
+          active={step}
+          layout="rail"
+          selectable={reachable}
+          onSelect={goTo}
+        />
         <p className="sp-reassure" data-testid="sp-reassure">
           {REASSURANCE}
         </p>
       </aside>
 
       <div className="sp__bar">
-        <SegmentedProgress done={done} active={step} layout="bar" />
+        <SegmentedProgress
+          done={done}
+          active={step}
+          layout="bar"
+          selectable={reachable}
+          onSelect={goTo}
+        />
         <p className="sp-reassure sp-reassure--bar">{REASSURANCE}</p>
       </div>
 
@@ -399,6 +453,15 @@ export function StudioProfileSetup({ ownerEmail }: { ownerEmail: string | null }
             onClick={() => commitAndAdvance(step)}
           >
             Save &amp; continue
+          </button>
+          <button
+            type="button"
+            className="sp-btn sp-btn--ghost"
+            data-testid="sp-back"
+            disabled={savedAsset !== null}
+            onClick={() => goTo(PREV_SCREEN[step])}
+          >
+            Back
           </button>
         </div>
       </main>
@@ -549,11 +612,12 @@ function ProofFields({
   const review = effective.agentReviews?.[0];
   const body = review?.body ?? "";
   const name = review?.attributionName ?? "";
+  // Store the text RAW (no trim) so the controlled inputs don't strip the space
+  // at the caret on every keystroke (the "can't type spaces" bug). Trimming +
+  // the empty-name default are applied once at commit (see commitAndAdvance).
   const setReview = (b: string, n: string) =>
     setField({
-      agentReviews: b.trim()
-        ? [{ body: b.trim(), attributionName: n.trim() || "A recent seller" }]
-        : undefined,
+      agentReviews: b.trim() ? [{ body: b, attributionName: n }] : undefined,
     });
   const base = effective.whyUs ?? (EMPTY_WHYUS as unknown as WhyUs);
   const proofPoint = base.differentiators?.[0] ?? "";
@@ -677,6 +741,7 @@ function WorkFields({
       <RecentListingsEditor
         listings={effective.recentListings ?? []}
         onChange={(next) => setField({ recentListings: next })}
+        enablePhotoPosition
       />
     </div>
   );

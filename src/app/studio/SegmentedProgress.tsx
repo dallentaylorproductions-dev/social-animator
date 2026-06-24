@@ -22,11 +22,16 @@ export function SegmentedProgress({
   done,
   active,
   layout = "rail",
+  selectable,
+  onSelect,
 }: {
   done: ReadonlySet<SegmentKey>;
   active: SegmentKey | null;
   /** "rail" = desktop vertical left rail; "bar" = mobile horizontal strip. */
   layout?: "rail" | "bar";
+  /** Segments the agent can click to jump back into (re-edit). */
+  selectable?: ReadonlySet<SegmentKey>;
+  onSelect?: (key: SegmentKey) => void;
 }) {
   const phase1 = SEGMENTS.filter((s) => s.phase === 1);
   const phase2 = SEGMENTS.filter((s) => s.phase === 2);
@@ -37,6 +42,29 @@ export function SegmentedProgress({
       : key === active
         ? "active"
         : "upcoming";
+    // Clickable only when reachable AND not the current step (no-op self-jump).
+    const clickable = !!selectable?.has(key) && !!onSelect && key !== active;
+    const mark = (
+      <span className="sp-seg__mark" aria-hidden="true">
+        {state === "done" ? "✓" : state === "active" ? "●" : ""}
+      </span>
+    );
+    const labelEl = <span className="sp-seg__label">{label}</span>;
+    if (clickable) {
+      return (
+        <li key={key} data-state={state}>
+          <button
+            type="button"
+            className={`sp-seg sp-seg--${state} sp-seg--clickable`}
+            data-testid={`sp-seg-${key}`}
+            onClick={() => onSelect!(key)}
+          >
+            {mark}
+            {labelEl}
+          </button>
+        </li>
+      );
+    }
     return (
       <li
         key={key}
@@ -45,10 +73,8 @@ export function SegmentedProgress({
         data-state={state}
         aria-current={state === "active" ? "step" : undefined}
       >
-        <span className="sp-seg__mark" aria-hidden="true">
-          {state === "done" ? "✓" : state === "active" ? "●" : ""}
-        </span>
-        <span className="sp-seg__label">{label}</span>
+        {mark}
+        {labelEl}
       </li>
     );
   };

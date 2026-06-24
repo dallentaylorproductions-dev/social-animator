@@ -38,9 +38,16 @@ const STREET_VIEW_RESOLVE_MS = 500;
 export function RecentListingsEditor({
   listings,
   onChange,
+  enablePhotoPosition = false,
 }: {
   listings: SettingsRecentListing[];
   onChange: (next: SettingsRecentListing[]) => void;
+  /**
+   * Studio Profile opt-in: show the per-listing photo position/zoom control.
+   * Defaults false so the existing /settings usage is byte-identical; the Studio
+   * "Recent work" step passes true.
+   */
+  enablePhotoPosition?: boolean;
 }) {
   const { compPhotosEnabled } = useSPEntitlement();
   const atCap = listings.length >= RECENT_LISTINGS_CAP;
@@ -180,12 +187,102 @@ export function RecentListingsEditor({
             <ImageUploadField
               label="Listing photo"
               value={listing.photoUrl ?? ""}
-              onChange={(url) => patch(idx, { photoUrl: url || undefined })}
+              onChange={(url) =>
+                // A new photo resets any prior framing so it starts centered.
+                patch(idx, {
+                  photoUrl: url || undefined,
+                  photoFocalX: undefined,
+                  photoFocalY: undefined,
+                  photoScale: undefined,
+                })
+              }
               previewAspect="aspect-[4/3]"
               folder="agent-recent-listing"
               testIdPrefix={`brand-listing-photo-${idx}`}
               helpText="No photo? We will show a street view of the address."
             />
+
+            {enablePhotoPosition && listing.photoUrl && (
+              <div>
+                <label className="block text-[10px] uppercase tracking-[0.15em] text-neutral-500 mb-2">
+                  Photo position
+                </label>
+                <div className="flex gap-3 items-start">
+                  {/* WYSIWYG preview in the SAME 3:4 the coverflow card uses;
+                      click to set the focal point, drag the slider to zoom. */}
+                  <button
+                    type="button"
+                    onClick={(e) => {
+                      const rect = e.currentTarget.getBoundingClientRect();
+                      const x = Math.round(
+                        ((e.clientX - rect.left) / rect.width) * 100,
+                      );
+                      const y = Math.round(
+                        ((e.clientY - rect.top) / rect.height) * 100,
+                      );
+                      patch(idx, {
+                        photoFocalX: Math.min(100, Math.max(0, x)),
+                        photoFocalY: Math.min(100, Math.max(0, y)),
+                      });
+                    }}
+                    aria-label="Click where the home is to position the photo"
+                    data-testid={`brand-listing-pos-${idx}`}
+                    className="relative aspect-[3/4] w-20 shrink-0 cursor-crosshair overflow-hidden rounded-md border border-neutral-800"
+                  >
+                    {/* eslint-disable-next-line @next/next/no-img-element */}
+                    <img
+                      src={listing.photoUrl}
+                      alt=""
+                      draggable={false}
+                      className="absolute inset-0 h-full w-full object-cover"
+                      style={{
+                        objectPosition: `${listing.photoFocalX ?? 50}% ${listing.photoFocalY ?? 50}%`,
+                        transform:
+                          (listing.photoScale ?? 1) > 1
+                            ? `scale(${listing.photoScale})`
+                            : undefined,
+                        transformOrigin: `${listing.photoFocalX ?? 50}% ${listing.photoFocalY ?? 50}%`,
+                      }}
+                    />
+                  </button>
+                  <div className="flex-1">
+                    <label className="block text-[10px] uppercase tracking-[0.15em] text-neutral-500 mb-1">
+                      Zoom
+                    </label>
+                    <input
+                      type="range"
+                      min="1"
+                      max="2"
+                      step="0.05"
+                      value={listing.photoScale ?? 1}
+                      onChange={(e) => {
+                        const v = parseFloat(e.target.value);
+                        patch(idx, { photoScale: v > 1 ? v : undefined });
+                      }}
+                      data-testid={`brand-listing-zoom-${idx}`}
+                      className="w-full"
+                    />
+                    <button
+                      type="button"
+                      onClick={() =>
+                        patch(idx, {
+                          photoFocalX: undefined,
+                          photoFocalY: undefined,
+                          photoScale: undefined,
+                        })
+                      }
+                      data-testid={`brand-listing-pos-reset-${idx}`}
+                      className="mt-1 text-[11px] text-neutral-500 hover:text-neutral-200"
+                    >
+                      Center
+                    </button>
+                    <p className="mt-1 text-[11px] text-neutral-600 leading-relaxed">
+                      Click the photo where the home is, and zoom to fill the card.
+                    </p>
+                  </div>
+                </div>
+              </div>
+            )}
 
             <div>
               <label className="block text-[10px] uppercase tracking-[0.15em] text-neutral-500 mb-2">

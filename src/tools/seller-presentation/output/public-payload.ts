@@ -353,6 +353,14 @@ export interface PublicRecentListing {
   hasStreetView?: boolean;
   /** Derived compass bearing (0–360), pano → house, aimed at the home. */
   streetViewHeading?: number;
+  /**
+   * Photo framing (display-only): object-position % (0–100, default 50) + a
+   * 1.0–2.0 zoom, so an uploaded cover photo can be positioned on the card
+   * instead of always center-cropped. Image bytes are never altered.
+   */
+  photoFocalX?: number;
+  photoFocalY?: number;
+  photoScale?: number;
 }
 
 /** Seller State A · Zone 5 — coverflow card cap (full fan is 4–5; extra rows drop). */
@@ -754,6 +762,22 @@ function projectRecentListing(item: unknown): PublicRecentListing | null {
   if (typeof r.hasStreetView === "boolean") out.hasStreetView = r.hasStreetView;
   const heading = clampHeading(r.streetViewHeading);
   if (heading !== undefined) out.streetViewHeading = heading;
+  // Photo framing (display-only): focal % [0,100] + zoom [1,2]. Out-of-range /
+  // non-numeric values drop so a tampered record can't push the photo off-frame.
+  if (
+    typeof r.photoFocalX === "number" &&
+    r.photoFocalX >= 0 &&
+    r.photoFocalX <= 100
+  )
+    out.photoFocalX = r.photoFocalX;
+  if (
+    typeof r.photoFocalY === "number" &&
+    r.photoFocalY >= 0 &&
+    r.photoFocalY <= 100
+  )
+    out.photoFocalY = r.photoFocalY;
+  if (typeof r.photoScale === "number" && r.photoScale >= 1 && r.photoScale <= 2)
+    out.photoScale = r.photoScale;
   return out;
 }
 
