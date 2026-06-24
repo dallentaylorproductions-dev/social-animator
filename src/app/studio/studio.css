@@ -401,6 +401,20 @@
   /* the real .fs-page renders its own register; just give it a clean frame */
   min-height: 120px;
 }
+/*
+ * The preview deliberately omits the seller page's PresentationPageMotion island
+ * (no engagement beacon, no writes — the G1 no-side-effects contract), so the
+ * page's `.reveal` entrance state would otherwise leave all section content at
+ * opacity:0 (only CSS-background bits like the hero photo would show). Reveal it
+ * STATICALLY, scoped to the preview card only — pure CSS, no observer, no JS, no
+ * side effects — so the real components show in full. Real seller pages (which
+ * DO mount the island) are untouched.
+ */
+.sp-asset .fs-page .reveal {
+  opacity: 1 !important;
+  transform: none !important;
+  transition: none !important;
+}
 .sp-asset__ghost {
   padding: 48px 28px;
   text-align: center;
