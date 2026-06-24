@@ -226,6 +226,46 @@
   background: var(--sp-mint-soft);
 }
 
+/* ── marketing points editor (How you sell) ────────────────────────────── */
+.sp-mkt-point {
+  display: flex;
+  flex-direction: column;
+  gap: 6px;
+  padding: 12px;
+  border: 1px solid var(--sp-hairline);
+  border-radius: 10px;
+  background: rgba(255, 255, 255, 0.02);
+  margin-bottom: 10px;
+}
+.sp-mkt-remove {
+  align-self: flex-start;
+  appearance: none;
+  background: none;
+  border: none;
+  color: var(--sp-muted);
+  font-size: 12px;
+  cursor: pointer;
+  padding: 0;
+}
+.sp-mkt-remove:hover {
+  color: #e88;
+}
+.sp-mkt-add {
+  appearance: none;
+  background: none;
+  border: 1px dashed var(--sp-hairline-strong);
+  border-radius: 10px;
+  color: var(--sp-ink);
+  font-size: 14px;
+  font-weight: 600;
+  padding: 10px 14px;
+  cursor: pointer;
+}
+.sp-mkt-add:hover {
+  border-color: var(--sp-mint);
+  color: var(--sp-mint);
+}
+
 /* ── brand color input ─────────────────────────────────────────────────── */
 .sp-color {
   display: flex;

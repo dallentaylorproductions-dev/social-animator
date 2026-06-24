@@ -9,6 +9,7 @@ import {
 import { formatAppointment } from "@/tools/seller-presentation/engine/appointment";
 import { newsreader } from "@/tools/seller-presentation/output/flagship/fonts";
 import { StateAHero } from "@/tools/seller-presentation/output/flagship/StateAHero";
+import { AgentBand } from "@/tools/seller-presentation/output/flagship/AgentBand";
 import { CampaignSpread } from "@/tools/seller-presentation/output/flagship/CampaignSpread";
 import {
   ConfirmTime,
@@ -42,7 +43,7 @@ import type { SegmentKey } from "@/lib/studio-profile/setup-state";
  *   Proof → TrustStrip (the real cream testimonial)
  *   Sell  → CampaignSpread (the real redesigned "How I'll get your home seen")
  *   Work  → CampaignSpread coverflow-only (the real recent-listings coverflow)
- *   Brand → StateAHero (the real hero, re-hued by the agent's signature accent)
+ *   Brand → AgentBand (accent CTA buttons + the logo lockup — color & logo plain)
  *
  * When a section has nothing to render yet (no contact / no proof), it flexes
  * out to null on the real page — here we show a calm ghost so the stage is never
@@ -85,8 +86,9 @@ export function AssetPreviewFrame({
     // Just the exposure coverflow (recent listings, real reach).
     body = <CampaignSpread payload={payload} variant="coverflow-only" />;
   } else if (asset === "brand") {
-    // The hero, re-hued by the agent's signature accent.
-    body = <StateAHero payload={payload} appt={appt} />;
+    // The agent band — accent-colored CTA buttons + the logo lockup — so the
+    // signature color AND the logo are both plainly visible as they change.
+    body = <AgentBand payload={payload} />;
   }
 
   const animate = saved && !reducedMotion;

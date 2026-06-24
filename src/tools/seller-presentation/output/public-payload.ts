@@ -431,6 +431,16 @@ export interface PublicPayload {
   /** Undefined when no brand color was set — the consumer CSS falls back to the Editorial defaults. */
   brandColors?: PublicBrandColors;
 
+  /**
+   * Studio Profile — the agent's brand logo, rendered in the AgentBand's brand
+   * lockup slot (the "global logo slot") at a true-dimension, uncropped frame.
+   * Currently emitted ONLY by the Studio Profile live preview (so the agent can
+   * see how their logo + accent look together); the real publish path does NOT
+   * set it, so every published page stays byte-identical (wordmark) until a
+   * follow-on wires it to publish.
+   */
+  brandLogoUrl?: string;
+
   // ---- B0b agent-constant "Why us" marketing layer (v2 renderer only) ----
   /**
    * The pre-listing "why list with us" package, snapshotted from brand
@@ -1508,6 +1518,10 @@ export function clampPublicPayload(raw: unknown): PublicPayload {
     areaStats: clampAreaStats(r.areaStats),
     agent,
     brandColors: clampBrandColors(r.brandColors),
+    brandLogoUrl:
+      typeof r.brandLogoUrl === "string" && r.brandLogoUrl.trim()
+        ? r.brandLogoUrl
+        : undefined,
     // B0b — re-clamp the "Why us" layer at the read boundary (same allowlist
     // the projector used at publish), so a hand-edited KV record can't smuggle
     // an unbounded list or a private key into the renderer.

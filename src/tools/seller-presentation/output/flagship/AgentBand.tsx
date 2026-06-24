@@ -122,11 +122,31 @@ export function AgentBand({
       {showFoot && (
         <div className="agent__foot" data-testid="fs-foot">
           <div className="agent__lower">
-            {showWordmark && (
-              <div className="agent__brand" data-testid="fs-wordmark">
-                Studio <em>SEP</em>
-              </div>
-            )}
+            {showWordmark &&
+              (payload.brandLogoUrl ? (
+                // The "global logo slot": the agent's logo at a true-dimension,
+                // UNCROPPED frame (height-bounded, object-fit: contain) that fits
+                // virtually any professionally-made logo. Absent → the wordmark,
+                // byte-identical to today.
+                // eslint-disable-next-line @next/next/no-img-element
+                <img
+                  className="agent__brand-logo"
+                  data-testid="fs-wordmark-logo"
+                  src={payload.brandLogoUrl}
+                  alt={a.name ? `${a.name} logo` : "Agent logo"}
+                  style={{
+                    height: "40px",
+                    width: "auto",
+                    maxWidth: "220px",
+                    objectFit: "contain",
+                    display: "block",
+                  }}
+                />
+              ) : (
+                <div className="agent__brand" data-testid="fs-wordmark">
+                  Studio <em>SEP</em>
+                </div>
+              ))}
             <div className="agent__disc">{disclaimer}</div>
           </div>
         </div>

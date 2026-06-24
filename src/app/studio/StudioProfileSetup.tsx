@@ -14,10 +14,10 @@ import {
 } from "@/lib/seller-presentation/lead-emphasis";
 import { HeadshotField } from "@/app/settings/HeadshotField";
 import type { HeadshotCropValue } from "@/app/settings/HeadshotCropEditor";
-import { WhyUsSection } from "@/app/settings/WhyUsSection";
 import { RecentListingsEditor } from "@/app/settings/RecentListingsEditor";
 import { PhoneInput } from "@/components/inputs/PhoneInput";
 import { ImageUploadField } from "@/components/ImageUploadField";
+import { VideoUploadField } from "@/components/VideoUploadField";
 import { buildSamplePreviewPayload } from "@/lib/onboarding/sample-listing-draft";
 import { emitStudioEvent, STUDIO_EVENTS } from "@/lib/studio-profile/funnel";
 import {
@@ -196,6 +196,11 @@ export function StudioProfileSetup({ ownerEmail }: { ownerEmail: string | null }
     [effective, ownerEmail],
   );
   const previewPayload = useMemo(() => {
+    // Carry the logo so the Brand-step AgentBand preview shows it in the global
+    // logo slot. Studio-preview-only: the publish path never sets brandLogoUrl,
+    // so published pages stay byte-identical (wordmark).
+    const logo = effective.logoDataUrl || undefined;
+    let payload = logo ? { ...basePayload, brandLogoUrl: logo } : basePayload;
     if (activeStep === "work") {
       // Preview-only: the agent's own listings as the public shape (the publish
       // projector remains the real clamp/cap boundary; this mapper's objects
@@ -203,10 +208,20 @@ export function StudioProfileSetup({ ownerEmail }: { ownerEmail: string | null }
       const own = recentListingsToPublishInput(effective.recentListings ?? []) as
         | PublicRecentListing[]
         | undefined;
-      if (own?.length) return { ...basePayload, recentListings: own };
+      if (own?.length) payload = { ...payload, recentListings: own };
     }
-    return basePayload;
-  }, [basePayload, activeStep, effective.recentListings]);
+    return payload;
+  }, [basePayload, activeStep, effective.recentListings, effective.logoDataUrl]);
+
+  // Pre-populate the How-you-sell preview: the moment the step opens, seed the
+  // default "Why us" content (marketing approach etc.) so the preview renders a
+  // full marketing zone immediately — never blank-until-touched. Matches the
+  // Settings "arrives done" pattern; the agent edits rather than starts empty.
+  useEffect(() => {
+    if (screen === "sell" && !settings.whyUs && !overlay.whyUs) {
+      setOverlay((o) => ({ ...o, whyUs: defaultWhyUs() }));
+    }
+  }, [screen, settings.whyUs, overlay.whyUs]);
 
   const commitAndAdvance = (step: SegmentKey) => {
     const wasReady = isClientReady(settings);
@@ -345,11 +360,12 @@ export function StudioProfileSetup({ ownerEmail }: { ownerEmail: string | null }
   if (screen === "launch") {
     return (
       <CenteredScreen testid="sp-launch">
-        <p className="sp-eyebrow">Studio is ready</p>
-        <h1 className="sp-title">Studio is ready to carry your brand.</h1>
+        <p className="sp-eyebrow">You&rsquo;re set</p>
+        <h1 className="sp-title">Your seller page is ready.</h1>
         <p className="sp-sub">
-          Your pages, promos, follow-ups, and future tools now start with your
-          identity, proof, selling approach, recent work, and brand built in.
+          Studio will carry your identity, proof, marketing, recent work, and
+          brand into every page you create. Extras for your full presentation and
+          pre-listing page live in Settings whenever you want.
         </p>
         <div className="sp-actions">
           <button
@@ -695,6 +711,8 @@ function ProofFields({
   );
 }
 
+const MARKETING_CAP = 3;
+
 function SellFields({
   effective,
   setField,
@@ -702,12 +720,24 @@ function SellFields({
   effective: BrandSettings;
   setField: (patch: Partial<BrandSettings>) => void;
 }) {
+  // Narrow step: ONLY what the State-A marketing-zone preview renders — the lead
+  // emphasis (→ the zone headline) and the marketing approach points (→ the
+  // "What's included" cards), hard-capped at 3. Differentiators / how-we-work /
+  // guarantee / stats stay editable in Settings (they power the full-presentation
+  // & pre-listing WhyUs), so "done" here is honest about the preview.
   const whyUs = effective.whyUs ?? defaultWhyUs();
+  const points = whyUs.marketingApproach.slice(0, MARKETING_CAP);
+  const writePoints = (next: typeof points) =>
+    setField({ whyUs: { ...whyUs, marketingApproach: next } });
+
   return (
     <>
       <div className="sp-field">
         <span className="sp-label">What gets buyers in?</span>
-        <p className="sp-hint">Pick the angle you lead with — it shapes your campaign headline.</p>
+        <p className="sp-hint">
+          Pick the angle you lead with — it becomes your page&rsquo;s
+          &ldquo;How I&rsquo;ll get your home seen&rdquo; headline.
+        </p>
         <div className="sp-levers" data-testid="sp-levers">
           {LEAD_EMPHASIS_PRIMARY.map((k) => (
             <button
@@ -722,8 +752,70 @@ function SellFields({
           ))}
         </div>
       </div>
-      <div className="sp-embed" data-testid="sp-whyus">
-        <WhyUsSection whyUs={whyUs} onChange={(next) => setField({ whyUs: next })} />
+
+      <div className="sp-field" data-testid="sp-marketing">
+        {/* Label matches the prominent eyebrow the preview renders. */}
+        <span className="sp-label">How I&rsquo;ll get your home seen</span>
+        <p className="sp-hint">
+          Your {MARKETING_CAP} strongest marketing points — they appear under
+          &ldquo;What&rsquo;s included&rdquo; on your page.
+        </p>
+        {points.map((p, i) => (
+          <div className="sp-mkt-point" key={i} data-testid={`sp-mkt-point-${i}`}>
+            <input
+              className="sp-input"
+              type="text"
+              value={p.title}
+              placeholder="Professional photography & video"
+              data-testid={`sp-mkt-title-${i}`}
+              onChange={(e) =>
+                writePoints(
+                  points.map((q, j) =>
+                    j === i ? { ...q, title: e.target.value } : q,
+                  ),
+                )
+              }
+            />
+            <textarea
+              className="sp-input sp-textarea"
+              rows={2}
+              value={p.detail ?? ""}
+              placeholder="Every listing, shot by a pro."
+              data-testid={`sp-mkt-detail-${i}`}
+              onChange={(e) =>
+                writePoints(
+                  points.map((q, j) =>
+                    j === i ? { ...q, detail: e.target.value } : q,
+                  ),
+                )
+              }
+            />
+            {points.length > 1 && (
+              <button
+                type="button"
+                className="sp-mkt-remove"
+                data-testid={`sp-mkt-remove-${i}`}
+                onClick={() => writePoints(points.filter((_, j) => j !== i))}
+              >
+                Remove
+              </button>
+            )}
+          </div>
+        ))}
+        {points.length < MARKETING_CAP ? (
+          <button
+            type="button"
+            className="sp-mkt-add"
+            data-testid="sp-mkt-add"
+            onClick={() => writePoints([...points, { title: "", detail: "" }])}
+          >
+            + Add a point
+          </button>
+        ) : (
+          <p className="sp-hint">
+            That&rsquo;s your {MARKETING_CAP} strongest — your page shows three.
+          </p>
+        )}
       </div>
     </>
   );
@@ -737,13 +829,47 @@ function WorkFields({
   setField: (patch: Partial<BrandSettings>) => void;
 }) {
   return (
-    <div className="sp-embed" data-testid="sp-recent-listings">
-      <RecentListingsEditor
-        listings={effective.recentListings ?? []}
-        onChange={(next) => setField({ recentListings: next })}
-        enablePhotoPosition
-      />
-    </div>
+    <>
+      <div className="sp-field">
+        <span className="sp-label">Sample listing photo (optional)</span>
+        <p className="sp-hint">
+          Your best listing photography — it leads your &ldquo;How I&rsquo;ll get
+          your home seen&rdquo; showcase.
+        </p>
+        <ImageUploadField
+          label="Sample photo"
+          value={effective.sampleListingPhotoUrl ?? ""}
+          onChange={(url) => setField({ sampleListingPhotoUrl: url || undefined })}
+          folder="agent-sample-photo"
+          testIdPrefix="sp-sample-photo"
+          previewAspect="aspect-[4/3]"
+        />
+      </div>
+
+      <div className="sp-field">
+        <span className="sp-label">Sample video tour (optional)</span>
+        <p className="sp-hint">A recent tour you produced — shown in the showcase.</p>
+        <VideoUploadField
+          label="Sample video"
+          value={effective.sampleVideoUrl ?? ""}
+          onChange={(url) => setField({ sampleVideoUrl: url || undefined })}
+          folder="agent-sample-video"
+          testIdPrefix="sp-sample-video"
+          currentPosterUrl={effective.sampleVideoPosterUrl}
+          onPosterChange={(url) =>
+            setField({ sampleVideoPosterUrl: url || undefined })
+          }
+        />
+      </div>
+
+      <div className="sp-embed" data-testid="sp-recent-listings">
+        <RecentListingsEditor
+          listings={effective.recentListings ?? []}
+          onChange={(next) => setField({ recentListings: next })}
+          enablePhotoPosition
+        />
+      </div>
+    </>
   );
 }
 
@@ -786,8 +912,10 @@ function BrandFields({
           onChange={(url) => setField({ logoDataUrl: url || null })}
           folder="brand-logo"
           testIdPrefix="sp-logo"
-          previewAspect="aspect-[3/1]"
+          previewAspect="aspect-[5/1]"
+          previewFit="contain"
         />
+        <p className="sp-hint">Shown at its true size on your pages — never cropped.</p>
       </div>
     </>
   );
