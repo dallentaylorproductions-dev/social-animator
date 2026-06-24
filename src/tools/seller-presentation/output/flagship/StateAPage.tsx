@@ -238,18 +238,22 @@ export function ValuationPreparedV3({
   const dayLabel = appt ? `${appt.weekday}, ${appt.date}` : null;
   const range = payload.valuationRange;
   const hasRange = !!range && range.high > range.low;
+  const compCount = range?.points.length ?? 0;
+  // Right side of the panel eyebrow row: the same grounding-sales count the tie
+  // line names, surfaced as a quiet "{N} nearby sales" tag (singular/plural).
+  const nearbyLabel = `${compCount} nearby ${compCount === 1 ? "sale" : "sales"}`;
 
   return (
     <section
-      className="section z-offwhite sa-val sa-val--v3"
+      className="section sa-val sa-val--v3"
       data-testid="fs-sa-valuation"
       data-valuation-variant="v3"
     >
       <div className="reveal sa-valr" data-has-range={hasRange ? "true" : "false"}>
-        <div className="eyebrow">
+        <div className="eyebrow sa-valr__eyebrow">
           Your Valuation <span className="rule" aria-hidden="true" />
         </div>
-        <h2 className="head">
+        <h2 className="head sa-valr__head">
           Being <em>prepared</em>
           {dayLabel ? <> for {dayLabel}.</> : "."}
         </h2>
@@ -259,11 +263,20 @@ export function ValuationPreparedV3({
 
         {hasRange && (
           <>
-            {/* The range IS the moment: small label, serif low–high, thin meter.
-                The dash sits between dollar values (digit-flanked), so the
-                no-em-dash copy gate never trips on it. */}
-            <div className="sa-valr__range" data-testid="fs-sa-valuation-range">
-              <span className="sa-valr__range-label">{VALUATION_RANGE_LABEL}</span>
+            {/* The range gets its OWN raised panel inside the dark section so it
+                reads as a bright focal block: an eyebrow row (label · count), the
+                serif low–high on ONE line, the thin dotted meter, and the tie line
+                back to the brief. The dash sits between dollar values
+                (digit-flanked), so the no-em-dash copy gate never trips on it. */}
+            <div className="sa-valr__panel" data-testid="fs-sa-valuation-range">
+              <div className="sa-valr__rangehead">
+                <span className="sa-valr__range-label">
+                  {VALUATION_RANGE_LABEL}
+                </span>
+                <span className="sa-valr__count" data-testid="fs-sa-valuation-count">
+                  {nearbyLabel}
+                </span>
+              </div>
               <div
                 className="sa-valr__nums"
                 aria-label={`${formatDollarsAbbrev(range!.low)} to ${formatDollarsAbbrev(range!.high)}`}
@@ -279,10 +292,10 @@ export function ValuationPreparedV3({
                   {formatDollarsAbbrev(range!.high)}
                 </span>
               </div>
-              {/* Thin meter: a light full-width track, the teal band (low→high,
-                  stretches in on reveal), and the nearby sales as minimal dots at
-                  their sold positions (no labels, no tap). aria-hidden — the range
-                  is already announced by the numbers above. */}
+              {/* Thin meter: a dark track, the blue-teal band (low→high, stretches
+                  in on reveal), and the nearby sales as minimal dots at their sold
+                  positions (no labels, no tap). aria-hidden — the range is already
+                  announced by the numbers above. */}
               <div className="sa-valr__meter" aria-hidden="true">
                 <span className="sa-valr__track" />
                 <span className="sa-valr__band" />
@@ -299,10 +312,10 @@ export function ValuationPreparedV3({
                   />
                 ))}
               </div>
+              <p className="sa-valr__tie" data-testid="fs-sa-valuation-tie">
+                {valuationTieLine(range!.points.length)}
+              </p>
             </div>
-            <p className="sa-valr__tie" data-testid="fs-sa-valuation-tie">
-              {valuationTieLine(range!.points.length)}
-            </p>
           </>
         )}
 
