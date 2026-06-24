@@ -47,6 +47,12 @@ export function buildOnboardingStateAPayload(
   // identical. Resolved by the SERVER welcome shell and threaded down as a prop,
   // since this client builder can't read the non-NEXT_PUBLIC env flag itself.
   marketingZoneRedesign: boolean = false,
+  // VALUATION_REDESIGN (v1.7 Packet B) — same provenance/channel as the marketing
+  // flag above: resolved by the SERVER welcome shell and threaded down so the
+  // onboarding reveal + "sample home, real you" mirror render the redesigned
+  // valuation section (with its comp-derived range) exactly when a flag-on publish
+  // would. Defaults false so every existing caller stays byte-identical.
+  valuationRedesign: boolean = false,
 ): PublicPayload {
   const { agentContact, brandReviews, brandColors, brandWhyUs } =
     brandToPublishInputs(brand);
@@ -71,5 +77,7 @@ export function buildOnboardingStateAPayload(
     // redesign flag lands in the correct (10th) slot.
     false,
     marketingZoneRedesign,
+    // VALUATION_REDESIGN — 11th positional slot.
+    valuationRedesign,
   );
 }

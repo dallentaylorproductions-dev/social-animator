@@ -127,6 +127,47 @@ export function defaultValuationMessage(): string {
 }
 
 /**
+ * v1.7 Packet B — the redesigned State-A valuation section (VALUATION_REDESIGN).
+ * Open-editorial: a small "LIKELY RANGE" label over the serif low–high range, a
+ * thin dotted meter, a tie line back to the nearby-sales brief above, and ONE
+ * italic honesty line that REPLACES the old PREPARED ESTIMATE / PENDING
+ * WALKTHROUGH pills. Evergreen + seller-facing; the honesty gate is load-bearing
+ * (a range from comps, never a fabricated firm number before the walkthrough).
+ * No em-dash anywhere (the static-copy gate scans this file).
+ */
+export const VALUATION_RANGE_LABEL = "Likely range";
+export const VALUATION_LEAD_LINE =
+  "From the recent sales near you, here's where your home is likely to land.";
+
+/**
+ * The tie line beneath the meter, connecting the plotted dots back to the photo
+ * comps in the nearby-sales brief ABOVE this section (never re-listing them).
+ * `{count}` is the number of grounding sales; the helper renders the singular /
+ * plural form. Reassurance framing only, no number, no em-dash.
+ */
+export function valuationTieLine(count: number): string {
+  const sales = count === 1 ? "recent sale" : "recent sales";
+  return `Plotted from the ${count} ${sales} in your brief above.`;
+}
+
+/**
+ * The single italic honesty line (teal left rule) that replaces the pills. Shipped
+ * as TWO sentences rather than one clause-break so it carries no em-dash (the
+ * static-copy gate). Names the truth plainly: a prepared range, not a final
+ * figure, and the exact number is set together at the walkthrough.
+ */
+export const VALUATION_HONESTY_LINE =
+  "A prepared range, not a final figure. We'll set your home's exact number together when I walk it.";
+
+/**
+ * The reassurance line shown in the FLEX case (the flag is on but too few comps
+ * ground a real range, so the dotted meter is omitted). Keeps the section honest
+ * and complete without inventing a range. No em-dash.
+ */
+export const VALUATION_NO_RANGE_LINE =
+  "I'll ground your range in the recent sales near you, then we'll set your home's exact number together when I walk it.";
+
+/**
  * Strong default for the editable personal WELCOME line near the agent in the
  * hero. Warm, evergreen, first person. Agent can rewrite it in Settings.
  */

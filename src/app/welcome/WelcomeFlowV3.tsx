@@ -60,10 +60,16 @@ export function WelcomeFlowV3({
   // the redesigned marketing zone exactly when a flag-on publish would. Default
   // false keeps a flag-off session byte-identical to today's grid.
   marketingZoneRedesignEnabled = false,
+  // VALUATION_REDESIGN (v1.7 Packet B) — resolved on the server welcome shell and
+  // threaded to the Path A mirror so its inline State-A preview shows the
+  // redesigned valuation section exactly when a flag-on publish would. Default
+  // false keeps a flag-off session byte-identical.
+  valuationRedesignEnabled = false,
 }: {
   ownerEmail: string | null;
   serverDraftsEnabled: boolean;
   marketingZoneRedesignEnabled?: boolean;
+  valuationRedesignEnabled?: boolean;
 }) {
   const router = useRouter();
   const [screen, setScreen] = useState<Screen>('first');
@@ -220,6 +226,7 @@ export function WelcomeFlowV3({
               onBack={() => setScreen('first')}
               ownerEmail={ownerEmail}
               marketingZoneRedesignEnabled={marketingZoneRedesignEnabled}
+              valuationRedesignEnabled={valuationRedesignEnabled}
             />
           )}
         </div>

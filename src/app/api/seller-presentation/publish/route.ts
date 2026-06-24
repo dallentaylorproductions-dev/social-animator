@@ -12,6 +12,7 @@ import { isCompPhotosEnabled } from "@/lib/seller-presentation/street-view";
 import { isSellerStateAEnabled } from "@/lib/seller-presentation/state-a";
 import { isSellerListingsCoverflowEnabled } from "@/lib/seller-presentation/listings-coverflow";
 import { isMarketingZoneRedesignEnabled } from "@/lib/seller-presentation/marketing-zone-redesign";
+import { isValuationRedesignEnabled } from "@/lib/seller-presentation/valuation-redesign";
 import {
   clampDraft,
   describeMissingRequiredInputs,
@@ -216,6 +217,12 @@ export async function POST(req: Request) {
     // renders the current grid. Render-only: it reshuffles data already in the
     // payload, so flipping it changes no stored data, only the State-A render.
     isMarketingZoneRedesignEnabled(),
+    // VALUATION_REDESIGN kill switch (v1.7 Packet B). OFF => no
+    // `valuationRedesign`/`valuationRange` keys reach KV (byte-identical) and
+    // ValuationPrepared renders the current block. When on (State-A invitation),
+    // the projector computes the comp-derived range from the (price-bearing)
+    // draft comps before the public strip blanks soldPrice.
+    isValuationRedesignEnabled(),
   );
 
   const data = publicPayload as unknown as Record<string, unknown>;

@@ -134,10 +134,16 @@ export function WelcomeFlowV2({
   // redesigned marketing zone exactly when a flag-on publish would. Default
   // false keeps a flag-off session byte-identical to today's grid.
   marketingZoneRedesignEnabled = false,
+  // VALUATION_REDESIGN (v1.7 Packet B) — resolved on the server welcome shell and
+  // threaded here so the 9-beat reveal's valuation slice renders the redesigned
+  // section exactly when a flag-on publish would. Default false keeps a flag-off
+  // session byte-identical.
+  valuationRedesignEnabled = false,
 }: {
   ownerEmail: string | null;
   serverDraftsEnabled: boolean;
   marketingZoneRedesignEnabled?: boolean;
+  valuationRedesignEnabled?: boolean;
 }) {
   const router = useRouter();
 
@@ -220,14 +226,23 @@ export function WelcomeFlowV2({
         brand,
         undefined,
         marketingZoneRedesignEnabled,
+        valuationRedesignEnabled,
       );
     return buildOnboardingStateAPayload(
       draftSeed,
       brand,
       ownerEmail ?? '',
       marketingZoneRedesignEnabled,
+      valuationRedesignEnabled,
     );
-  }, [brand, isSample, draftSeed, ownerEmail, marketingZoneRedesignEnabled]);
+  }, [
+    brand,
+    isSample,
+    draftSeed,
+    ownerEmail,
+    marketingZoneRedesignEnabled,
+    valuationRedesignEnabled,
+  ]);
 
   const exitToDashboard = useCallback(() => {
     emitOnboardingEvent(ONBOARDING_EVENTS.dismissed, { step: beat });

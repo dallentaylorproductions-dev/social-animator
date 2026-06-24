@@ -2,6 +2,10 @@ import { notFound } from "next/navigation";
 import type { HandoutRecord } from "@/lib/share-urls";
 import { SellerPresentationPage } from "@/tools/seller-presentation/output/presentation-page";
 import {
+  computeValuationRange,
+  type PublicPayload,
+} from "@/tools/seller-presentation/output/public-payload";
+import {
   AREA_PARTIAL_PAYLOAD,
   FLAGSHIP_PRIVACY_PAYLOAD,
   FULL_PAYLOAD,
@@ -90,6 +94,16 @@ interface PageProps {
      * flipping the server env flag. Any other value → the current grid renders.
      */
     redesign?: string;
+    /**
+     * VALUATION_REDESIGN (v1.7 Packet B) — `?valrange=1` merges the
+     * `valuationRedesign` discriminator AND a comp-derived `valuationRange`
+     * (computed from the fixture's own comps with the SAME `computeValuationRange`
+     * the projector uses) onto a state-a fixture, then routes it through the same
+     * clamp as a real publish — so the suite + Dallen's smoke can see the
+     * redesigned valuation section on any state-a fixture without flipping the
+     * server env flag. Any other value → today's valuation block renders.
+     */
+    valrange?: string;
   }>;
 }
 
@@ -105,6 +119,7 @@ export default async function SellerPresentationPreview({ searchParams }: PagePr
     suppressWordmark,
     reviewSourceLogos,
     redesign,
+    valrange,
   } = await searchParams;
   // `?reviewSourceLogos=1` forces the chip on; otherwise leave undefined so
   // SellerPresentationPage falls back to the server env flag (off in tests).
@@ -275,6 +290,18 @@ export default async function SellerPresentationPreview({ searchParams }: PagePr
   // MARKETING_ZONE_REDESIGN — `?redesign=1` flips the redesigned marketing zone
   // on for this preview render (re-clamped like a real publish). Render-only.
   if (redesign === "1") merged.marketingZoneRedesign = true;
+  // VALUATION_REDESIGN — `?valrange=1` flips the redesigned valuation section on
+  // for this preview render. The range is computed from the fixture's OWN comps
+  // (which carry sold prices, unlike a real stripped invitation publish) with the
+  // same helper the projector uses, then re-clamped like a real publish. Absent
+  // range (e.g. the minimal fixture) → the v3 meter flexes out, honesty-only.
+  if (valrange === "1") {
+    merged.valuationRedesign = true;
+    const fixtureComps = Array.isArray((payload as PublicPayload).comps)
+      ? (payload as PublicPayload).comps
+      : [];
+    merged.valuationRange = computeValuationRange(fixtureComps);
+  }
   const data = merged as Record<string, unknown>;
 
   // Wrap the fixture payload in a HandoutRecord so the renderer's

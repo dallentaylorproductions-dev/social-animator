@@ -101,6 +101,12 @@ export async function GET(req: Request) {
       // preview matches what a flag-on publish projects.
       marketingZoneRedesignEnabled:
         process.env.MARKETING_ZONE_REDESIGN_ENABLED === "true",
+      // VALUATION_REDESIGN (v1.7 Packet B) — the redesigned State-A valuation
+      // section. OFF by default; when false the wizard live/EXAMPLE preview
+      // renders today's valuation block (byte-identical). Mirrors the publish-time
+      // env flag so the preview matches what a flag-on publish projects.
+      valuationRedesignEnabled:
+        process.env.VALUATION_REDESIGN_ENABLED === "true",
     },
   });
 }

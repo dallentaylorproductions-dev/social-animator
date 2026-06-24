@@ -4,6 +4,7 @@ import { isOnboardingFirstRunEnabled } from "@/lib/config/onboarding-first-run";
 import { isOnboardingFirstRunV2Enabled } from "@/lib/config/onboarding-first-run-v2";
 import { isOnboardingHybridV3Enabled } from "@/lib/config/onboarding-first-run-v3";
 import { isMarketingZoneRedesignEnabled } from "@/lib/seller-presentation/marketing-zone-redesign";
+import { isValuationRedesignEnabled } from "@/lib/seller-presentation/valuation-redesign";
 import { WelcomeFlow } from "./WelcomeFlow";
 import { WelcomeFlowV2 } from "./WelcomeFlowV2";
 import { WelcomeFlowV3 } from "./WelcomeFlowV3";
@@ -53,6 +54,11 @@ export default async function WelcomePage() {
   // preview surfaces render the redesigned marketing zone exactly when a flag-on
   // publish would. Flag off → the flows pass false → today's grid, byte-identical.
   const marketingZoneRedesignEnabled = isMarketingZoneRedesignEnabled();
+  // VALUATION_REDESIGN (v1.7 Packet B) — resolved on the SERVER (the env flag is
+  // not NEXT_PUBLIC) and threaded down so the onboarding State-A preview surfaces
+  // render the redesigned valuation section exactly when a flag-on publish would.
+  // Flag off → the flows pass false → today's valuation block, byte-identical.
+  const valuationRedesignEnabled = isValuationRedesignEnabled();
 
   // Account-cache reconcile runs on EVERY /welcome entry, ahead of the flow, so
   // a foreign brand left in this browser is cleared before any flow hydrates,
@@ -67,6 +73,7 @@ export default async function WelcomePage() {
           ownerEmail={ownerEmail}
           serverDraftsEnabled={serverDraftsEnabled}
           marketingZoneRedesignEnabled={marketingZoneRedesignEnabled}
+          valuationRedesignEnabled={valuationRedesignEnabled}
         />
       </>
     );
@@ -80,6 +87,7 @@ export default async function WelcomePage() {
           ownerEmail={ownerEmail}
           serverDraftsEnabled={serverDraftsEnabled}
           marketingZoneRedesignEnabled={marketingZoneRedesignEnabled}
+          valuationRedesignEnabled={valuationRedesignEnabled}
         />
       </>
     );

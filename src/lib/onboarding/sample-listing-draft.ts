@@ -217,12 +217,19 @@ export function buildSamplePreviewPayload(
   // exactly when a flag-on publish would. Defaults false so the flag-off mirror
   // is byte-identical to today's grid; threaded into the shared State-A builder.
   marketingZoneRedesign: boolean = false,
+  // VALUATION_REDESIGN (v1.7 Packet B) — mirror the publish-time flag so the
+  // Path A "sample home, real you" mirror shows the redesigned valuation section
+  // exactly when a flag-on publish would. Defaults false so the flag-off mirror
+  // is byte-identical; threaded into the shared State-A builder, which computes
+  // the comp-derived range from SAMPLE_LISTING_DRAFT's (price-bearing) comps.
+  valuationRedesign: boolean = false,
 ): PublicPayload {
   const base = buildOnboardingStateAPayload(
     SAMPLE_LISTING_DRAFT,
     brand,
     accountEmail,
     marketingZoneRedesign,
+    valuationRedesign,
   );
   // Zone 5 exposure coverflow — overlay the representative demo listings so the
   // already-built coverflow renders in the labeled "Sample property" preview.
