@@ -922,6 +922,118 @@
   }
 }
 
+/* ═══════════════════════════════════════════════════════════════════════════
+ * MOBILE single-column pass (< 960px) — layout/responsive ONLY.
+ *
+ * The desktop three-panel console (≥ 960px) is byte-identical: everything below
+ * is additive, gated under `max-width: 959.98px`, and never edits a base or a
+ * `min-width: 960px` rule. The same markup + the SAME real components
+ * (AssetPreviewFrame, the State-A sections, SegmentedProgress) reflow into the
+ * locked mobile pattern:
+ *   slim sticky chrome  →  pinned segmented progress  →  one editor block  →
+ *   the live "What sellers see" preview card directly beneath  →  a sticky
+ *   bottom action (Save & continue / Back) above the home indicator.
+ * Three calm tonal zones carry from desktop: page (editor) · stage (preview) ·
+ * the translucent chrome/action bars.
+ * ═══════════════════════════════════════════════════════════════════════════ */
+@media (max-width: 959.98px) {
+  /* ── the 6-step / 2-phase progress, PINNED under the slim top chrome ────────
+     Compact dotted strip: the current step name + count already live in the
+     sticky top bar, so the strip shows position/shape (two gap-grouped phases of
+     three) without sprawling labels. */
+  .sp__bar {
+    position: sticky;
+    top: var(--sp-topbar-h);
+    z-index: 4;
+    padding: 11px 18px;
+    background: color-mix(in srgb, var(--sp-page) 90%, transparent);
+    backdrop-filter: blur(10px);
+    border-bottom: 1px solid var(--sp-hairline);
+  }
+  /* The pinned strip stays slim: the "set once, reused everywhere" frame is
+     carried per-step by the destination bar beneath each preview. */
+  .sp__bar .sp-reassure--bar {
+    display: none;
+  }
+  .sp__bar .sp-progress--bar {
+    gap: 26px; /* the two phases read as two grouped clusters of three */
+    justify-content: center;
+    align-items: center;
+  }
+  /* dots only — the grouping gap conveys the two phases */
+  .sp__bar .sp-progress__phase-label,
+  .sp__bar .sp-seg__label {
+    display: none;
+  }
+  .sp__bar .sp-progress__list {
+    gap: 9px;
+  }
+  .sp__bar .sp-seg {
+    padding: 5px;
+    gap: 0;
+    border-radius: 999px;
+  }
+  /* the active step: a clean emphasized dot, not the desktop pill */
+  .sp__bar .sp-seg--active {
+    background: none;
+  }
+  .sp__bar .sp-seg--active .sp-seg__mark {
+    border-color: var(--sp-mint);
+    color: var(--sp-mint);
+    box-shadow: 0 0 0 3px var(--sp-mint-soft);
+  }
+
+  /* ── the editor block — full width within comfortable gutters ─────────────
+     The action row leaves flow (it becomes the sticky bottom bar), so the block
+     just needs breathing room before the preview zone begins. */
+  .sp__center {
+    padding: 28px 18px 32px;
+  }
+
+  /* ── the live preview, its OWN tonal "stage" zone beneath the editor ──────
+     Same `--sp-stage` surround as the desktop preview pane so depth carries; the
+     cream `.sp-asset` card reads as an elevated stage against it. Generous bottom
+     clearance so the destination note can scroll clear of the sticky action. */
+  .sp__preview {
+    display: flex;
+    justify-content: center;
+    background: var(--sp-stage);
+    border-top: 1px solid var(--sp-hairline);
+    padding: 26px 18px calc(96px + env(safe-area-inset-bottom));
+  }
+  .sp__stage {
+    margin: 0 auto;
+  }
+
+  /* ── the sticky bottom action — primary always thumb-reachable ────────────
+     Scoped to `.sp--console` so the centered intro / milestone / launch screens
+     (`.sp--centered`) keep their inline actions. Primary (first in DOM) sits
+     right + wide via row-reverse; Back stays compact on the left. Safe-area
+     padding clears the home indicator (viewport-fit=cover is set globally). */
+  .sp--console .sp-actions {
+    position: fixed;
+    left: 0;
+    right: 0;
+    bottom: 0;
+    z-index: 6;
+    margin: 0;
+    gap: 10px;
+    flex-wrap: nowrap;
+    flex-direction: row-reverse;
+    padding: 12px 18px calc(12px + env(safe-area-inset-bottom));
+    background: color-mix(in srgb, var(--sp-page) 92%, transparent);
+    backdrop-filter: blur(10px);
+    border-top: 1px solid var(--sp-hairline);
+  }
+  .sp--console .sp-actions .sp-btn--primary {
+    flex: 1;
+    justify-content: center;
+  }
+  .sp--console .sp-actions .sp-btn--ghost {
+    flex: none;
+  }
+}
+
 @media (prefers-reduced-motion: reduce) {
   .sp-asset--saved,
   .sp-toast,
