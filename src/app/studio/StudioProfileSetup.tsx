@@ -1,0 +1,1209 @@
+"use client";
+
+import { useEffect, useMemo, useRef, useState } from "react";
+import { useRouter } from "next/navigation";
+import {
+  useBrandSettings,
+  extractPhoneDigits,
+  formatPhone,
+  EDITORIAL_BRAND_DEFAULTS,
+} from "@/lib/brand";
+import type { BrandSettings } from "@/lib/brand";
+import { type WhyUs, defaultWhyUs } from "@/lib/whyus";
+import {
+  recentListingsToPublishInput,
+  RECENT_LISTINGS_CAP,
+} from "@/lib/seller-presentation/recent-listings";
+import type { PublicRecentListing } from "@/tools/seller-presentation/output/public-payload";
+import {
+  LEAD_EMPHASIS_LABELS,
+  LEAD_EMPHASIS_PRIMARY,
+  type LeadEmphasisKey,
+} from "@/lib/seller-presentation/lead-emphasis";
+import { HeadshotField } from "@/app/settings/HeadshotField";
+import type { HeadshotCropValue } from "@/app/settings/HeadshotCropEditor";
+import { RecentListingsEditor } from "@/app/settings/RecentListingsEditor";
+import { PhoneInput } from "@/components/inputs/PhoneInput";
+import { ImageUploadField } from "@/components/ImageUploadField";
+import { VideoUploadField } from "@/components/VideoUploadField";
+import { ListingPhotoCrop } from "@/components/ListingPhotoCrop";
+import { BrandEngine } from "@/lib/brand/color-engine";
+import { buildSamplePreviewPayload } from "@/lib/onboarding/sample-listing-draft";
+import { emitStudioEvent, STUDIO_EVENTS } from "@/lib/studio-profile/funnel";
+import {
+  completedSegments,
+  isClientReady,
+  isFullyComplete,
+  isProofDone,
+  EMPTY_WHYUS,
+  type SegmentKey,
+} from "@/lib/studio-profile/setup-state";
+import {
+  clearStudioBuffer,
+  loadStudioBuffer,
+  saveStudioBuffer,
+} from "@/lib/studio-profile/setup-storage";
+import { SegmentedProgress } from "./SegmentedProgress";
+import { AssetPreviewFrame } from "./AssetPreviewFrame";
+import "./studio.css";
+
+/**
+ * StudioProfileSetup — the complete guided activation (Studio Profile).
+ *
+ * The full 6-step flow: intro → You → Reach → Proof → (client-ready continue
+ * beat) → How you sell → Recent work → Brand → launch. Desktop renders a
+ * three-panel console (rail · capture · live asset-preview); mobile stacks
+ * (progress · field · preview beneath).
+ *
+ * MOMENTUM (the core revision): there is NO mid-flow exit. "I'll do this later"
+ * lives ONLY on the intro. Client-ready is a brief calm CONTINUE beat (one
+ * forward action), never a fork — the sparse-page off-ramp is gone. A constant
+ * reassurance line keeps the "set once, reused everywhere" frame present at every
+ * step. The ONLY "Create your first seller page" CTA is at TRUE completion (after
+ * Brand) — the launch moment.
+ *
+ * Save model: each field edits a LOCAL overlay that feeds the live preview;
+ * "Save & continue" is the reward COMMIT — it writes the brand record via
+ * useBrandSettings().update, plays the save animation + the reuse-teaching
+ * confirmation + the rail check, then advances. A quiet background buffer
+ * (socanim_studio_setup) holds the unsaved overlay for crash-safety only.
+ */
+
+type Screen = "intro" | SegmentKey | "clientready" | "launch";
+const STEP_ORDER: SegmentKey[] = ["you", "reach", "proof", "sell", "work", "brand"];
+const SAVE_ANIM_MS = 1100;
+/** Fallback attribution so the review preview renders from the body alone. */
+const DEFAULT_REVIEW_ATTRIBUTION = "A past client";
+/** Sample showcase image so "the work" tile is never blank before the agent uploads. */
+const SAMPLE_SHOWCASE_PHOTO = "/sample-assets/living-room.webp";
+
+/** Where each step advances after its commit. */
+const NEXT_SCREEN: Record<SegmentKey, Screen> = {
+  you: "reach",
+  reach: "proof",
+  proof: "clientready", // the calm continue beat, not a fork
+  sell: "work",
+  work: "brand",
+  brand: "launch", // true completion → the launch moment
+};
+
+/** Where "Back" returns to (so a saved step can be revisited to fix a typo). */
+const PREV_SCREEN: Record<SegmentKey, Screen> = {
+  you: "intro",
+  reach: "you",
+  proof: "reach",
+  sell: "clientready",
+  work: "sell",
+  brand: "work",
+};
+
+/** The reuse-teaching confirmation per step (the "thankful" moment). */
+const SAVE_TOAST: Record<SegmentKey, string> = {
+  you: "Saved. Your pages will now open with your face and name.",
+  reach: "Saved. Every page now has a clear way to reach you.",
+  proof: "Saved. Studio will reuse this on every seller page and follow-up.",
+  sell: "Studio can now explain how you get homes seen.",
+  work: "Your showcase now shows real reach.",
+  brand: "Your brand color now carries every page.",
+};
+
+const STEP_FRAME: Record<
+  SegmentKey,
+  { eyebrow: string; title: string; sub: string }
+> = {
+  you: {
+    eyebrow: "You",
+    title: "Make your pages feel like you.",
+    sub: "Your name, face, and brokerage open every seller page you send.",
+  },
+  reach: {
+    eyebrow: "Reach",
+    title: "Give sellers one clear way to reach you.",
+    sub: "Email or phone is enough. Add a scheduling link if you use one.",
+  },
+  proof: {
+    eyebrow: "Proof",
+    title: "Add one piece of proof sellers can trust.",
+    sub: "A review is best. If you can't paste one, a credential still makes the page read credible.",
+  },
+  sell: {
+    eyebrow: "How you sell",
+    title: "Show how you get homes seen.",
+    sub: "Your marketing approach and edge, reused in every page's marketing section.",
+  },
+  work: {
+    eyebrow: "Recent work",
+    title: "Prove your reach.",
+    sub: "Recent listings with real view counts power your showcase coverflow.",
+  },
+  brand: {
+    eyebrow: "Brand",
+    title: "Make it unmistakably yours.",
+    sub: "Your signature color carries across every page, promo, and follow-up.",
+  },
+};
+
+const REASSURANCE =
+  "Your one-time Studio setup · saved once, reused on every page, promo & follow-up.";
+
+export function StudioProfileSetup({ ownerEmail }: { ownerEmail: string | null }) {
+  const router = useRouter();
+  const { settings, update } = useBrandSettings();
+
+  const [overlay, setOverlay] = useState<Partial<BrandSettings>>({});
+  const effective = useMemo<BrandSettings>(
+    () => ({ ...settings, ...overlay }),
+    [settings, overlay],
+  );
+
+  const [screen, setScreen] = useState<Screen>("intro");
+  const [savedAsset, setSavedAsset] = useState<SegmentKey | null>(null);
+  const [toast, setToast] = useState<string | null>(null);
+  const reducedMotion = usePrefersReducedMotion();
+  const startedAtRef = useRef<number>(0);
+  const hydratedRef = useRef(false);
+
+  // One-time hydrate from the crash-safety buffer, then announce start.
+  useEffect(() => {
+    if (hydratedRef.current) return;
+    hydratedRef.current = true;
+    const buf = loadStudioBuffer();
+    if (buf?.overlay) setOverlay(buf.overlay);
+    if (buf?.screen) setScreen(buf.screen as Screen);
+    startedAtRef.current = buf?.startedAt ?? Date.now();
+    emitStudioEvent(STUDIO_EVENTS.setupStarted);
+  }, []);
+
+  // Quiet background safety net (debounced) — NOT the commit.
+  useEffect(() => {
+    if (!hydratedRef.current) return;
+    const id = window.setTimeout(() => {
+      saveStudioBuffer({ screen, overlay, startedAt: startedAtRef.current });
+    }, 800);
+    return () => window.clearTimeout(id);
+  }, [screen, overlay]);
+
+  const activeStep: SegmentKey | null = (STEP_ORDER as string[]).includes(screen)
+    ? (screen as SegmentKey)
+    : null;
+
+  // Per-step entry instrumentation.
+  useEffect(() => {
+    if (activeStep) emitStudioEvent(STUDIO_EVENTS.stepEntered, { step: activeStep });
+  }, [activeStep]);
+
+  // Auto-scroll the newly-active section into view on every screen change
+  // (advance / Back / rail-jump / continue beat), so the agent is never left
+  // looking at the wrong part of the console after changing steps. Smooth on
+  // desktop; reduced-motion jumps instead of animating.
+  useEffect(() => {
+    if (typeof window === "undefined") return;
+    window.scrollTo({ top: 0, behavior: reducedMotion ? "auto" : "smooth" });
+  }, [screen, reducedMotion]);
+
+  const setField = (patch: Partial<BrandSettings>) =>
+    setOverlay((o) => ({ ...o, ...patch }));
+
+  // Item 5a — when the agent adds a listing, bring the live preview's listings
+  // coverflow into view so they SEE the effect (most agents click Add without
+  // having scrolled the preview down to the cards). Smooth on desktop; reduced
+  // motion jumps. rAF so the just-appended slot has rendered first.
+  const scrollPreviewToListings = () => {
+    if (typeof window === "undefined") return;
+    window.requestAnimationFrame(() => {
+      const el = document.querySelector('[data-testid="fs-sa-cf"]');
+      el?.scrollIntoView({
+        behavior: reducedMotion ? "auto" : "smooth",
+        block: "center",
+      });
+    });
+  };
+
+  const elapsed = () => Math.max(0, Date.now() - startedAtRef.current);
+
+  const done = useMemo(
+    () => new Set<SegmentKey>(completedSegments(effective)),
+    [effective],
+  );
+
+  // PREVIEW-ONLY normalization (never persisted, never touches the editor): make
+  // every preview render full from defaults/sample context so the agent always
+  // refines a real asset, never stares at a blank or a name-gated section.
+  const previewBrand = useMemo<BrandSettings>(() => {
+    let b = effective;
+    // #1 — render the review from its BODY alone: default the attribution when
+    // the name box is still empty (the projector drops a nameless review).
+    const rv = b.agentReviews?.[0];
+    if (rv?.body?.trim() && !rv.attributionName?.trim()) {
+      b = {
+        ...b,
+        agentReviews: [{ ...rv, attributionName: DEFAULT_REVIEW_ATTRIBUTION }],
+      };
+    }
+    // #4 — the marketing zone is never blank: default the 3 marketing points
+    // (so the cards + their icons render from the start) and feed a sample
+    // showcase image (so "the work" tile is populated, not a big empty space).
+    if (!b.whyUs || b.whyUs.marketingApproach.length === 0) {
+      b = {
+        ...b,
+        whyUs: {
+          ...(b.whyUs ?? (EMPTY_WHYUS as unknown as WhyUs)),
+          marketingApproach: defaultWhyUs().marketingApproach,
+        },
+      };
+    }
+    if (!b.sampleListingPhotoUrl) {
+      b = { ...b, sampleListingPhotoUrl: SAMPLE_SHOWCASE_PHOTO };
+    }
+    // #3/#7 — the preview's default signature color must equal the real brand
+    // default (the teal-blue #037290), NOT the onboarding "studio mint" that
+    // `buildSamplePreviewPayload` otherwise substitutes for an unset accent.
+    // Seeding the default here makes the review/TrustStrip + the CTA buttons
+    // render in the true default blue and keeps the Brand-step swatch (which also
+    // defaults to #037290) matching the live preview exactly. A real accent wins.
+    if (!b.brandAccent?.trim()) {
+      b = { ...b, brandAccent: EDITORIAL_BRAND_DEFAULTS.accent };
+    }
+    return b;
+  }, [effective]);
+
+  // Live preview payload. marketingZoneRedesign=true so the marketing-zone
+  // preview is the v1.7 redesigned one; for the Recent-work step, overlay the
+  // agent's OWN listings (the sample seeds the rest so nothing is empty).
+  const basePayload = useMemo(
+    () => buildSamplePreviewPayload(previewBrand, ownerEmail ?? "", true),
+    [previewBrand, ownerEmail],
+  );
+  const previewPayload = useMemo(() => {
+    // Carry the logo so the Brand-step AgentBand preview shows it in the global
+    // logo slot. Studio-preview-only: the publish path never sets brandLogoUrl,
+    // so published pages stay byte-identical (wordmark).
+    const logo = effective.logoDataUrl || undefined;
+    let payload = logo ? { ...basePayload, brandLogoUrl: logo } : basePayload;
+    if (activeStep === "work") {
+      // Preview-only: the agent's own listings as the public shape (the publish
+      // projector remains the real clamp/cap boundary; this mapper's objects
+      // match PublicRecentListing structurally — address + optional fields).
+      const own = (recentListingsToPublishInput(effective.recentListings ?? []) ??
+        []) as PublicRecentListing[];
+      const samples = (basePayload.recentListings ?? []) as PublicRecentListing[];
+      // Item 5 state model — the listings section ALWAYS reads full: the agent's
+      // real cards lead, and the sample/example cards backfill the remaining
+      // slots up to the display target (4 = the sample fan size), capped at
+      // RECENT_LISTINGS_CAP (5). So examples are replaced ONE AT A TIME as real
+      // listings land — the section never collapses to a single empty slot, and
+      // at 4–5 real listings the samples drop out entirely. PREVIEW-ONLY: the
+      // publish path still projects ONLY the agent's own listings.
+      const TARGET = 4;
+      const fill = Math.max(0, TARGET - own.length);
+      const merged = [...own, ...samples.slice(0, fill)].slice(0, RECENT_LISTINGS_CAP);
+      payload = { ...payload, recentListings: merged };
+    }
+    return payload;
+  }, [basePayload, activeStep, effective.recentListings, effective.logoDataUrl]);
+
+  // Pre-populate the How-you-sell step: the moment it opens, seed the default
+  // marketing approach so the editor "arrives done" (3 cards to keep + edit) and
+  // a Save persists them. Seeds whenever marketing is empty (NOT gated on the
+  // whole whyUs), so a proof-point set earlier on the Proof step can't suppress
+  // it. Preserves any existing whyUs fields (e.g. that proof point).
+  useEffect(() => {
+    if (screen !== "sell") return;
+    const cur = overlay.whyUs ?? settings.whyUs;
+    if (!cur || cur.marketingApproach.length === 0) {
+      const baseWhy = cur ?? (EMPTY_WHYUS as unknown as WhyUs);
+      setOverlay((o) => ({
+        ...o,
+        whyUs: { ...baseWhy, marketingApproach: defaultWhyUs().marketingApproach },
+      }));
+    }
+  }, [screen, settings.whyUs, overlay.whyUs]);
+
+  const commitAndAdvance = (step: SegmentKey) => {
+    const wasReady = isClientReady(settings);
+    const merged = { ...settings, ...overlay };
+    // Normalize the proof review at commit: trim the raw-stored text and apply
+    // the empty-name default (kept raw during editing so spaces type normally).
+    if (step === "proof" && merged.agentReviews?.[0]) {
+      const r = merged.agentReviews[0];
+      const body = r.body.trim();
+      merged.agentReviews = body
+        ? [{ ...r, body, attributionName: r.attributionName.trim() || DEFAULT_REVIEW_ATTRIBUTION }]
+        : undefined;
+    }
+    update(merged); // the reward commit → brand record (+ server autosave)
+    setOverlay({});
+    emitStudioEvent(STUDIO_EVENTS.stepSaved, { step });
+    if (!wasReady && isClientReady(merged)) {
+      emitStudioEvent(STUDIO_EVENTS.clientReadyReached, { ms: elapsed() });
+    }
+    if (step === "brand" && isFullyComplete(merged)) {
+      emitStudioEvent(STUDIO_EVENTS.fullSetupCompleted, { ms: elapsed() });
+    }
+    setSavedAsset(step);
+    setToast(SAVE_TOAST[step]);
+    window.setTimeout(
+      () => {
+        setSavedAsset(null);
+        setToast(null);
+        setScreen(NEXT_SCREEN[step]);
+      },
+      reducedMotion ? 60 : SAVE_ANIM_MS,
+    );
+  };
+
+  // Re-edit navigation: Back returns to the previous screen; the rail lets the
+  // agent jump back into any step they've already reached. Overlay edits are
+  // never cleared on navigation (only an explicit commit clears them) and
+  // committed values live in `settings`, so no entered data is lost going back.
+  const goTo = (next: Screen) => {
+    if (savedAsset) return; // ignore mid-save-animation
+    setScreen(next);
+  };
+
+  const onLater = () => {
+    // The ONLY defer/exit — intro screen only. Keep the buffer so a return resumes.
+    router.push("/dashboard");
+  };
+  const onCreatePage = () => {
+    emitStudioEvent(STUDIO_EVENTS.createPageClicked, { from: "launch" });
+    clearStudioBuffer();
+    router.push("/dashboard");
+  };
+  const onReview = () => {
+    clearStudioBuffer();
+    router.push("/settings");
+  };
+
+  /* ───────────────────────── intro / continue / launch ───────────────────── */
+
+  if (screen === "intro") {
+    return (
+      <CenteredScreen testid="sp-intro">
+        <p className="sp-eyebrow">Studio Profile</p>
+        <h1 className="sp-title">Set up Studio once.</h1>
+        <p className="sp-sub">
+          Most agents finish in 5–8 minutes. Studio reuses these details across
+          your seller pages, listing promos, follow-ups, and every new tool you
+          create later, so you never rebuild them per page.
+        </p>
+        <ol className="sp-map" data-testid="sp-intro-map">
+          {["You", "Reach", "Proof", "How you sell", "Recent work", "Brand"].map(
+            (label, i) => (
+              <li className="sp-map__item" key={label}>
+                <span className="sp-map__num">{i + 1}</span>
+                {label}
+              </li>
+            ),
+          )}
+        </ol>
+        <div className="sp-actions">
+          <button
+            type="button"
+            className="sp-btn sp-btn--primary"
+            data-testid="sp-intro-start"
+            onClick={() => setScreen("you")}
+          >
+            Start setup
+          </button>
+          <button
+            type="button"
+            className="sp-btn sp-btn--ghost"
+            data-testid="sp-intro-later"
+            onClick={onLater}
+          >
+            I&rsquo;ll do this later
+          </button>
+        </div>
+      </CenteredScreen>
+    );
+  }
+
+  if (screen === "clientready") {
+    // An earned MILESTONE, then a single forward action. No fork, no off-ramp.
+    return (
+      <CenteredScreen testid="sp-clientready" milestone>
+        <span className="sp-seal sp-seal--anim" data-testid="sp-seal" aria-hidden="true">
+          <svg className="sp-seal__svg" viewBox="0 0 52 52">
+            <circle className="sp-seal__ring" cx="26" cy="26" r="24" />
+            <path className="sp-seal__check" d="M15 27 l7 7 l15 -16" />
+          </svg>
+        </span>
+        <p className="sp-eyebrow sp-ms sp-ms--1">Milestone</p>
+        <h1 className="sp-title sp-ms sp-ms--2">You&rsquo;re client-ready.</h1>
+        <p className="sp-sub sp-ms sp-ms--3">
+          Your seller page now has you, a way to reach you, and proof sellers can
+          trust. A few more steps make every page stronger.
+        </p>
+        <div className="sp-actions sp-ms sp-ms--4">
+          <button
+            type="button"
+            className="sp-btn sp-btn--primary"
+            data-testid="sp-clientready-continue"
+            onClick={() => setScreen("sell")}
+          >
+            Keep going
+          </button>
+        </div>
+        <p className="sp-reassure sp-ms sp-ms--5">{REASSURANCE}</p>
+      </CenteredScreen>
+    );
+  }
+
+  if (screen === "launch") {
+    return (
+      <CenteredScreen testid="sp-launch">
+        <p className="sp-eyebrow">You&rsquo;re set</p>
+        <h1 className="sp-title">Your seller page is ready.</h1>
+        <p className="sp-sub">
+          Studio will carry your identity, proof, marketing, recent work, and
+          brand into every page you create. Extras for your full presentation and
+          pre-listing page live in Settings whenever you want.
+        </p>
+        <div className="sp-actions">
+          <button
+            type="button"
+            className="sp-btn sp-btn--primary"
+            data-testid="sp-launch-create"
+            onClick={onCreatePage}
+          >
+            Create your first seller page
+          </button>
+          <button
+            type="button"
+            className="sp-btn sp-btn--ghost"
+            data-testid="sp-launch-review"
+            onClick={onReview}
+          >
+            Review my Studio Profile
+          </button>
+        </div>
+      </CenteredScreen>
+    );
+  }
+
+  /* ─────────────────────────── the step console ──────────────────────────── */
+
+  const step = activeStep as SegmentKey;
+  const frame = STEP_FRAME[step];
+  // Phase-1 essentials gate to client-ready (required, no skip); Phase-2
+  // enrichment can always continue (encouraged via reassurance, never forced).
+  const canSave =
+    step === "you"
+      ? !!effective.agentName?.trim()
+      : step === "reach"
+        ? !!(effective.contactEmail?.trim() || effective.contactPhone?.trim())
+        : step === "proof"
+          ? isProofDone(effective)
+          : true;
+  // Item 8 — ALL six steps are freely clickable in the rail: the agent can jump
+  // ahead or back to any step, not just completed ones. Unsaved overlay edits are
+  // never cleared on navigation (only an explicit commit clears them) and
+  // committed values live in `settings`, so a jump never wipes entered data; a
+  // forward jump simply lands on a step whose Save stays gated until valid.
+  const reachable = new Set<SegmentKey>(STEP_ORDER);
+
+  // Item 11 — quiet orientation copy that fills the rail's lower region with
+  // something earned (a progress summary + the one-time-setup reassurance)
+  // rather than a void.
+  const doneCount = STEP_ORDER.filter((s) => done.has(s)).length;
+
+  return (
+    <div className="sp sp--console" data-testid="sp-console">
+      {/* Item 11 — light anchoring chrome so the console feels like a place. */}
+      <header className="sp__topbar">
+        <span className="sp__wordmark">
+          Studio <em>SEP</em>
+        </span>
+        <span className="sp__topbar-ctx" data-testid="sp-topbar-ctx">
+          <span className="sp__topbar-kicker">Studio setup</span>
+          <span className="sp__topbar-sep" aria-hidden="true">
+            /
+          </span>
+          <span className="sp__topbar-step">{frame.eyebrow}</span>
+        </span>
+        <span className="sp__topbar-count" aria-hidden="true">
+          {doneCount} / {STEP_ORDER.length}
+        </span>
+      </header>
+
+      <div className="sp__grid">
+        <aside className="sp__rail">
+          <div className="sp__rail-top">
+            <SegmentedProgress
+              done={done}
+              active={step}
+              layout="rail"
+              selectable={reachable}
+              onSelect={goTo}
+            />
+          </div>
+          <div className="sp__rail-foot">
+            <p className="sp-rail-summary" data-testid="sp-rail-summary">
+              {doneCount} of {STEP_ORDER.length} steps saved
+            </p>
+            <p className="sp-reassure" data-testid="sp-reassure">
+              {REASSURANCE}
+            </p>
+          </div>
+        </aside>
+
+        <div className="sp__bar">
+          <SegmentedProgress
+            done={done}
+            active={step}
+            layout="bar"
+            selectable={reachable}
+            onSelect={goTo}
+          />
+          <p className="sp-reassure sp-reassure--bar">{REASSURANCE}</p>
+        </div>
+
+        <main className="sp__center" data-testid={`sp-step-${step}`}>
+        <p className="sp-eyebrow">{frame.eyebrow}</p>
+        <h1 className="sp-step-title">{frame.title}</h1>
+        <p className="sp-sub">{frame.sub}</p>
+
+        <div className="sp-fields">
+          {step === "you" && <YouFields effective={effective} setField={setField} />}
+          {step === "reach" && (
+            <ReachFields effective={effective} setField={setField} />
+          )}
+          {step === "proof" && (
+            <ProofFields effective={effective} setField={setField} />
+          )}
+          {step === "sell" && <SellFields effective={effective} setField={setField} />}
+          {step === "work" && (
+            <WorkFields
+              effective={effective}
+              setField={setField}
+              onAddListing={scrollPreviewToListings}
+            />
+          )}
+          {step === "brand" && <BrandFields effective={effective} setField={setField} />}
+        </div>
+
+        {toast && (
+          <p className="sp-toast" data-testid="sp-toast" role="status">
+            {toast}
+          </p>
+        )}
+
+        <div className="sp-actions">
+          <button
+            type="button"
+            className="sp-btn sp-btn--primary"
+            data-testid="sp-save-continue"
+            disabled={!canSave || savedAsset !== null}
+            onClick={() => commitAndAdvance(step)}
+          >
+            Save &amp; continue
+          </button>
+          <button
+            type="button"
+            className="sp-btn sp-btn--ghost"
+            data-testid="sp-back"
+            disabled={savedAsset !== null}
+            onClick={() => goTo(PREV_SCREEN[step])}
+          >
+            Back
+          </button>
+        </div>
+      </main>
+
+        <section className="sp__preview" data-testid="sp-preview">
+          <div className="sp__stage">
+            <p className="sp__stage-eyebrow" aria-hidden="true">
+              What sellers see
+            </p>
+            <AssetPreviewFrame
+              payload={previewPayload}
+              asset={step}
+              saved={savedAsset === step}
+              reducedMotion={reducedMotion}
+            />
+            {/* Item 9 — the "one input → many outputs" idea, given a real
+                treatment: a caption that ties the previewed asset to the other
+                surfaces it reuses, with grouped, well-spaced pills. */}
+            <div className="sp-dest" data-testid="sp-destinations">
+              <p className="sp-dest__label">This also appears on</p>
+              <div className="sp-dest__chips" aria-hidden="true">
+                <span className="sp-dest__chip sp-dest__chip--active">
+                  Seller page
+                </span>
+                <span className="sp-dest__chip">Follow-up</span>
+                <span className="sp-dest__chip">Pre-listing</span>
+              </div>
+              <p className="sp-dest__note">
+                One input — reused everywhere you show up.
+              </p>
+            </div>
+          </div>
+        </section>
+      </div>
+    </div>
+  );
+}
+
+/* ───────────────────────────── step field groups ───────────────────────────── */
+
+function YouFields({
+  effective,
+  setField,
+}: {
+  effective: BrandSettings;
+  setField: (patch: Partial<BrandSettings>) => void;
+}) {
+  return (
+    <>
+      <label className="sp-field">
+        <span className="sp-label">Your name</span>
+        <input
+          className="sp-input"
+          data-testid="sp-input-name"
+          type="text"
+          autoFocus
+          value={effective.agentName ?? ""}
+          placeholder="Aaron Thomas"
+          onChange={(e) => setField({ agentName: e.target.value })}
+        />
+      </label>
+
+      <div className="sp-field">
+        <span className="sp-label">Your headshot</span>
+        <p className="sp-hint">Clean initials work beautifully until you add one.</p>
+        <HeadshotField
+          photoUrl={effective.agentPhotoUrl}
+          focalX={effective.agentHeadshotFocalX ?? 50}
+          focalY={effective.agentHeadshotFocalY ?? 50}
+          scale={effective.agentHeadshotScale ?? 1}
+          monogramName={effective.agentName ?? ""}
+          onPhotoChange={(url) =>
+            setField({
+              agentPhotoUrl: url || undefined,
+              agentHeadshotFocalX: undefined,
+              agentHeadshotFocalY: undefined,
+              agentHeadshotScale: undefined,
+            })
+          }
+          onCropChange={({ focalX, focalY, scale }: HeadshotCropValue) => {
+            const centered = focalX === 50 && focalY === 50 && scale === 1;
+            setField({
+              agentHeadshotFocalX: centered ? undefined : focalX,
+              agentHeadshotFocalY: centered ? undefined : focalY,
+              agentHeadshotScale: centered ? undefined : scale,
+            });
+          }}
+        />
+      </div>
+
+      <label className="sp-field">
+        <span className="sp-label">Brokerage</span>
+        <input
+          className="sp-input"
+          data-testid="sp-input-brokerage"
+          type="text"
+          value={effective.brokerage ?? ""}
+          placeholder="Windermere · Tacoma"
+          onChange={(e) => setField({ brokerage: e.target.value })}
+        />
+      </label>
+    </>
+  );
+}
+
+function ReachFields({
+  effective,
+  setField,
+}: {
+  effective: BrandSettings;
+  setField: (patch: Partial<BrandSettings>) => void;
+}) {
+  return (
+    <>
+      <label className="sp-field">
+        <span className="sp-label">Email</span>
+        <input
+          className="sp-input"
+          data-testid="sp-input-email"
+          type="email"
+          inputMode="email"
+          value={effective.contactEmail ?? ""}
+          placeholder="you@brokerage.com"
+          onChange={(e) => setField({ contactEmail: e.target.value })}
+        />
+      </label>
+
+      <label className="sp-field">
+        <span className="sp-label">Phone</span>
+        <PhoneInput
+          className="sp-input"
+          value={formatPhone(effective.contactPhone ?? "")}
+          onChange={(formatted) =>
+            setField({ contactPhone: extractPhoneDigits(formatted) })
+          }
+          placeholder="(253) 555-0188"
+          aria-label="Phone"
+        />
+      </label>
+
+      <label className="sp-field">
+        <span className="sp-label">Scheduling link (optional)</span>
+        <input
+          className="sp-input"
+          data-testid="sp-input-scheduling"
+          type="url"
+          inputMode="url"
+          value={effective.schedulingUrl ?? ""}
+          placeholder="calendly.com/your-handle"
+          onChange={(e) => setField({ schedulingUrl: e.target.value })}
+        />
+      </label>
+    </>
+  );
+}
+
+function ProofFields({
+  effective,
+  setField,
+}: {
+  effective: BrandSettings;
+  setField: (patch: Partial<BrandSettings>) => void;
+}) {
+  const review = effective.agentReviews?.[0];
+  const body = review?.body ?? "";
+  const name = review?.attributionName ?? "";
+  // Store the text RAW (no trim) so the controlled inputs don't strip the space
+  // at the caret on every keystroke (the "can't type spaces" bug). Trimming +
+  // the empty-name default are applied once at commit (see commitAndAdvance).
+  const setReview = (b: string, n: string) =>
+    setField({
+      agentReviews: b.trim() ? [{ body: b, attributionName: n }] : undefined,
+    });
+  const base = effective.whyUs ?? (EMPTY_WHYUS as unknown as WhyUs);
+  const proofPoint = base.differentiators?.[0] ?? "";
+  // Store RAW (no per-keystroke trim) so the spacebar isn't swallowed; the
+  // projector/load-clamp trims for display on the real page.
+  const setProofPoint = (v: string) =>
+    setField({
+      whyUs: {
+        ...base,
+        differentiators: v.trim()
+          ? [v, ...base.differentiators.slice(1)]
+          : base.differentiators.slice(1),
+      },
+    });
+
+  return (
+    <>
+      <div className="sp-field">
+        <span className="sp-label">Paste a review (recommended)</span>
+        <p className="sp-hint">A few words a past seller gave you.</p>
+        <textarea
+          className="sp-input sp-textarea"
+          data-testid="sp-input-review-body"
+          rows={3}
+          value={body}
+          placeholder="They made the whole sale feel easy…"
+          onChange={(e) => setReview(e.target.value, name)}
+        />
+        <input
+          className="sp-input"
+          data-testid="sp-input-review-name"
+          type="text"
+          value={name}
+          placeholder="Who said it (e.g. J. Mendoza)"
+          onChange={(e) => setReview(body, e.target.value)}
+        />
+        <input
+          className="sp-input"
+          data-testid="sp-input-review-outlink"
+          type="url"
+          inputMode="url"
+          value={effective.reviewsOutlinkUrl ?? ""}
+          placeholder="Link to all your reviews (e.g. Zillow profile)"
+          onChange={(e) => setField({ reviewsOutlinkUrl: e.target.value })}
+        />
+      </div>
+
+      {/* Always visible (not collapsed): the review is primary, and these add to
+          it. Both optional. */}
+      <div className="sp-extras" data-testid="sp-proof-extras">
+        <p className="sp-extras__head">Add these too (optional)</p>
+        <label className="sp-field">
+          <span className="sp-label">Years of experience</span>
+          <input
+            className="sp-input"
+            data-testid="sp-input-years"
+            type="text"
+            inputMode="numeric"
+            value={effective.agentYearsInArea ?? ""}
+            placeholder="11"
+            onChange={(e) =>
+              setField({ agentYearsInArea: e.target.value.replace(/\D/g, "") })
+            }
+          />
+        </label>
+        <label className="sp-field">
+          <span className="sp-label">One proof point</span>
+          <input
+            className="sp-input"
+            data-testid="sp-input-proofpoint"
+            type="text"
+            value={proofPoint}
+            placeholder="Sold 30+ homes in North Tacoma"
+            onChange={(e) => setProofPoint(e.target.value)}
+          />
+        </label>
+      </div>
+    </>
+  );
+}
+
+const MARKETING_CAP = 3;
+
+function SellFields({
+  effective,
+  setField,
+}: {
+  effective: BrandSettings;
+  setField: (patch: Partial<BrandSettings>) => void;
+}) {
+  // Narrow step: ONLY what the State-A marketing-zone preview renders — the lead
+  // emphasis (→ the zone headline) and the marketing approach points (→ the
+  // "What's included" cards), hard-capped at 3. Differentiators / how-we-work /
+  // guarantee / stats stay editable in Settings (they power the full-presentation
+  // & pre-listing WhyUs), so "done" here is honest about the preview.
+  const whyUs = effective.whyUs ?? defaultWhyUs();
+  const points = whyUs.marketingApproach.slice(0, MARKETING_CAP);
+  const writePoints = (next: typeof points) =>
+    setField({ whyUs: { ...whyUs, marketingApproach: next } });
+
+  return (
+    <>
+      <div className="sp-field">
+        <span className="sp-label">What gets buyers in?</span>
+        <p className="sp-hint">
+          Pick the angle you lead with. It becomes your page&rsquo;s
+          &ldquo;How I&rsquo;ll get your home seen&rdquo; headline.
+        </p>
+        <div className="sp-levers" data-testid="sp-levers">
+          {LEAD_EMPHASIS_PRIMARY.map((k) => (
+            <button
+              key={k}
+              type="button"
+              className={`sp-lever${effective.leadEmphasis === k ? " sp-lever--active" : ""}`}
+              data-testid={`sp-lever-${k}`}
+              onClick={() => setField({ leadEmphasis: k as LeadEmphasisKey })}
+            >
+              {LEAD_EMPHASIS_LABELS[k]}
+            </button>
+          ))}
+        </div>
+      </div>
+
+      <div className="sp-field" data-testid="sp-marketing">
+        {/* Label matches the prominent eyebrow the preview renders. */}
+        <span className="sp-label">How I&rsquo;ll get your home seen</span>
+        <p className="sp-hint">
+          Your {MARKETING_CAP} strongest marketing points. They appear under
+          &ldquo;What&rsquo;s included&rdquo; on your page.
+        </p>
+        {points.map((p, i) => (
+          <div className="sp-mkt-point" key={i} data-testid={`sp-mkt-point-${i}`}>
+            <input
+              className="sp-input"
+              type="text"
+              value={p.title}
+              placeholder="Professional photography & video"
+              data-testid={`sp-mkt-title-${i}`}
+              onChange={(e) =>
+                writePoints(
+                  points.map((q, j) =>
+                    j === i ? { ...q, title: e.target.value } : q,
+                  ),
+                )
+              }
+            />
+            <textarea
+              className="sp-input sp-textarea"
+              rows={2}
+              value={p.detail ?? ""}
+              placeholder="Every listing, shot by a pro."
+              data-testid={`sp-mkt-detail-${i}`}
+              onChange={(e) =>
+                writePoints(
+                  points.map((q, j) =>
+                    j === i ? { ...q, detail: e.target.value } : q,
+                  ),
+                )
+              }
+            />
+            {points.length > 1 && (
+              <button
+                type="button"
+                className="sp-mkt-remove"
+                data-testid={`sp-mkt-remove-${i}`}
+                onClick={() => writePoints(points.filter((_, j) => j !== i))}
+              >
+                Remove
+              </button>
+            )}
+          </div>
+        ))}
+        {points.length < MARKETING_CAP ? (
+          <button
+            type="button"
+            className="sp-mkt-add"
+            data-testid="sp-mkt-add"
+            onClick={() => writePoints([...points, { title: "", detail: "" }])}
+          >
+            + Add a point
+          </button>
+        ) : (
+          <p className="sp-hint">
+            That&rsquo;s your {MARKETING_CAP} strongest. Your page shows three.
+          </p>
+        )}
+      </div>
+    </>
+  );
+}
+
+function WorkFields({
+  effective,
+  setField,
+  onAddListing,
+}: {
+  effective: BrandSettings;
+  setField: (patch: Partial<BrandSettings>) => void;
+  onAddListing?: () => void;
+}) {
+  return (
+    <>
+      <div className="sp-field">
+        <span className="sp-label">Sample listing photo (optional)</span>
+        <p className="sp-hint">
+          Your best listing photography. It leads your &ldquo;How I&rsquo;ll get
+          your home seen&rdquo; showcase.
+        </p>
+        <ImageUploadField
+          label="Sample photo"
+          value={effective.sampleListingPhotoUrl ?? ""}
+          onChange={(url) =>
+            setField({
+              sampleListingPhotoUrl: url || undefined,
+              // A new photo starts centered.
+              sampleListingPhotoFocalX: undefined,
+              sampleListingPhotoFocalY: undefined,
+              sampleListingPhotoScale: undefined,
+            })
+          }
+          folder="agent-sample-photo"
+          testIdPrefix="sp-sample-photo"
+          previewAspect="aspect-[4/3]"
+        />
+        {effective.sampleListingPhotoUrl && (
+          <ListingPhotoCrop
+            photoUrl={effective.sampleListingPhotoUrl}
+            focalX={effective.sampleListingPhotoFocalX}
+            focalY={effective.sampleListingPhotoFocalY}
+            scale={effective.sampleListingPhotoScale}
+            aspect={4 / 3}
+            testIdPrefix="sp-sample-photo"
+            onChange={(p) =>
+              setField({
+                ...("focalX" in p ? { sampleListingPhotoFocalX: p.focalX } : {}),
+                ...("focalY" in p ? { sampleListingPhotoFocalY: p.focalY } : {}),
+                ...("scale" in p ? { sampleListingPhotoScale: p.scale } : {}),
+              })
+            }
+          />
+        )}
+      </div>
+
+      <div className="sp-field">
+        <span className="sp-label">Sample video tour (optional)</span>
+        <p className="sp-hint">A recent tour you produced, shown in the showcase.</p>
+        <VideoUploadField
+          label="Sample video"
+          value={effective.sampleVideoUrl ?? ""}
+          onChange={(url) => setField({ sampleVideoUrl: url || undefined })}
+          folder="agent-sample-video"
+          testIdPrefix="sp-sample-video"
+          currentPosterUrl={effective.sampleVideoPosterUrl}
+          onPosterChange={(url) =>
+            setField({ sampleVideoPosterUrl: url || undefined })
+          }
+        />
+        {/* VIDEO-THUMBNAIL CROP — follow-on (item 6 scaffold). The same recycled
+            <ListingPhotoCrop> applies cleanly to the poster frame; it needs three
+            new display-only BrandSettings fields (sampleVideoPosterFocalX/Y/Scale)
+            registered + projected the same way sampleListingPhoto* are, then:
+              {effective.sampleVideoPosterUrl && (
+                <ListingPhotoCrop aspect={16/9} photoUrl={effective.sampleVideoPosterUrl} … />
+              )}
+            Deferred here to avoid net-new payload fields in this pass — it is a
+            small follow-on, not a redesign. */}
+      </div>
+
+      <div className="sp-embed" data-testid="sp-recent-listings">
+        <RecentListingsEditor
+          listings={effective.recentListings ?? []}
+          onChange={(next) => setField({ recentListings: next })}
+          enablePhotoPosition
+          onAdd={onAddListing}
+        />
+      </div>
+    </>
+  );
+}
+
+function BrandFields({
+  effective,
+  setField,
+}: {
+  effective: BrandSettings;
+  setField: (patch: Partial<BrandSettings>) => void;
+}) {
+  return (
+    <>
+      <div className="sp-field">
+        <span className="sp-label">Signature color</span>
+        <p className="sp-hint">Carries across every page, promo, and follow-up.</p>
+        <SignatureColorField
+          value={effective.brandAccent ?? EDITORIAL_BRAND_DEFAULTS.accent}
+          onChange={(hex) => setField({ brandAccent: hex })}
+        />
+      </div>
+      <div className="sp-field">
+        <span className="sp-label">Logo (optional)</span>
+        <ImageUploadField
+          label="Logo"
+          value={effective.logoDataUrl ?? ""}
+          onChange={(url) => setField({ logoDataUrl: url || null })}
+          folder="brand-logo"
+          testIdPrefix="sp-logo"
+          previewAspect="aspect-[5/1]"
+          previewFit="contain"
+        />
+        <p className="sp-hint">Shown at its true size on your pages, never cropped.</p>
+      </div>
+    </>
+  );
+}
+
+/**
+ * The signature-color control — the approved production picker pattern (the
+ * BrandKit `ColorRow`/`HexField`): a native swatch trigger + a validated hex
+ * field that commits on blur/Enter and reverts an invalid value (via the SAME
+ * `BrandEngine.normHex` the brand-kit form uses), now themed for the dark Studio
+ * console. The single-source default is `EDITORIAL_BRAND_DEFAULTS.accent`
+ * (#037290) — exactly what the live preview renders — and a "Default" affordance
+ * resets to it. Writes `brandAccent` (the seller-page signature), never
+ * primaryColor/accentColor.
+ */
+function SignatureColorField({
+  value,
+  onChange,
+}: {
+  value: string;
+  onChange: (hex: string) => void;
+}) {
+  const [draft, setDraft] = useState(value);
+  const [bad, setBad] = useState(false);
+  useEffect(() => {
+    setDraft(value);
+  }, [value]);
+
+  const commit = (v: string) => {
+    const n = BrandEngine.normHex(v.trim());
+    if (n) {
+      setBad(false);
+      onChange(n);
+    } else {
+      setBad(true);
+    }
+  };
+
+  const normalized = (BrandEngine.normHex(value) || "").toLowerCase();
+  const defaultHex = EDITORIAL_BRAND_DEFAULTS.accent;
+  const isDefault = normalized === defaultHex.toLowerCase();
+  const pickerValue = (BrandEngine.normHex(value) || defaultHex).toLowerCase();
+
+  return (
+    <div className="sp-color">
+      <input
+        type="color"
+        className="sp-color__swatch"
+        data-testid="sp-input-brand-color"
+        value={pickerValue}
+        aria-label="Signature color"
+        onChange={(e) => onChange(BrandEngine.normHex(e.target.value) || e.target.value)}
+      />
+      <div className="sp-color__field">
+        <input
+          type="text"
+          className={`sp-input sp-color__hex${bad ? " sp-color__hex--bad" : ""}`}
+          data-testid="sp-input-brand-color-hex"
+          value={draft}
+          spellCheck={false}
+          aria-label="Signature color hex"
+          aria-invalid={bad || undefined}
+          onChange={(e) => setDraft(e.target.value)}
+          onBlur={(e) => commit(e.target.value)}
+          onKeyDown={(e) => {
+            if (e.key === "Enter") (e.target as HTMLInputElement).blur();
+          }}
+        />
+        <button
+          type="button"
+          className="sp-color__reset"
+          data-testid="sp-brand-color-reset"
+          disabled={isDefault}
+          onClick={() => onChange(defaultHex)}
+        >
+          Default
+        </button>
+      </div>
+      {bad && (
+        <span className="sp-color__hint" role="alert">
+          Not a valid hex. Use 6 digits, like {defaultHex}.
+        </span>
+      )}
+    </div>
+  );
+}
+
+/* ───────────────────────────── shared chrome ───────────────────────────── */
+
+function CenteredScreen({
+  children,
+  testid,
+  milestone = false,
+}: {
+  children: React.ReactNode;
+  testid: string;
+  milestone?: boolean;
+}) {
+  return (
+    <div className="sp sp--centered" data-testid={testid}>
+      <div className={`sp-card${milestone ? " sp-card--milestone" : ""}`}>
+        {children}
+      </div>
+    </div>
+  );
+}
+
+function usePrefersReducedMotion(): boolean {
+  const [reduced, setReduced] = useState(false);
+  useEffect(() => {
+    if (typeof window === "undefined" || !window.matchMedia) return;
+    const mq = window.matchMedia("(prefers-reduced-motion: reduce)");
+    setReduced(mq.matches);
+    const onChange = () => setReduced(mq.matches);
+    mq.addEventListener("change", onChange);
+    return () => mq.removeEventListener("change", onChange);
+  }, []);
+  return reduced;
+}

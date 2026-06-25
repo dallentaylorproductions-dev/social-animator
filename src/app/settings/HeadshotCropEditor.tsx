@@ -43,6 +43,17 @@ export interface HeadshotCropValue {
   scale: number;
 }
 
+/**
+ * The crop FRAME shape. `circle` is the headshot default (byte-identical to the
+ * original component). `rect` reuses the SAME drag-to-pan + scroll/pinch-zoom
+ * interaction for a rectangular subject (e.g. a listing cover photo / a video
+ * thumbnail), where the focal/scale math is identical and only the mask + the
+ * workspace aspect differ.
+ */
+export type CropFrame =
+  | { shape: "circle" }
+  | { shape: "rect"; /** width / height, e.g. 4 / 3 */ aspect: number };
+
 export function HeadshotCropEditor({
   photoUrl,
   focalX: initialFocalX,
@@ -50,6 +61,10 @@ export function HeadshotCropEditor({
   scale: initialScale,
   onApply,
   onCancel,
+  title = "Adjust headshot",
+  helpText = "Drag to position your face. Scroll or pinch to zoom.",
+  frame = { shape: "circle" },
+  testIdPrefix = "headshot-crop",
 }: {
   photoUrl: string;
   focalX: number;
@@ -57,7 +72,20 @@ export function HeadshotCropEditor({
   scale: number;
   onApply: (next: HeadshotCropValue) => void;
   onCancel: () => void;
+  /** Dialog heading (default "Adjust headshot"). */
+  title?: string;
+  /** The instruction line under the zoom slider. */
+  helpText?: string;
+  /** Crop frame shape — circle (headshot) or a rectangular aspect. */
+  frame?: CropFrame;
+  /** Testid namespace (default "headshot-crop" keeps the headshot contract). */
+  testIdPrefix?: string;
 }) {
+  const tid = (s: string) => `${testIdPrefix}-${s}`;
+  const isCircle = frame.shape === "circle";
+  // The workspace matches the frame aspect so the WYSIWYG crop is accurate: a
+  // square for the circular headshot, the listing/thumbnail ratio for a rect.
+  const workspaceAspect = isCircle ? 1 : frame.aspect;
   const [focalX, setFocalX] = useState(initialFocalX);
   const [focalY, setFocalY] = useState(initialFocalY);
   const [scale, setScale] = useState(initialScale);
@@ -199,26 +227,24 @@ export function HeadshotCropEditor({
         // Click on the backdrop (not the panel) cancels — standard modal.
         if (e.target === e.currentTarget) onCancel();
       }}
-      data-testid="headshot-crop-backdrop"
+      data-testid={tid("backdrop")}
     >
       <div
         ref={panelRef}
         role="dialog"
         aria-modal="true"
-        aria-label="Adjust headshot"
+        aria-label={title}
         tabIndex={-1}
-        data-testid="headshot-crop-editor"
+        data-testid={tid("editor")}
         className="flex h-full w-full flex-col bg-neutral-950 outline-none sm:h-auto sm:max-w-[420px] sm:rounded-2xl sm:border sm:border-neutral-800 sm:shadow-2xl"
       >
         <div className="flex items-center justify-between border-b border-neutral-900 px-5 py-4">
-          <h2 className="text-sm font-medium text-neutral-100">
-            Adjust headshot
-          </h2>
+          <h2 className="text-sm font-medium text-neutral-100">{title}</h2>
           <button
             type="button"
             onClick={onCancel}
             aria-label="Close"
-            data-testid="headshot-crop-close"
+            data-testid={tid("close")}
             className="text-neutral-500 hover:text-neutral-200"
           >
             <svg width="18" height="18" viewBox="0 0 18 18" fill="none" aria-hidden>
@@ -238,17 +264,22 @@ export function HeadshotCropEditor({
               giant box-shadow scrim. Drag to pan, wheel/pinch to zoom. */}
           <div
             ref={workspaceRef}
-            data-testid="headshot-crop-workspace"
+            data-testid={tid("workspace")}
             onPointerDown={onPointerDown}
             onPointerMove={onPointerMove}
             onPointerUp={endPointer}
             onPointerCancel={endPointer}
             onWheel={onWheel}
-            className="relative aspect-square w-full max-w-[320px] touch-none select-none overflow-hidden rounded-2xl bg-neutral-900"
-            style={{ cursor: dragging ? "grabbing" : "grab" }}
+            className={`relative w-full max-w-[320px] touch-none select-none overflow-hidden rounded-2xl bg-neutral-900${
+              isCircle ? " aspect-square" : ""
+            }`}
+            style={{
+              cursor: dragging ? "grabbing" : "grab",
+              ...(isCircle ? null : { aspectRatio: String(workspaceAspect) }),
+            }}
           >
             <div
-              data-testid="headshot-crop-img"
+              data-testid={tid("img")}
               className="absolute inset-0 bg-no-repeat"
               style={{
                 backgroundImage: bg,
@@ -259,21 +290,37 @@ export function HeadshotCropEditor({
               }}
             />
 
-            {/* Circular window: a centered circle whose huge spread box-shadow
-                dims everything outside it. The ring + rule-of-thirds grid sit
-                inside the circle (clipped to it) as the familiar reassurance
-                affordance. pointer-events-none so drag passes through. */}
-            <div
-              aria-hidden
-              className="pointer-events-none absolute left-1/2 top-1/2 aspect-square w-[86%] -translate-x-1/2 -translate-y-1/2 overflow-hidden rounded-full border border-white/70"
-              style={{ boxShadow: "0 0 0 9999px rgba(0,0,0,0.55)" }}
-            >
-              {/* rule-of-thirds */}
-              <div className="absolute left-1/3 top-0 h-full w-px bg-white/25" />
-              <div className="absolute left-2/3 top-0 h-full w-px bg-white/25" />
-              <div className="absolute left-0 top-1/3 h-px w-full bg-white/25" />
-              <div className="absolute left-0 top-2/3 h-px w-full bg-white/25" />
-            </div>
+            {isCircle ? (
+              /* Circular window: a centered circle whose huge spread box-shadow
+                 dims everything outside it. The ring + rule-of-thirds grid sit
+                 inside the circle (clipped to it) as the familiar reassurance
+                 affordance. pointer-events-none so drag passes through. */
+              <div
+                aria-hidden
+                className="pointer-events-none absolute left-1/2 top-1/2 aspect-square w-[86%] -translate-x-1/2 -translate-y-1/2 overflow-hidden rounded-full border border-white/70"
+                style={{ boxShadow: "0 0 0 9999px rgba(0,0,0,0.55)" }}
+              >
+                {/* rule-of-thirds */}
+                <div className="absolute left-1/3 top-0 h-full w-px bg-white/25" />
+                <div className="absolute left-2/3 top-0 h-full w-px bg-white/25" />
+                <div className="absolute left-0 top-1/3 h-px w-full bg-white/25" />
+                <div className="absolute left-0 top-2/3 h-px w-full bg-white/25" />
+              </div>
+            ) : (
+              /* Rectangular window: the whole workspace IS the crop (the photo
+                 fills the card frame), so only a thin guide border + the rule-of-
+                 thirds grid sit on top — no scrim, since nothing is cropped away
+                 beyond the card edges. */
+              <div
+                aria-hidden
+                className="pointer-events-none absolute inset-0 overflow-hidden rounded-2xl border border-white/40"
+              >
+                <div className="absolute left-1/3 top-0 h-full w-px bg-white/20" />
+                <div className="absolute left-2/3 top-0 h-full w-px bg-white/20" />
+                <div className="absolute left-0 top-1/3 h-px w-full bg-white/20" />
+                <div className="absolute left-0 top-2/3 h-px w-full bg-white/20" />
+              </div>
+            )}
           </div>
 
           <div className="w-full max-w-[320px]">
@@ -289,19 +336,17 @@ export function HeadshotCropEditor({
               max={MAX_SCALE}
               step={SCALE_STEP}
               value={scale}
-              data-testid="headshot-crop-zoom"
+              data-testid={tid("zoom")}
               onChange={(e) => setScale(clampScale(Number(e.target.value)))}
               className="w-full accent-mint"
               aria-label="Zoom"
             />
             <div className="mt-2 flex items-center justify-between">
-              <p className="text-[11px] text-neutral-500">
-                Drag to position your face. Scroll or pinch to zoom.
-              </p>
+              <p className="text-[11px] text-neutral-500">{helpText}</p>
               {isAdjusted && (
                 <button
                   type="button"
-                  data-testid="headshot-crop-reset"
+                  data-testid={tid("reset")}
                   onClick={() => {
                     setFocalX(50);
                     setFocalY(50);
@@ -320,7 +365,7 @@ export function HeadshotCropEditor({
           <button
             type="button"
             onClick={onCancel}
-            data-testid="headshot-crop-cancel"
+            data-testid={tid("cancel")}
             className="rounded-md px-4 py-2 text-sm text-neutral-400 hover:text-neutral-200"
           >
             Cancel
@@ -328,7 +373,7 @@ export function HeadshotCropEditor({
           <button
             type="button"
             onClick={apply}
-            data-testid="headshot-crop-apply"
+            data-testid={tid("apply")}
             className="rounded-md bg-mint px-4 py-2 text-sm font-medium text-black hover:bg-mint-hover"
           >
             Apply

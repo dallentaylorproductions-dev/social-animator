@@ -2,6 +2,7 @@
 
 import { useEffect, useRef } from "react";
 import { ImageUploadField } from "@/components/ImageUploadField";
+import { ListingPhotoCrop } from "@/components/ListingPhotoCrop";
 import { NumberInput } from "@/components/inputs";
 import { useSPEntitlement } from "@/tools/seller-presentation/components/SPEntitlementContext";
 import { resolveCompCoverage } from "@/lib/seller-presentation/street-view";
@@ -38,9 +39,23 @@ const STREET_VIEW_RESOLVE_MS = 500;
 export function RecentListingsEditor({
   listings,
   onChange,
+  enablePhotoPosition = false,
+  onAdd,
 }: {
   listings: SettingsRecentListing[];
   onChange: (next: SettingsRecentListing[]) => void;
+  /**
+   * Studio Profile opt-in: show the per-listing photo position/zoom control.
+   * Defaults false so the existing /settings usage is byte-identical; the Studio
+   * "Recent work" step passes true.
+   */
+  enablePhotoPosition?: boolean;
+  /**
+   * Studio Profile opt-in: fired after "+ Add a listing" appends a new slot, so
+   * the host can scroll its live preview to the listings section (item 5a). The
+   * /settings usage omits it — byte-identical.
+   */
+  onAdd?: () => void;
 }) {
   const { compPhotosEnabled } = useSPEntitlement();
   const atCap = listings.length >= RECENT_LISTINGS_CAP;
@@ -59,6 +74,7 @@ export function RecentListingsEditor({
   const add = () => {
     if (atCap) return;
     onChange([...listings, emptyRecentListing()]);
+    onAdd?.();
   };
 
   // Street View fallback resolver. Mirrors StepNearbySales exactly: only rows
@@ -180,12 +196,38 @@ export function RecentListingsEditor({
             <ImageUploadField
               label="Listing photo"
               value={listing.photoUrl ?? ""}
-              onChange={(url) => patch(idx, { photoUrl: url || undefined })}
+              onChange={(url) =>
+                // A new photo resets any prior framing so it starts centered.
+                patch(idx, {
+                  photoUrl: url || undefined,
+                  photoFocalX: undefined,
+                  photoFocalY: undefined,
+                  photoScale: undefined,
+                })
+              }
               previewAspect="aspect-[4/3]"
               folder="agent-recent-listing"
               testIdPrefix={`brand-listing-photo-${idx}`}
               helpText="No photo? We will show a street view of the address."
             />
+
+            {enablePhotoPosition && listing.photoUrl && (
+              <ListingPhotoCrop
+                photoUrl={listing.photoUrl}
+                focalX={listing.photoFocalX}
+                focalY={listing.photoFocalY}
+                scale={listing.photoScale}
+                aspect={3 / 4}
+                testIdPrefix={`brand-listing-${idx}`}
+                onChange={(p) =>
+                  patch(idx, {
+                    ...("focalX" in p ? { photoFocalX: p.focalX } : {}),
+                    ...("focalY" in p ? { photoFocalY: p.focalY } : {}),
+                    ...("scale" in p ? { photoScale: p.scale } : {}),
+                  })
+                }
+              />
+            )}
 
             <div>
               <label className="block text-[10px] uppercase tracking-[0.15em] text-neutral-500 mb-2">

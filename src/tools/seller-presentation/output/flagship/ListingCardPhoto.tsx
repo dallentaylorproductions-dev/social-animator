@@ -1,6 +1,6 @@
 "use client";
 
-import { useEffect, useRef, useState } from "react";
+import { useEffect, useRef, useState, type CSSProperties } from "react";
 import { CompPhotoPlaceholder } from "./CompPhotoPlaceholder";
 
 /**
@@ -22,12 +22,41 @@ import { CompPhotoPlaceholder } from "./CompPhotoPlaceholder";
 export function ListingCardPhoto({
   sources,
   testId,
+  focalX,
+  focalY,
+  scale,
 }: {
   sources: string[];
   testId?: string;
+  /** Display framing (object-position % + zoom); unset = centered, no zoom. */
+  focalX?: number;
+  focalY?: number;
+  scale?: number;
 }) {
   const [idx, setIdx] = useState(0);
   const imgRef = useRef<HTMLImageElement | null>(null);
+
+  // Pure DISPLAY transform (image bytes untouched): object-position maps the
+  // focal point, and a zoom > 1 scales from that same point. Default 50/50/1 is
+  // equivalent to the CSS `object-position: center`, so an unset photo renders
+  // byte-identical to before.
+  const hasFraming =
+    typeof focalX === "number" ||
+    typeof focalY === "number" ||
+    typeof scale === "number";
+  // No framing set → no inline style at all, so existing cards render exactly as
+  // before (the CSS `object-position: center` stands). Byte-identical.
+  let frameStyle: CSSProperties | undefined;
+  if (hasFraming) {
+    const fx = typeof focalX === "number" ? focalX : 50;
+    const fy = typeof focalY === "number" ? focalY : 50;
+    const sc = typeof scale === "number" ? scale : 1;
+    frameStyle = { objectPosition: `${fx}% ${fy}%` };
+    if (sc > 1) {
+      frameStyle.transform = `scale(${sc})`;
+      frameStyle.transformOrigin = `${fx}% ${fy}%`;
+    }
+  }
 
   // Pre-hydration safety net: an SSR'd <img> can finish loading and FAIL before
   // React attaches the onError handler (a 404 that resolved during first paint).
@@ -63,6 +92,7 @@ export function ListingCardPhoto({
       alt=""
       aria-hidden="true"
       draggable={false}
+      style={frameStyle}
       onError={() => setIdx((i) => i + 1)}
       data-testid={testId}
     />

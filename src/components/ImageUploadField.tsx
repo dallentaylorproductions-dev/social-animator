@@ -43,6 +43,13 @@ interface ImageUploadFieldProps {
   onChange: (url: string) => void;
   /** Aspect-ratio class for the preview (e.g. "aspect-[4/3]" or "aspect-square"). */
   previewAspect?: string;
+  /**
+   * How the preview image fits its frame. "cover" (default) crops to fill — the
+   * right choice for photos. "contain" shows the whole image uncropped on a
+   * surface — for logos, so the preview is an honest "how it shows up", never a
+   * tight crop. Default keeps every existing caller byte-identical.
+   */
+  previewFit?: "cover" | "contain";
   /** Help text shown below the field. */
   helpText?: string;
   /** Optional subfolder for the Blob path. Defaults to "uploads". */
@@ -78,6 +85,7 @@ export function ImageUploadField({
   value,
   onChange,
   previewAspect = "aspect-[4/3]",
+  previewFit = "cover",
   helpText,
   folder,
   testIdPrefix,
@@ -139,7 +147,11 @@ export function ImageUploadField({
             <img
               src={value}
               alt={label}
-              className={`${previewAspect} w-full object-cover`}
+              className={`${previewAspect} w-full ${
+                previewFit === "contain"
+                  ? "object-contain bg-neutral-800"
+                  : "object-cover"
+              }`}
               data-testid={tid("preview")}
             />
           </div>

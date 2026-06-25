@@ -61,6 +61,15 @@ export interface BrandSettings {
   agentYearsInArea?: string;
   agentCtaReassurance?: string;
   /**
+   * Studio Profile (Slice 1) — the agent's scheduling link (Calendly/Cal.com/
+   * etc.), captured in the guided "Reach" step. AGENT-CONSTANT, set once,
+   * reusable. DATA-IN ONLY this slice: it is NOT yet enumerated by
+   * `brandToPublishInputs`, so it never reaches a public seller page — a
+   * follow-on wires it to the contact/CTA block. Optional; a non-string / empty
+   * value drops to undefined on load, so a flag-off blob is byte-identical.
+   */
+  schedulingUrl?: string;
+  /**
    * A7d.2 — curated reviews. AGENT-CONSTANT: entered once in Settings,
    * surfaced on every Seller Presentation. The wizard's editorial step
    * no longer captures per-presentation reviews; the projector reads
@@ -121,6 +130,15 @@ export interface BrandSettings {
    * the video frame can render a concrete poster.
    */
   sampleListingPhotoUrl?: string;
+  /**
+   * Studio Profile — display framing for the sample listing photo on the
+   * marketing-zone "the work" showcase (the same fit pattern as the recent-
+   * listing cards): object-position % (0–100, default 50) + a 1.0–2.0 zoom. The
+   * image bytes are never altered. All optional; unset = centered, no zoom.
+   */
+  sampleListingPhotoFocalX?: number;
+  sampleListingPhotoFocalY?: number;
+  sampleListingPhotoScale?: number;
   sampleVideoUrl?: string;
   sampleVideoPosterUrl?: string;
   /**
@@ -454,6 +472,12 @@ export function loadBrandSettings(): BrandSettings {
         parsed.agentCtaReassurance.length > 0
           ? parsed.agentCtaReassurance
           : undefined,
+      // Studio Profile (Slice 1) — scheduling link; data-in only (see type doc).
+      schedulingUrl:
+        typeof parsed.schedulingUrl === "string" &&
+        parsed.schedulingUrl.length > 0
+          ? parsed.schedulingUrl
+          : undefined,
       agentReviews: clampStoredReviews(parsed.agentReviews),
       reviewsOutlinkUrl:
         typeof parsed.reviewsOutlinkUrl === "string" &&
@@ -496,6 +520,10 @@ export function loadBrandSettings(): BrandSettings {
         parsed.sampleListingPhotoUrl.length > 0
           ? parsed.sampleListingPhotoUrl
           : undefined,
+      // Studio Profile — sample-photo framing (reuse the headshot clamps).
+      sampleListingPhotoFocalX: clampStoredPct(parsed.sampleListingPhotoFocalX),
+      sampleListingPhotoFocalY: clampStoredPct(parsed.sampleListingPhotoFocalY),
+      sampleListingPhotoScale: clampStoredScale(parsed.sampleListingPhotoScale),
       sampleVideoUrl:
         typeof parsed.sampleVideoUrl === "string" &&
         parsed.sampleVideoUrl.length > 0

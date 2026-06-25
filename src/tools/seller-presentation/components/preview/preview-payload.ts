@@ -61,6 +61,10 @@ export function brandToPublishInputs(brand: BrandSettings) {
     bioShort: brand.agentBioShort,
     yearsInArea: brand.agentYearsInArea,
     ctaReassurance: brand.agentCtaReassurance,
+    // Studio Profile — the scheduling link rides the same agentContact path as
+    // the other contact fields; the projector trims it and the CTA blocks point
+    // "Schedule a listing call" at it when set. Unset → undefined (byte-identical).
+    schedulingUrl: brand.schedulingUrl,
   };
   const brandReviews = {
     reviews: brand.agentReviews,
@@ -86,6 +90,9 @@ export function brandToPublishInputs(brand: BrandSettings) {
     valuationMessage: brand.valuationMessage,
     welcomeLine: brand.welcomeLine,
     sampleListingPhotoUrl: brand.sampleListingPhotoUrl,
+    sampleListingPhotoFocalX: brand.sampleListingPhotoFocalX,
+    sampleListingPhotoFocalY: brand.sampleListingPhotoFocalY,
+    sampleListingPhotoScale: brand.sampleListingPhotoScale,
     sampleVideoUrl: brand.sampleVideoUrl,
     sampleVideoPosterUrl: brand.sampleVideoPosterUrl,
     // Seller State A · Pass 2b — the set-once lead emphasis (onboarding BEAT 5),

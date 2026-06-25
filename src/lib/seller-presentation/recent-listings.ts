@@ -52,6 +52,16 @@ export interface SettingsRecentListing {
   hasStreetView?: boolean;
   /** Derived compass bearing (0–360), pano → house, aimed at the home. */
   streetViewHeading?: number;
+  /**
+   * Photo FRAMING (display-only, like the agent headshot): `photoFocalX/Y` are
+   * the CSS object-position as 0–100% (default centered 50/50) and `photoScale`
+   * is a 1.0–2.0 display zoom (default 1). They reposition the cover photo on the
+   * coverflow card so an uploaded photo no longer sits "wonky". The image bytes
+   * are never re-cropped. All optional; unset = centered, no zoom (byte-identical).
+   */
+  photoFocalX?: number;
+  photoFocalY?: number;
+  photoScale?: number;
 }
 
 /** A fresh, empty listing row for the "+ Add" affordance. */
@@ -64,6 +74,26 @@ function clampHeading(value: unknown): number | undefined {
     Number.isFinite(value) &&
     value >= 0 &&
     value <= 360
+    ? value
+    : undefined;
+}
+
+/** Photo-framing focal percentage [0,100]; anything else → undefined (centered). */
+function clampFocalPct(value: unknown): number | undefined {
+  return typeof value === "number" &&
+    Number.isFinite(value) &&
+    value >= 0 &&
+    value <= 100
+    ? value
+    : undefined;
+}
+
+/** Photo-framing zoom [1,2]; anything else → undefined (no zoom). */
+function clampPhotoScale(value: unknown): number | undefined {
+  return typeof value === "number" &&
+    Number.isFinite(value) &&
+    value >= 1 &&
+    value <= 2
     ? value
     : undefined;
 }
@@ -102,6 +132,12 @@ export function clampStoredRecentListings(
       listing.hasStreetView = r.hasStreetView;
     const heading = clampHeading(r.streetViewHeading);
     if (heading !== undefined) listing.streetViewHeading = heading;
+    const fx = clampFocalPct(r.photoFocalX);
+    if (fx !== undefined) listing.photoFocalX = fx;
+    const fy = clampFocalPct(r.photoFocalY);
+    if (fy !== undefined) listing.photoFocalY = fy;
+    const scale = clampPhotoScale(r.photoScale);
+    if (scale !== undefined) listing.photoScale = scale;
     out.push(listing);
   }
   return out.length ? out : undefined;
@@ -146,6 +182,9 @@ export function recentListingsToPublishInput(
     if (typeof l.hasStreetView === "boolean") out.hasStreetView = l.hasStreetView;
     if (l.streetViewHeading !== undefined)
       out.streetViewHeading = l.streetViewHeading;
+    if (typeof l.photoFocalX === "number") out.photoFocalX = l.photoFocalX;
+    if (typeof l.photoFocalY === "number") out.photoFocalY = l.photoFocalY;
+    if (typeof l.photoScale === "number") out.photoScale = l.photoScale;
     return out;
   });
 }

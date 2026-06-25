@@ -117,6 +117,14 @@ export interface AgentBranding {
   photoFocalY?: number;
   /** Display zoom (1.0–2.0). Absent / 1 ⇒ no zoom (byte-identical). */
   photoScale?: number;
+  /**
+   * Studio Profile — the agent's scheduling link (Calendly/Cal.com/etc.). When
+   * set, the contact/CTA block's "Schedule a listing call" action links here
+   * instead of the mailto, and email/phone remain as additional reach. Optional;
+   * an empty/blank value is dropped at projection, so a page with no scheduling
+   * link is byte-identical to a pre-Studio-Profile publish.
+   */
+  schedulingUrl?: string;
 }
 
 /**
@@ -190,6 +198,10 @@ export interface BrandWhyUsInput {
   valuationMessage?: string;
   welcomeLine?: string;
   sampleListingPhotoUrl?: string;
+  /** Sample-photo display framing for the marketing-zone showcase: object-position % (0–100) + 1.0–2.0 zoom. */
+  sampleListingPhotoFocalX?: number;
+  sampleListingPhotoFocalY?: number;
+  sampleListingPhotoScale?: number;
   sampleVideoUrl?: string;
   sampleVideoPosterUrl?: string;
   /**
@@ -353,6 +365,14 @@ export interface PublicRecentListing {
   hasStreetView?: boolean;
   /** Derived compass bearing (0–360), pano → house, aimed at the home. */
   streetViewHeading?: number;
+  /**
+   * Photo framing (display-only): object-position % (0–100, default 50) + a
+   * 1.0–2.0 zoom, so an uploaded cover photo can be positioned on the card
+   * instead of always center-cropped. Image bytes are never altered.
+   */
+  photoFocalX?: number;
+  photoFocalY?: number;
+  photoScale?: number;
 }
 
 /** Seller State A · Zone 5 — coverflow card cap (full fan is 4–5; extra rows drop). */
@@ -423,6 +443,16 @@ export interface PublicPayload {
   /** Undefined when no brand color was set — the consumer CSS falls back to the Editorial defaults. */
   brandColors?: PublicBrandColors;
 
+  /**
+   * Studio Profile — the agent's brand logo, rendered in the AgentBand's brand
+   * lockup slot (the "global logo slot") at a true-dimension, uncropped frame.
+   * Currently emitted ONLY by the Studio Profile live preview (so the agent can
+   * see how their logo + accent look together); the real publish path does NOT
+   * set it, so every published page stays byte-identical (wordmark) until a
+   * follow-on wires it to publish.
+   */
+  brandLogoUrl?: string;
+
   // ---- B0b agent-constant "Why us" marketing layer (v2 renderer only) ----
   /**
    * The pre-listing "why list with us" package, snapshotted from brand
@@ -457,6 +487,10 @@ export interface PublicPayload {
   valuationMessage?: string;
   welcomeLine?: string;
   sampleListingPhotoUrl?: string;
+  /** Sample-photo display framing for the marketing-zone showcase: object-position % (0–100) + 1.0–2.0 zoom. */
+  sampleListingPhotoFocalX?: number;
+  sampleListingPhotoFocalY?: number;
+  sampleListingPhotoScale?: number;
   sampleVideoUrl?: string;
   sampleVideoPosterUrl?: string;
   /**
@@ -754,6 +788,22 @@ function projectRecentListing(item: unknown): PublicRecentListing | null {
   if (typeof r.hasStreetView === "boolean") out.hasStreetView = r.hasStreetView;
   const heading = clampHeading(r.streetViewHeading);
   if (heading !== undefined) out.streetViewHeading = heading;
+  // Photo framing (display-only): focal % [0,100] + zoom [1,2]. Out-of-range /
+  // non-numeric values drop so a tampered record can't push the photo off-frame.
+  if (
+    typeof r.photoFocalX === "number" &&
+    r.photoFocalX >= 0 &&
+    r.photoFocalX <= 100
+  )
+    out.photoFocalX = r.photoFocalX;
+  if (
+    typeof r.photoFocalY === "number" &&
+    r.photoFocalY >= 0 &&
+    r.photoFocalY <= 100
+  )
+    out.photoFocalY = r.photoFocalY;
+  if (typeof r.photoScale === "number" && r.photoScale >= 1 && r.photoScale <= 2)
+    out.photoScale = r.photoScale;
   return out;
 }
 
@@ -931,7 +981,30 @@ function projectAgent(agent: AgentBranding): AgentBranding {
     photoFocalX: clampHeadshotPct(agent.photoFocalX),
     photoFocalY: clampHeadshotPct(agent.photoFocalY),
     photoScale: clampHeadshotScale(agent.photoScale),
+    // Studio Profile — emit only a non-empty trimmed link; blank/whitespace
+    // drops to undefined (JSON.stringify omits it), keeping no-link pages
+    // byte-identical to a pre-Studio-Profile publish.
+    schedulingUrl: clampSchedulingUrl(agent.schedulingUrl),
   };
+}
+
+/** Studio Profile — accept only a non-empty trimmed string; else undefined. */
+function clampSchedulingUrl(value: unknown): string | undefined {
+  if (typeof value !== "string") return undefined;
+  const trimmed = value.trim();
+  return trimmed.length > 0 ? trimmed : undefined;
+}
+
+/**
+ * Studio Profile — resolve a stored scheduling link to a safe href. Agents type
+ * it bare ("calendly.com/handle"), so prepend https:// when no scheme is present;
+ * mailto:/tel: pass through. Returns null for empty so the CTA flexes out.
+ */
+export function schedulingLinkHref(url: string | undefined): string | null {
+  const t = url?.trim();
+  if (!t) return null;
+  if (/^(https?:\/\/|mailto:|tel:)/i.test(t)) return t;
+  return `https://${t}`;
 }
 
 /** B0b — string coerce mirroring the whyus.ts boundary (non-strings → ""). */
@@ -1268,6 +1341,16 @@ export function toPublicPayload(
   const projectedSampleListingPhotoUrl = projectPublicWhyUsText(
     brandWhyUs.sampleListingPhotoUrl,
   );
+  // Sample-photo framing: focal % [0,100] + zoom [1,2]; out-of-range drops.
+  const projectedSampleListingPhotoFocalX = clampFocalPct(
+    brandWhyUs.sampleListingPhotoFocalX,
+  );
+  const projectedSampleListingPhotoFocalY = clampFocalPct(
+    brandWhyUs.sampleListingPhotoFocalY,
+  );
+  const projectedSampleListingPhotoScale = clampFocalZoom(
+    brandWhyUs.sampleListingPhotoScale,
+  );
   const projectedSampleVideoUrl = projectPublicWhyUsText(
     brandWhyUs.sampleVideoUrl,
   );
@@ -1302,6 +1385,9 @@ export function toPublicPayload(
           valuationMessage: projectedValuationMessage,
           welcomeLine: projectedWelcomeLine,
           sampleListingPhotoUrl: projectedSampleListingPhotoUrl,
+          sampleListingPhotoFocalX: projectedSampleListingPhotoFocalX,
+          sampleListingPhotoFocalY: projectedSampleListingPhotoFocalY,
+          sampleListingPhotoScale: projectedSampleListingPhotoScale,
           sampleVideoUrl: projectedSampleVideoUrl,
           sampleVideoPosterUrl: projectedSampleVideoPosterUrl,
           // Pass 2b lead emphasis — clamped to a known lever key (undefined drops
@@ -1484,6 +1570,10 @@ export function clampPublicPayload(raw: unknown): PublicPayload {
     areaStats: clampAreaStats(r.areaStats),
     agent,
     brandColors: clampBrandColors(r.brandColors),
+    brandLogoUrl:
+      typeof r.brandLogoUrl === "string" && r.brandLogoUrl.trim()
+        ? r.brandLogoUrl
+        : undefined,
     // B0b — re-clamp the "Why us" layer at the read boundary (same allowlist
     // the projector used at publish), so a hand-edited KV record can't smuggle
     // an unbounded list or a private key into the renderer.
@@ -1553,6 +1643,19 @@ function clampValuationRange(raw: unknown): PublicValuationRange | undefined {
   return { low, high, points };
 }
 
+/** Sample-photo focal percentage [0,100]; anything else → undefined (centered). */
+function clampFocalPct(v: unknown): number | undefined {
+  return typeof v === "number" && Number.isFinite(v) && v >= 0 && v <= 100
+    ? v
+    : undefined;
+}
+/** Sample-photo zoom [1,2]; anything else → undefined (no zoom). */
+function clampFocalZoom(v: unknown): number | undefined {
+  return typeof v === "number" && Number.isFinite(v) && v >= 1 && v <= 2
+    ? v
+    : undefined;
+}
+
 /**
  * Seller State A — read-boundary clamp for the prepared-invitation fields. The
  * status is coerced first; the appointment + every State A copy/asset field
@@ -1567,6 +1670,10 @@ function clampStateAFields(r: Record<string, unknown>): {
   valuationMessage?: string;
   welcomeLine?: string;
   sampleListingPhotoUrl?: string;
+  /** Sample-photo display framing for the marketing-zone showcase: object-position % (0–100) + 1.0–2.0 zoom. */
+  sampleListingPhotoFocalX?: number;
+  sampleListingPhotoFocalY?: number;
+  sampleListingPhotoScale?: number;
   sampleVideoUrl?: string;
   sampleVideoPosterUrl?: string;
   leadEmphasis?: LeadEmphasisKey;
@@ -1580,6 +1687,9 @@ function clampStateAFields(r: Record<string, unknown>): {
     valuationMessage: projectPublicWhyUsText(r.valuationMessage),
     welcomeLine: projectPublicWhyUsText(r.welcomeLine),
     sampleListingPhotoUrl: projectPublicWhyUsText(r.sampleListingPhotoUrl),
+    sampleListingPhotoFocalX: clampFocalPct(r.sampleListingPhotoFocalX),
+    sampleListingPhotoFocalY: clampFocalPct(r.sampleListingPhotoFocalY),
+    sampleListingPhotoScale: clampFocalZoom(r.sampleListingPhotoScale),
     sampleVideoUrl: projectPublicWhyUsText(r.sampleVideoUrl),
     sampleVideoPosterUrl: projectPublicWhyUsText(r.sampleVideoPosterUrl),
     // Pass 2b — re-clamp the lead emphasis to a known key on read; survives ONLY
@@ -1718,6 +1828,10 @@ function clampAgentBranding(raw: unknown): AgentBranding {
     photoFocalX: clampHeadshotPct(r.photoFocalX),
     photoFocalY: clampHeadshotPct(r.photoFocalY),
     photoScale: clampHeadshotScale(r.photoScale),
+    // Studio Profile — carry the scheduling link through the read boundary too,
+    // so the CTA blocks on a published page (/h, /why) can point at it. Empty/
+    // non-string drops to undefined (byte-identical when no link is set).
+    schedulingUrl: clampSchedulingUrl(r.schedulingUrl),
   };
 }
 
