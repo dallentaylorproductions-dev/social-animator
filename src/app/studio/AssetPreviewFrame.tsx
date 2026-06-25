@@ -42,7 +42,7 @@ import type { SegmentKey } from "@/lib/studio-profile/setup-state";
  *   Reach → ConfirmTime (the real contact / CTA block)
  *   Proof → TrustStrip (the real cream testimonial)
  *   Sell  → CampaignSpread (the real redesigned "How I'll get your home seen")
- *   Work  → CampaignSpread coverflow-only (the real recent-listings coverflow)
+ *   Work  → CampaignSpread (showcase media + the real recent-listings coverflow)
  *   Brand → AgentBand (accent CTA buttons + the logo lockup — color & logo plain)
  *
  * When a section has nothing to render yet (no contact / no proof), it flexes
@@ -83,8 +83,10 @@ export function AssetPreviewFrame({
     // The redesigned marketing zone (payload carries marketingZoneRedesign).
     body = <CampaignSpread payload={payload} />;
   } else if (asset === "work") {
-    // Just the exposure coverflow (recent listings, real reach).
-    body = <CampaignSpread payload={payload} variant="coverflow-only" />;
+    // Full marketing zone so EVERY field this step captures is visible: the
+    // sample photo/video in "the work" showcase AND the recent-listings
+    // coverflow (the redesigned zone renders both).
+    body = <CampaignSpread payload={payload} />;
   } else if (asset === "brand") {
     // The agent band — accent-colored CTA buttons + the logo lockup — so the
     // signature color AND the logo are both plainly visible as they change.

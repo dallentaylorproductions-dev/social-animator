@@ -62,6 +62,10 @@ import "./studio.css";
 type Screen = "intro" | SegmentKey | "clientready" | "launch";
 const STEP_ORDER: SegmentKey[] = ["you", "reach", "proof", "sell", "work", "brand"];
 const SAVE_ANIM_MS = 1100;
+/** Fallback attribution so the review preview renders from the body alone. */
+const DEFAULT_REVIEW_ATTRIBUTION = "A past client";
+/** Sample showcase image so "the work" tile is never blank before the agent uploads. */
+const SAMPLE_SHOWCASE_PHOTO = "/sample-assets/living-room.webp";
 
 /** Where each step advances after its commit. */
 const NEXT_SCREEN: Record<SegmentKey, Screen> = {
@@ -115,7 +119,7 @@ const STEP_FRAME: Record<
   sell: {
     eyebrow: "How you sell",
     title: "Show how you get homes seen.",
-    sub: "Your marketing approach and edge — reused in every page's marketing section.",
+    sub: "Your marketing approach and edge, reused in every page's marketing section.",
   },
   work: {
     eyebrow: "Recent work",
@@ -188,12 +192,44 @@ export function StudioProfileSetup({ ownerEmail }: { ownerEmail: string | null }
     [effective],
   );
 
-  // Live preview payload. marketingZoneRedesign=true so the How-you-sell preview
-  // shows the v1.7 redesigned marketing zone; for the Recent-work step, overlay
-  // the agent's OWN listings (the sample seeds the rest so nothing is empty).
+  // PREVIEW-ONLY normalization (never persisted, never touches the editor): make
+  // every preview render full from defaults/sample context so the agent always
+  // refines a real asset, never stares at a blank or a name-gated section.
+  const previewBrand = useMemo<BrandSettings>(() => {
+    let b = effective;
+    // #1 — render the review from its BODY alone: default the attribution when
+    // the name box is still empty (the projector drops a nameless review).
+    const rv = b.agentReviews?.[0];
+    if (rv?.body?.trim() && !rv.attributionName?.trim()) {
+      b = {
+        ...b,
+        agentReviews: [{ ...rv, attributionName: DEFAULT_REVIEW_ATTRIBUTION }],
+      };
+    }
+    // #4 — the marketing zone is never blank: default the 3 marketing points
+    // (so the cards + their icons render from the start) and feed a sample
+    // showcase image (so "the work" tile is populated, not a big empty space).
+    if (!b.whyUs || b.whyUs.marketingApproach.length === 0) {
+      b = {
+        ...b,
+        whyUs: {
+          ...(b.whyUs ?? (EMPTY_WHYUS as unknown as WhyUs)),
+          marketingApproach: defaultWhyUs().marketingApproach,
+        },
+      };
+    }
+    if (!b.sampleListingPhotoUrl) {
+      b = { ...b, sampleListingPhotoUrl: SAMPLE_SHOWCASE_PHOTO };
+    }
+    return b;
+  }, [effective]);
+
+  // Live preview payload. marketingZoneRedesign=true so the marketing-zone
+  // preview is the v1.7 redesigned one; for the Recent-work step, overlay the
+  // agent's OWN listings (the sample seeds the rest so nothing is empty).
   const basePayload = useMemo(
-    () => buildSamplePreviewPayload(effective, ownerEmail ?? "", true),
-    [effective, ownerEmail],
+    () => buildSamplePreviewPayload(previewBrand, ownerEmail ?? "", true),
+    [previewBrand, ownerEmail],
   );
   const previewPayload = useMemo(() => {
     // Carry the logo so the Brand-step AgentBand preview shows it in the global
@@ -213,13 +249,20 @@ export function StudioProfileSetup({ ownerEmail }: { ownerEmail: string | null }
     return payload;
   }, [basePayload, activeStep, effective.recentListings, effective.logoDataUrl]);
 
-  // Pre-populate the How-you-sell preview: the moment the step opens, seed the
-  // default "Why us" content (marketing approach etc.) so the preview renders a
-  // full marketing zone immediately — never blank-until-touched. Matches the
-  // Settings "arrives done" pattern; the agent edits rather than starts empty.
+  // Pre-populate the How-you-sell step: the moment it opens, seed the default
+  // marketing approach so the editor "arrives done" (3 cards to keep + edit) and
+  // a Save persists them. Seeds whenever marketing is empty (NOT gated on the
+  // whole whyUs), so a proof-point set earlier on the Proof step can't suppress
+  // it. Preserves any existing whyUs fields (e.g. that proof point).
   useEffect(() => {
-    if (screen === "sell" && !settings.whyUs && !overlay.whyUs) {
-      setOverlay((o) => ({ ...o, whyUs: defaultWhyUs() }));
+    if (screen !== "sell") return;
+    const cur = overlay.whyUs ?? settings.whyUs;
+    if (!cur || cur.marketingApproach.length === 0) {
+      const baseWhy = cur ?? (EMPTY_WHYUS as unknown as WhyUs);
+      setOverlay((o) => ({
+        ...o,
+        whyUs: { ...baseWhy, marketingApproach: defaultWhyUs().marketingApproach },
+      }));
     }
   }, [screen, settings.whyUs, overlay.whyUs]);
 
@@ -232,7 +275,7 @@ export function StudioProfileSetup({ ownerEmail }: { ownerEmail: string | null }
       const r = merged.agentReviews[0];
       const body = r.body.trim();
       merged.agentReviews = body
-        ? [{ ...r, body, attributionName: r.attributionName.trim() || "A recent seller" }]
+        ? [{ ...r, body, attributionName: r.attributionName.trim() || DEFAULT_REVIEW_ATTRIBUTION }]
         : undefined;
     }
     update(merged); // the reward commit → brand record (+ server autosave)
@@ -289,7 +332,7 @@ export function StudioProfileSetup({ ownerEmail }: { ownerEmail: string | null }
         <p className="sp-sub">
           Most agents finish in 5–8 minutes. Studio reuses these details across
           your seller pages, listing promos, follow-ups, and every new tool you
-          create later — so you never rebuild them per page.
+          create later, so you never rebuild them per page.
         </p>
         <ol className="sp-map" data-testid="sp-intro-map">
           {["You", "Reach", "Proof", "How you sell", "Recent work", "Brand"].map(
@@ -328,11 +371,11 @@ export function StudioProfileSetup({ ownerEmail }: { ownerEmail: string | null }
     return (
       <CenteredScreen testid="sp-clientready">
         <p className="sp-eyebrow">You&rsquo;re client-ready</p>
-        <h1 className="sp-title">Nice — you&rsquo;re client-ready.</h1>
+        <h1 className="sp-title">Nice. You&rsquo;re client-ready.</h1>
         <p className="sp-sub">
           Now let&rsquo;s make every page stronger. Three quick steps add your
-          marketing approach, recent work, and brand — the parts that fill a
-          page&rsquo;s biggest sections.
+          marketing approach, recent work, and brand (the parts that fill a
+          page&rsquo;s biggest sections).
         </p>
         <div className="sp-actions">
           <button
@@ -637,12 +680,14 @@ function ProofFields({
     });
   const base = effective.whyUs ?? (EMPTY_WHYUS as unknown as WhyUs);
   const proofPoint = base.differentiators?.[0] ?? "";
+  // Store RAW (no per-keystroke trim) so the spacebar isn't swallowed; the
+  // projector/load-clamp trims for display on the real page.
   const setProofPoint = (v: string) =>
     setField({
       whyUs: {
         ...base,
         differentiators: v.trim()
-          ? [v.trim(), ...base.differentiators.slice(1)]
+          ? [v, ...base.differentiators.slice(1)]
           : base.differentiators.slice(1),
       },
     });
@@ -735,7 +780,7 @@ function SellFields({
       <div className="sp-field">
         <span className="sp-label">What gets buyers in?</span>
         <p className="sp-hint">
-          Pick the angle you lead with — it becomes your page&rsquo;s
+          Pick the angle you lead with. It becomes your page&rsquo;s
           &ldquo;How I&rsquo;ll get your home seen&rdquo; headline.
         </p>
         <div className="sp-levers" data-testid="sp-levers">
@@ -757,7 +802,7 @@ function SellFields({
         {/* Label matches the prominent eyebrow the preview renders. */}
         <span className="sp-label">How I&rsquo;ll get your home seen</span>
         <p className="sp-hint">
-          Your {MARKETING_CAP} strongest marketing points — they appear under
+          Your {MARKETING_CAP} strongest marketing points. They appear under
           &ldquo;What&rsquo;s included&rdquo; on your page.
         </p>
         {points.map((p, i) => (
@@ -813,7 +858,7 @@ function SellFields({
           </button>
         ) : (
           <p className="sp-hint">
-            That&rsquo;s your {MARKETING_CAP} strongest — your page shows three.
+            That&rsquo;s your {MARKETING_CAP} strongest. Your page shows three.
           </p>
         )}
       </div>
@@ -833,7 +878,7 @@ function WorkFields({
       <div className="sp-field">
         <span className="sp-label">Sample listing photo (optional)</span>
         <p className="sp-hint">
-          Your best listing photography — it leads your &ldquo;How I&rsquo;ll get
+          Your best listing photography. It leads your &ldquo;How I&rsquo;ll get
           your home seen&rdquo; showcase.
         </p>
         <ImageUploadField
@@ -848,7 +893,7 @@ function WorkFields({
 
       <div className="sp-field">
         <span className="sp-label">Sample video tour (optional)</span>
-        <p className="sp-hint">A recent tour you produced — shown in the showcase.</p>
+        <p className="sp-hint">A recent tour you produced, shown in the showcase.</p>
         <VideoUploadField
           label="Sample video"
           value={effective.sampleVideoUrl ?? ""}
@@ -915,7 +960,7 @@ function BrandFields({
           previewAspect="aspect-[5/1]"
           previewFit="contain"
         />
-        <p className="sp-hint">Shown at its true size on your pages — never cropped.</p>
+        <p className="sp-hint">Shown at its true size on your pages, never cropped.</p>
       </div>
     </>
   );
