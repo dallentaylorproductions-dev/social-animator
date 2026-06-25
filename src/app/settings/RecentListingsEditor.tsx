@@ -2,6 +2,7 @@
 
 import { useEffect, useRef } from "react";
 import { ImageUploadField } from "@/components/ImageUploadField";
+import { PhotoFitControl } from "@/components/PhotoFitControl";
 import { NumberInput } from "@/components/inputs";
 import { useSPEntitlement } from "@/tools/seller-presentation/components/SPEntitlementContext";
 import { resolveCompCoverage } from "@/lib/seller-presentation/street-view";
@@ -203,85 +204,20 @@ export function RecentListingsEditor({
             />
 
             {enablePhotoPosition && listing.photoUrl && (
-              <div>
-                <label className="block text-[10px] uppercase tracking-[0.15em] text-neutral-500 mb-2">
-                  Photo position
-                </label>
-                <div className="flex gap-3 items-start">
-                  {/* WYSIWYG preview in the SAME 3:4 the coverflow card uses;
-                      click to set the focal point, drag the slider to zoom. */}
-                  <button
-                    type="button"
-                    onClick={(e) => {
-                      const rect = e.currentTarget.getBoundingClientRect();
-                      const x = Math.round(
-                        ((e.clientX - rect.left) / rect.width) * 100,
-                      );
-                      const y = Math.round(
-                        ((e.clientY - rect.top) / rect.height) * 100,
-                      );
-                      patch(idx, {
-                        photoFocalX: Math.min(100, Math.max(0, x)),
-                        photoFocalY: Math.min(100, Math.max(0, y)),
-                      });
-                    }}
-                    aria-label="Click where the home is to position the photo"
-                    data-testid={`brand-listing-pos-${idx}`}
-                    className="relative aspect-[3/4] w-20 shrink-0 cursor-crosshair overflow-hidden rounded-md border border-neutral-800"
-                  >
-                    {/* eslint-disable-next-line @next/next/no-img-element */}
-                    <img
-                      src={listing.photoUrl}
-                      alt=""
-                      draggable={false}
-                      className="absolute inset-0 h-full w-full object-cover"
-                      style={{
-                        objectPosition: `${listing.photoFocalX ?? 50}% ${listing.photoFocalY ?? 50}%`,
-                        transform:
-                          (listing.photoScale ?? 1) > 1
-                            ? `scale(${listing.photoScale})`
-                            : undefined,
-                        transformOrigin: `${listing.photoFocalX ?? 50}% ${listing.photoFocalY ?? 50}%`,
-                      }}
-                    />
-                  </button>
-                  <div className="flex-1">
-                    <label className="block text-[10px] uppercase tracking-[0.15em] text-neutral-500 mb-1">
-                      Zoom
-                    </label>
-                    <input
-                      type="range"
-                      min="1"
-                      max="2"
-                      step="0.05"
-                      value={listing.photoScale ?? 1}
-                      onChange={(e) => {
-                        const v = parseFloat(e.target.value);
-                        patch(idx, { photoScale: v > 1 ? v : undefined });
-                      }}
-                      data-testid={`brand-listing-zoom-${idx}`}
-                      className="w-full"
-                    />
-                    <button
-                      type="button"
-                      onClick={() =>
-                        patch(idx, {
-                          photoFocalX: undefined,
-                          photoFocalY: undefined,
-                          photoScale: undefined,
-                        })
-                      }
-                      data-testid={`brand-listing-pos-reset-${idx}`}
-                      className="mt-1 text-[11px] text-neutral-500 hover:text-neutral-200"
-                    >
-                      Center
-                    </button>
-                    <p className="mt-1 text-[11px] text-neutral-600 leading-relaxed">
-                      Click the photo where the home is, and zoom to fill the card.
-                    </p>
-                  </div>
-                </div>
-              </div>
+              <PhotoFitControl
+                photoUrl={listing.photoUrl}
+                focalX={listing.photoFocalX}
+                focalY={listing.photoFocalY}
+                scale={listing.photoScale}
+                testIdPrefix={`brand-listing-${idx}`}
+                onChange={(p) =>
+                  patch(idx, {
+                    ...("focalX" in p ? { photoFocalX: p.focalX } : {}),
+                    ...("focalY" in p ? { photoFocalY: p.focalY } : {}),
+                    ...("scale" in p ? { photoScale: p.scale } : {}),
+                  })
+                }
+              />
             )}
 
             <div>

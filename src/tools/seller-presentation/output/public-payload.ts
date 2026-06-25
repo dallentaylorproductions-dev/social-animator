@@ -190,6 +190,10 @@ export interface BrandWhyUsInput {
   valuationMessage?: string;
   welcomeLine?: string;
   sampleListingPhotoUrl?: string;
+  /** Sample-photo display framing for the marketing-zone showcase: object-position % (0–100) + 1.0–2.0 zoom. */
+  sampleListingPhotoFocalX?: number;
+  sampleListingPhotoFocalY?: number;
+  sampleListingPhotoScale?: number;
   sampleVideoUrl?: string;
   sampleVideoPosterUrl?: string;
   /**
@@ -475,6 +479,10 @@ export interface PublicPayload {
   valuationMessage?: string;
   welcomeLine?: string;
   sampleListingPhotoUrl?: string;
+  /** Sample-photo display framing for the marketing-zone showcase: object-position % (0–100) + 1.0–2.0 zoom. */
+  sampleListingPhotoFocalX?: number;
+  sampleListingPhotoFocalY?: number;
+  sampleListingPhotoScale?: number;
   sampleVideoUrl?: string;
   sampleVideoPosterUrl?: string;
   /**
@@ -1302,6 +1310,16 @@ export function toPublicPayload(
   const projectedSampleListingPhotoUrl = projectPublicWhyUsText(
     brandWhyUs.sampleListingPhotoUrl,
   );
+  // Sample-photo framing: focal % [0,100] + zoom [1,2]; out-of-range drops.
+  const projectedSampleListingPhotoFocalX = clampFocalPct(
+    brandWhyUs.sampleListingPhotoFocalX,
+  );
+  const projectedSampleListingPhotoFocalY = clampFocalPct(
+    brandWhyUs.sampleListingPhotoFocalY,
+  );
+  const projectedSampleListingPhotoScale = clampFocalZoom(
+    brandWhyUs.sampleListingPhotoScale,
+  );
   const projectedSampleVideoUrl = projectPublicWhyUsText(
     brandWhyUs.sampleVideoUrl,
   );
@@ -1336,6 +1354,9 @@ export function toPublicPayload(
           valuationMessage: projectedValuationMessage,
           welcomeLine: projectedWelcomeLine,
           sampleListingPhotoUrl: projectedSampleListingPhotoUrl,
+          sampleListingPhotoFocalX: projectedSampleListingPhotoFocalX,
+          sampleListingPhotoFocalY: projectedSampleListingPhotoFocalY,
+          sampleListingPhotoScale: projectedSampleListingPhotoScale,
           sampleVideoUrl: projectedSampleVideoUrl,
           sampleVideoPosterUrl: projectedSampleVideoPosterUrl,
           // Pass 2b lead emphasis — clamped to a known lever key (undefined drops
@@ -1591,6 +1612,19 @@ function clampValuationRange(raw: unknown): PublicValuationRange | undefined {
   return { low, high, points };
 }
 
+/** Sample-photo focal percentage [0,100]; anything else → undefined (centered). */
+function clampFocalPct(v: unknown): number | undefined {
+  return typeof v === "number" && Number.isFinite(v) && v >= 0 && v <= 100
+    ? v
+    : undefined;
+}
+/** Sample-photo zoom [1,2]; anything else → undefined (no zoom). */
+function clampFocalZoom(v: unknown): number | undefined {
+  return typeof v === "number" && Number.isFinite(v) && v >= 1 && v <= 2
+    ? v
+    : undefined;
+}
+
 /**
  * Seller State A — read-boundary clamp for the prepared-invitation fields. The
  * status is coerced first; the appointment + every State A copy/asset field
@@ -1605,6 +1639,10 @@ function clampStateAFields(r: Record<string, unknown>): {
   valuationMessage?: string;
   welcomeLine?: string;
   sampleListingPhotoUrl?: string;
+  /** Sample-photo display framing for the marketing-zone showcase: object-position % (0–100) + 1.0–2.0 zoom. */
+  sampleListingPhotoFocalX?: number;
+  sampleListingPhotoFocalY?: number;
+  sampleListingPhotoScale?: number;
   sampleVideoUrl?: string;
   sampleVideoPosterUrl?: string;
   leadEmphasis?: LeadEmphasisKey;
@@ -1618,6 +1656,9 @@ function clampStateAFields(r: Record<string, unknown>): {
     valuationMessage: projectPublicWhyUsText(r.valuationMessage),
     welcomeLine: projectPublicWhyUsText(r.welcomeLine),
     sampleListingPhotoUrl: projectPublicWhyUsText(r.sampleListingPhotoUrl),
+    sampleListingPhotoFocalX: clampFocalPct(r.sampleListingPhotoFocalX),
+    sampleListingPhotoFocalY: clampFocalPct(r.sampleListingPhotoFocalY),
+    sampleListingPhotoScale: clampFocalZoom(r.sampleListingPhotoScale),
     sampleVideoUrl: projectPublicWhyUsText(r.sampleVideoUrl),
     sampleVideoPosterUrl: projectPublicWhyUsText(r.sampleVideoPosterUrl),
     // Pass 2b — re-clamp the lead emphasis to a known key on read; survives ONLY

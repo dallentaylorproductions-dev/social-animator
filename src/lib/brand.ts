@@ -130,6 +130,15 @@ export interface BrandSettings {
    * the video frame can render a concrete poster.
    */
   sampleListingPhotoUrl?: string;
+  /**
+   * Studio Profile — display framing for the sample listing photo on the
+   * marketing-zone "the work" showcase (the same fit pattern as the recent-
+   * listing cards): object-position % (0–100, default 50) + a 1.0–2.0 zoom. The
+   * image bytes are never altered. All optional; unset = centered, no zoom.
+   */
+  sampleListingPhotoFocalX?: number;
+  sampleListingPhotoFocalY?: number;
+  sampleListingPhotoScale?: number;
   sampleVideoUrl?: string;
   sampleVideoPosterUrl?: string;
   /**
@@ -511,6 +520,10 @@ export function loadBrandSettings(): BrandSettings {
         parsed.sampleListingPhotoUrl.length > 0
           ? parsed.sampleListingPhotoUrl
           : undefined,
+      // Studio Profile — sample-photo framing (reuse the headshot clamps).
+      sampleListingPhotoFocalX: clampStoredPct(parsed.sampleListingPhotoFocalX),
+      sampleListingPhotoFocalY: clampStoredPct(parsed.sampleListingPhotoFocalY),
+      sampleListingPhotoScale: clampStoredScale(parsed.sampleListingPhotoScale),
       sampleVideoUrl:
         typeof parsed.sampleVideoUrl === "string" &&
         parsed.sampleVideoUrl.length > 0

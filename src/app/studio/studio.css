@@ -202,6 +202,46 @@
   margin-top: 22px;
 }
 
+/* ── client-ready milestone (elevated reward) ──────────────────────────── */
+.sp-card--milestone {
+  border-color: var(--sp-mint-line);
+  box-shadow:
+    inset 0 0 0 1px var(--sp-mint-line),
+    0 28px 70px -28px rgba(0, 0, 0, 0.7),
+    0 0 60px -20px rgba(70, 222, 194, 0.25);
+  padding-top: 44px;
+}
+.sp-seal {
+  display: inline-flex;
+  align-items: center;
+  justify-content: center;
+  width: 56px;
+  height: 56px;
+  border-radius: 50%;
+  background: var(--sp-mint-soft);
+  border: 1.5px solid var(--sp-mint);
+  color: var(--sp-mint);
+  font-size: 26px;
+  line-height: 1;
+  margin-bottom: 22px;
+}
+
+/* ── proof extras (Years / One proof point), always visible ────────────── */
+.sp-extras {
+  margin-top: 6px;
+  border-top: 1px solid var(--sp-hairline);
+  padding-top: 16px;
+  display: flex;
+  flex-direction: column;
+  gap: 14px;
+}
+.sp-extras__head {
+  font-size: 13px;
+  font-weight: 600;
+  color: var(--sp-muted);
+  margin: 0;
+}
+
 /* ── lead-emphasis levers (How you sell) ───────────────────────────────── */
 .sp-levers {
   display: flex;

@@ -18,6 +18,7 @@ import { RecentListingsEditor } from "@/app/settings/RecentListingsEditor";
 import { PhoneInput } from "@/components/inputs/PhoneInput";
 import { ImageUploadField } from "@/components/ImageUploadField";
 import { VideoUploadField } from "@/components/VideoUploadField";
+import { PhotoFitControl } from "@/components/PhotoFitControl";
 import { buildSamplePreviewPayload } from "@/lib/onboarding/sample-listing-draft";
 import { emitStudioEvent, STUDIO_EVENTS } from "@/lib/studio-profile/funnel";
 import {
@@ -181,6 +182,15 @@ export function StudioProfileSetup({ ownerEmail }: { ownerEmail: string | null }
   useEffect(() => {
     if (activeStep) emitStudioEvent(STUDIO_EVENTS.stepEntered, { step: activeStep });
   }, [activeStep]);
+
+  // Auto-scroll the newly-active section into view on every screen change
+  // (advance / Back / rail-jump / continue beat), so the agent is never left
+  // looking at the wrong part of the console after changing steps. Smooth on
+  // desktop; reduced-motion jumps instead of animating.
+  useEffect(() => {
+    if (typeof window === "undefined") return;
+    window.scrollTo({ top: 0, behavior: reducedMotion ? "auto" : "smooth" });
+  }, [screen, reducedMotion]);
 
   const setField = (patch: Partial<BrandSettings>) =>
     setOverlay((o) => ({ ...o, ...patch }));
@@ -367,15 +377,17 @@ export function StudioProfileSetup({ ownerEmail }: { ownerEmail: string | null }
   }
 
   if (screen === "clientready") {
-    // A brief calm CONTINUE beat — ONE forward action, no fork, no off-ramp.
+    // An earned MILESTONE, then a single forward action. No fork, no off-ramp.
     return (
-      <CenteredScreen testid="sp-clientready">
-        <p className="sp-eyebrow">You&rsquo;re client-ready</p>
-        <h1 className="sp-title">Nice. You&rsquo;re client-ready.</h1>
+      <CenteredScreen testid="sp-clientready" milestone>
+        <span className="sp-seal" data-testid="sp-seal" aria-hidden="true">
+          ✓
+        </span>
+        <p className="sp-eyebrow">Milestone</p>
+        <h1 className="sp-title">You&rsquo;re client-ready.</h1>
         <p className="sp-sub">
-          Now let&rsquo;s make every page stronger. Three quick steps add your
-          marketing approach, recent work, and brand (the parts that fill a
-          page&rsquo;s biggest sections).
+          Your seller page now has you, a way to reach you, and proof sellers can
+          trust. A few more steps make every page stronger.
         </p>
         <div className="sp-actions">
           <button
@@ -385,14 +397,6 @@ export function StudioProfileSetup({ ownerEmail }: { ownerEmail: string | null }
             onClick={() => setScreen("sell")}
           >
             Keep going
-          </button>
-          <button
-            type="button"
-            className="sp-btn sp-btn--ghost"
-            data-testid="sp-clientready-back"
-            onClick={() => goTo("proof")}
-          >
-            Back
           </button>
         </div>
         <p className="sp-reassure">{REASSURANCE}</p>
@@ -695,7 +699,7 @@ function ProofFields({
   return (
     <>
       <div className="sp-field">
-        <span className="sp-label">Paste a review</span>
+        <span className="sp-label">Paste a review (recommended)</span>
         <p className="sp-hint">A few words a past seller gave you.</p>
         <textarea
           className="sp-input sp-textarea"
@@ -724,8 +728,10 @@ function ProofFields({
         />
       </div>
 
-      <details className="sp-fallback" data-testid="sp-proof-fallbacks">
-        <summary>Can&rsquo;t paste a review? Add one of these instead.</summary>
+      {/* Always visible (not collapsed): the review is primary, and these add to
+          it. Both optional. */}
+      <div className="sp-extras" data-testid="sp-proof-extras">
+        <p className="sp-extras__head">Add these too (optional)</p>
         <label className="sp-field">
           <span className="sp-label">Years of experience</span>
           <input
@@ -751,7 +757,7 @@ function ProofFields({
             onChange={(e) => setProofPoint(e.target.value)}
           />
         </label>
-      </details>
+      </div>
     </>
   );
 }
@@ -884,11 +890,35 @@ function WorkFields({
         <ImageUploadField
           label="Sample photo"
           value={effective.sampleListingPhotoUrl ?? ""}
-          onChange={(url) => setField({ sampleListingPhotoUrl: url || undefined })}
+          onChange={(url) =>
+            setField({
+              sampleListingPhotoUrl: url || undefined,
+              // A new photo starts centered.
+              sampleListingPhotoFocalX: undefined,
+              sampleListingPhotoFocalY: undefined,
+              sampleListingPhotoScale: undefined,
+            })
+          }
           folder="agent-sample-photo"
           testIdPrefix="sp-sample-photo"
           previewAspect="aspect-[4/3]"
         />
+        {effective.sampleListingPhotoUrl && (
+          <PhotoFitControl
+            photoUrl={effective.sampleListingPhotoUrl}
+            focalX={effective.sampleListingPhotoFocalX}
+            focalY={effective.sampleListingPhotoFocalY}
+            scale={effective.sampleListingPhotoScale}
+            testIdPrefix="sp-sample-photo"
+            onChange={(p) =>
+              setField({
+                ...("focalX" in p ? { sampleListingPhotoFocalX: p.focalX } : {}),
+                ...("focalY" in p ? { sampleListingPhotoFocalY: p.focalY } : {}),
+                ...("scale" in p ? { sampleListingPhotoScale: p.scale } : {}),
+              })
+            }
+          />
+        )}
       </div>
 
       <div className="sp-field">
@@ -971,13 +1001,17 @@ function BrandFields({
 function CenteredScreen({
   children,
   testid,
+  milestone = false,
 }: {
   children: React.ReactNode;
   testid: string;
+  milestone?: boolean;
 }) {
   return (
     <div className="sp sp--centered" data-testid={testid}>
-      <div className="sp-card">{children}</div>
+      <div className={`sp-card${milestone ? " sp-card--milestone" : ""}`}>
+        {children}
+      </div>
     </div>
   );
 }

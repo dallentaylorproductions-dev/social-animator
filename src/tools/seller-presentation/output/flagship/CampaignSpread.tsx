@@ -1,3 +1,4 @@
+import type { CSSProperties } from "react";
 import type { PublicPayload, PublicRecentListing } from "../public-payload";
 import {
   streetViewStaticUrl,
@@ -58,7 +59,29 @@ type Frame = {
   sub?: string;
   image?: string;
   kind: "photo" | "asset";
+  /** Display framing for the image (object/background-position % + zoom). */
+  focalX?: number;
+  focalY?: number;
+  scale?: number;
 };
+
+/**
+ * Background style for a frame's image, applying its display framing (position +
+ * zoom). No framing set → just the image, byte-identical to before.
+ */
+function frameBgStyle(f: Frame): CSSProperties {
+  const style: CSSProperties = {
+    backgroundImage: `url("${(f.image ?? "").replace(/"/g, '\\"')}")`,
+  };
+  if (typeof f.focalX === "number" || typeof f.focalY === "number") {
+    style.backgroundPosition = `${f.focalX ?? 50}% ${f.focalY ?? 50}%`;
+  }
+  if (typeof f.scale === "number" && f.scale > 1) {
+    style.transform = `scale(${f.scale})`;
+    style.transformOrigin = `${f.focalX ?? 50}% ${f.focalY ?? 50}%`;
+  }
+  return style;
+}
 
 /**
  * `variant`:
@@ -93,6 +116,9 @@ export function CampaignSpread({
       sub: CAPABILITY_PHOTO_SUB,
       image: samplePhoto,
       kind: "photo",
+      focalX: payload.sampleListingPhotoFocalX,
+      focalY: payload.sampleListingPhotoFocalY,
+      scale: payload.sampleListingPhotoScale,
     });
   }
 
@@ -185,6 +211,9 @@ export function CampaignSpread({
         sub: CAPABILITY_PHOTO_SUB,
         image: samplePhoto,
         kind: "photo",
+        focalX: payload.sampleListingPhotoFocalX,
+        focalY: payload.sampleListingPhotoFocalY,
+        scale: payload.sampleListingPhotoScale,
       });
     }
     if (sampleVideo) {
@@ -522,9 +551,7 @@ function SpreadFrame({ frame, lead = false }: { frame: Frame; lead?: boolean }) 
              hello lives in the hero, not this spread. */
           className="sa-frame__photo"
           aria-hidden="true"
-          style={{
-            backgroundImage: `url("${frame.image.replace(/"/g, '\\"')}")`,
-          }}
+          style={frameBgStyle(frame)}
         />
       )}
       <div className="sa-frame__cap">
@@ -576,9 +603,7 @@ function WorkShowcase({ frames }: { frames: Frame[] }) {
                 <span
                   className="sa-work__photo"
                   aria-hidden="true"
-                  style={{
-                    backgroundImage: `url("${f.image.replace(/"/g, '\\"')}")`,
-                  }}
+                  style={frameBgStyle(f)}
                 />
               )}
               <figcaption className="sa-work__band">
