@@ -2,7 +2,7 @@
 
 import { useEffect, useRef } from "react";
 import { ImageUploadField } from "@/components/ImageUploadField";
-import { PhotoFitControl } from "@/components/PhotoFitControl";
+import { ListingPhotoCrop } from "@/components/ListingPhotoCrop";
 import { NumberInput } from "@/components/inputs";
 import { useSPEntitlement } from "@/tools/seller-presentation/components/SPEntitlementContext";
 import { resolveCompCoverage } from "@/lib/seller-presentation/street-view";
@@ -40,6 +40,7 @@ export function RecentListingsEditor({
   listings,
   onChange,
   enablePhotoPosition = false,
+  onAdd,
 }: {
   listings: SettingsRecentListing[];
   onChange: (next: SettingsRecentListing[]) => void;
@@ -49,6 +50,12 @@ export function RecentListingsEditor({
    * "Recent work" step passes true.
    */
   enablePhotoPosition?: boolean;
+  /**
+   * Studio Profile opt-in: fired after "+ Add a listing" appends a new slot, so
+   * the host can scroll its live preview to the listings section (item 5a). The
+   * /settings usage omits it — byte-identical.
+   */
+  onAdd?: () => void;
 }) {
   const { compPhotosEnabled } = useSPEntitlement();
   const atCap = listings.length >= RECENT_LISTINGS_CAP;
@@ -67,6 +74,7 @@ export function RecentListingsEditor({
   const add = () => {
     if (atCap) return;
     onChange([...listings, emptyRecentListing()]);
+    onAdd?.();
   };
 
   // Street View fallback resolver. Mirrors StepNearbySales exactly: only rows
@@ -204,11 +212,12 @@ export function RecentListingsEditor({
             />
 
             {enablePhotoPosition && listing.photoUrl && (
-              <PhotoFitControl
+              <ListingPhotoCrop
                 photoUrl={listing.photoUrl}
                 focalX={listing.photoFocalX}
                 focalY={listing.photoFocalY}
                 scale={listing.photoScale}
+                aspect={3 / 4}
                 testIdPrefix={`brand-listing-${idx}`}
                 onChange={(p) =>
                   patch(idx, {

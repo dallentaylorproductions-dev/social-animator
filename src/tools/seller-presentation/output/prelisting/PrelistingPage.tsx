@@ -2,6 +2,7 @@ import type { CSSProperties } from "react";
 import type { HandoutRecord } from "@/lib/share-urls";
 import {
   clampPrelistingPayload,
+  schedulingLinkHref,
   type AgentBranding,
   type PublicPayload,
   type StandalonePrelistingPayload,
@@ -88,11 +89,17 @@ export function PrelistingPage({ record }: { record: HandoutRecord }) {
 function PrelistingCta({ agent }: { agent: AgentBranding }) {
   const email = agent.email?.trim();
   const phone = agent.phone?.replace(/[^0-9+]/g, "");
-  if (!email && !phone) return null;
+  // Studio Profile — a scheduling link is the most direct close, so the single
+  // "Schedule a listing consultation" button points at it when set; otherwise
+  // the existing email-then-phone preference is byte-identical.
+  const schedule = schedulingLinkHref(agent.schedulingUrl);
+  if (!email && !phone && !schedule) return null;
 
-  const href = email
-    ? `mailto:${email}?subject=${encodeURIComponent("Listing consultation")}`
-    : `tel:${phone}`;
+  const href = schedule
+    ? schedule
+    : email
+      ? `mailto:${email}?subject=${encodeURIComponent("Listing consultation")}`
+      : `tel:${phone}`;
 
   return (
     <section className="pl-cta fs-block" data-testid="pl-cta">
@@ -108,6 +115,7 @@ function PrelistingCta({ agent }: { agent: AgentBranding }) {
           <a
             className="fs-btn-primary reveal"
             href={href}
+            {...(schedule ? { target: "_blank", rel: "noopener noreferrer" } : {})}
             data-testid="pl-cta-primary"
           >
             Schedule a listing consultation

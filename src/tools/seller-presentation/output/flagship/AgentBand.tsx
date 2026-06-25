@@ -1,4 +1,8 @@
-import type { AgentBranding, PublicPayload } from "../public-payload";
+import {
+  schedulingLinkHref,
+  type AgentBranding,
+  type PublicPayload,
+} from "../public-payload";
 
 /**
  * §06 · Your agent (footer) — DARK beat, ported from the prototype's
@@ -105,7 +109,7 @@ export function AgentBand({
         (a.ctaReassurance ? (
           <div className="agent__note">{a.ctaReassurance}</div>
         ) : (
-          (a.email || a.phone) && (
+          (a.email || a.phone || a.schedulingUrl?.trim()) && (
             <div className="agent__note">No pressure, reach out anytime.</div>
           )
         ))}
@@ -222,16 +226,51 @@ function Avatar({
 function AgentCtas({ agent, first }: { agent: AgentBranding; first: string }) {
   const phone = agent.phone?.replace(/[^0-9+]/g, "");
   const email = agent.email;
-  if (!phone && !email) return null;
+  // Studio Profile — when the agent set a scheduling link, "Schedule a listing
+  // call" points at it (a Calendly/Cal.com link IS the way to schedule), and
+  // email/phone fall in behind it as additional reach. Without a link the primary
+  // stays the mailto labeled "Schedule a listing call" — byte-identical to before.
+  const schedule = schedulingLinkHref(agent.schedulingUrl);
+  if (!phone && !email && !schedule) return null;
   return (
     <div className="agent__cta reveal">
-      {email && (
+      {schedule ? (
         <a
           className="btn btn--primary"
-          href={`mailto:${email}?subject=${encodeURIComponent("Listing call")}`}
-          data-testid="fs-cta-primary"
+          href={schedule}
+          target="_blank"
+          rel="noopener noreferrer"
+          data-testid="fs-cta-schedule"
         >
           <span className="btn__lbl">Schedule a listing call</span>{" "}
+          <span className="ar" aria-hidden="true">
+            →
+          </span>
+        </a>
+      ) : (
+        email && (
+          <a
+            className="btn btn--primary"
+            href={`mailto:${email}?subject=${encodeURIComponent("Listing call")}`}
+            data-testid="fs-cta-primary"
+          >
+            <span className="btn__lbl">Schedule a listing call</span>{" "}
+            <span className="ar" aria-hidden="true">
+              →
+            </span>
+          </a>
+        )
+      )}
+      {/* With a scheduling link present, email becomes a quiet additional action
+          ("Email {first}") so the schedule button owns the primary "Schedule"
+          slot without a duplicate label. */}
+      {schedule && email && (
+        <a
+          className="btn btn--ghost"
+          href={`mailto:${email}?subject=${encodeURIComponent("Listing call")}`}
+          data-testid="fs-cta-email"
+        >
+          <span className="btn__lbl">Email {first}</span>{" "}
           <span className="ar" aria-hidden="true">
             →
           </span>

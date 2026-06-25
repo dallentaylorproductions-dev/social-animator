@@ -1,6 +1,10 @@
 import type { CSSProperties } from "react";
 import type { HandoutRecord } from "@/lib/share-urls";
-import { clampPublicPayload, type PublicPayload } from "../public-payload";
+import {
+  clampPublicPayload,
+  schedulingLinkHref,
+  type PublicPayload,
+} from "../public-payload";
 import { consumerRoleVars, deriveConsumerRoles } from "../consumer-roles";
 import { PresentationPageMotion } from "../motion";
 import {
@@ -525,7 +529,10 @@ export function ConfirmTime({ payload, appt }: { payload: PublicPayload; appt: A
   const email = a.email?.trim();
   const phone = a.phone?.trim();
   const telHref = phone ? phone.replace(/[^0-9+]/g, "") : "";
-  if (!email && !phone) return null;
+  // Studio Profile — the scheduling link surfaces as a "Schedule a listing call"
+  // action alongside the existing confirm/call actions. Absent → byte-identical.
+  const schedule = schedulingLinkHref(a.schedulingUrl);
+  if (!email && !phone && !schedule) return null;
 
   const first = a.name?.trim().split(/\s+/)[0];
   const subject = appt
@@ -555,6 +562,17 @@ export function ConfirmTime({ payload, appt }: { payload: PublicPayload; appt: A
             data-testid="fs-sa-confirm-email"
           >
             Confirm our time
+          </a>
+        )}
+        {schedule && (
+          <a
+            className={`sa-cta__btn ${email ? "sa-cta__btn--ghost" : "sa-cta__btn--primary"}`}
+            href={schedule}
+            target="_blank"
+            rel="noopener noreferrer"
+            data-testid="fs-sa-confirm-schedule"
+          >
+            Schedule a listing call
           </a>
         )}
         {phone && (

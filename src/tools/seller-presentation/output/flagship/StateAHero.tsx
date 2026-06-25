@@ -128,14 +128,7 @@ function HeroAgent({ payload }: { payload: PublicPayload }) {
       {name && (
         <div className="sa-hero__who">
           {a.photoUrl ? (
-            <span
-              className="sa-hero__avatar"
-              data-testid="fs-sa-hero-avatar"
-              style={{
-                backgroundImage: `url("${a.photoUrl.replace(/"/g, '\\"')}")`,
-              }}
-              aria-hidden="true"
-            />
+            <HeroAvatar agent={a} />
           ) : (
             <span className="sa-hero__avatar" data-monogram={monogram}>
               {monogram}
@@ -163,5 +156,57 @@ function HeroAgent({ payload }: { payload: PublicPayload }) {
         </p>
       )}
     </div>
+  );
+}
+
+/**
+ * The hero headshot avatar. Default = a plain centered `cover` photo (byte-
+ * identical to the pre-fix avatar). REPOSITIONED (off-center focal OR zoom) =
+ * an inner clip whose background-position maps the focal point and whose scale
+ * is anchored at the focal point — a pure DISPLAY transform (image bytes
+ * untouched), mirroring the agent-band `Avatar` so the agent's headshot crop
+ * renders IDENTICALLY here as it does on the agent band and in the Studio
+ * preview. (Previously the hero ignored focal/scale, so a cropped headshot
+ * showed uncropped on the State-A hero.)
+ */
+function HeroAvatar({ agent }: { agent: PublicPayload["agent"] }) {
+  const photoUrl = agent.photoUrl!;
+  const fx = typeof agent.photoFocalX === "number" ? agent.photoFocalX : 50;
+  const fy = typeof agent.photoFocalY === "number" ? agent.photoFocalY : 50;
+  const scale = typeof agent.photoScale === "number" ? agent.photoScale : 1;
+  const bg = `url("${photoUrl.replace(/"/g, '\\"')}")`;
+  const repositioned = fx !== 50 || fy !== 50 || scale > 1;
+
+  if (!repositioned) {
+    return (
+      <span
+        className="sa-hero__avatar"
+        data-testid="fs-sa-hero-avatar"
+        style={{ backgroundImage: bg }}
+        aria-hidden="true"
+      />
+    );
+  }
+  return (
+    <span
+      className="sa-hero__avatar"
+      data-testid="fs-sa-hero-avatar"
+      style={{ position: "relative", overflow: "hidden" }}
+      aria-hidden="true"
+    >
+      <span
+        data-testid="fs-sa-hero-avatar-img"
+        style={{
+          position: "absolute",
+          inset: 0,
+          backgroundImage: bg,
+          backgroundSize: "cover",
+          backgroundPosition: `${fx}% ${fy}%`,
+          ...(scale > 1
+            ? { transform: `scale(${scale})`, transformOrigin: `${fx}% ${fy}%` }
+            : null),
+        }}
+      />
+    </span>
   );
 }

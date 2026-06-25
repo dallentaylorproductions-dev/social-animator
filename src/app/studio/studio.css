@@ -16,9 +16,13 @@
  */
 
 .sp {
-  --sp-page: #0c120f; /* console / page bg */
-  --sp-panel: #151c18; /* rail + cards */
-  --sp-panel-active: #13201b; /* active step / segment */
+  /* Item 11 — four distinguishable tonal zones (page · rail · editor · stage),
+     so the composition has depth without any glow (calm ≠ flat). */
+  --sp-page: #0b110e; /* base page bg */
+  --sp-rail: #0f1714; /* the quiet orientation rail */
+  --sp-stage: #101a16; /* the preview "stage" surround (the precious object) */
+  --sp-panel: #151c18; /* centered cards (intro / milestone / launch) */
+  --sp-panel-active: #16241e; /* active step / segment */
   --sp-hairline: rgba(255, 255, 255, 0.07);
   --sp-hairline-strong: rgba(255, 255, 255, 0.14);
   --sp-input-bg: #101713;
@@ -30,30 +34,96 @@
   --sp-on-mint: #06231c;
   --sp-mint-soft: rgba(70, 222, 194, 0.12);
   --sp-mint-line: rgba(70, 222, 194, 0.35);
+  /* Item 11 — one 4/8px-based spacing scale used across all three panes. */
+  --sp-topbar-h: 56px;
+  --sp-gutter: 32px;
   min-height: 100vh;
   background: var(--sp-page);
   color: var(--sp-ink);
   font-family: var(--font-inter, system-ui, sans-serif);
 }
-
-/* ── desktop three-panel console ───────────────────────────────────────── */
-.sp__console,
-.sp {
+.sp,
+.sp * {
   box-sizing: border-box;
 }
-.sp[data-testid="sp-console"] {
-  display: grid;
-  grid-template-columns: 1fr;
-  gap: 0;
+
+/* ── the console shell: a slim top chrome bar + the 3-column grid ───────── */
+.sp--console {
+  display: flex;
+  flex-direction: column;
+  min-height: 100vh;
 }
 
+.sp__topbar {
+  position: sticky;
+  top: 0;
+  z-index: 5;
+  display: flex;
+  align-items: center;
+  gap: 14px;
+  height: var(--sp-topbar-h);
+  padding: 0 20px;
+  border-bottom: 1px solid var(--sp-hairline);
+  background: color-mix(in srgb, var(--sp-page) 88%, transparent);
+  backdrop-filter: blur(10px);
+}
 @media (min-width: 960px) {
-  .sp[data-testid="sp-console"] {
-    grid-template-columns: 260px minmax(0, 1fr) minmax(0, 46%);
-    align-items: start;
-    max-width: 1320px;
+  .sp__topbar {
+    padding: 0 28px;
+  }
+}
+.sp__wordmark {
+  font-size: 15px;
+  font-weight: 600;
+  letter-spacing: 0.01em;
+  color: var(--sp-header);
+}
+.sp__wordmark em {
+  font-style: normal;
+  color: var(--sp-mint);
+}
+.sp__topbar-ctx {
+  display: flex;
+  align-items: center;
+  gap: 9px;
+}
+.sp__topbar-kicker {
+  text-transform: uppercase;
+  letter-spacing: 0.12em;
+  font-size: 11px;
+  font-weight: 600;
+  color: var(--sp-muted);
+}
+.sp__topbar-sep {
+  color: var(--sp-muted);
+  opacity: 0.5;
+}
+.sp__topbar-step {
+  font-size: 13px;
+  font-weight: 500;
+  color: var(--sp-ink);
+}
+.sp__topbar-count {
+  margin-left: auto;
+  font-size: 12px;
+  font-weight: 600;
+  color: var(--sp-muted);
+  font-variant-numeric: tabular-nums;
+}
+
+/* ── desktop three-panel grid ──────────────────────────────────────────── */
+.sp__grid {
+  display: grid;
+  grid-template-columns: 1fr;
+  flex: 1;
+}
+@media (min-width: 960px) {
+  .sp__grid {
+    grid-template-columns: 264px minmax(0, 1fr) 440px;
+    align-items: stretch;
+    width: 100%;
+    max-width: 1280px;
     margin: 0 auto;
-    min-height: 100vh;
   }
   .sp__bar {
     display: none;
@@ -65,13 +135,29 @@
 }
 @media (min-width: 960px) {
   .sp__rail {
-    display: block;
+    display: flex;
+    flex-direction: column;
+    justify-content: space-between;
+    gap: 24px;
     position: sticky;
-    top: 0;
-    padding: 40px 24px;
+    top: var(--sp-topbar-h);
+    height: calc(100vh - var(--sp-topbar-h));
+    padding: 40px 24px 28px;
     border-right: 1px solid var(--sp-hairline);
-    height: 100vh;
+    background: var(--sp-rail);
   }
+}
+.sp__rail-foot {
+  display: flex;
+  flex-direction: column;
+  gap: 12px;
+}
+.sp-rail-summary {
+  margin: 0;
+  font-size: 12px;
+  font-weight: 600;
+  letter-spacing: 0.02em;
+  color: var(--sp-muted);
 }
 
 .sp__bar {
@@ -84,9 +170,10 @@
 }
 @media (min-width: 960px) {
   .sp__center {
-    padding: 56px 40px;
-    justify-self: center;
+    padding: 48px 48px 64px;
+    justify-self: start;
     width: 100%;
+    max-width: 620px;
   }
 }
 
@@ -96,11 +183,30 @@
 @media (min-width: 960px) {
   .sp__preview {
     position: sticky;
-    top: 0;
-    padding: 40px 32px;
-    max-height: 100vh;
+    top: var(--sp-topbar-h);
+    height: calc(100vh - var(--sp-topbar-h));
+    display: flex;
+    justify-content: center;
+    align-items: flex-start;
+    padding: 48px 36px;
     overflow: auto;
+    background: var(--sp-stage);
+    border-left: 1px solid var(--sp-hairline);
   }
+}
+
+/* ── the preview "stage" — the precious object, evenly contained ─────────── */
+.sp__stage {
+  width: 100%;
+  max-width: 420px;
+}
+.sp__stage-eyebrow {
+  margin: 0 0 12px;
+  font-size: 11px;
+  font-weight: 600;
+  text-transform: uppercase;
+  letter-spacing: 0.14em;
+  color: var(--sp-muted);
 }
 
 /* ── typography + actions ──────────────────────────────────────────────── */
@@ -215,15 +321,69 @@
   display: inline-flex;
   align-items: center;
   justify-content: center;
-  width: 56px;
-  height: 56px;
+  width: 60px;
+  height: 60px;
   border-radius: 50%;
   background: var(--sp-mint-soft);
-  border: 1.5px solid var(--sp-mint);
   color: var(--sp-mint);
-  font-size: 26px;
   line-height: 1;
   margin-bottom: 22px;
+}
+.sp-seal__svg {
+  width: 36px;
+  height: 36px;
+  display: block;
+}
+.sp-seal__ring,
+.sp-seal__check {
+  fill: none;
+  stroke: var(--sp-mint);
+}
+.sp-seal__ring {
+  stroke-width: 2.5;
+  /* 2·π·r (r=24) ≈ 151 — the full ring length, hidden then drawn. */
+  stroke-dasharray: 151;
+  stroke-dashoffset: 151;
+}
+.sp-seal__check {
+  stroke-width: 3.5;
+  stroke-linecap: round;
+  stroke-linejoin: round;
+  stroke-dasharray: 40;
+  stroke-dashoffset: 40;
+}
+/* Item 4 — the earned MILESTONE entrance: the seal pops + the ring draws on, the
+   check strokes in as the hero moment, a one-time gentle mint glow settles, then
+   the eyebrow → headline → body → button → reassurance rise in a short stagger.
+   Calm and premium (not bouncy), plays ONCE on mount. */
+.sp-seal--anim {
+  animation:
+    sp-seal-pop 0.5s cubic-bezier(0.2, 0.8, 0.2, 1.1) both,
+    sp-seal-glow 1.1s ease-out 0.82s 1;
+}
+.sp-seal--anim .sp-seal__ring {
+  animation: sp-draw 0.62s ease-out 0.1s forwards;
+}
+.sp-seal--anim .sp-seal__check {
+  animation: sp-draw 0.34s ease-out 0.52s forwards;
+}
+.sp-ms {
+  animation: sp-ms-rise 0.55s cubic-bezier(0.2, 0.7, 0.2, 1) both;
+}
+.sp-ms--1 {
+  animation-delay: 0.64s;
+}
+.sp-ms--2 {
+  animation-delay: 0.74s;
+}
+.sp-ms--3 {
+  animation-delay: 0.84s;
+}
+.sp-ms--4 {
+  animation-delay: 0.94s;
+}
+.sp-ms--5 {
+  animation-delay: 1.04s;
 }
 
 /* ── proof extras (Years / One proof point), always visible ────────────── */
@@ -306,11 +466,51 @@
   color: var(--sp-mint);
 }
 
-/* ── brand color input ─────────────────────────────────────────────────── */
+/* ── signature color picker (approved validated-hex pattern, dark-themed) ── */
 .sp-color {
   display: flex;
   gap: 10px;
   align-items: center;
+  flex-wrap: wrap;
+}
+.sp-color__field {
+  display: flex;
+  gap: 8px;
+  align-items: center;
+  flex: 1;
+  min-width: 0;
+}
+.sp-color__hex--bad {
+  border-color: #e0786a;
+}
+.sp-color__hex--bad:focus {
+  box-shadow: 0 0 0 3px rgba(224, 120, 106, 0.18);
+}
+.sp-color__reset {
+  appearance: none;
+  background: none;
+  border: 1px solid var(--sp-hairline-strong);
+  border-radius: 8px;
+  color: var(--sp-ink);
+  font-size: 12px;
+  font-weight: 600;
+  padding: 8px 12px;
+  cursor: pointer;
+  flex: none;
+  transition: border-color 0.12s ease, color 0.12s ease;
+}
+.sp-color__reset:disabled {
+  opacity: 0.4;
+  cursor: not-allowed;
+}
+.sp-color__reset:not(:disabled):hover {
+  border-color: var(--sp-mint);
+  color: var(--sp-mint);
+}
+.sp-color__hint {
+  flex-basis: 100%;
+  font-size: 12px;
+  color: #e0a89a;
 }
 .sp-color__swatch {
   appearance: none;
@@ -620,29 +820,43 @@
 .sp-asset--saved {
   animation: sp-asset-pop 1s ease both;
 }
+/* ── destination bar — "one input → reused everywhere" (item 9) ──────────── */
 .sp-dest {
+  margin-top: 22px;
+  padding-top: 18px;
+  border-top: 1px solid var(--sp-hairline);
+}
+.sp-dest__label {
+  margin: 0 0 10px;
+  font-size: 11px;
+  font-weight: 600;
+  text-transform: uppercase;
+  letter-spacing: 0.12em;
+  color: var(--sp-muted);
+}
+.sp-dest__chips {
   display: flex;
-  gap: 8px;
-  margin-top: 16px;
   flex-wrap: wrap;
+  gap: 8px;
 }
 .sp-dest__chip {
   font-size: 12px;
   font-weight: 600;
-  padding: 5px 11px;
+  padding: 6px 12px;
   border-radius: 999px;
   border: 1px solid var(--sp-hairline-strong);
   color: var(--sp-muted);
-  background: var(--sp-panel);
+  background: rgba(255, 255, 255, 0.02);
 }
 .sp-dest__chip--active {
-  border-color: var(--sp-mint);
+  border-color: var(--sp-mint-line);
   color: var(--sp-mint);
   background: var(--sp-mint-soft);
 }
 .sp-dest__note {
-  margin: 8px 0 0;
-  font-size: 12px;
+  margin: 12px 0 0;
+  font-size: 12.5px;
+  line-height: 1.5;
   color: var(--sp-muted);
 }
 
@@ -668,12 +882,64 @@
     box-shadow: 0 26px 70px -34px rgba(0, 0, 0, 0.8);
   }
 }
+@keyframes sp-draw {
+  to {
+    stroke-dashoffset: 0;
+  }
+}
+@keyframes sp-seal-pop {
+  0% {
+    transform: scale(0.7);
+    opacity: 0;
+  }
+  55% {
+    opacity: 1;
+  }
+  100% {
+    transform: scale(1);
+    opacity: 1;
+  }
+}
+@keyframes sp-seal-glow {
+  0% {
+    box-shadow: 0 0 0 0 rgba(70, 222, 194, 0);
+  }
+  40% {
+    box-shadow: 0 0 0 9px rgba(70, 222, 194, 0.18);
+  }
+  100% {
+    box-shadow: 0 0 0 0 rgba(70, 222, 194, 0);
+  }
+}
+@keyframes sp-ms-rise {
+  from {
+    opacity: 0;
+    transform: translateY(8px);
+  }
+  to {
+    opacity: 1;
+    transform: none;
+  }
+}
 
 @media (prefers-reduced-motion: reduce) {
   .sp-asset--saved,
   .sp-toast,
-  .sp-btn {
+  .sp-btn,
+  .sp-ms,
+  .sp-seal--anim,
+  .sp-seal--anim .sp-seal__ring,
+  .sp-seal--anim .sp-seal__check {
     animation: none !important;
     transition: none !important;
+  }
+  /* No motion → the milestone simply APPEARS, fully drawn. */
+  .sp-ms {
+    opacity: 1 !important;
+    transform: none !important;
+  }
+  .sp-seal--anim .sp-seal__ring,
+  .sp-seal--anim .sp-seal__check {
+    stroke-dashoffset: 0 !important;
   }
 }

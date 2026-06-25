@@ -117,6 +117,14 @@ export interface AgentBranding {
   photoFocalY?: number;
   /** Display zoom (1.0–2.0). Absent / 1 ⇒ no zoom (byte-identical). */
   photoScale?: number;
+  /**
+   * Studio Profile — the agent's scheduling link (Calendly/Cal.com/etc.). When
+   * set, the contact/CTA block's "Schedule a listing call" action links here
+   * instead of the mailto, and email/phone remain as additional reach. Optional;
+   * an empty/blank value is dropped at projection, so a page with no scheduling
+   * link is byte-identical to a pre-Studio-Profile publish.
+   */
+  schedulingUrl?: string;
 }
 
 /**
@@ -973,7 +981,30 @@ function projectAgent(agent: AgentBranding): AgentBranding {
     photoFocalX: clampHeadshotPct(agent.photoFocalX),
     photoFocalY: clampHeadshotPct(agent.photoFocalY),
     photoScale: clampHeadshotScale(agent.photoScale),
+    // Studio Profile — emit only a non-empty trimmed link; blank/whitespace
+    // drops to undefined (JSON.stringify omits it), keeping no-link pages
+    // byte-identical to a pre-Studio-Profile publish.
+    schedulingUrl: clampSchedulingUrl(agent.schedulingUrl),
   };
+}
+
+/** Studio Profile — accept only a non-empty trimmed string; else undefined. */
+function clampSchedulingUrl(value: unknown): string | undefined {
+  if (typeof value !== "string") return undefined;
+  const trimmed = value.trim();
+  return trimmed.length > 0 ? trimmed : undefined;
+}
+
+/**
+ * Studio Profile — resolve a stored scheduling link to a safe href. Agents type
+ * it bare ("calendly.com/handle"), so prepend https:// when no scheme is present;
+ * mailto:/tel: pass through. Returns null for empty so the CTA flexes out.
+ */
+export function schedulingLinkHref(url: string | undefined): string | null {
+  const t = url?.trim();
+  if (!t) return null;
+  if (/^(https?:\/\/|mailto:|tel:)/i.test(t)) return t;
+  return `https://${t}`;
 }
 
 /** B0b — string coerce mirroring the whyus.ts boundary (non-strings → ""). */
@@ -1797,6 +1828,10 @@ function clampAgentBranding(raw: unknown): AgentBranding {
     photoFocalX: clampHeadshotPct(r.photoFocalX),
     photoFocalY: clampHeadshotPct(r.photoFocalY),
     photoScale: clampHeadshotScale(r.photoScale),
+    // Studio Profile — carry the scheduling link through the read boundary too,
+    // so the CTA blocks on a published page (/h, /why) can point at it. Empty/
+    // non-string drops to undefined (byte-identical when no link is set).
+    schedulingUrl: clampSchedulingUrl(r.schedulingUrl),
   };
 }
 
