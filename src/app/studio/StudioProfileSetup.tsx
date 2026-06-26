@@ -99,12 +99,48 @@ const PREV_SCREEN: Record<SegmentKey, Screen> = {
 
 /** The reuse-teaching confirmation per step (the "thankful" moment). */
 const SAVE_TOAST: Record<SegmentKey, string> = {
-  you: "Saved. Your pages will now open with your face and name.",
-  reach: "Saved. Every page now has a clear way to reach you.",
-  proof: "Saved. Studio will reuse this on every seller page and follow-up.",
-  sell: "Studio can now explain how you get homes seen.",
-  work: "Your showcase now shows real reach.",
-  brand: "Your brand color now carries every page.",
+  you: "Saved. Studio will introduce you this way across your pages.",
+  reach: "Saved. Sellers can reach you from every page now.",
+  proof: "Saved. Studio will reuse this proof on your seller pages and follow-ups.",
+  sell: "Saved. Studio will explain how you sell across your pages.",
+  work: "Saved. Your recent work now shows up everywhere Studio introduces you.",
+  brand: "Saved. Your brand color now carries across Studio assets.",
+};
+
+/**
+ * MOBILE focus model (the four-state shell). Each editor field carries a
+ * `data-region` so the shell can (a) name the thing being edited in the
+ * "Editing your {label}" caption and (b) scroll/highlight the matching sub-region
+ * of the REAL isolated asset. The highlight + de-emphasis themselves are pure
+ * CSS keyed off `data-focus-region` on the console root (see studio.css), so the
+ * flagship components stay untouched (no consumer-page impact). This map is the
+ * field-region → asset-selector anchor used only to scroll the region into view.
+ */
+const REGION_SELECTOR: Record<string, string> = {
+  name: ".sa-hero__agentname",
+  avatar: ".sa-hero__avatar",
+  brokerage: ".sa-hero__agentrole",
+  email: '[data-testid="fs-sa-confirm-email"]',
+  phone: '[data-testid="fs-sa-confirm-phone"]',
+  schedule: '[data-testid="fs-sa-confirm-schedule"]',
+  review: ".sa-quote__q",
+  sell: ".sa-frame--lead",
+  work: ".sa-cf__card",
+  brand: ".agent .btn--primary",
+};
+
+/** The human label for the "Editing your {label}" focus caption. */
+const REGION_LABEL: Record<string, string> = {
+  name: "name",
+  avatar: "headshot",
+  brokerage: "brokerage",
+  email: "email",
+  phone: "phone",
+  schedule: "scheduling link",
+  review: "review",
+  sell: "marketing approach",
+  work: "recent work",
+  brand: "brand color",
 };
 
 const STEP_FRAME: Record<
@@ -163,6 +199,18 @@ export function StudioProfileSetup({ ownerEmail }: { ownerEmail: string | null }
   const startedAtRef = useRef<number>(0);
   const hydratedRef = useRef(false);
 
+  // ── MOBILE four-state shell (Browse / Focus / Expanded / Saved) ───────────
+  // Desktop stays the 3-panel console untouched: all of the below only takes
+  // effect when isMobile, and the focus visuals live behind a mobile media query
+  // so the desktop render is byte-identical. New mobile-only DOM (the focus
+  // caption, the Expand affordance, the expanded sheet) is gated on isMobile so
+  // it never enters the desktop tree at all.
+  const isMobile = useIsMobile();
+  const [focusField, setFocusField] = useState<string | null>(null);
+  const [expanded, setExpanded] = useState(false);
+  const rootRef = useRef<HTMLDivElement>(null);
+  const focusActive = isMobile && focusField !== null;
+
   // One-time hydrate from the crash-safety buffer, then announce start.
   useEffect(() => {
     if (hydratedRef.current) return;
@@ -200,6 +248,87 @@ export function StudioProfileSetup({ ownerEmail }: { ownerEmail: string | null }
     if (typeof window === "undefined") return;
     window.scrollTo({ top: 0, behavior: reducedMotion ? "auto" : "smooth" });
   }, [screen, reducedMotion]);
+
+  // Leaving a step (advance / back / checkpoint) drops focus mode + the sheet.
+  // On mobile, each step starts in Browse (no auto keyboard): neutralize the
+  // name field's autoFocus (which desktop keeps) so the four-state shell begins
+  // in Browse and the user taps to enter Focus.
+  useEffect(() => {
+    setFocusField(null);
+    setExpanded(false);
+    if (!isMobile || typeof document === "undefined") return;
+    const ae = document.activeElement as HTMLElement | null;
+    if (
+      ae &&
+      rootRef.current?.contains(ae) &&
+      (ae.tagName === "INPUT" || ae.tagName === "TEXTAREA")
+    ) {
+      ae.blur();
+    }
+  }, [screen, isMobile]);
+
+  // Keyboard-safe sizing: mirror the visual viewport (which shrinks when the
+  // soft keyboard opens) into CSS vars so the focused shell can be a fixed,
+  // exactly-keyboard-tall flex column with no page scroll. Degrades gracefully:
+  // if visualViewport is unavailable the focus container falls back to 100dvh.
+  useEffect(() => {
+    if (!isMobile || typeof window === "undefined") return;
+    const vv = window.visualViewport;
+    if (!vv) return;
+    const apply = () => {
+      const el = rootRef.current;
+      if (!el) return;
+      el.style.setProperty("--sp-vvh", `${Math.round(vv.height)}px`);
+      el.style.setProperty("--sp-vvt", `${Math.round(vv.offsetTop)}px`);
+    };
+    apply();
+    vv.addEventListener("resize", apply);
+    vv.addEventListener("scroll", apply);
+    return () => {
+      vv.removeEventListener("resize", apply);
+      vv.removeEventListener("scroll", apply);
+    };
+  }, [isMobile]);
+
+  // On entering focus, pin to top so the fixed focus container aligns, then bring
+  // the active region of the REAL asset into view inside the (now-compressed)
+  // preview so the highlighted region is always visible without page scroll.
+  useEffect(() => {
+    if (!focusActive || !focusField || typeof window === "undefined") return;
+    window.scrollTo({ top: 0, behavior: "auto" });
+    const sel = REGION_SELECTOR[focusField];
+    if (!sel) return;
+    // Wait for the focus layout (fixed + compressed, scrollable preview) to
+    // settle before centering the region, otherwise scrollIntoView runs against
+    // a not-yet-scrollable container and the region stays out of view.
+    const id = window.setTimeout(() => {
+      const el = document.querySelector<HTMLElement>(`.sp-asset ${sel}`);
+      el?.scrollIntoView({
+        behavior: reducedMotion ? "auto" : "smooth",
+        block: "center",
+        inline: "center",
+      });
+    }, 200);
+    return () => window.clearTimeout(id);
+  }, [focusActive, focusField, reducedMotion]);
+
+  // Focus controller: a field gaining focus enters Focus mode for its region; a
+  // blur that doesn't land on another field (keyboard dismiss, tapping Save)
+  // exits. Reading the region from the nearest [data-region] handles embedded
+  // editors (Recent work) and multi-input fields (Proof) cleanly.
+  // Not gated on isMobile: focusField is harmless on desktop (focusActive =
+  // isMobile && focusField, and only focusActive applies the shell), and leaving
+  // it ungated means a focus that fires before the isMobile flip still resolves
+  // into Focus once mobile is known.
+  const onCenterFocus = (e: React.FocusEvent<HTMLElement>) => {
+    const region = e.target.closest?.("[data-region]")?.getAttribute("data-region");
+    if (region) setFocusField(region);
+  };
+  const onCenterBlur = (e: React.FocusEvent<HTMLElement>) => {
+    const next = e.relatedTarget as HTMLElement | null;
+    const region = next?.closest?.("[data-region]")?.getAttribute("data-region");
+    setFocusField(region ?? null);
+  };
 
   const setField = (patch: Partial<BrandSettings>) =>
     setOverlay((o) => ({ ...o, ...patch }));
@@ -447,20 +576,26 @@ export function StudioProfileSetup({ ownerEmail }: { ownerEmail: string | null }
         <p className="sp-eyebrow sp-ms sp-ms--1">Milestone</p>
         <h1 className="sp-title sp-ms sp-ms--2">You&rsquo;re client-ready.</h1>
         <p className="sp-sub sp-ms sp-ms--3">
-          Your seller page now has you, a way to reach you, and proof sellers can
-          trust. A few more steps make every page stronger.
+          Your first seller page now has you, a way to reach you, and proof
+          sellers can trust. Finish the next 3 steps so every Studio tool starts
+          stronger.
         </p>
-        <div className="sp-actions sp-ms sp-ms--4">
-          <button
-            type="button"
-            className="sp-btn sp-btn--primary"
-            data-testid="sp-clientready-continue"
-            onClick={() => setScreen("sell")}
-          >
-            Keep going
-          </button>
+        <div className="sp-ms sp-ms--4" style={{ width: "100%" }}>
+          <div className="sp-ckpt-progress" data-testid="sp-clientready-progress" aria-hidden="true">
+            <span className="sp-ckpt-progress__fill" />
+            <span className="sp-ckpt-progress__count">3 of 6</span>
+          </div>
+          <div className="sp-actions">
+            <button
+              type="button"
+              className="sp-btn sp-btn--primary"
+              data-testid="sp-clientready-continue"
+              onClick={() => setScreen("sell")}
+            >
+              Finish setup
+            </button>
+          </div>
         </div>
-        <p className="sp-reassure sp-ms sp-ms--5">{REASSURANCE}</p>
       </CenteredScreen>
     );
   }
@@ -533,8 +668,20 @@ export function StudioProfileSetup({ ownerEmail }: { ownerEmail: string | null }
   // rather than a void.
   const doneCount = STEP_ORDER.filter((s) => done.has(s)).length;
 
+  // Mobile top-chrome context: "Step N of 6 · {phase}", and the expand
+  // affordance only appears once the asset is worth enlarging (step 3 on).
+  const stepIndex = STEP_ORDER.indexOf(step);
+  const stepNum = stepIndex + 1;
+  const phaseLabel = stepIndex < 3 ? "Client-ready" : "Finish your profile";
+  const expandable = stepIndex >= 2;
+
   return (
-    <div className="sp sp--console" data-testid="sp-console">
+    <div
+      ref={rootRef}
+      className={`sp sp--console${focusActive ? " sp--focus" : ""}`}
+      data-testid="sp-console"
+      data-focus-region={focusActive ? (focusField ?? undefined) : undefined}
+    >
       {/* Item 11 — light anchoring chrome so the console feels like a place. */}
       <header className="sp__topbar">
         <span className="sp__wordmark">
@@ -574,6 +721,17 @@ export function StudioProfileSetup({ ownerEmail }: { ownerEmail: string | null }
         </aside>
 
         <div className="sp__bar">
+          {/* Mobile top chrome (mobile-only; in Focus it collapses to the thin
+              segmented bar). Gated on isMobile so it never enters the desktop
+              tree, keeping the desktop console byte-identical. */}
+          {isMobile && (
+            <div className="sp__m-chrome" aria-hidden="true">
+              <p className="sp__m-title">Set up Studio once</p>
+              <p className="sp__m-step">
+                Step {stepNum} of {STEP_ORDER.length} &middot; {phaseLabel}
+              </p>
+            </div>
+          )}
           <SegmentedProgress
             done={done}
             active={step}
@@ -581,13 +739,24 @@ export function StudioProfileSetup({ ownerEmail }: { ownerEmail: string | null }
             selectable={reachable}
             onSelect={goTo}
           />
-          <p className="sp-reassure sp-reassure--bar">{REASSURANCE}</p>
         </div>
 
-        <main className="sp__center" data-testid={`sp-step-${step}`}>
+        <main
+          className="sp__center"
+          data-testid={`sp-step-${step}`}
+          onFocusCapture={onCenterFocus}
+          onBlurCapture={onCenterBlur}
+        >
         <p className="sp-eyebrow">{frame.eyebrow}</p>
         <h1 className="sp-step-title">{frame.title}</h1>
         <p className="sp-sub">{frame.sub}</p>
+
+        {/* Focus-mode caption (mobile only): replaces the field label. */}
+        {isMobile && focusField && (
+          <p className="sp-focus-cap" data-testid="sp-focus-caption">
+            Editing your {REGION_LABEL[focusField] ?? "profile"}
+          </p>
+        )}
 
         <div className="sp-fields">
           {step === "you" && <YouFields effective={effective} setField={setField} />}
@@ -647,6 +816,18 @@ export function StudioProfileSetup({ ownerEmail }: { ownerEmail: string | null }
               saved={savedAsset === step}
               reducedMotion={reducedMotion}
             />
+            {/* Expanded preview affordance (mobile, from step 3 on) — opens the
+                isolated asset larger with its reuse context. */}
+            {isMobile && expandable && (
+              <button
+                type="button"
+                className="sp-expand"
+                data-testid="sp-expand"
+                onClick={() => setExpanded(true)}
+              >
+                Expand preview
+              </button>
+            )}
             {/* Item 9 (A2) — one complete thought: the detail entered here is
                 reused across every surface. The three surfaces read as ONE
                 connected, equal set (a joined segmented group); the surface on
@@ -666,6 +847,28 @@ export function StudioProfileSetup({ ownerEmail }: { ownerEmail: string | null }
           </div>
         </section>
       </div>
+
+      {/* Expanded preview sheet (mobile) — the isolated asset larger, with the
+          reuse context. Swipe down or tap X / the backdrop to dismiss. */}
+      {isMobile && expanded && (
+        <ExpandedSheet onClose={() => setExpanded(false)}>
+          <p className="sp-sheet__eyebrow">What sellers see</p>
+          <div className="sp-sheet__asset">
+            <AssetPreviewFrame
+              payload={previewPayload}
+              asset={step}
+              saved={false}
+              reducedMotion={reducedMotion}
+            />
+          </div>
+          <p className="sp-sheet__used">
+            Used in: Seller page &middot; Follow-up &middot; Pre-listing
+          </p>
+          <p className="sp-sheet__note">
+            This updates automatically anywhere Studio uses your profile.
+          </p>
+        </ExpandedSheet>
+      )}
     </div>
   );
 }
@@ -681,7 +884,7 @@ function YouFields({
 }) {
   return (
     <>
-      <label className="sp-field">
+      <label className="sp-field" data-region="name">
         <span className="sp-label">Your name</span>
         <input
           className="sp-input"
@@ -694,7 +897,7 @@ function YouFields({
         />
       </label>
 
-      <div className="sp-field">
+      <div className="sp-field" data-region="avatar">
         <span className="sp-label">Your headshot</span>
         <p className="sp-hint">Clean initials work beautifully until you add one.</p>
         <HeadshotField
@@ -722,7 +925,7 @@ function YouFields({
         />
       </div>
 
-      <label className="sp-field">
+      <label className="sp-field" data-region="brokerage">
         <span className="sp-label">Brokerage</span>
         <input
           className="sp-input"
@@ -746,7 +949,7 @@ function ReachFields({
 }) {
   return (
     <>
-      <label className="sp-field">
+      <label className="sp-field" data-region="email">
         <span className="sp-label">Email</span>
         <input
           className="sp-input"
@@ -759,7 +962,7 @@ function ReachFields({
         />
       </label>
 
-      <label className="sp-field">
+      <label className="sp-field" data-region="phone">
         <span className="sp-label">Phone</span>
         <PhoneInput
           className="sp-input"
@@ -772,7 +975,7 @@ function ReachFields({
         />
       </label>
 
-      <label className="sp-field">
+      <label className="sp-field" data-region="schedule">
         <span className="sp-label">Scheduling link (optional)</span>
         <input
           className="sp-input"
@@ -821,7 +1024,7 @@ function ProofFields({
 
   return (
     <>
-      <div className="sp-field">
+      <div className="sp-field" data-region="review">
         <span className="sp-label">Paste a review (recommended)</span>
         <p className="sp-hint">A few words a past seller gave you.</p>
         <textarea
@@ -853,7 +1056,7 @@ function ProofFields({
 
       {/* Always visible (not collapsed): the review is primary, and these add to
           it. Both optional. */}
-      <div className="sp-extras" data-testid="sp-proof-extras">
+      <div className="sp-extras" data-testid="sp-proof-extras" data-region="review">
         <p className="sp-extras__head">Add these too (optional)</p>
         <label className="sp-field">
           <span className="sp-label">Years of experience</span>
@@ -906,7 +1109,7 @@ function SellFields({
 
   return (
     <>
-      <div className="sp-field">
+      <div className="sp-field" data-region="sell">
         <span className="sp-label">What gets buyers in?</span>
         <p className="sp-hint">
           Pick the angle you lead with. It becomes your page&rsquo;s
@@ -927,7 +1130,7 @@ function SellFields({
         </div>
       </div>
 
-      <div className="sp-field" data-testid="sp-marketing">
+      <div className="sp-field" data-testid="sp-marketing" data-region="sell">
         {/* Label matches the prominent eyebrow the preview renders. */}
         <span className="sp-label">How I&rsquo;ll get your home seen</span>
         <p className="sp-hint">
@@ -1006,7 +1209,7 @@ function WorkFields({
 }) {
   return (
     <>
-      <div className="sp-field">
+      <div className="sp-field" data-region="work">
         <span className="sp-label">Sample listing photo (optional)</span>
         <p className="sp-hint">
           Your best listing photography. It leads your &ldquo;How I&rsquo;ll get
@@ -1047,7 +1250,7 @@ function WorkFields({
         )}
       </div>
 
-      <div className="sp-field">
+      <div className="sp-field" data-region="work">
         <span className="sp-label">Sample video tour (optional)</span>
         <p className="sp-hint">A recent tour you produced, shown in the showcase.</p>
         <VideoUploadField
@@ -1072,7 +1275,7 @@ function WorkFields({
             small follow-on, not a redesign. */}
       </div>
 
-      <div className="sp-embed" data-testid="sp-recent-listings">
+      <div className="sp-embed" data-testid="sp-recent-listings" data-region="work">
         <RecentListingsEditor
           listings={effective.recentListings ?? []}
           onChange={(next) => setField({ recentListings: next })}
@@ -1093,7 +1296,7 @@ function BrandFields({
 }) {
   return (
     <>
-      <div className="sp-field">
+      <div className="sp-field" data-region="brand">
         <span className="sp-label">Signature color</span>
         <p className="sp-hint">Carries across every page, promo, and follow-up.</p>
         <SignatureColorField
@@ -1101,7 +1304,7 @@ function BrandFields({
           onChange={(hex) => setField({ brandAccent: hex })}
         />
       </div>
-      <div className="sp-field">
+      <div className="sp-field" data-region="brand">
         <span className="sp-label">Logo (optional)</span>
         <ImageUploadField
           label="Logo"
@@ -1202,6 +1405,72 @@ function SignatureColorField({
 
 /* ───────────────────────────── shared chrome ───────────────────────────── */
 
+/**
+ * ExpandedSheet — the mobile "Expanded" state: a bottom sheet showing the
+ * isolated asset larger with its reuse context. Dismiss via the X, the backdrop,
+ * or a downward swipe on the sheet. Esc also closes (keyboard users).
+ */
+function ExpandedSheet({
+  children,
+  onClose,
+}: {
+  children: React.ReactNode;
+  onClose: () => void;
+}) {
+  const startY = useRef<number | null>(null);
+  const [drag, setDrag] = useState(0);
+
+  useEffect(() => {
+    const onKey = (e: KeyboardEvent) => {
+      if (e.key === "Escape") onClose();
+    };
+    window.addEventListener("keydown", onKey);
+    return () => window.removeEventListener("keydown", onKey);
+  }, [onClose]);
+
+  return (
+    <div
+      className="sp-sheet__backdrop"
+      data-testid="sp-sheet-backdrop"
+      onClick={onClose}
+    >
+      <div
+        className="sp-sheet"
+        data-testid="sp-sheet"
+        role="dialog"
+        aria-modal="true"
+        style={drag ? { transform: `translateY(${drag}px)` } : undefined}
+        onClick={(e) => e.stopPropagation()}
+        onTouchStart={(e) => {
+          startY.current = e.touches[0]?.clientY ?? null;
+        }}
+        onTouchMove={(e) => {
+          if (startY.current == null) return;
+          const dy = (e.touches[0]?.clientY ?? 0) - startY.current;
+          setDrag(Math.max(0, dy));
+        }}
+        onTouchEnd={() => {
+          if (drag > 70) onClose();
+          else setDrag(0);
+          startY.current = null;
+        }}
+      >
+        <button
+          type="button"
+          className="sp-sheet__close"
+          data-testid="sp-sheet-close"
+          aria-label="Close preview"
+          onClick={onClose}
+        >
+          &times;
+        </button>
+        <span className="sp-sheet__grip" aria-hidden="true" />
+        {children}
+      </div>
+    </div>
+  );
+}
+
 function CenteredScreen({
   children,
   testid,
@@ -1218,6 +1487,24 @@ function CenteredScreen({
       </div>
     </div>
   );
+}
+
+/**
+ * True below the 960px console breakpoint. Starts false so SSR + the desktop
+ * tree are identical; flips on the client only on a real phone-width viewport,
+ * which is what gates every mobile-only node + behavior of the four-state shell.
+ */
+function useIsMobile(): boolean {
+  const [mobile, setMobile] = useState(false);
+  useEffect(() => {
+    if (typeof window === "undefined" || !window.matchMedia) return;
+    const mq = window.matchMedia("(max-width: 959.98px)");
+    setMobile(mq.matches);
+    const onChange = () => setMobile(mq.matches);
+    mq.addEventListener("change", onChange);
+    return () => mq.removeEventListener("change", onChange);
+  }, []);
+  return mobile;
 }
 
 function usePrefersReducedMotion(): boolean {
