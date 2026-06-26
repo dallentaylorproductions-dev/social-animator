@@ -143,6 +143,16 @@ const REGION_LABEL: Record<string, string> = {
   brand: "brand color",
 };
 
+/**
+ * Focus-mode preview is a COMPACT, height-bounded region window (not a dimmed
+ * full-height asset): the real component still renders in full inside it, but the
+ * window clips to this height and the inner asset is translated so the active
+ * region sits centered. A bounded window is what guarantees the field + Save
+ * always have room above the keyboard. Kept in sync with `.sp--focus .sp-asset`
+ * height in studio.css.
+ */
+const FOCUS_WINDOW_H = 150;
+
 const STEP_FRAME: Record<
   SegmentKey,
   { eyebrow: string; title: string; sub: string }
@@ -290,27 +300,60 @@ export function StudioProfileSetup({ ownerEmail }: { ownerEmail: string | null }
     };
   }, [isMobile]);
 
-  // On entering focus, pin to top so the fixed focus container aligns, then bring
-  // the active region of the REAL asset into view inside the (now-compressed)
-  // preview so the highlighted region is always visible without page scroll.
+  // FRAME the active region inside the compact focus window (replaces the old
+  // page-level scrollIntoView, which scrolled the whole page and fought iOS).
+  // We measure the [data-region] target's offset within the asset and translate
+  // the inner asset so the region is vertically centered in the fixed-height
+  // window. A ResizeObserver re-frames as the asset's content height changes
+  // (e.g. the review quote appearing/growing as the agent types).
   useEffect(() => {
     if (!focusActive || !focusField || typeof window === "undefined") return;
-    window.scrollTo({ top: 0, behavior: "auto" });
     const sel = REGION_SELECTOR[focusField];
-    if (!sel) return;
-    // Wait for the focus layout (fixed + compressed, scrollable preview) to
-    // settle before centering the region, otherwise scrollIntoView runs against
-    // a not-yet-scrollable container and the region stays out of view.
-    const id = window.setTimeout(() => {
-      const el = document.querySelector<HTMLElement>(`.sp-asset ${sel}`);
-      el?.scrollIntoView({
-        behavior: reducedMotion ? "auto" : "smooth",
-        block: "center",
-        inline: "center",
-      });
-    }, 200);
-    return () => window.clearTimeout(id);
-  }, [focusActive, focusField, reducedMotion]);
+    const asset = document.querySelector<HTMLElement>(".sp__preview .sp-asset");
+    const page = document.querySelector<HTMLElement>(".sp__preview .sp-asset__page");
+    if (!asset || !page) return;
+    const frame = () => {
+      // Measure untranslated, then compute + apply the centering translate.
+      asset.style.setProperty("--sp-frame-y", "0px");
+      const region = sel ? page.querySelector<HTMLElement>(sel) : null;
+      if (!region) return; // no target yet (e.g. empty review) → asset sits at top
+      const pageRect = page.getBoundingClientRect();
+      const rRect = region.getBoundingClientRect();
+      const regionCenter = rRect.top - pageRect.top + rRect.height / 2;
+      const pageH = page.scrollHeight;
+      let ty = FOCUS_WINDOW_H / 2 - regionCenter;
+      ty = Math.max(Math.min(0, FOCUS_WINDOW_H - pageH), Math.min(0, ty));
+      asset.style.setProperty("--sp-frame-y", `${Math.round(ty)}px`);
+    };
+    const id = window.requestAnimationFrame(frame);
+    const t = window.setTimeout(frame, 220);
+    let ro: ResizeObserver | null = null;
+    if (typeof ResizeObserver !== "undefined") {
+      ro = new ResizeObserver(frame);
+      ro.observe(page);
+    }
+    return () => {
+      window.cancelAnimationFrame(id);
+      window.clearTimeout(t);
+      ro?.disconnect();
+    };
+  }, [focusActive, focusField]);
+
+  // Lock body scroll while Focus owns the visual viewport, so iOS Safari can't
+  // scroll the input out from under the keyboard-pinned column. Restored on exit.
+  useEffect(() => {
+    if (!focusActive || typeof document === "undefined") return;
+    const body = document.body;
+    const prevOverflow = body.style.overflow;
+    const prevTouch = body.style.touchAction;
+    window.scrollTo({ top: 0, behavior: "auto" });
+    body.style.overflow = "hidden";
+    body.style.touchAction = "none";
+    return () => {
+      body.style.overflow = prevOverflow;
+      body.style.touchAction = prevTouch;
+    };
+  }, [focusActive]);
 
   // Focus controller: a field gaining focus enters Focus mode for its region; a
   // blur that doesn't land on another field (keyboard dismiss, tapping Save)
