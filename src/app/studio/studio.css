@@ -956,7 +956,7 @@
    IDENTITY, not a footer band. Scoped to the You asset only; no flagship edit, no
    consumer-page change. The region anchors are unaffected: name → .agent__name,
    avatar → .agent__avatar, brokerage → .agent__who .r. */
-.sp-asset[data-testid="sp-asset-you"] .eyebrow,
+.sp-asset[data-testid="sp-asset-you"] .agent .eyebrow,
 .sp-asset[data-testid="sp-asset-you"] .agent__meta,
 .sp-asset[data-testid="sp-asset-you"] .agent__bio {
   display: none;
@@ -1561,6 +1561,149 @@
   }
 }
 
+/* ═══════════════════════════════════════════════════════════════════════════
+ * Step 1 (You) FOCUS LENS — a dedicated portal OVERLAY (NOT an in-place collapse)
+ * sized to window.visualViewport in JS (height + top set inline). It owns the
+ * band above the keyboard and packs its children top-down, so "empty void" and
+ * "input behind the keyboard" are structurally impossible. Mobile only.
+ * ═══════════════════════════════════════════════════════════════════════════ */
+@media (max-width: 959.98px) {
+  /* Browse: name + brokerage as tap-to-edit field buttons (look like inputs). */
+  .sp-field-tap {
+    display: flex;
+    flex-direction: column;
+    gap: 7px;
+    align-items: stretch;
+    text-align: left;
+    width: 100%;
+    background: none;
+    border: none;
+    padding: 0;
+    cursor: pointer;
+  }
+  .sp-field-tap__val {
+    display: block;
+    text-align: left;
+    color: var(--sp-ink);
+  }
+  .sp-field-tap__val--ph {
+    color: var(--sp-muted);
+    opacity: 0.7;
+  }
+
+  .sp-lens {
+    position: fixed;
+    left: 0;
+    right: 0;
+    top: 0; /* JS sets top = visualViewport.offsetTop */
+    width: 100%;
+    height: 100dvh; /* JS sets height = visualViewport.height; dvh is fallback only */
+    min-height: 0; /* MUST override .sp min-height:100vh, else it runs behind the keyboard */
+    z-index: 60;
+    display: flex;
+    flex-direction: column;
+    background: var(--sp-page);
+    opacity: 0;
+    pointer-events: none;
+    overflow: hidden;
+    transition: opacity 0.18s ease;
+    padding: calc(8px + env(safe-area-inset-top)) 18px
+      calc(10px + env(safe-area-inset-bottom));
+  }
+  .sp-lens--active {
+    opacity: 1;
+    pointer-events: auto;
+  }
+  /* segmented progress (3 + 3) */
+  .sp-lens__progress {
+    flex: 0 0 auto;
+    display: flex;
+    gap: 5px;
+    padding-top: 4px;
+  }
+  .sp-lens__seg {
+    flex: 1;
+    height: 4px;
+    border-radius: 999px;
+    background: var(--sp-hairline-strong);
+  }
+  .sp-lens__seg.is-done,
+  .sp-lens__seg.is-active {
+    background: var(--sp-mint);
+  }
+  .sp-lens__seg.is-break {
+    margin-left: 14px; /* the gap between the two phases */
+  }
+  /* the compressed identity WINDOW (~24% of a keyboard-open lens), at the top
+     under the progress */
+  .sp-lens__preview {
+    flex: 0 0 auto;
+    display: flex;
+    justify-content: center;
+    padding-top: 14px;
+  }
+  /* the editing controls bottom-anchor above the keyboard (margin-top:auto puts
+     the slack BETWEEN the preview and the controls — deliberate separation, not a
+     dead zone); caption + input + Save sit snug together. */
+  .sp-lens__edit {
+    flex: 0 0 auto;
+    margin-top: auto;
+    display: flex;
+    flex-direction: column;
+    gap: 10px;
+  }
+  .sp-lens__preview .sp-asset {
+    width: 100%;
+    max-width: 340px;
+    height: 120px;
+    overflow: hidden;
+  }
+  .sp-lens .sp-asset__page {
+    transform: translateY(var(--sp-frame-y, 0px));
+    transition: transform 0.2s ease;
+    will-change: transform;
+  }
+  .sp-lens__cap {
+    flex: 0 0 auto;
+    margin: 0;
+    font-size: 11px;
+    font-weight: 600;
+    letter-spacing: 0.12em;
+    text-transform: uppercase;
+    color: var(--sp-mint);
+  }
+  .sp-lens__field {
+    flex: 0 0 auto;
+  }
+  .sp-lens__actions {
+    flex: 0 0 auto;
+    padding-top: 2px;
+  }
+  .sp-lens__actions .sp-btn--primary {
+    width: 100%;
+    justify-content: center;
+  }
+  /* region isolation + highlight inside the lens (dark AgentBand) */
+  .sp-lens[data-focus-region="name"] .sp-asset .fs-frame *:not(:has(.agent__name)):not(.agent__name):not(.agent__name *),
+  .sp-lens[data-focus-region="brokerage"] .sp-asset .fs-frame *:not(:has(.agent__who .r)):not(.agent__who .r):not(.agent__who .r *) {
+    opacity: 0.26;
+    filter: saturate(0.55);
+  }
+  .sp-lens[data-focus-region="name"] .sp-asset .agent__name,
+  .sp-lens[data-focus-region="brokerage"] .sp-asset .agent__who .r {
+    position: relative;
+    z-index: 1;
+    border-radius: 10px;
+    background: rgba(255, 255, 255, 0.07);
+    box-shadow:
+      0 0 0 5px rgba(255, 255, 255, 0.07),
+      0 0 0 6px rgba(70, 222, 194, 0.4),
+      -9px 0 0 -6px var(--sp-mint),
+      8px 10px 22px -8px rgba(0, 0, 0, 0.4);
+    animation: sp-focus-glow-dark 0.9s ease both;
+  }
+}
+
 /* ── client-ready checkpoint progress (3 of 6) — full-screen both surfaces ─── */
 .sp-ckpt-progress {
   position: relative;
@@ -1645,7 +1788,9 @@
   .sp-seal--anim .sp-seal__check,
   .sp-sheet,
   .sp-sheet__backdrop,
-  .sp--focus .sp-asset * {
+  .sp--focus .sp-asset *,
+  .sp-lens,
+  .sp-lens .sp-asset * {
     animation: none !important;
     transition: none !important;
   }

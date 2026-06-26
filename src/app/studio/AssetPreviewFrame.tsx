@@ -9,6 +9,7 @@ import {
 import { formatAppointment } from "@/tools/seller-presentation/engine/appointment";
 import { newsreader } from "@/tools/seller-presentation/output/flagship/fonts";
 import { AgentBand } from "@/tools/seller-presentation/output/flagship/AgentBand";
+import { StateAHero } from "@/tools/seller-presentation/output/flagship/StateAHero";
 import { CampaignSpread } from "@/tools/seller-presentation/output/flagship/CampaignSpread";
 import {
   ConfirmTime,
@@ -56,12 +57,19 @@ export function AssetPreviewFrame({
   asset,
   saved,
   reducedMotion,
+  youIdentity = false,
 }: {
   payload: PublicPayload;
   asset: SegmentKey;
   /** True briefly after a commit — plays the dedicated "finished" animation. */
   saved: boolean;
   reducedMotion: boolean;
+  /**
+   * MOBILE-only: render the You step as the isolated AgentBand AGENT IDENTITY
+   * (the mobile editing lens). Desktop leaves this false and keeps the original
+   * StateAHero hero — so the desktop console preview is byte-identical to before.
+   */
+  youIdentity?: boolean;
 }) {
   const roleVars = consumerRoleVars(
     deriveConsumerRoles(payload.brandColors?.accent),
@@ -72,11 +80,16 @@ export function AssetPreviewFrame({
   let ghost: string | null = null;
 
   if (asset === "you") {
-    // The isolated AGENT IDENTITY band (identity-only: no contact CTAs, no
-    // disclaimer foot) — the real seller-facing identity asset the You step
-    // improves. AgentBand returns null without a name; the You preview payload
-    // seeds a sample identity so Browse is never blank.
-    body = <AgentBand payload={payload} showCtas={false} showFoot={false} />;
+    // MOBILE (youIdentity): the isolated AGENT IDENTITY band (identity-only: no
+    // contact CTAs, no disclaimer foot) — the real seller-facing identity asset
+    // the You step improves. DESKTOP keeps the original StateAHero hero so the
+    // desktop console preview stays byte-identical. AgentBand returns null without
+    // a name; the You preview payload seeds a sample identity so it's never blank.
+    body = youIdentity ? (
+      <AgentBand payload={payload} showCtas={false} showFoot={false} />
+    ) : (
+      <StateAHero payload={payload} appt={appt} />
+    );
   } else if (asset === "reach") {
     const hasContact = !!(payload.agent.email || payload.agent.phone);
     if (hasContact) body = <ConfirmTime payload={payload} appt={appt} />;
