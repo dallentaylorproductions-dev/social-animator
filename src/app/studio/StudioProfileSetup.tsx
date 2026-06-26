@@ -117,9 +117,11 @@ const SAVE_TOAST: Record<SegmentKey, string> = {
  * field-region → asset-selector anchor used only to scroll the region into view.
  */
 const REGION_SELECTOR: Record<string, string> = {
-  name: ".sa-hero__agentname",
-  avatar: ".sa-hero__avatar",
-  brokerage: ".sa-hero__agentrole",
+  // You = the isolated AgentBand identity (see AssetPreviewFrame): name headline,
+  // the avatar, and the role line (brokerage).
+  name: ".agent__name",
+  avatar: ".agent__avatar",
+  brokerage: ".agent__who .r",
   email: '[data-testid="fs-sa-confirm-email"]',
   phone: '[data-testid="fs-sa-confirm-phone"]',
   schedule: '[data-testid="fs-sa-confirm-schedule"]',
@@ -160,7 +162,7 @@ const STEP_FRAME: Record<
   you: {
     eyebrow: "You",
     title: "Make your pages feel like you.",
-    sub: "Your name, face, and brokerage open every seller page you send.",
+    sub: "Your name, face, and brokerage appear anywhere Studio introduces you.",
   },
   reach: {
     eyebrow: "Reach",
@@ -220,6 +222,9 @@ export function StudioProfileSetup({ ownerEmail }: { ownerEmail: string | null }
   const [expanded, setExpanded] = useState(false);
   const rootRef = useRef<HTMLDivElement>(null);
   const focusActive = isMobile && focusField !== null;
+  // Step 1 (You) regions get a bottom-anchored focus layout (no dead space).
+  const youFocus =
+    focusActive && ["name", "avatar", "brokerage"].includes(focusField ?? "");
 
   // One-time hydrate from the crash-safety buffer, then announce start.
   useEffect(() => {
@@ -321,8 +326,11 @@ export function StudioProfileSetup({ ownerEmail }: { ownerEmail: string | null }
       const rRect = region.getBoundingClientRect();
       const regionCenter = rRect.top - pageRect.top + rRect.height / 2;
       const pageH = page.scrollHeight;
-      let ty = FOCUS_WINDOW_H / 2 - regionCenter;
-      ty = Math.max(Math.min(0, FOCUS_WINDOW_H - pageH), Math.min(0, ty));
+      // Center against the ACTUAL bounded window height (the .sp-asset clientHeight
+      // in focus), so it stays correct whatever a step sets the window height to.
+      const winH = asset.clientHeight || FOCUS_WINDOW_H;
+      let ty = winH / 2 - regionCenter;
+      ty = Math.max(Math.min(0, winH - pageH), Math.min(0, ty));
       asset.style.setProperty("--sp-frame-y", `${Math.round(ty)}px`);
     };
     const id = window.requestAnimationFrame(frame);
@@ -470,6 +478,21 @@ export function StudioProfileSetup({ ownerEmail }: { ownerEmail: string | null }
       const fill = Math.max(0, TARGET - own.length);
       const merged = [...own, ...samples.slice(0, fill)].slice(0, RECENT_LISTINGS_CAP);
       payload = { ...payload, recentListings: merged };
+    }
+    if (activeStep === "you") {
+      // PREVIEW-ONLY: the You step previews the AgentBand identity, which renders
+      // nothing without a name. Seed a sample name + brokerage so Browse always
+      // shows a real identity asset to refine; the agent's typed values flow
+      // through `effective` and override the sample the moment they type.
+      const ag = payload.agent;
+      payload = {
+        ...payload,
+        agent: {
+          ...ag,
+          name: ag.name?.trim() ? ag.name : "Aaron Thomas",
+          brokerage: ag.brokerage?.trim() ? ag.brokerage : "Windermere · Tacoma",
+        },
+      };
     }
     return payload;
   }, [basePayload, activeStep, effective.recentListings, effective.logoDataUrl]);
@@ -721,8 +744,9 @@ export function StudioProfileSetup({ ownerEmail }: { ownerEmail: string | null }
   return (
     <div
       ref={rootRef}
-      className={`sp sp--console${focusActive ? " sp--focus" : ""}`}
+      className={`sp sp--console${focusActive ? " sp--focus" : ""}${youFocus ? " sp--focus-you" : ""}`}
       data-testid="sp-console"
+      data-step={step}
       data-focus-region={focusActive ? (focusField ?? undefined) : undefined}
     >
       {/* Item 11 — light anchoring chrome so the console feels like a place. */}
@@ -927,7 +951,7 @@ function YouFields({
 }) {
   return (
     <>
-      <label className="sp-field" data-region="name">
+      <label className="sp-field sp-field--primary" data-region="name">
         <span className="sp-label">Your name</span>
         <input
           className="sp-input"
@@ -940,6 +964,11 @@ function YouFields({
         />
       </label>
 
+      {/* Headshot + brokerage are compact SECONDARY items on mobile Browse (so
+          Step 1 reads as a lens, not a long settings stack); each still enters
+          its own Focus state on tap. Desktop is unaffected (the wrapper is inert
+          there; the compaction lives behind the mobile media query). */}
+      <div className="sp-you-secondary">
       <div className="sp-field" data-region="avatar">
         <span className="sp-label">Your headshot</span>
         <p className="sp-hint">Clean initials work beautifully until you add one.</p>
@@ -979,6 +1008,7 @@ function YouFields({
           onChange={(e) => setField({ brokerage: e.target.value })}
         />
       </label>
+      </div>
     </>
   );
 }

@@ -1356,9 +1356,9 @@
      their non-region children dim individually — no parent opacity group). Uses
      :has(); where unsupported it simply no-ops (the highlight plate still shows).
      Targets the existing flagship selectors — the components are never modified. */
-  .sp--focus[data-focus-region="name"] .sp-asset .fs-frame *:not(:has(.sa-hero__agentname)):not(.sa-hero__agentname):not(.sa-hero__agentname *),
-  .sp--focus[data-focus-region="avatar"] .sp-asset .fs-frame *:not(:has(.sa-hero__avatar)):not(.sa-hero__avatar):not(.sa-hero__avatar *),
-  .sp--focus[data-focus-region="brokerage"] .sp-asset .fs-frame *:not(:has(.sa-hero__agentrole)):not(.sa-hero__agentrole):not(.sa-hero__agentrole *),
+  .sp--focus[data-focus-region="name"] .sp-asset .fs-frame *:not(:has(.agent__name)):not(.agent__name):not(.agent__name *),
+  .sp--focus[data-focus-region="avatar"] .sp-asset .fs-frame *:not(:has(.agent__avatar)):not(.agent__avatar):not(.agent__avatar *),
+  .sp--focus[data-focus-region="brokerage"] .sp-asset .fs-frame *:not(:has(.agent__who .r)):not(.agent__who .r):not(.agent__who .r *),
   .sp--focus[data-focus-region="email"] .sp-asset .fs-frame *:not(:has([data-testid="fs-sa-confirm-email"])):not([data-testid="fs-sa-confirm-email"]):not([data-testid="fs-sa-confirm-email"] *),
   .sp--focus[data-focus-region="phone"] .sp-asset .fs-frame *:not(:has([data-testid="fs-sa-confirm-phone"])):not([data-testid="fs-sa-confirm-phone"]):not([data-testid="fs-sa-confirm-phone"] *),
   .sp--focus[data-focus-region="schedule"] .sp-asset .fs-frame *:not(:has([data-testid="fs-sa-confirm-schedule"])):not([data-testid="fs-sa-confirm-schedule"]):not([data-testid="fs-sa-confirm-schedule"] *),
@@ -1370,11 +1370,25 @@
     filter: saturate(0.55);
     transition: opacity 0.2s ease;
   }
+  /* You regions live on the DARK AgentBand — a white plate would wash the text,
+     so they get a dark-friendly gentle-active plate: a faint light fill + a
+     low-saturation mint edge + a subtle left accent + the one-shot glow. */
+  .sp--focus[data-focus-region="name"] .sp-asset .agent__name,
+  .sp--focus[data-focus-region="avatar"] .sp-asset .agent__avatar,
+  .sp--focus[data-focus-region="brokerage"] .sp-asset .agent__who .r {
+    position: relative;
+    z-index: 1;
+    border-radius: 10px;
+    background: rgba(255, 255, 255, 0.07);
+    box-shadow:
+      0 0 0 5px rgba(255, 255, 255, 0.07),
+      0 0 0 6px rgba(70, 222, 194, 0.4),
+      -9px 0 0 -6px var(--sp-mint),
+      8px 10px 22px -8px rgba(0, 0, 0, 0.4);
+    animation: sp-focus-glow-dark 0.9s ease both;
+  }
   /* ── the active-region highlight: a soft cream plate + low-saturation edge +
      a subtle left accent rule + a one-shot glow on first focus. Calm, premium. */
-  .sp--focus[data-focus-region="name"] .sp-asset .sa-hero__agentname,
-  .sp--focus[data-focus-region="avatar"] .sp-asset .sa-hero__avatar,
-  .sp--focus[data-focus-region="brokerage"] .sp-asset .sa-hero__agentrole,
   .sp--focus[data-focus-region="email"] .sp-asset [data-testid="fs-sa-confirm-email"],
   .sp--focus[data-focus-region="phone"] .sp-asset [data-testid="fs-sa-confirm-phone"],
   .sp--focus[data-focus-region="schedule"] .sp-asset [data-testid="fs-sa-confirm-schedule"],
@@ -1391,6 +1405,83 @@
       -9px 0 0 -6px rgba(3, 114, 144, 0.55),
       8px 10px 22px -8px rgba(0, 0, 0, 0.18);
     animation: sp-focus-glow 0.9s ease both;
+  }
+
+  /* ── STEP 1 (You) focus layout: bottom-anchored, NO dead space. The single
+     short field would otherwise leave a large blank zone between the input and
+     Save (a flex:1 field area). Instead the [preview · caption · field · Save]
+     group is pinned just above the keyboard (margin-top:auto absorbs the slack
+     ABOVE the preview as deliberate breathing room under the progress bar), and
+     the field area does NOT grow. Scoped to You so other steps keep their
+     scroll-tall-field layout. */
+  .sp--focus-you .sp__preview {
+    margin-top: auto;
+  }
+  .sp--focus-you .sp__center {
+    flex: 0 0 auto;
+  }
+  .sp--focus-you .sp-fields {
+    flex: 0 0 auto;
+    overflow: visible;
+  }
+  /* keep the focus window a touch tighter on You (~26% on a keyboard-open phone) */
+  .sp--focus-you .sp-asset {
+    height: 132px;
+  }
+
+  /* ── BROWSE (You): the agent-identity PREVIEW is the hero, so it sits directly
+     under the chrome, ABOVE the work area (the editor follows). Without this the
+     preview renders last and falls below the fold. Scoped to the You step and
+     Browse only (focus owns its own order). */
+  .sp--console[data-step="you"]:not(.sp--focus) .sp__preview {
+    order: 1;
+    border-top: none;
+    border-bottom: 1px solid var(--sp-hairline);
+    padding: 16px 18px 10px;
+  }
+  .sp--console[data-step="you"]:not(.sp--focus) .sp-asset {
+    max-height: 34vh; /* ~30% — the identity asset, not a full page preview */
+    overflow: hidden;
+  }
+  /* the "reused everywhere" affordance is secondary on Step 1 (it lives in the
+     expanded sheet) — keep the agent identity the hero, not a destination bar */
+  .sp--console[data-step="you"]:not(.sp--focus) .sp-dest {
+    display: none;
+  }
+  .sp--console[data-step="you"]:not(.sp--focus) .sp__center {
+    order: 2;
+    padding-bottom: calc(96px + env(safe-area-inset-bottom)); /* clear sticky Save */
+  }
+
+  /* ── BROWSE (You): name is primary; headshot + brokerage are COMPACT secondary
+     items, not a long settings stack. Tighter spacing + a contained group so the
+     agent-identity preview stays the hero. (Desktop unaffected — mobile only.) */
+  .sp-you-secondary {
+    margin-top: 6px;
+    padding: 14px 14px;
+    border: 1px solid var(--sp-hairline);
+    border-radius: 12px;
+    background: rgba(255, 255, 255, 0.015);
+    display: flex;
+    flex-direction: column;
+    gap: 12px;
+  }
+  /* compact the headshot control so Step 1 doesn't read as a settings form:
+     keep the camera-roll affordance, drop the paste-URL fallback + helper, and
+     tighten the dropzone. (Full controls remain on desktop + in Settings.) */
+  .sp-you-secondary [data-testid="brand-headshot-avatar"] {
+    height: 56px;
+    width: 56px;
+  }
+  .sp-you-secondary [data-testid="brand-headshot-url"] {
+    display: none;
+  }
+  .sp-you-secondary [data-testid="brand-headshot-upload"] {
+    padding-top: 12px;
+    padding-bottom: 12px;
+  }
+  .sp-you-secondary .sp-hint {
+    display: none;
   }
 
   /* ═══ EXPANDED — the bottom-sheet preview ═════════════════════════════════ */
@@ -1496,6 +1587,22 @@
       0 0 0 7px rgba(20, 30, 25, 0.08),
       -9px 0 0 -6px rgba(3, 114, 144, 0.55),
       8px 10px 22px -8px rgba(0, 0, 0, 0.18);
+  }
+}
+@keyframes sp-focus-glow-dark {
+  0% {
+    box-shadow:
+      0 0 0 5px rgba(255, 255, 255, 0.07),
+      0 0 0 10px rgba(70, 222, 194, 0.5),
+      -9px 0 0 -6px var(--sp-mint),
+      8px 10px 22px -8px rgba(0, 0, 0, 0.4);
+  }
+  100% {
+    box-shadow:
+      0 0 0 5px rgba(255, 255, 255, 0.07),
+      0 0 0 6px rgba(70, 222, 194, 0.4),
+      -9px 0 0 -6px var(--sp-mint),
+      8px 10px 22px -8px rgba(0, 0, 0, 0.4);
   }
 }
 @keyframes sp-fade {

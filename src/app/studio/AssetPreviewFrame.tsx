@@ -8,7 +8,6 @@ import {
 } from "@/tools/seller-presentation/output/consumer-roles";
 import { formatAppointment } from "@/tools/seller-presentation/engine/appointment";
 import { newsreader } from "@/tools/seller-presentation/output/flagship/fonts";
-import { StateAHero } from "@/tools/seller-presentation/output/flagship/StateAHero";
 import { AgentBand } from "@/tools/seller-presentation/output/flagship/AgentBand";
 import { CampaignSpread } from "@/tools/seller-presentation/output/flagship/CampaignSpread";
 import {
@@ -38,7 +37,10 @@ import type { SegmentKey } from "@/lib/studio-profile/setup-state";
  * sits inside a `.fs-frame`. Only ONE asset shows at a time — never the whole
  * page — so the agent never gets the "this is huge" feeling.
  *
- *   You   → StateAHero (the real hero / agent identity area)
+ *   You   → AgentBand identity-only (the real agent-identity band: headshot /
+ *           initials + name + brokerage; CTAs + foot suppressed) — the exact
+ *           seller-facing identity asset the You step improves, NOT the property
+ *           hero (which is too broad and crops to a washed-out blank on mobile).
  *   Reach → ConfirmTime (the real contact / CTA block)
  *   Proof → TrustStrip (the real cream testimonial)
  *   Sell  → CampaignSpread (the real redesigned "How I'll get your home seen")
@@ -70,7 +72,11 @@ export function AssetPreviewFrame({
   let ghost: string | null = null;
 
   if (asset === "you") {
-    body = <StateAHero payload={payload} appt={appt} />;
+    // The isolated AGENT IDENTITY band (identity-only: no contact CTAs, no
+    // disclaimer foot) — the real seller-facing identity asset the You step
+    // improves. AgentBand returns null without a name; the You preview payload
+    // seeds a sample identity so Browse is never blank.
+    body = <AgentBand payload={payload} showCtas={false} showFoot={false} />;
   } else if (asset === "reach") {
     const hasContact = !!(payload.agent.email || payload.agent.phone);
     if (hasContact) body = <ConfirmTime payload={payload} appt={appt} />;
