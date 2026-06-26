@@ -673,6 +673,97 @@
   line-height: 1.8;
 }
 
+/* ── intro (B) — a confident full-screen entrance ───────────────────────────
+   Borrows the old /welcome composition (wordmark anchored top, a vertically
+   centered eyebrow + headline + subline, the six steps as a crafted hairline
+   list, full-width stacked actions, generous balanced whitespace) in the dark
+   Studio palette, so the first screen feels like a high-end app rather than a
+   bordered card floating mid-screen. Shared structure across desktop + mobile;
+   the inner column is simply centered in a calm field on wider viewports. */
+.sp--intro {
+  display: flex;
+  flex-direction: column;
+}
+.sp-intro__inner {
+  width: 100%;
+  max-width: 540px;
+  margin: 0 auto;
+  flex: 1;
+  min-height: 100vh;
+  display: flex;
+  flex-direction: column;
+  padding: 24px 22px calc(40px + env(safe-area-inset-bottom));
+}
+.sp-intro__top {
+  display: flex;
+  align-items: center;
+  margin-bottom: 24px;
+}
+.sp-intro__body {
+  flex: 1;
+  display: flex;
+  flex-direction: column;
+  justify-content: center;
+  gap: 18px;
+  padding-bottom: 16px;
+}
+.sp-intro__title {
+  font-size: clamp(32px, 7vw, 46px);
+  line-height: 1.06;
+  letter-spacing: -0.01em;
+  font-weight: 600;
+  color: var(--sp-header);
+  margin: 0;
+}
+.sp-intro__sub {
+  font-size: 16px;
+  line-height: 1.6;
+  color: var(--sp-muted);
+  margin: 0;
+  max-width: 44ch;
+}
+/* the six steps, crafted: numbered nodes in hairline-separated rows */
+.sp-intro__steps {
+  list-style: none;
+  margin: 6px 0 0;
+  padding: 0;
+  border-top: 1px solid var(--sp-hairline);
+}
+.sp-intro__step {
+  display: flex;
+  align-items: center;
+  gap: 14px;
+  padding: 13px 2px;
+  border-bottom: 1px solid var(--sp-hairline);
+  font-size: 15px;
+  font-weight: 500;
+  color: var(--sp-ink);
+}
+.sp-intro__step-num {
+  width: 26px;
+  height: 26px;
+  border-radius: 50%;
+  border: 1px solid var(--sp-mint-line);
+  background: var(--sp-mint-soft);
+  color: var(--sp-mint);
+  font-size: 12px;
+  font-weight: 700;
+  display: inline-flex;
+  align-items: center;
+  justify-content: center;
+  flex: none;
+}
+.sp-intro__actions {
+  display: flex;
+  flex-direction: column;
+  gap: 10px;
+  margin-top: 26px;
+}
+.sp-intro__actions .sp-btn {
+  width: 100%;
+  justify-content: center;
+}
+
 /* ── segmented progress ────────────────────────────────────────────────── */
 .sp-progress__phase + .sp-progress__phase {
   margin-top: 22px;
@@ -759,6 +850,43 @@
   color: var(--sp-mint);
 }
 
+/* ── progress (C) — DESKTOP rail as a connected vertical stepper ─────────────
+   The six labeled steps become a deliberate stepper: a thin connector line runs
+   through each phase's nodes (the marks punch it with an opaque fill), done = a
+   mint check, active = a ringed node + mint label. No full-row pill (it would
+   break the connector). Scoped to `.sp__rail` so the mobile bar owns its own
+   treatment below. */
+.sp__rail .sp-progress__list {
+  position: relative;
+  gap: 8px;
+}
+.sp__rail .sp-progress__list::before {
+  content: "";
+  position: absolute;
+  left: 17px; /* mark center: 8px seg padding + 9px half-mark */
+  top: 16px;
+  bottom: 16px;
+  width: 2px;
+  background: var(--sp-hairline-strong);
+  z-index: 0;
+}
+.sp__rail .sp-seg {
+  position: relative;
+  z-index: 1;
+}
+.sp__rail .sp-seg__mark {
+  background: var(--sp-rail); /* opaque: punch the connector at each node */
+}
+.sp__rail .sp-seg--done .sp-seg__mark {
+  background: var(--sp-mint); /* keep done = mint over the rail fill */
+}
+.sp__rail .sp-seg--active {
+  background: none; /* drop the row pill so the connector stays continuous */
+}
+.sp__rail .sp-seg--active .sp-seg__mark {
+  box-shadow: 0 0 0 3px var(--sp-mint-soft); /* active = a ringed node */
+}
+
 /* ── the live asset-preview stage — LIGHT/cream ON PURPOSE (see header) ──── */
 .sp-asset {
   border-radius: 16px;
@@ -820,7 +948,11 @@
 .sp-asset--saved {
   animation: sp-asset-pop 1s ease both;
 }
-/* ── destination bar — "one input → reused everywhere" (item 9) ──────────── */
+/* ── destination bar (A2) — one connected statement ──────────────────────────
+   "Reused everywhere you show up" over the three surfaces as ONE joined, equal
+   group (a segmented set). The surface currently on the stage is marked as the
+   CURRENT preview, so it reads as current, not as the only place the detail
+   appears. No second redundant line. Shared by desktop + mobile. */
 .sp-dest {
   margin-top: 22px;
   padding-top: 18px;
@@ -834,28 +966,32 @@
   letter-spacing: 0.12em;
   color: var(--sp-muted);
 }
-.sp-dest__chips {
+.sp-dest__set {
   display: flex;
-  flex-wrap: wrap;
-  gap: 8px;
+  border: 1px solid var(--sp-hairline-strong);
+  border-radius: 10px;
+  overflow: hidden;
 }
 .sp-dest__chip {
+  flex: 1;
+  min-width: 0;
+  text-align: center;
   font-size: 12px;
   font-weight: 600;
-  padding: 6px 12px;
-  border-radius: 999px;
-  border: 1px solid var(--sp-hairline-strong);
-  color: var(--sp-muted);
+  padding: 8px 8px;
+  color: var(--sp-ink);
   background: rgba(255, 255, 255, 0.02);
 }
-.sp-dest__chip--active {
-  border-color: var(--sp-mint-line);
+.sp-dest__chip + .sp-dest__chip {
+  border-left: 1px solid var(--sp-hairline);
+}
+.sp-dest__chip--current {
   color: var(--sp-mint);
   background: var(--sp-mint-soft);
 }
-.sp-dest__note {
-  margin: 12px 0 0;
-  font-size: 12.5px;
+.sp-dest__now {
+  margin: 10px 0 0;
+  font-size: 12px;
   line-height: 1.5;
   color: var(--sp-muted);
 }
@@ -937,49 +1073,88 @@
  * the translucent chrome/action bars.
  * ═══════════════════════════════════════════════════════════════════════════ */
 @media (max-width: 959.98px) {
-  /* ── the 6-step / 2-phase progress, PINNED under the slim top chrome ────────
-     Compact dotted strip: the current step name + count already live in the
-     sticky top bar, so the strip shows position/shape (two gap-grouped phases of
-     three) without sprawling labels. */
+  /* ── progress (C) — MOBILE labeled connector stepper, pinned under the chrome
+     Two phase rows, each three nodes joined by a connector line with the step
+     label beneath, so you can read what every step is. The current step name +
+     n/6 still live in the sticky top chrome above. */
   .sp__bar {
     position: sticky;
     top: var(--sp-topbar-h);
     z-index: 4;
-    padding: 11px 18px;
-    background: color-mix(in srgb, var(--sp-page) 90%, transparent);
+    padding: 9px 16px 11px;
+    background: color-mix(in srgb, var(--sp-page) 92%, transparent);
     backdrop-filter: blur(10px);
     border-bottom: 1px solid var(--sp-hairline);
   }
-  /* The pinned strip stays slim: the "set once, reused everywhere" frame is
+  /* The pinned strip stays focused: the "set once, reused everywhere" frame is
      carried per-step by the destination bar beneath each preview. */
   .sp__bar .sp-reassure--bar {
     display: none;
   }
   .sp__bar .sp-progress--bar {
-    gap: 26px; /* the two phases read as two grouped clusters of three */
-    justify-content: center;
-    align-items: center;
+    flex-direction: column;
+    gap: 11px;
   }
-  /* dots only — the grouping gap conveys the two phases */
-  .sp__bar .sp-progress__phase-label,
-  .sp__bar .sp-seg__label {
-    display: none;
+  .sp__bar .sp-progress__phase + .sp-progress__phase {
+    margin-top: 0;
+  }
+  .sp__bar .sp-progress__phase-label {
+    display: block;
+    text-align: center;
+    margin: 0 0 6px;
+    font-size: 10px;
   }
   .sp__bar .sp-progress__list {
-    gap: 9px;
+    position: relative;
+    flex-direction: row;
+    flex-wrap: nowrap;
+    gap: 0;
+  }
+  /* the connector line between the three node centers (1/6 .. 5/6) */
+  .sp__bar .sp-progress__list::before {
+    content: "";
+    position: absolute;
+    left: 16.66%;
+    right: 16.66%;
+    top: 9px; /* mark center */
+    height: 2px;
+    background: var(--sp-hairline-strong);
+    z-index: 0;
+  }
+  /* equal thirds on the LIST CHILDREN: clickable steps render as a plain <li>
+     wrapping a button, so flex must live on the <li>, not on .sp-seg. */
+  .sp__bar .sp-progress__list > li {
+    position: relative;
+    z-index: 1;
+    flex: 1;
+    min-width: 0;
   }
   .sp__bar .sp-seg {
-    padding: 5px;
-    gap: 0;
-    border-radius: 999px;
+    width: 100%;
+    flex-direction: column;
+    align-items: center;
+    gap: 5px;
+    padding: 0;
+    background: none;
   }
-  /* the active step: a clean emphasized dot, not the desktop pill */
+  .sp__bar .sp-seg__mark {
+    background: var(--sp-page); /* opaque: punch the connector at each node */
+  }
+  .sp__bar .sp-seg--done .sp-seg__mark {
+    background: var(--sp-mint);
+  }
+  .sp__bar .sp-seg__label {
+    display: block;
+    font-size: 10.5px;
+    line-height: 1.2;
+    text-align: center;
+    color: inherit;
+  }
+  /* active = a ringed node + mint label, no pill */
   .sp__bar .sp-seg--active {
     background: none;
   }
   .sp__bar .sp-seg--active .sp-seg__mark {
-    border-color: var(--sp-mint);
-    color: var(--sp-mint);
     box-shadow: 0 0 0 3px var(--sp-mint-soft);
   }
 

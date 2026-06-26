@@ -378,44 +378,59 @@ export function StudioProfileSetup({ ownerEmail }: { ownerEmail: string | null }
   /* ───────────────────────── intro / continue / launch ───────────────────── */
 
   if (screen === "intro") {
+    // B — a confident, full-screen entrance (referencing the old /welcome
+    // composition: wordmark anchored top, a vertically-centered eyebrow +
+    // headline + subline, the six steps as a crafted list, full-width stacked
+    // actions, generous balanced whitespace) so the first screen feels like a
+    // crafted, high-end app, not a bordered card floating mid-screen. Evergreen
+    // copy is preserved.
     return (
-      <CenteredScreen testid="sp-intro">
-        <p className="sp-eyebrow">Studio Profile</p>
-        <h1 className="sp-title">Set up Studio once.</h1>
-        <p className="sp-sub">
-          Most agents finish in 5–8 minutes. Studio reuses these details across
-          your seller pages, listing promos, follow-ups, and every new tool you
-          create later, so you never rebuild them per page.
-        </p>
-        <ol className="sp-map" data-testid="sp-intro-map">
-          {["You", "Reach", "Proof", "How you sell", "Recent work", "Brand"].map(
-            (label, i) => (
-              <li className="sp-map__item" key={label}>
-                <span className="sp-map__num">{i + 1}</span>
-                {label}
-              </li>
-            ),
-          )}
-        </ol>
-        <div className="sp-actions">
-          <button
-            type="button"
-            className="sp-btn sp-btn--primary"
-            data-testid="sp-intro-start"
-            onClick={() => setScreen("you")}
-          >
-            Start setup
-          </button>
-          <button
-            type="button"
-            className="sp-btn sp-btn--ghost"
-            data-testid="sp-intro-later"
-            onClick={onLater}
-          >
-            I&rsquo;ll do this later
-          </button>
+      <div className="sp sp--intro" data-testid="sp-intro">
+        <div className="sp-intro__inner">
+          <header className="sp-intro__top">
+            <span className="sp__wordmark">
+              Studio <em>SEP</em>
+            </span>
+          </header>
+          <div className="sp-intro__body">
+            <p className="sp-eyebrow">Studio Profile</p>
+            <h1 className="sp-intro__title">Set up Studio once.</h1>
+            <p className="sp-intro__sub">
+              Most agents finish in 5 to 8 minutes. Studio reuses these details
+              across your seller pages, listing promos, follow-ups, and every new
+              tool you create later, so you never rebuild them per page.
+            </p>
+            <ol className="sp-intro__steps" data-testid="sp-intro-map">
+              {["You", "Reach", "Proof", "How you sell", "Recent work", "Brand"].map(
+                (label, i) => (
+                  <li className="sp-intro__step" key={label}>
+                    <span className="sp-intro__step-num">{i + 1}</span>
+                    <span className="sp-intro__step-label">{label}</span>
+                  </li>
+                ),
+              )}
+            </ol>
+            <div className="sp-intro__actions">
+              <button
+                type="button"
+                className="sp-btn sp-btn--primary"
+                data-testid="sp-intro-start"
+                onClick={() => setScreen("you")}
+              >
+                Start setup
+              </button>
+              <button
+                type="button"
+                className="sp-btn sp-btn--ghost"
+                data-testid="sp-intro-later"
+                onClick={onLater}
+              >
+                I&rsquo;ll do this later
+              </button>
+            </div>
+          </div>
         </div>
-      </CenteredScreen>
+      </div>
     );
   }
 
@@ -451,16 +466,26 @@ export function StudioProfileSetup({ ownerEmail }: { ownerEmail: string | null }
   }
 
   if (screen === "launch") {
+    // D — the finish reward: reuse the mid-flow milestone checkmark entrance
+    // (the beat Dallen liked) so completing the flow lands with delight — the
+    // seal draws on as the hero, then the copy settles in. Plays once on mount;
+    // prefers-reduced-motion just appears, fully drawn.
     return (
-      <CenteredScreen testid="sp-launch">
-        <p className="sp-eyebrow">You&rsquo;re set</p>
-        <h1 className="sp-title">Your seller page is ready.</h1>
-        <p className="sp-sub">
+      <CenteredScreen testid="sp-launch" milestone>
+        <span className="sp-seal sp-seal--anim" data-testid="sp-launch-seal" aria-hidden="true">
+          <svg className="sp-seal__svg" viewBox="0 0 52 52">
+            <circle className="sp-seal__ring" cx="26" cy="26" r="24" />
+            <path className="sp-seal__check" d="M15 27 l7 7 l15 -16" />
+          </svg>
+        </span>
+        <p className="sp-eyebrow sp-ms sp-ms--1">You&rsquo;re set</p>
+        <h1 className="sp-title sp-ms sp-ms--2">Your seller page is ready.</h1>
+        <p className="sp-sub sp-ms sp-ms--3">
           Studio will carry your identity, proof, marketing, recent work, and
           brand into every page you create. Extras for your full presentation and
           pre-listing page live in Settings whenever you want.
         </p>
-        <div className="sp-actions">
+        <div className="sp-actions sp-ms sp-ms--4">
           <button
             type="button"
             className="sp-btn sp-btn--primary"
@@ -622,21 +647,21 @@ export function StudioProfileSetup({ ownerEmail }: { ownerEmail: string | null }
               saved={savedAsset === step}
               reducedMotion={reducedMotion}
             />
-            {/* Item 9 — the "one input → many outputs" idea, given a real
-                treatment: a caption that ties the previewed asset to the other
-                surfaces it reuses, with grouped, well-spaced pills. */}
+            {/* Item 9 (A2) — one complete thought: the detail entered here is
+                reused across every surface. The three surfaces read as ONE
+                connected, equal set (a joined segmented group); the surface on
+                the stage is marked as the CURRENT preview, not as the only place
+                the detail appears. */}
             <div className="sp-dest" data-testid="sp-destinations">
-              <p className="sp-dest__label">This also appears on</p>
-              <div className="sp-dest__chips" aria-hidden="true">
-                <span className="sp-dest__chip sp-dest__chip--active">
-                  Seller page
+              <p className="sp-dest__label">Reused everywhere you show up</p>
+              <div className="sp-dest__set" aria-hidden="true">
+                <span className="sp-dest__chip sp-dest__chip--current">
+                  Seller pages
                 </span>
-                <span className="sp-dest__chip">Follow-up</span>
+                <span className="sp-dest__chip">Follow-ups</span>
                 <span className="sp-dest__chip">Pre-listing</span>
               </div>
-              <p className="sp-dest__note">
-                One input — reused everywhere you show up.
-              </p>
+              <p className="sp-dest__now">Now previewing: Seller pages</p>
             </div>
           </div>
         </section>
