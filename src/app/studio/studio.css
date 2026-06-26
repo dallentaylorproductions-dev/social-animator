@@ -948,6 +948,19 @@
 .sp-asset--saved {
   animation: sp-asset-pop 1s ease both;
 }
+
+/* ── Step 1 (You) identity preview trim ──────────────────────────────────────
+   The You asset is AgentBand rendered identity-only (showCtas/showFoot false),
+   which still emits the "06 · Your Agent" section eyebrow and the contact meta
+   ("Email" etc.). Trim to avatar + name + brokerage so the preview is the agent
+   IDENTITY, not a footer band. Scoped to the You asset only; no flagship edit, no
+   consumer-page change. The region anchors are unaffected: name → .agent__name,
+   avatar → .agent__avatar, brokerage → .agent__who .r. */
+.sp-asset[data-testid="sp-asset-you"] .eyebrow,
+.sp-asset[data-testid="sp-asset-you"] .agent__meta,
+.sp-asset[data-testid="sp-asset-you"] .agent__bio {
+  display: none;
+}
 /* ── destination bar (A2) — one connected statement ──────────────────────────
    "Reused everywhere you show up" over the three surfaces as ONE joined, equal
    group (a segmented set). The surface currently on the stage is marked as the

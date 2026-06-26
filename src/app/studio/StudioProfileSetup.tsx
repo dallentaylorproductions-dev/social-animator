@@ -221,6 +221,10 @@ export function StudioProfileSetup({ ownerEmail }: { ownerEmail: string | null }
   const [focusField, setFocusField] = useState<string | null>(null);
   const [expanded, setExpanded] = useState(false);
   const rootRef = useRef<HTMLDivElement>(null);
+  // Browse scroll offset captured at focus-in (before the console goes
+  // position:fixed and the browser clamps scrollY to 0), so it can be restored
+  // when Focus closes.
+  const browseScrollRef = useRef(0);
   const focusActive = isMobile && focusField !== null;
   // Step 1 (You) regions get a bottom-anchored focus layout (no dead space).
   const youFocus =
@@ -348,18 +352,38 @@ export function StudioProfileSetup({ ownerEmail }: { ownerEmail: string | null }
   }, [focusActive, focusField]);
 
   // Lock body scroll while Focus owns the visual viewport, so iOS Safari can't
-  // scroll the input out from under the keyboard-pinned column. Restored on exit.
+  // scroll the input out from under the keyboard-pinned column. The position:fixed
+  // lock would reset the page to the top, so we PRESERVE the Browse scroll offset
+  // (shift the body up by scrollY while locked) and RESTORE it on exit — otherwise
+  // Browse jumps to the top every time the keyboard dismisses.
   useEffect(() => {
     if (!focusActive || typeof document === "undefined") return;
     const body = document.body;
-    const prevOverflow = body.style.overflow;
-    const prevTouch = body.style.touchAction;
-    window.scrollTo({ top: 0, behavior: "auto" });
+    // Use the offset captured at focus-in (window.scrollY is already 0 here, the
+    // console having gone position:fixed in this render).
+    const scrollY = browseScrollRef.current;
+    const prev = {
+      position: body.style.position,
+      top: body.style.top,
+      left: body.style.left,
+      right: body.style.right,
+      width: body.style.width,
+      overflow: body.style.overflow,
+    };
+    body.style.position = "fixed";
+    body.style.top = `-${scrollY}px`;
+    body.style.left = "0";
+    body.style.right = "0";
+    body.style.width = "100%";
     body.style.overflow = "hidden";
-    body.style.touchAction = "none";
     return () => {
-      body.style.overflow = prevOverflow;
-      body.style.touchAction = prevTouch;
+      body.style.position = prev.position;
+      body.style.top = prev.top;
+      body.style.left = prev.left;
+      body.style.right = prev.right;
+      body.style.width = prev.width;
+      body.style.overflow = prev.overflow;
+      window.scrollTo(0, scrollY);
     };
   }, [focusActive]);
 
@@ -373,7 +397,13 @@ export function StudioProfileSetup({ ownerEmail }: { ownerEmail: string | null }
   // into Focus once mobile is known.
   const onCenterFocus = (e: React.FocusEvent<HTMLElement>) => {
     const region = e.target.closest?.("[data-region]")?.getAttribute("data-region");
-    if (region) setFocusField(region);
+    if (!region) return;
+    // Capture the Browse scroll BEFORE entering Focus (focusActive still false),
+    // i.e. before the console becomes position:fixed and scrollY clamps to 0.
+    if (!focusActive && typeof window !== "undefined") {
+      browseScrollRef.current = window.scrollY;
+    }
+    setFocusField(region);
   };
   const onCenterBlur = (e: React.FocusEvent<HTMLElement>) => {
     const next = e.relatedTarget as HTMLElement | null;
