@@ -1,7 +1,6 @@
 "use client";
 
 import { useEffect, useMemo, useRef, useState } from "react";
-import { createPortal } from "react-dom";
 import { useRouter } from "next/navigation";
 import {
   useBrandSettings,
@@ -49,6 +48,7 @@ import {
 } from "@/lib/studio-profile/setup-storage";
 import { SegmentedProgress } from "./SegmentedProgress";
 import { AssetPreviewFrame } from "./AssetPreviewFrame";
+import { SectionDeck, YOU_SECTION } from "./SectionDeck";
 import "./studio.css";
 
 /**
@@ -231,10 +231,6 @@ export function StudioProfileSetup({ ownerEmail }: { ownerEmail: string | null }
   // position:fixed and the browser clamps scrollY to 0), so it can be restored
   // when Focus closes.
   const browseScrollRef = useRef(0);
-  // The persistent Focus Lens input (always in the DOM for the You step on
-  // mobile), so a Browse field tap can focus it SYNCHRONOUSLY inside the gesture
-  // and iOS opens the keyboard reliably.
-  const lensInputRef = useRef<HTMLInputElement>(null);
   const focusActive = isMobile && focusField !== null;
 
   // One-time hydrate from the crash-safety buffer, then announce start.
@@ -261,16 +257,12 @@ export function StudioProfileSetup({ ownerEmail }: { ownerEmail: string | null }
     ? (screen as SegmentKey)
     : null;
 
-  // The You step uses the dedicated Focus Lens OVERLAY (a portal sized to the
-  // visual viewport — see FocusLens). The OTHER five steps keep the in-place
-  // focus shell. `lensRegion` is the active You TEXT field (name/brokerage);
-  // avatar (the headshot) is an upload, not a lens field. `inPlaceFocus` gates
-  // the legacy in-place shell to non-You steps only.
+  // The You step uses the mobile SECTION DECK (a stable-section + subsection
+  // prompt deck — see SectionDeck), so it never enters the in-place focus shell.
+  // The OTHER five steps keep the in-place focus shell. `inPlaceFocus` gates that
+  // legacy shell to non-You steps only.
   const isYouStep = activeStep === "you";
-  const lensRegion: string | null =
-    isMobile && isYouStep && (focusField === "name" || focusField === "brokerage")
-      ? focusField
-      : null;
+  const mobileYouDeck = isMobile && isYouStep;
   const inPlaceFocus = focusActive && !isYouStep;
 
   // Per-step entry instrumentation.
@@ -432,17 +424,6 @@ export function StudioProfileSetup({ ownerEmail }: { ownerEmail: string | null }
     setFocusField(region ?? null);
   };
 
-  // Open the Focus Lens for a You text field. Focus the persistent lens input
-  // SYNCHRONOUSLY inside the tap gesture (the input is always mounted) so iOS
-  // opens the keyboard, then flip on the overlay. Capture the Browse scroll first
-  // so it can be restored on close.
-  const openLens = (region: "name" | "brokerage") => {
-    if (typeof window !== "undefined") browseScrollRef.current = window.scrollY;
-    lensInputRef.current?.focus();
-    setFocusField(region);
-  };
-  const closeLens = () => setFocusField(null);
-
   const setField = (patch: Partial<BrandSettings>) =>
     setOverlay((o) => ({ ...o, ...patch }));
 
@@ -543,21 +524,32 @@ export function StudioProfileSetup({ ownerEmail }: { ownerEmail: string | null }
     }
     if (activeStep === "you") {
       // PREVIEW-ONLY: the You step previews the AgentBand identity, which renders
-      // nothing without a name. Seed a sample name + brokerage so Browse always
-      // shows a real identity asset to refine; the agent's typed values flow
-      // through `effective` and override the sample the moment they type.
+      // nothing without a name. Seed a placeholder so the identity asset is never
+      // blank; the agent's typed values flow through `effective` and override it
+      // the moment they type. MOBILE (the section deck) uses neutral "Your Name" /
+      // "Your Brokerage" placeholders — never a fake sample identity. DESKTOP keeps
+      // the original sample so its console preview stays byte-identical. These
+      // strings are render-only and are NEVER written back to the brand record.
       const ag = payload.agent;
       payload = {
         ...payload,
         agent: {
           ...ag,
-          name: ag.name?.trim() ? ag.name : "Aaron Thomas",
-          brokerage: ag.brokerage?.trim() ? ag.brokerage : "Windermere · Tacoma",
+          name: ag.name?.trim()
+            ? ag.name
+            : isMobile
+              ? "Your Name"
+              : "Aaron Thomas",
+          brokerage: ag.brokerage?.trim()
+            ? ag.brokerage
+            : isMobile
+              ? "Your Brokerage"
+              : "Windermere · Tacoma",
         },
       };
     }
     return payload;
-  }, [basePayload, activeStep, effective.recentListings, effective.logoDataUrl]);
+  }, [basePayload, activeStep, effective.recentListings, effective.logoDataUrl, isMobile]);
 
   // Pre-populate the How-you-sell step: the moment it opens, seed the default
   // marketing approach so the editor "arrives done" (3 cards to keep + edit) and
@@ -803,6 +795,35 @@ export function StudioProfileSetup({ ownerEmail }: { ownerEmail: string | null }
   const phaseLabel = stepIndex < 3 ? "Client-ready" : "Finish your profile";
   const expandable = stepIndex >= 2;
 
+  // MOBILE Step 1 (You): the stable-section + subsection prompt deck replaces the
+  // whole console for this step (no Browse/Focus split, no lens overlay). rootRef
+  // still hosts it so the visualViewport → --sp-vvh/--sp-vvt publishing applies and
+  // the deck (a child) inherits the keyboard-safe sizing vars.
+  if (mobileYouDeck) {
+    return (
+      <div
+        ref={rootRef}
+        className="sp sp--console sp--deck-host"
+        data-testid="sp-console"
+        data-step="you"
+      >
+        <SectionDeck
+          section={YOU_SECTION}
+          effective={effective}
+          setField={setField}
+          previewPayload={previewPayload}
+          reducedMotion={reducedMotion}
+          done={done}
+          saving={savedAsset !== null}
+          savedNow={savedAsset === "you"}
+          toast={toast}
+          onFinish={() => commitAndAdvance("you")}
+          onBack={() => goTo(PREV_SCREEN.you)}
+        />
+      </div>
+    );
+  }
+
   return (
     <div
       ref={rootRef}
@@ -889,12 +910,7 @@ export function StudioProfileSetup({ ownerEmail }: { ownerEmail: string | null }
 
         <div className="sp-fields">
           {step === "you" && (
-            <YouFields
-              effective={effective}
-              setField={setField}
-              isMobile={isMobile}
-              onEditField={openLens}
-            />
+            <YouFields effective={effective} setField={setField} />
           )}
           {step === "reach" && (
             <ReachFields effective={effective} setField={setField} />
@@ -1011,26 +1027,6 @@ export function StudioProfileSetup({ ownerEmail }: { ownerEmail: string | null }
         </ExpandedSheet>
       )}
 
-      {/* Step 1 (You) Focus Lens — a portal OVERLAY (not an in-place collapse).
-          Always mounted on mobile You so the persistent input pre-exists for a
-          synchronous keyboard-opening focus; it becomes visible only when a You
-          text field is active. */}
-      {isMobile && isYouStep && (
-        <FocusLens
-          region={lensRegion}
-          effective={effective}
-          setField={setField}
-          previewPayload={previewPayload}
-          reducedMotion={reducedMotion}
-          done={done}
-          inputRef={lensInputRef}
-          browseScrollY={browseScrollRef.current}
-          canSave={canSave}
-          saving={savedAsset !== null}
-          onSave={() => commitAndAdvance("you")}
-          onClose={closeLens}
-        />
-      )}
     </div>
   );
 }
@@ -1040,54 +1036,30 @@ export function StudioProfileSetup({ ownerEmail }: { ownerEmail: string | null }
 function YouFields({
   effective,
   setField,
-  isMobile,
-  onEditField,
 }: {
   effective: BrandSettings;
   setField: (patch: Partial<BrandSettings>) => void;
-  /** MOBILE: name + brokerage are tap-to-edit field buttons that open the Focus
-      Lens; DESKTOP keeps real inputs (the console editing surface, unchanged). */
-  isMobile?: boolean;
-  onEditField?: (region: "name" | "brokerage") => void;
 }) {
+  // DESKTOP console editing surface (real inputs). MOBILE Step 1 is the section
+  // deck (see SectionDeck), which never renders YouFields — so this is the single
+  // desktop path, byte-identical to before.
   const nameVal = effective.agentName ?? "";
   const brokerageVal = effective.brokerage ?? "";
   return (
     <>
-      {isMobile ? (
-        <button
-          type="button"
-          className="sp-field sp-field--primary sp-field-tap"
-          data-region="name"
-          data-testid="sp-field-name"
-          onClick={() => onEditField?.("name")}
-        >
-          <span className="sp-label">Your name</span>
-          <span
-            className={`sp-input sp-field-tap__val${nameVal.trim() ? "" : " sp-field-tap__val--ph"}`}
-          >
-            {nameVal.trim() || "Aaron Thomas"}
-          </span>
-        </button>
-      ) : (
-        <label className="sp-field sp-field--primary" data-region="name">
-          <span className="sp-label">Your name</span>
-          <input
-            className="sp-input"
-            data-testid="sp-input-name"
-            type="text"
-            autoFocus
-            value={nameVal}
-            placeholder="Aaron Thomas"
-            onChange={(e) => setField({ agentName: e.target.value })}
-          />
-        </label>
-      )}
+      <label className="sp-field sp-field--primary" data-region="name">
+        <span className="sp-label">Your name</span>
+        <input
+          className="sp-input"
+          data-testid="sp-input-name"
+          type="text"
+          autoFocus
+          value={nameVal}
+          placeholder="Aaron Thomas"
+          onChange={(e) => setField({ agentName: e.target.value })}
+        />
+      </label>
 
-      {/* Headshot + brokerage are compact SECONDARY items on mobile Browse (so
-          Step 1 reads as a lens, not a long settings stack); each still enters
-          its own Focus state on tap. Desktop is unaffected (the wrapper is inert
-          there; the compaction lives behind the mobile media query). */}
       <div className="sp-you-secondary">
       <div className="sp-field" data-region="avatar">
         <span className="sp-label">Your headshot</span>
@@ -1117,34 +1089,17 @@ function YouFields({
         />
       </div>
 
-      {isMobile ? (
-        <button
-          type="button"
-          className="sp-field sp-field-tap"
-          data-region="brokerage"
-          data-testid="sp-field-brokerage"
-          onClick={() => onEditField?.("brokerage")}
-        >
-          <span className="sp-label">Brokerage</span>
-          <span
-            className={`sp-input sp-field-tap__val${brokerageVal.trim() ? "" : " sp-field-tap__val--ph"}`}
-          >
-            {brokerageVal.trim() || "Windermere · Tacoma"}
-          </span>
-        </button>
-      ) : (
-        <label className="sp-field" data-region="brokerage">
-          <span className="sp-label">Brokerage</span>
-          <input
-            className="sp-input"
-            data-testid="sp-input-brokerage"
-            type="text"
-            value={brokerageVal}
-            placeholder="Windermere · Tacoma"
-            onChange={(e) => setField({ brokerage: e.target.value })}
-          />
-        </label>
-      )}
+      <label className="sp-field" data-region="brokerage">
+        <span className="sp-label">Brokerage</span>
+        <input
+          className="sp-input"
+          data-testid="sp-input-brokerage"
+          type="text"
+          value={brokerageVal}
+          placeholder="Windermere · Tacoma"
+          onChange={(e) => setField({ brokerage: e.target.value })}
+        />
+      </label>
       </div>
     </>
   );
@@ -1610,206 +1565,6 @@ function SignatureColorField({
         </span>
       )}
     </div>
-  );
-}
-
-/* ───────────────────────────── focus lens (You) ───────────────────────────── */
-
-/**
- * FocusLens — Step 1 (You) Focus Mode as a dedicated OVERLAY (a React portal at
- * document.body), NOT an in-place collapse of the Browse DOM. It owns the visible
- * band above the keyboard: it reads `window.visualViewport` directly and packs
- * its children top-down inside that exact rectangle, so "empty void" and "input
- * behind the keyboard" are structurally impossible (children in normal flow; the
- * container's bottom edge IS the keyboard's top edge).
- *
- * Internal stack: segmented progress · the compressed AgentBand identity (the
- * active region highlighted) · "Editing your {field}" · the active input · Save
- * pinned to the bottom. The input is PERSISTENT (always mounted) so a Browse field
- * tap can focus it synchronously and iOS opens the keyboard.
- */
-function FocusLens({
-  region,
-  effective,
-  setField,
-  previewPayload,
-  reducedMotion,
-  done,
-  inputRef,
-  browseScrollY,
-  canSave,
-  saving,
-  onSave,
-  onClose,
-}: {
-  region: string | null;
-  effective: BrandSettings;
-  setField: (patch: Partial<BrandSettings>) => void;
-  previewPayload: PublicPayload;
-  reducedMotion: boolean;
-  done: ReadonlySet<SegmentKey>;
-  inputRef: React.RefObject<HTMLInputElement | null>;
-  browseScrollY: number;
-  canSave: boolean;
-  saving: boolean;
-  onSave: () => void;
-  onClose: () => void;
-}) {
-  const active = region !== null;
-  const lensRef = useRef<HTMLDivElement>(null);
-  const previewRef = useRef<HTMLDivElement>(null);
-
-  // Size the lens to the VISUAL viewport (the band above the keyboard). top
-  // tracks offsetTop (iOS shifts it during the keyboard animation). rAF-debounced,
-  // subscribed to both resize and scroll. 100dvh fallback only.
-  useEffect(() => {
-    if (typeof window === "undefined") return;
-    const el = lensRef.current;
-    if (!el) return;
-    const vv = window.visualViewport;
-    let raf = 0;
-    const apply = () => {
-      if (vv) {
-        const h = Math.round(vv.height);
-        el.style.height = `${h}px`;
-        el.style.top = `${Math.round(vv.offsetTop)}px`;
-        // Publish the lens height so the preview can cap itself at a fraction of
-        // the ACTUAL keyboard-open band (not svh, which ignores the keyboard) —
-        // keeping the identity <=24% of the lens on every device.
-        el.style.setProperty("--sp-lens-h", `${h}px`);
-      } else {
-        el.style.height = "100dvh";
-        el.style.top = "0px";
-        el.style.setProperty("--sp-lens-h", "100dvh");
-      }
-    };
-    const onChange = () => {
-      if (raf) cancelAnimationFrame(raf);
-      raf = requestAnimationFrame(apply);
-    };
-    apply();
-    vv?.addEventListener("resize", onChange);
-    vv?.addEventListener("scroll", onChange);
-    return () => {
-      vv?.removeEventListener("resize", onChange);
-      vv?.removeEventListener("scroll", onChange);
-      if (raf) cancelAnimationFrame(raf);
-    };
-  }, [active]);
-
-  // Body lock + scroll preserve while the lens is active (restored on close).
-  useEffect(() => {
-    if (!active || typeof document === "undefined") return;
-    const body = document.body;
-    const prev = {
-      position: body.style.position,
-      top: body.style.top,
-      left: body.style.left,
-      right: body.style.right,
-      width: body.style.width,
-      overflow: body.style.overflow,
-    };
-    body.style.position = "fixed";
-    body.style.top = `-${browseScrollY}px`;
-    body.style.left = "0";
-    body.style.right = "0";
-    body.style.width = "100%";
-    body.style.overflow = "hidden";
-    return () => {
-      body.style.position = prev.position;
-      body.style.top = prev.top;
-      body.style.left = prev.left;
-      body.style.right = prev.right;
-      body.style.width = prev.width;
-      body.style.overflow = prev.overflow;
-      window.scrollTo(0, browseScrollY);
-    };
-  }, [active, browseScrollY]);
-
-  // SCALE-not-crop: the trimmed identity (avatar + name + brokerage) renders in
-  // full and is scaled down by CSS to fit the preview band — never re-cropped or
-  // translated to a sub-region. The active region is shown by emphasis (dimmed
-  // siblings), not by windowing, so no JS framing/translate is needed here.
-
-  if (typeof document === "undefined") return null;
-
-  const isBrokerage = region === "brokerage";
-  const value = isBrokerage ? effective.brokerage ?? "" : effective.agentName ?? "";
-  const label = region ? REGION_LABEL[region] ?? "profile" : "name";
-
-  return createPortal(
-    <div
-      ref={lensRef}
-      className={`sp sp-lens${active ? " sp-lens--active" : ""}`}
-      data-focus-region={region ?? undefined}
-      data-testid="sp-lens"
-      aria-hidden={!active}
-    >
-      <div className="sp-lens__progress" aria-hidden="true">
-        {STEP_ORDER.map((k, i) => (
-          <span
-            key={k}
-            className={`sp-lens__seg${done.has(k) ? " is-done" : ""}${
-              k === "you" ? " is-active" : ""
-            }${i === 3 ? " is-break" : ""}`}
-          />
-        ))}
-      </div>
-      {/* preview sits at the top, directly under the progress (the "what sellers
-          see" zone); the editing controls bottom-anchor above the keyboard. The
-          slack between them reads as deliberate separation, not dead space. */}
-      {active && (
-        <div className="sp-lens__preview" ref={previewRef}>
-          <AssetPreviewFrame
-            payload={previewPayload}
-            asset="you"
-            youIdentity
-            saved={false}
-            reducedMotion={reducedMotion}
-          />
-        </div>
-      )}
-      <div className="sp-lens__edit">
-        <p className="sp-lens__cap" data-testid="sp-lens-caption">
-          Editing your {label}
-        </p>
-        <div className="sp-lens__field">
-          <input
-            ref={inputRef}
-            className="sp-input"
-            data-testid="sp-lens-input"
-            type="text"
-            value={value}
-            placeholder={isBrokerage ? "Windermere · Tacoma" : "Aaron Thomas"}
-            aria-label={isBrokerage ? "Brokerage" : "Your name"}
-            onChange={(e) =>
-              setField(
-                isBrokerage
-                  ? { brokerage: e.target.value }
-                  : { agentName: e.target.value },
-              )
-            }
-            onBlur={(e) => {
-              const next = e.relatedTarget as HTMLElement | null;
-              if (next && next.closest?.(".sp-lens__actions")) return; // tapping Save
-              onClose();
-            }}
-          />
-        </div>
-        <div className="sp-lens__actions">
-          <button
-            type="button"
-            className="sp-btn sp-btn--primary"
-            data-testid="sp-lens-save"
-            disabled={!canSave || saving}
-            onClick={onSave}
-          >
-            Save &amp; continue
-          </button>
-        </div>
-      </div>
-    </div>,
-    document.body,
   );
 }
 

@@ -1578,134 +1578,113 @@
 }
 
 /* ═══════════════════════════════════════════════════════════════════════════
- * Step 1 (You) FOCUS LENS — a dedicated portal OVERLAY (NOT an in-place collapse)
- * sized to window.visualViewport in JS (height + top set inline). It owns the
- * band above the keyboard and packs its children top-down, so "empty void" and
- * "input behind the keyboard" are structurally impossible. Mobile only.
+ * STEP 1 (You) SECTION DECK — the stable-section + subsection prompt deck that
+ * replaces the region-cropping Focus Lens. An IN-PLACE fixed column sized to the
+ * visual viewport (--sp-vvh / --sp-vvt, published on the console root from JS).
+ * The section preview is ONE element SCALED to fit (never windowed, translated,
+ * or zoomed); the prompt deck holds exactly one subsection at a time and slides
+ * in; the CTA pins above the keyboard. No page scroll, no dim-the-rest. Mobile
+ * only — the desktop console and steps 2–6 are untouched.
  * ═══════════════════════════════════════════════════════════════════════════ */
 @media (max-width: 959.98px) {
-  /* Browse: name + brokerage as tap-to-edit field buttons (look like inputs). */
-  .sp-field-tap {
-    display: flex;
-    flex-direction: column;
-    gap: 7px;
-    align-items: stretch;
-    text-align: left;
-    width: 100%;
-    background: none;
-    border: none;
-    padding: 0;
-    cursor: pointer;
-  }
-  .sp-field-tap__val {
-    display: block;
-    text-align: left;
-    color: var(--sp-ink);
-  }
-  .sp-field-tap__val--ph {
-    color: var(--sp-muted);
-    opacity: 0.7;
-  }
-
-  .sp-lens {
+  .sp-deck {
     position: fixed;
+    top: var(--sp-vvt, 0);
     left: 0;
     right: 0;
-    top: 0; /* JS sets top = visualViewport.offsetTop */
-    width: 100%;
-    height: 100dvh; /* JS sets height = visualViewport.height; dvh is fallback only */
-    min-height: 0; /* MUST override .sp min-height:100vh, else it runs behind the keyboard */
-    z-index: 60;
+    height: var(--sp-vvh, 100dvh);
+    min-height: 0; /* override the .sp 100vh floor, else it runs under the keyboard */
+    z-index: 50;
     display: flex;
     flex-direction: column;
-    background: var(--sp-page);
-    opacity: 0;
-    pointer-events: none;
     overflow: hidden;
-    transition: opacity 0.18s ease;
+    background: var(--sp-page);
     padding: calc(8px + env(safe-area-inset-top)) 18px
-      calc(10px + env(safe-area-inset-bottom));
+      calc(12px + env(safe-area-inset-bottom));
+    gap: 12px;
   }
-  .sp-lens--active {
-    opacity: 1;
-    pointer-events: auto;
-  }
-  /* segmented progress (3 + 3) */
-  .sp-lens__progress {
+
+  /* compact header + the SINGLE 6-step progress scale */
+  .sp-deck__head {
     flex: 0 0 auto;
+  }
+  .sp-deck__title {
+    margin: 0 0 8px;
+    font-size: 13px;
+    font-weight: 600;
+    color: var(--sp-header);
+  }
+  .sp-deck__progress {
     display: flex;
     gap: 5px;
-    padding-top: 4px;
   }
-  .sp-lens__seg {
+  .sp-deck__seg {
     flex: 1;
     height: 4px;
     border-radius: 999px;
     background: var(--sp-hairline-strong);
   }
-  .sp-lens__seg.is-done,
-  .sp-lens__seg.is-active {
+  .sp-deck__seg.is-done,
+  .sp-deck__seg.is-active {
     background: var(--sp-mint);
   }
-  .sp-lens__seg.is-break {
+  .sp-deck__seg.is-break {
     margin-left: 14px; /* the gap between the two phases */
   }
-  /* The stable identity preview: the WHOLE trimmed identity (avatar + name +
-     brokerage) renders in full and is SCALED to fit this band — never cropped or
-     windowed. It flex-grows to absorb the lens slack and centers its content, so
-     there is no dead middle: the identity floats in the upper region, the edit
-     controls group directly beneath it. */
-  .sp-lens__preview {
-    flex: 1 1 auto;
+
+  /* THE STABLE SECTION — scaled to fit, never windowed. margin-top:auto pushes the
+     [preview · prompt · CTA] group to the bottom (above the keyboard) so the slack
+     collects under the header as breathing room — no dead middle. */
+  .sp-deck__preview {
+    flex: 0 1 auto;
     min-height: 0;
+    margin-top: auto;
     display: flex;
     align-items: center;
     justify-content: center;
-    padding: 10px 0;
   }
-  /* The editing controls pack directly under the preview (no margin-top:auto
-     split). caption + input + Save sit snug as one tight group at the bottom of
-     the lens, just above the keyboard. */
-  .sp-lens__edit {
-    flex: 0 0 auto;
-    display: flex;
-    flex-direction: column;
-    gap: 10px;
-  }
-  /* SCALE-not-crop: the trimmed identity card is capped to ~24% of the lens by a
-     max-height, and the whole composition scales down to fit it (no overflow
-     clip, no translate). */
-  .sp-lens__preview .sp-asset {
+  .sp-deck__preview .sp-asset {
     width: 100%;
     max-width: 340px;
-    /* cap at 24% of the ACTUAL keyboard-open band (--sp-lens-h, set by the lens
-       JS from visualViewport); svh would ignore the keyboard and overshoot. */
-    max-height: calc(var(--sp-lens-h, 100dvh) * 0.24);
+    /* ≤32% before-tap; flex squeezes it further (≤24%) once the keyboard shrinks
+       --sp-vvh. Capped against the ACTUAL visual viewport, never vh/dvh. */
+    max-height: calc(var(--sp-vvh, 100dvh) * 0.32);
     display: flex;
     align-items: center;
     justify-content: center;
   }
-  /* let the page shrink to the compact trimmed card (override the 120px floor),
-     so the identity scales to the band instead of being forced tall. */
-  .sp-lens__preview .sp-asset__page {
+  .sp-deck__preview .sp-asset__page {
     min-height: 0;
     width: 100%;
   }
-  /* Lens-only compaction so the trimmed identity sits comfortably within 24% of a
-     real keyboard-open band (Browse keeps the slightly larger card). */
-  .sp-lens .sp-asset[data-testid="sp-asset-you"] .agent.section {
+  /* compact the identity card so it sits comfortably within the band */
+  .sp-deck .sp-asset[data-testid="sp-asset-you"] .agent.section {
     padding: 8px 12px;
   }
-  .sp-lens .sp-asset[data-testid="sp-asset-you"] .agent__card {
+  .sp-deck .sp-asset[data-testid="sp-asset-you"] .agent__card {
     padding: 11px 13px;
   }
-  .sp-lens .sp-asset[data-testid="sp-asset-you"] .agent__avatar {
+  .sp-deck .sp-asset[data-testid="sp-asset-you"] .agent__avatar {
     width: 44px;
     height: 44px;
     font-size: 16px;
   }
-  .sp-lens__cap {
+
+  /* THE PROMPT DECK — exactly one subsection in the DOM at a time; slides in on
+     change. The section preview above stays anchored throughout. */
+  .sp-deck__prompt {
     flex: 0 0 auto;
+    display: flex;
+    flex-direction: column;
+    gap: 8px;
+  }
+  .sp-deck__prompt--fwd {
+    animation: sp-deck-in-right 0.22s ease both;
+  }
+  .sp-deck__prompt--back {
+    animation: sp-deck-in-left 0.22s ease both;
+  }
+  .sp-deck__count {
     margin: 0;
     font-size: 11px;
     font-weight: 600;
@@ -1713,29 +1692,73 @@
     text-transform: uppercase;
     color: var(--sp-mint);
   }
-  .sp-lens__field {
-    flex: 0 0 auto;
+  .sp-deck__label {
+    margin: 0;
+    font-size: 15px;
+    font-weight: 600;
+    color: var(--sp-header);
   }
-  .sp-lens__actions {
-    flex: 0 0 auto;
-    padding-top: 2px;
-  }
-  .sp-lens__actions .sp-btn--primary {
+  .sp-deck__input {
     width: 100%;
+  }
+
+  .sp-deck__toast {
+    flex: 0 0 auto;
+    margin: 0;
+    font-size: 13px;
+    line-height: 1.45;
+    color: var(--sp-ink);
+  }
+
+  /* CTA pinned above the keyboard (same primary+ghost pattern as the console) */
+  .sp-deck__cta {
+    flex: 0 0 auto;
+    display: flex;
+    flex-direction: row-reverse;
+    gap: 10px;
+  }
+  .sp-deck__cta .sp-btn--primary {
+    flex: 1;
     justify-content: center;
   }
-  /* Active-region emphasis inside the lens = the active part of the trimmed
-     identity stays at full opacity while its siblings DIM. No border, no pill, no
-     neon ring (debug-looking and banned) — emphasis by de-emphasis only. */
-  .sp-lens[data-focus-region="name"] .sp-asset .fs-frame *:not(:has(.agent__who .n)):not(.agent__who .n):not(.agent__who .n *),
-  .sp-lens[data-focus-region="brokerage"] .sp-asset .fs-frame *:not(:has(.agent__who .r)):not(.agent__who .r):not(.agent__who .r *) {
-    opacity: 0.45;
-    transition: opacity 0.2s ease;
+  .sp-deck__cta .sp-btn--ghost {
+    flex: none;
   }
-  .sp-lens[data-focus-region="name"] .sp-asset .agent__who .n,
-  .sp-lens[data-focus-region="brokerage"] .sp-asset .agent__who .r {
+}
+
+@keyframes sp-deck-in-right {
+  from {
+    opacity: 0;
+    transform: translateX(16px);
+  }
+  to {
     opacity: 1;
-    transition: opacity 0.2s ease;
+    transform: translateX(0);
+  }
+}
+@keyframes sp-deck-in-left {
+  from {
+    opacity: 0;
+    transform: translateX(-16px);
+  }
+  to {
+    opacity: 1;
+    transform: translateX(0);
+  }
+}
+/* reduced-motion: cross-fade only, no slide */
+@media (prefers-reduced-motion: reduce) {
+  .sp-deck__prompt--fwd,
+  .sp-deck__prompt--back {
+    animation: sp-deck-fade 0.18s ease both;
+  }
+}
+@keyframes sp-deck-fade {
+  from {
+    opacity: 0;
+  }
+  to {
+    opacity: 1;
   }
 }
 
@@ -1824,8 +1847,8 @@
   .sp-sheet,
   .sp-sheet__backdrop,
   .sp--focus .sp-asset *,
-  .sp-lens,
-  .sp-lens .sp-asset * {
+  .sp-deck,
+  .sp-deck .sp-asset * {
     animation: none !important;
     transition: none !important;
   }
