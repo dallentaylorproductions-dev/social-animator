@@ -48,7 +48,12 @@ import {
 } from "@/lib/studio-profile/setup-storage";
 import { SegmentedProgress } from "./SegmentedProgress";
 import { AssetPreviewFrame } from "./AssetPreviewFrame";
-import { SectionDeck, YOU_SECTION } from "./SectionDeck";
+import {
+  SectionDeck,
+  YOU_SECTION,
+  REACH_SECTION,
+  type SectionConfig,
+} from "./SectionDeck";
 import "./studio.css";
 
 /**
@@ -75,6 +80,16 @@ import "./studio.css";
 
 type Screen = "intro" | SegmentKey | "clientready" | "launch";
 const STEP_ORDER: SegmentKey[] = ["you", "reach", "proof", "sell", "work", "brand"];
+
+/**
+ * Steps converted to the MOBILE SectionDeck (stable-section + subsection prompt
+ * deck). You + Reach are live; Proof/Sell/Work/Brand are the follow-on config
+ * pass and keep the legacy in-place focus shell until then.
+ */
+const DECK_SECTIONS: Partial<Record<SegmentKey, SectionConfig>> = {
+  you: YOU_SECTION,
+  reach: REACH_SECTION,
+};
 const SAVE_ANIM_MS = 1100;
 /** Fallback attribution so the review preview renders from the body alone. */
 const DEFAULT_REVIEW_ATTRIBUTION = "A past client";
@@ -257,13 +272,12 @@ export function StudioProfileSetup({ ownerEmail }: { ownerEmail: string | null }
     ? (screen as SegmentKey)
     : null;
 
-  // The You step uses the mobile SECTION DECK (a stable-section + subsection
-  // prompt deck — see SectionDeck), so it never enters the in-place focus shell.
-  // The OTHER five steps keep the in-place focus shell. `inPlaceFocus` gates that
-  // legacy shell to non-You steps only.
-  const isYouStep = activeStep === "you";
-  const mobileYouDeck = isMobile && isYouStep;
-  const inPlaceFocus = focusActive && !isYouStep;
+  // Deck steps (You, Reach) use the mobile SECTION DECK, so they never enter the
+  // in-place focus shell. The remaining steps keep the legacy in-place shell;
+  // `inPlaceFocus` gates it to those non-deck steps only.
+  const deckSection = activeStep ? DECK_SECTIONS[activeStep] : undefined;
+  const mobileDeck = isMobile && !!deckSection;
+  const inPlaceFocus = focusActive && !mobileDeck;
 
   // Per-step entry instrumentation.
   useEffect(() => {
@@ -407,7 +421,7 @@ export function StudioProfileSetup({ ownerEmail }: { ownerEmail: string | null }
   // it ungated means a focus that fires before the isMobile flip still resolves
   // into Focus once mobile is known.
   const onCenterFocus = (e: React.FocusEvent<HTMLElement>) => {
-    if (activeStep === "you") return; // You uses the Focus Lens (button-driven)
+    if (activeStep && DECK_SECTIONS[activeStep]) return; // deck steps own their focus
     const region = e.target.closest?.("[data-region]")?.getAttribute("data-region");
     if (!region) return;
     // Capture the Browse scroll BEFORE entering Focus (focusActive still false),
@@ -418,7 +432,7 @@ export function StudioProfileSetup({ ownerEmail }: { ownerEmail: string | null }
     setFocusField(region);
   };
   const onCenterBlur = (e: React.FocusEvent<HTMLElement>) => {
-    if (activeStep === "you") return;
+    if (activeStep && DECK_SECTIONS[activeStep]) return;
     const next = e.relatedTarget as HTMLElement | null;
     const region = next?.closest?.("[data-region]")?.getAttribute("data-region");
     setFocusField(region ?? null);
@@ -795,30 +809,30 @@ export function StudioProfileSetup({ ownerEmail }: { ownerEmail: string | null }
   const phaseLabel = stepIndex < 3 ? "Client-ready" : "Finish your profile";
   const expandable = stepIndex >= 2;
 
-  // MOBILE Step 1 (You): the stable-section + subsection prompt deck replaces the
-  // whole console for this step (no Browse/Focus split, no lens overlay). rootRef
-  // still hosts it so the visualViewport → --sp-vvh/--sp-vvt publishing applies and
-  // the deck (a child) inherits the keyboard-safe sizing vars.
-  if (mobileYouDeck) {
+  // MOBILE deck steps (You, Reach): the stable-section + subsection prompt deck
+  // replaces the whole console for this step (no Browse/Focus split, no lens
+  // overlay). rootRef still hosts it so the visualViewport → --sp-vvh/--sp-vvt
+  // publishing applies and the deck (a child) inherits the keyboard-safe vars.
+  if (mobileDeck && deckSection) {
     return (
       <div
         ref={rootRef}
         className="sp sp--console sp--deck-host"
         data-testid="sp-console"
-        data-step="you"
+        data-step={step}
       >
         <SectionDeck
-          section={YOU_SECTION}
+          section={deckSection}
           effective={effective}
           setField={setField}
           previewPayload={previewPayload}
           reducedMotion={reducedMotion}
           done={done}
           saving={savedAsset !== null}
-          savedNow={savedAsset === "you"}
+          savedNow={savedAsset === step}
           toast={toast}
-          onFinish={() => commitAndAdvance("you")}
-          onBack={() => goTo(PREV_SCREEN.you)}
+          onFinish={() => commitAndAdvance(step)}
+          onBack={() => goTo(PREV_SCREEN[step])}
         />
       </div>
     );
@@ -985,20 +999,16 @@ export function StudioProfileSetup({ ownerEmail }: { ownerEmail: string | null }
               </button>
             )}
             {/* Item 9 (A2) — one complete thought: the detail entered here is
-                reused across every surface. The three surfaces read as ONE
-                connected, equal set (a joined segmented group); the surface on
-                the stage is marked as the CURRENT preview, not as the only place
-                the detail appears. */}
+                reused across every surface. The three surfaces read as an EQUAL,
+                informational set (not a tab control), so nothing implies a
+                selected destination or a switch. */}
             <div className="sp-dest" data-testid="sp-destinations">
               <p className="sp-dest__label">Reused everywhere you show up</p>
               <div className="sp-dest__set" aria-hidden="true">
-                <span className="sp-dest__chip sp-dest__chip--current">
-                  Seller pages
-                </span>
+                <span className="sp-dest__chip">Seller pages</span>
                 <span className="sp-dest__chip">Follow-ups</span>
                 <span className="sp-dest__chip">Pre-listing</span>
               </div>
-              <p className="sp-dest__now">Now previewing: Seller pages</p>
             </div>
           </div>
         </section>

@@ -995,34 +995,23 @@
   letter-spacing: 0.12em;
   color: var(--sp-muted);
 }
+/* An EQUAL, non-interactive informational set — three static tags, NOT a
+   segmented tab control. No selected/highlighted state, no joined container, so
+   it reads "reused on all three," never "pick one." */
 .sp-dest__set {
   display: flex;
-  border: 1px solid var(--sp-hairline-strong);
-  border-radius: 10px;
-  overflow: hidden;
+  flex-wrap: wrap;
+  gap: 8px;
 }
 .sp-dest__chip {
-  flex: 1;
   min-width: 0;
-  text-align: center;
   font-size: 12px;
   font-weight: 600;
-  padding: 8px 8px;
-  color: var(--sp-ink);
-  background: rgba(255, 255, 255, 0.02);
-}
-.sp-dest__chip + .sp-dest__chip {
-  border-left: 1px solid var(--sp-hairline);
-}
-.sp-dest__chip--current {
-  color: var(--sp-mint);
-  background: var(--sp-mint-soft);
-}
-.sp-dest__now {
-  margin: 10px 0 0;
-  font-size: 12px;
-  line-height: 1.5;
+  padding: 6px 12px;
+  border-radius: 999px;
+  border: 1px solid var(--sp-hairline);
   color: var(--sp-muted);
+  background: rgba(255, 255, 255, 0.02);
 }
 
 /* ── motion ────────────────────────────────────────────────────────────── */
@@ -1632,16 +1621,22 @@
     margin-left: 14px; /* the gap between the two phases */
   }
 
-  /* THE STABLE SECTION — scaled to fit, never windowed. margin-top:auto pushes the
-     [preview · prompt · CTA] group to the bottom (above the keyboard) so the slack
-     collects under the header as breathing room — no dead middle. */
+  /* THE STABLE SECTION — scaled to fit, never windowed. Two compositions:
+     RESTING (no keyboard) — the preview sits in the upper region and the prompt +
+     CTA group directly beneath it, content packed from the top so the remainder is
+     balanced breathing room (never bottom-stuck). EDITING (keyboard up, see
+     .sp-deck--editing) — the group sinks to the visualViewport band with Save
+     just above the keyboard. */
   .sp-deck__preview {
     flex: 0 1 auto;
     min-height: 0;
-    margin-top: auto;
+    margin-top: calc(var(--sp-vvh, 100dvh) * 0.06);
     display: flex;
     align-items: center;
     justify-content: center;
+  }
+  .sp-deck--editing .sp-deck__preview {
+    margin-top: auto; /* keyboard band: bottom-anchor so Save clears the keyboard */
   }
   .sp-deck__preview .sp-asset {
     width: 100%;
@@ -1683,6 +1678,13 @@
   }
   .sp-deck__prompt--back {
     animation: sp-deck-in-left 0.22s ease both;
+  }
+  /* MEDIA subsections (the headshot) FADE, never slide: a retained slide transform
+     would make this block a containing block for the crop modal's position:fixed,
+     pushing its confirm/cancel off-screen. Fade keeps no transform. (Must follow
+     the --fwd/--back rules so it wins the animation-name.) */
+  .sp-deck__prompt--media {
+    animation-name: sp-deck-fade;
   }
   .sp-deck__count {
     margin: 0;
