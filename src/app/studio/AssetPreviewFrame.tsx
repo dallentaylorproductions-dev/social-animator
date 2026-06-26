@@ -86,7 +86,12 @@ export function AssetPreviewFrame({
     // desktop console preview stays byte-identical. AgentBand returns null without
     // a name; the You preview payload seeds a sample identity so it's never blank.
     body = youIdentity ? (
-      <AgentBand payload={payload} showCtas={false} showFoot={false} />
+      <AgentBand
+        payload={payload}
+        showCtas={false}
+        showFoot={false}
+        showHeadline={false}
+      />
     ) : (
       <StateAHero payload={payload} appt={appt} />
     );

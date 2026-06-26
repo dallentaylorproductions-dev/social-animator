@@ -950,16 +950,32 @@
 }
 
 /* ── Step 1 (You) identity preview trim ──────────────────────────────────────
-   The You asset is AgentBand rendered identity-only (showCtas/showFoot false),
-   which still emits the "06 · Your Agent" section eyebrow and the contact meta
-   ("Email" etc.). Trim to avatar + name + brokerage so the preview is the agent
-   IDENTITY, not a footer band. Scoped to the You asset only; no flagship edit, no
-   consumer-page change. The region anchors are unaffected: name → .agent__name,
-   avatar → .agent__avatar, brokerage → .agent__who .r. */
-.sp-asset[data-testid="sp-asset-you"] .agent .eyebrow,
+   The You asset is AgentBand rendered identity-only (showCtas/showFoot/showHeadline
+   false), so the big serif "{name}." page headline + "06 · Your Agent" eyebrow are
+   already gone. Trim the remaining footer-band bits (contact meta, bio) and COMPACT
+   the band so the whole trimmed identity (avatar + name + brokerage) is the
+   content — short enough to render in full at the preview's scale, never cropped.
+   Scoped to the You asset only; no flagship edit, no consumer-page change. The
+   region anchors: name → .agent__who .n, avatar → .agent__avatar, brokerage →
+   .agent__who .r. */
 .sp-asset[data-testid="sp-asset-you"] .agent__meta,
 .sp-asset[data-testid="sp-asset-you"] .agent__bio {
   display: none;
+}
+/* Compact the section so the card is the whole asset (the real band's section
+   padding is 46-104px — far too tall for the identity card alone). */
+.sp-asset[data-testid="sp-asset-you"] .agent.section {
+  padding: 16px 18px;
+}
+/* The band's top row is a 2-col grid (headline | card); with the headline gone
+   the card must span the full width as a single column, not a squeezed half. */
+.sp-asset[data-testid="sp-asset-you"] .agent__top {
+  grid-template-columns: 1fr;
+  gap: 0;
+}
+/* Drop the card's headline-relative top margin so it sits compact. */
+.sp-asset[data-testid="sp-asset-you"] .agent__card {
+  margin-top: 0;
 }
 /* ── destination bar (A2) — one connected statement ──────────────────────────
    "Reused everywhere you show up" over the three surfaces as ONE joined, equal
@@ -1634,34 +1650,59 @@
   .sp-lens__seg.is-break {
     margin-left: 14px; /* the gap between the two phases */
   }
-  /* the compressed identity WINDOW (~24% of a keyboard-open lens), at the top
-     under the progress */
+  /* The stable identity preview: the WHOLE trimmed identity (avatar + name +
+     brokerage) renders in full and is SCALED to fit this band — never cropped or
+     windowed. It flex-grows to absorb the lens slack and centers its content, so
+     there is no dead middle: the identity floats in the upper region, the edit
+     controls group directly beneath it. */
   .sp-lens__preview {
-    flex: 0 0 auto;
+    flex: 1 1 auto;
+    min-height: 0;
     display: flex;
+    align-items: center;
     justify-content: center;
-    padding-top: 14px;
+    padding: 10px 0;
   }
-  /* the editing controls bottom-anchor above the keyboard (margin-top:auto puts
-     the slack BETWEEN the preview and the controls — deliberate separation, not a
-     dead zone); caption + input + Save sit snug together. */
+  /* The editing controls pack directly under the preview (no margin-top:auto
+     split). caption + input + Save sit snug as one tight group at the bottom of
+     the lens, just above the keyboard. */
   .sp-lens__edit {
     flex: 0 0 auto;
-    margin-top: auto;
     display: flex;
     flex-direction: column;
     gap: 10px;
   }
+  /* SCALE-not-crop: the trimmed identity card is capped to ~24% of the lens by a
+     max-height, and the whole composition scales down to fit it (no overflow
+     clip, no translate). */
   .sp-lens__preview .sp-asset {
     width: 100%;
     max-width: 340px;
-    height: 120px;
-    overflow: hidden;
+    /* cap at 24% of the ACTUAL keyboard-open band (--sp-lens-h, set by the lens
+       JS from visualViewport); svh would ignore the keyboard and overshoot. */
+    max-height: calc(var(--sp-lens-h, 100dvh) * 0.24);
+    display: flex;
+    align-items: center;
+    justify-content: center;
   }
-  .sp-lens .sp-asset__page {
-    transform: translateY(var(--sp-frame-y, 0px));
-    transition: transform 0.2s ease;
-    will-change: transform;
+  /* let the page shrink to the compact trimmed card (override the 120px floor),
+     so the identity scales to the band instead of being forced tall. */
+  .sp-lens__preview .sp-asset__page {
+    min-height: 0;
+    width: 100%;
+  }
+  /* Lens-only compaction so the trimmed identity sits comfortably within 24% of a
+     real keyboard-open band (Browse keeps the slightly larger card). */
+  .sp-lens .sp-asset[data-testid="sp-asset-you"] .agent.section {
+    padding: 8px 12px;
+  }
+  .sp-lens .sp-asset[data-testid="sp-asset-you"] .agent__card {
+    padding: 11px 13px;
+  }
+  .sp-lens .sp-asset[data-testid="sp-asset-you"] .agent__avatar {
+    width: 44px;
+    height: 44px;
+    font-size: 16px;
   }
   .sp-lens__cap {
     flex: 0 0 auto;
@@ -1683,24 +1724,18 @@
     width: 100%;
     justify-content: center;
   }
-  /* region isolation + highlight inside the lens (dark AgentBand) */
-  .sp-lens[data-focus-region="name"] .sp-asset .fs-frame *:not(:has(.agent__name)):not(.agent__name):not(.agent__name *),
+  /* Active-region emphasis inside the lens = the active part of the trimmed
+     identity stays at full opacity while its siblings DIM. No border, no pill, no
+     neon ring (debug-looking and banned) — emphasis by de-emphasis only. */
+  .sp-lens[data-focus-region="name"] .sp-asset .fs-frame *:not(:has(.agent__who .n)):not(.agent__who .n):not(.agent__who .n *),
   .sp-lens[data-focus-region="brokerage"] .sp-asset .fs-frame *:not(:has(.agent__who .r)):not(.agent__who .r):not(.agent__who .r *) {
-    opacity: 0.26;
-    filter: saturate(0.55);
+    opacity: 0.45;
+    transition: opacity 0.2s ease;
   }
-  .sp-lens[data-focus-region="name"] .sp-asset .agent__name,
+  .sp-lens[data-focus-region="name"] .sp-asset .agent__who .n,
   .sp-lens[data-focus-region="brokerage"] .sp-asset .agent__who .r {
-    position: relative;
-    z-index: 1;
-    border-radius: 10px;
-    background: rgba(255, 255, 255, 0.07);
-    box-shadow:
-      0 0 0 5px rgba(255, 255, 255, 0.07),
-      0 0 0 6px rgba(70, 222, 194, 0.4),
-      -9px 0 0 -6px var(--sp-mint),
-      8px 10px 22px -8px rgba(0, 0, 0, 0.4);
-    animation: sp-focus-glow-dark 0.9s ease both;
+    opacity: 1;
+    transition: opacity 0.2s ease;
   }
 }
 

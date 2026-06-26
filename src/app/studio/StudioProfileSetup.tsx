@@ -121,9 +121,11 @@ const SAVE_TOAST: Record<SegmentKey, string> = {
  * field-region → asset-selector anchor used only to scroll the region into view.
  */
 const REGION_SELECTOR: Record<string, string> = {
-  // You = the isolated AgentBand identity (see AssetPreviewFrame): name headline,
-  // the avatar, and the role line (brokerage).
-  name: ".agent__name",
+  // You = the isolated AgentBand identity (see AssetPreviewFrame). The mobile You
+  // preview is TRIMMED to the identity card (no big serif "{name}." headline), so
+  // the name region is the card name (.agent__who .n), the avatar, and the role
+  // line (brokerage) — the three parts of the trimmed identity.
+  name: ".agent__who .n",
   avatar: ".agent__avatar",
   brokerage: ".agent__who .r",
   email: '[data-testid="fs-sa-confirm-email"]',
@@ -942,7 +944,10 @@ export function StudioProfileSetup({ ownerEmail }: { ownerEmail: string | null }
         <section className="sp__preview" data-testid="sp-preview">
           <div className="sp__stage">
             <p className="sp__stage-eyebrow" aria-hidden="true">
-              What sellers see
+              {/* Mobile keeps a quiet "Live preview" label (the loud "WHAT SELLERS
+                  SEE" competes with the step headline on a phone); desktop stays
+                  byte-identical. */}
+              {isMobile ? "Live preview" : "What sellers see"}
             </p>
             <AssetPreviewFrame
               payload={previewPayload}
@@ -1665,11 +1670,17 @@ function FocusLens({
     let raf = 0;
     const apply = () => {
       if (vv) {
-        el.style.height = `${Math.round(vv.height)}px`;
+        const h = Math.round(vv.height);
+        el.style.height = `${h}px`;
         el.style.top = `${Math.round(vv.offsetTop)}px`;
+        // Publish the lens height so the preview can cap itself at a fraction of
+        // the ACTUAL keyboard-open band (not svh, which ignores the keyboard) —
+        // keeping the identity <=24% of the lens on every device.
+        el.style.setProperty("--sp-lens-h", `${h}px`);
       } else {
         el.style.height = "100dvh";
         el.style.top = "0px";
+        el.style.setProperty("--sp-lens-h", "100dvh");
       }
     };
     const onChange = () => {
@@ -1715,39 +1726,10 @@ function FocusLens({
     };
   }, [active, browseScrollY]);
 
-  // Frame the active region inside the compressed preview window.
-  useEffect(() => {
-    if (!active || !region) return;
-    const sel = REGION_SELECTOR[region];
-    const wrap = previewRef.current;
-    const asset = wrap?.querySelector<HTMLElement>(".sp-asset");
-    const page = wrap?.querySelector<HTMLElement>(".sp-asset__page");
-    if (!asset || !page) return;
-    const frame = () => {
-      asset.style.setProperty("--sp-frame-y", "0px");
-      const r = sel ? page.querySelector<HTMLElement>(sel) : null;
-      if (!r) return;
-      const pr = page.getBoundingClientRect();
-      const rr = r.getBoundingClientRect();
-      const center = rr.top - pr.top + rr.height / 2;
-      const winH = asset.clientHeight || FOCUS_WINDOW_H;
-      let ty = winH / 2 - center;
-      ty = Math.max(Math.min(0, winH - page.scrollHeight), Math.min(0, ty));
-      asset.style.setProperty("--sp-frame-y", `${Math.round(ty)}px`);
-    };
-    const raf = window.requestAnimationFrame(frame);
-    const t = window.setTimeout(frame, 220);
-    let ro: ResizeObserver | null = null;
-    if (typeof ResizeObserver !== "undefined") {
-      ro = new ResizeObserver(frame);
-      ro.observe(page);
-    }
-    return () => {
-      window.cancelAnimationFrame(raf);
-      window.clearTimeout(t);
-      ro?.disconnect();
-    };
-  }, [active, region]);
+  // SCALE-not-crop: the trimmed identity (avatar + name + brokerage) renders in
+  // full and is scaled down by CSS to fit the preview band — never re-cropped or
+  // translated to a sub-region. The active region is shown by emphasis (dimmed
+  // siblings), not by windowing, so no JS framing/translate is needed here.
 
   if (typeof document === "undefined") return null;
 

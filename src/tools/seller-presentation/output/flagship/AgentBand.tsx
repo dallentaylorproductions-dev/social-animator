@@ -17,6 +17,7 @@ export function AgentBand({
   eyebrowIndex = "06",
   showCtas = true,
   showFoot = true,
+  showHeadline = true,
   showGuarantee = false,
 }: {
   payload: PublicPayload;
@@ -27,6 +28,13 @@ export function AgentBand({
   showCtas?: boolean;
   /** B0c — suppress the folded foot (the standalone page renders its own Footer). */
   showFoot?: boolean;
+  /**
+   * Studio Profile (You step preview) — drop the big serif "{name}." page
+   * headline + the "06 · Your Agent" eyebrow + tagline, leaving ONLY the trimmed
+   * identity card (avatar + name + brokerage). Default true so every consumer
+   * page renders byte-identically; only the mobile You preview opts out.
+   */
+  showHeadline?: boolean;
   /**
    * D1-CLEANUP — render the agent's guarantee as a quiet line by the CTAs. The
    * v2 SELLER page sets this (the guarantee moved here off the removed why-us
@@ -64,22 +72,24 @@ export function AgentBand({
   return (
     <section className="section agent" data-testid="fs-agent">
       <div className="agent__top">
-        <div className="reveal">
-          <div className="eyebrow on-dark">
-            {eyebrowIndex && (
-              <>
-                <span className="num">{eyebrowIndex}</span> ·{" "}
-              </>
-            )}
-            Your Agent
-          </div>
-          <h2 className="agent__name">{a.name}.</h2>
-          {payload.agentTagline && (
-            <div className="agent__tag" data-testid="fs-agent-tagline">
-              {payload.agentTagline}
+        {showHeadline && (
+          <div className="reveal">
+            <div className="eyebrow on-dark">
+              {eyebrowIndex && (
+                <>
+                  <span className="num">{eyebrowIndex}</span> ·{" "}
+                </>
+              )}
+              Your Agent
             </div>
-          )}
-        </div>
+            <h2 className="agent__name">{a.name}.</h2>
+            {payload.agentTagline && (
+              <div className="agent__tag" data-testid="fs-agent-tagline">
+                {payload.agentTagline}
+              </div>
+            )}
+          </div>
+        )}
         <div className="reveal">
           <div className="agent__card">
             <Avatar agent={a} monogram={monogram} />
