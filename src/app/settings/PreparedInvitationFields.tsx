@@ -2,6 +2,7 @@
 
 import { ImageUploadField } from "@/components/ImageUploadField";
 import { VideoUploadField } from "@/components/VideoUploadField";
+import { ListingPhotoCrop } from "@/components/ListingPhotoCrop";
 import { useSPEntitlement } from "@/tools/seller-presentation/components/SPEntitlementContext";
 import {
   defaultValuationMessage,
@@ -33,6 +34,9 @@ export function PreparedInvitationFields({
   valuationMessage,
   welcomeLine,
   sampleListingPhotoUrl,
+  sampleListingPhotoFocalX,
+  sampleListingPhotoFocalY,
+  sampleListingPhotoScale,
   sampleVideoUrl,
   sampleVideoPosterUrl,
   recentListings,
@@ -42,6 +46,9 @@ export function PreparedInvitationFields({
   valuationMessage?: string;
   welcomeLine?: string;
   sampleListingPhotoUrl?: string;
+  sampleListingPhotoFocalX?: number;
+  sampleListingPhotoFocalY?: number;
+  sampleListingPhotoScale?: number;
   sampleVideoUrl?: string;
   sampleVideoPosterUrl?: string;
   recentListings?: SettingsRecentListing[];
@@ -51,6 +58,9 @@ export function PreparedInvitationFields({
     valuationMessage?: string;
     welcomeLine?: string;
     sampleListingPhotoUrl?: string;
+    sampleListingPhotoFocalX?: number;
+    sampleListingPhotoFocalY?: number;
+    sampleListingPhotoScale?: number;
     sampleVideoUrl?: string;
     sampleVideoPosterUrl?: string;
     recentListings?: SettingsRecentListing[];
@@ -104,13 +114,36 @@ export function PreparedInvitationFields({
           label="Sample listing photo"
           value={sampleListingPhotoUrl ?? ""}
           onChange={(url) =>
-            onChange({ sampleListingPhotoUrl: url || undefined })
+            onChange({
+              sampleListingPhotoUrl: url || undefined,
+              // A new photo starts centered (mirror Studio WorkFields).
+              sampleListingPhotoFocalX: undefined,
+              sampleListingPhotoFocalY: undefined,
+              sampleListingPhotoScale: undefined,
+            })
           }
           previewAspect="aspect-[4/3]"
           folder="agent-sample-photo"
           testIdPrefix="brand-sample-photo"
           helpText="Your best listing photography, not this home. Shows how you shoot every listing."
         />
+        {sampleListingPhotoUrl && (
+          <ListingPhotoCrop
+            photoUrl={sampleListingPhotoUrl}
+            focalX={sampleListingPhotoFocalX}
+            focalY={sampleListingPhotoFocalY}
+            scale={sampleListingPhotoScale}
+            aspect={4 / 3}
+            testIdPrefix="brand-sample-photo"
+            onChange={(p) =>
+              onChange({
+                ...("focalX" in p ? { sampleListingPhotoFocalX: p.focalX } : {}),
+                ...("focalY" in p ? { sampleListingPhotoFocalY: p.focalY } : {}),
+                ...("scale" in p ? { sampleListingPhotoScale: p.scale } : {}),
+              })
+            }
+          />
+        )}
       </div>
 
       <div className="space-y-1">
@@ -146,6 +179,7 @@ export function PreparedInvitationFields({
           undefined so "no listings" stays a single state. */}
       <RecentListingsEditor
         listings={recentListings ?? []}
+        enablePhotoPosition
         onChange={(next) =>
           onChange({ recentListings: next.length ? next : undefined })
         }

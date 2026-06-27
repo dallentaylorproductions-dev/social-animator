@@ -469,6 +469,9 @@ export function BrandProfileForm() {
           valuationMessage={s.valuationMessage}
           welcomeLine={s.welcomeLine}
           sampleListingPhotoUrl={s.sampleListingPhotoUrl}
+          sampleListingPhotoFocalX={s.sampleListingPhotoFocalX}
+          sampleListingPhotoFocalY={s.sampleListingPhotoFocalY}
+          sampleListingPhotoScale={s.sampleListingPhotoScale}
           sampleVideoUrl={s.sampleVideoUrl}
           sampleVideoPosterUrl={s.sampleVideoPosterUrl}
           recentListings={s.recentListings}

@@ -79,7 +79,11 @@ import { upload } from "@vercel/blob/client";
 export function friendlyUploadError(err: unknown): string {
   const raw = err instanceof Error ? err.message : "Upload failed";
   if (/failed to\s+retrieve the client token/i.test(raw)) {
-    return "Couldn't start the upload. Your session may have expired — refresh the page and sign in again, then retry. If it keeps failing, the file may be too large or an unsupported format.";
+    // The SDK collapses every non-2xx handshake into this one opaque error, so we
+    // can't name the exact cause here — present the real possibilities evenly
+    // rather than over-attributing to an expired session (which mislabeled the
+    // folder-allowlist failure). The precise reason is in the Vercel runtime logs.
+    return "Couldn't start the upload. This can happen if the file is too large or an unsupported format, or if your session expired (refresh and sign in again). Try again, and if it keeps failing try a smaller file.";
   }
   return raw;
 }
