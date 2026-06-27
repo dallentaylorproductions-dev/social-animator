@@ -32,6 +32,7 @@ import { VideoUploadField } from "@/components/VideoUploadField";
 import { ListingPhotoCrop } from "@/components/ListingPhotoCrop";
 import { BrandEngine } from "@/lib/brand/color-engine";
 import { buildSamplePreviewPayload } from "@/lib/onboarding/sample-listing-draft";
+import { markOnboardingSeen } from "@/lib/onboarding/seen";
 import { emitStudioEvent, STUDIO_EVENTS } from "@/lib/studio-profile/funnel";
 import {
   completedSegments,
@@ -290,6 +291,17 @@ export function StudioProfileSetup({ ownerEmail }: { ownerEmail: string | null }
     if (activeStep) emitStudioEvent(STUDIO_EVENTS.stepEntered, { step: activeStep });
   }, [activeStep]);
 
+  // One-and-done first-run routing: mark the onboarding-seen flag the moment the
+  // agent reaches the launch screen (finished the deck). Reuses the SAME key/setter
+  // /welcome writes (markOnboardingSeen → socanim_onboarding_seen), which the
+  // dashboard OnboardingEntryGate reads via hasSeenOnboarding(). So a completed
+  // setup routes to /dashboard on the next sign-in instead of back into /studio.
+  // (Abandoning mid-flow without reaching launch leaves the flag unset, so an
+  // agent who made no choice is still re-nudged — acceptable.)
+  useEffect(() => {
+    if (screen === "launch") markOnboardingSeen();
+  }, [screen]);
+
   // Auto-scroll the newly-active section into view on every screen change
   // (advance / Back / rail-jump / continue beat), so the agent is never left
   // looking at the wrong part of the console after changing steps. Smooth on
@@ -530,6 +542,10 @@ export function StudioProfileSetup({ ownerEmail }: { ownerEmail: string | null }
 
   const onLater = () => {
     // The ONLY defer/exit — intro screen only. Keep the buffer so a return resumes.
+    // One-and-done (the respectful default): an explicit "I'll do this later" is a
+    // real choice, so mark onboarding seen (same key/setter /welcome uses) — the
+    // gate routes them to /dashboard next sign-in instead of re-nudging into /studio.
+    markOnboardingSeen();
     router.push("/dashboard");
   };
   const onCreatePage = () => {
