@@ -511,10 +511,15 @@ export function StudioProfileSetup({ ownerEmail }: { ownerEmail: string | null }
 
   const elapsed = () => Math.max(0, Date.now() - startedAtRef.current);
 
-  const done = useMemo(
-    () => new Set<SegmentKey>(completedSegments(effective)),
-    [effective],
-  );
+  const done = useMemo(() => {
+    const set = new Set<SegmentKey>(completedSegments(effective));
+    // Recent work is the preview-only BEAT (zero subsections, persists nothing), so
+    // completedSegments never includes it. Fill its progress segment once the user
+    // has advanced PAST it (on/after Brand) — completion-on-continue for the beat.
+    // Other steps are untouched; they still fill from saved data.
+    if (screen === "brand" || screen === "launch") set.add("work");
+    return set;
+  }, [effective, screen]);
 
   // PREVIEW-ONLY normalization (never persisted, never touches the editor): make
   // every preview render full from defaults/sample context so the agent always
