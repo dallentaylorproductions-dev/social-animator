@@ -8,8 +8,8 @@ import {
 } from "@/tools/seller-presentation/output/consumer-roles";
 import { formatAppointment } from "@/tools/seller-presentation/engine/appointment";
 import { newsreader } from "@/tools/seller-presentation/output/flagship/fonts";
-import { StateAHero } from "@/tools/seller-presentation/output/flagship/StateAHero";
 import { AgentBand } from "@/tools/seller-presentation/output/flagship/AgentBand";
+import { StateAHero } from "@/tools/seller-presentation/output/flagship/StateAHero";
 import { CampaignSpread } from "@/tools/seller-presentation/output/flagship/CampaignSpread";
 import {
   ConfirmTime,
@@ -38,7 +38,10 @@ import type { SegmentKey } from "@/lib/studio-profile/setup-state";
  * sits inside a `.fs-frame`. Only ONE asset shows at a time — never the whole
  * page — so the agent never gets the "this is huge" feeling.
  *
- *   You   → StateAHero (the real hero / agent identity area)
+ *   You   → AgentBand identity-only (the real agent-identity band: headshot /
+ *           initials + name + brokerage; CTAs + foot suppressed) — the exact
+ *           seller-facing identity asset the You step improves, NOT the property
+ *           hero (which is too broad and crops to a washed-out blank on mobile).
  *   Reach → ConfirmTime (the real contact / CTA block)
  *   Proof → TrustStrip (the real cream testimonial)
  *   Sell  → CampaignSpread (the real redesigned "How I'll get your home seen")
@@ -54,12 +57,34 @@ export function AssetPreviewFrame({
   asset,
   saved,
   reducedMotion,
+  youIdentity = false,
+  campaignVariant,
+  trimHeadline = false,
 }: {
   payload: PublicPayload;
   asset: SegmentKey;
   /** True briefly after a commit — plays the dedicated "finished" animation. */
   saved: boolean;
   reducedMotion: boolean;
+  /**
+   * MOBILE-only: render the You step as the isolated AgentBand AGENT IDENTITY
+   * (the mobile editing lens). Desktop leaves this false and keeps the original
+   * StateAHero hero — so the desktop console preview is byte-identical to before.
+   */
+  youIdentity?: boolean;
+  /**
+   * MOBILE-only: override the CampaignSpread variant for the sell/work asset
+   * (e.g. "coverflow-only" so the Recent-work beat frames just the listings).
+   * Undefined keeps the default "full" — so the desktop console stays byte-identical.
+   */
+  campaignVariant?: "full" | "coverflow-only";
+  /**
+   * MOBILE-only: trim the AgentBand headline (the "06 · YOUR AGENT" eyebrow + the
+   * big serif "{name}." — which also doubles a trailing period on names like
+   * "Dallen T."). Used by the Brand deck preview. Default false → desktop console
+   * byte-identical.
+   */
+  trimHeadline?: boolean;
 }) {
   const roleVars = consumerRoleVars(
     deriveConsumerRoles(payload.brandColors?.accent),
@@ -70,7 +95,21 @@ export function AssetPreviewFrame({
   let ghost: string | null = null;
 
   if (asset === "you") {
-    body = <StateAHero payload={payload} appt={appt} />;
+    // MOBILE (youIdentity): the isolated AGENT IDENTITY band (identity-only: no
+    // contact CTAs, no disclaimer foot) — the real seller-facing identity asset
+    // the You step improves. DESKTOP keeps the original StateAHero hero so the
+    // desktop console preview stays byte-identical. AgentBand returns null without
+    // a name; the You preview payload seeds a sample identity so it's never blank.
+    body = youIdentity ? (
+      <AgentBand
+        payload={payload}
+        showCtas={false}
+        showFoot={false}
+        showHeadline={false}
+      />
+    ) : (
+      <StateAHero payload={payload} appt={appt} />
+    );
   } else if (asset === "reach") {
     const hasContact = !!(payload.agent.email || payload.agent.phone);
     if (hasContact) body = <ConfirmTime payload={payload} appt={appt} />;
@@ -81,16 +120,19 @@ export function AssetPreviewFrame({
     else ghost = "The proof a seller can trust appears here once you add a review.";
   } else if (asset === "sell") {
     // The redesigned marketing zone (payload carries marketingZoneRedesign).
-    body = <CampaignSpread payload={payload} />;
+    body = <CampaignSpread payload={payload} variant={campaignVariant} />;
   } else if (asset === "work") {
     // Full marketing zone so EVERY field this step captures is visible: the
     // sample photo/video in "the work" showcase AND the recent-listings
-    // coverflow (the redesigned zone renders both).
-    body = <CampaignSpread payload={payload} />;
+    // coverflow (the redesigned zone renders both). The mobile Recent-work beat
+    // passes "coverflow-only" to frame just the listings.
+    body = <CampaignSpread payload={payload} variant={campaignVariant} />;
   } else if (asset === "brand") {
     // The agent band — accent-colored CTA buttons + the logo lockup — so the
-    // signature color AND the logo are both plainly visible as they change.
-    body = <AgentBand payload={payload} />;
+    // signature color AND the logo are both plainly visible as they change. The
+    // mobile Brand deck passes trimHeadline to drop the "06 · YOUR AGENT" eyebrow
+    // + the big serif name (and its doubled trailing period).
+    body = <AgentBand payload={payload} showHeadline={!trimHeadline} />;
   }
 
   const animate = saved && !reducedMotion;

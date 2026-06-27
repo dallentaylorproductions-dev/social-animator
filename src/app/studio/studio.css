@@ -673,6 +673,97 @@
   line-height: 1.8;
 }
 
+/* ── intro (B) — a confident full-screen entrance ───────────────────────────
+   Borrows the old /welcome composition (wordmark anchored top, a vertically
+   centered eyebrow + headline + subline, the six steps as a crafted hairline
+   list, full-width stacked actions, generous balanced whitespace) in the dark
+   Studio palette, so the first screen feels like a high-end app rather than a
+   bordered card floating mid-screen. Shared structure across desktop + mobile;
+   the inner column is simply centered in a calm field on wider viewports. */
+.sp--intro {
+  display: flex;
+  flex-direction: column;
+}
+.sp-intro__inner {
+  width: 100%;
+  max-width: 540px;
+  margin: 0 auto;
+  flex: 1;
+  min-height: 100vh;
+  display: flex;
+  flex-direction: column;
+  padding: 24px 22px calc(40px + env(safe-area-inset-bottom));
+}
+.sp-intro__top {
+  display: flex;
+  align-items: center;
+  margin-bottom: 24px;
+}
+.sp-intro__body {
+  flex: 1;
+  display: flex;
+  flex-direction: column;
+  justify-content: center;
+  gap: 18px;
+  padding-bottom: 16px;
+}
+.sp-intro__title {
+  font-size: clamp(32px, 7vw, 46px);
+  line-height: 1.06;
+  letter-spacing: -0.01em;
+  font-weight: 600;
+  color: var(--sp-header);
+  margin: 0;
+}
+.sp-intro__sub {
+  font-size: 16px;
+  line-height: 1.6;
+  color: var(--sp-muted);
+  margin: 0;
+  max-width: 44ch;
+}
+/* the six steps, crafted: numbered nodes in hairline-separated rows */
+.sp-intro__steps {
+  list-style: none;
+  margin: 6px 0 0;
+  padding: 0;
+  border-top: 1px solid var(--sp-hairline);
+}
+.sp-intro__step {
+  display: flex;
+  align-items: center;
+  gap: 14px;
+  padding: 13px 2px;
+  border-bottom: 1px solid var(--sp-hairline);
+  font-size: 15px;
+  font-weight: 500;
+  color: var(--sp-ink);
+}
+.sp-intro__step-num {
+  width: 26px;
+  height: 26px;
+  border-radius: 50%;
+  border: 1px solid var(--sp-mint-line);
+  background: var(--sp-mint-soft);
+  color: var(--sp-mint);
+  font-size: 12px;
+  font-weight: 700;
+  display: inline-flex;
+  align-items: center;
+  justify-content: center;
+  flex: none;
+}
+.sp-intro__actions {
+  display: flex;
+  flex-direction: column;
+  gap: 10px;
+  margin-top: 26px;
+}
+.sp-intro__actions .sp-btn {
+  width: 100%;
+  justify-content: center;
+}
+
 /* ── segmented progress ────────────────────────────────────────────────── */
 .sp-progress__phase + .sp-progress__phase {
   margin-top: 22px;
@@ -759,6 +850,43 @@
   color: var(--sp-mint);
 }
 
+/* ── progress (C) — DESKTOP rail as a connected vertical stepper ─────────────
+   The six labeled steps become a deliberate stepper: a thin connector line runs
+   through each phase's nodes (the marks punch it with an opaque fill), done = a
+   mint check, active = a ringed node + mint label. No full-row pill (it would
+   break the connector). Scoped to `.sp__rail` so the mobile bar owns its own
+   treatment below. */
+.sp__rail .sp-progress__list {
+  position: relative;
+  gap: 8px;
+}
+.sp__rail .sp-progress__list::before {
+  content: "";
+  position: absolute;
+  left: 17px; /* mark center: 8px seg padding + 9px half-mark */
+  top: 16px;
+  bottom: 16px;
+  width: 2px;
+  background: var(--sp-hairline-strong);
+  z-index: 0;
+}
+.sp__rail .sp-seg {
+  position: relative;
+  z-index: 1;
+}
+.sp__rail .sp-seg__mark {
+  background: var(--sp-rail); /* opaque: punch the connector at each node */
+}
+.sp__rail .sp-seg--done .sp-seg__mark {
+  background: var(--sp-mint); /* keep done = mint over the rail fill */
+}
+.sp__rail .sp-seg--active {
+  background: none; /* drop the row pill so the connector stays continuous */
+}
+.sp__rail .sp-seg--active .sp-seg__mark {
+  box-shadow: 0 0 0 3px var(--sp-mint-soft); /* active = a ringed node */
+}
+
 /* ── the live asset-preview stage — LIGHT/cream ON PURPOSE (see header) ──── */
 .sp-asset {
   border-radius: 16px;
@@ -820,7 +948,40 @@
 .sp-asset--saved {
   animation: sp-asset-pop 1s ease both;
 }
-/* ── destination bar — "one input → reused everywhere" (item 9) ──────────── */
+
+/* ── Step 1 (You) identity preview trim ──────────────────────────────────────
+   The You asset is AgentBand rendered identity-only (showCtas/showFoot/showHeadline
+   false), so the big serif "{name}." page headline + "06 · Your Agent" eyebrow are
+   already gone. Trim the remaining footer-band bits (contact meta, bio) and COMPACT
+   the band so the whole trimmed identity (avatar + name + brokerage) is the
+   content — short enough to render in full at the preview's scale, never cropped.
+   Scoped to the You asset only; no flagship edit, no consumer-page change. The
+   region anchors: name → .agent__who .n, avatar → .agent__avatar, brokerage →
+   .agent__who .r. */
+.sp-asset[data-testid="sp-asset-you"] .agent__meta,
+.sp-asset[data-testid="sp-asset-you"] .agent__bio {
+  display: none;
+}
+/* Compact the section so the card is the whole asset (the real band's section
+   padding is 46-104px — far too tall for the identity card alone). */
+.sp-asset[data-testid="sp-asset-you"] .agent.section {
+  padding: 16px 18px;
+}
+/* The band's top row is a 2-col grid (headline | card); with the headline gone
+   the card must span the full width as a single column, not a squeezed half. */
+.sp-asset[data-testid="sp-asset-you"] .agent__top {
+  grid-template-columns: 1fr;
+  gap: 0;
+}
+/* Drop the card's headline-relative top margin so it sits compact. */
+.sp-asset[data-testid="sp-asset-you"] .agent__card {
+  margin-top: 0;
+}
+/* ── destination bar (A2) — one connected statement ──────────────────────────
+   "Reused everywhere you show up" over the three surfaces as ONE joined, equal
+   group (a segmented set). The surface currently on the stage is marked as the
+   CURRENT preview, so it reads as current, not as the only place the detail
+   appears. No second redundant line. Shared by desktop + mobile. */
 .sp-dest {
   margin-top: 22px;
   padding-top: 18px;
@@ -834,30 +995,23 @@
   letter-spacing: 0.12em;
   color: var(--sp-muted);
 }
-.sp-dest__chips {
+/* An EQUAL, non-interactive informational set — three static tags, NOT a
+   segmented tab control. No selected/highlighted state, no joined container, so
+   it reads "reused on all three," never "pick one." */
+.sp-dest__set {
   display: flex;
   flex-wrap: wrap;
   gap: 8px;
 }
 .sp-dest__chip {
+  min-width: 0;
   font-size: 12px;
   font-weight: 600;
   padding: 6px 12px;
   border-radius: 999px;
-  border: 1px solid var(--sp-hairline-strong);
+  border: 1px solid var(--sp-hairline);
   color: var(--sp-muted);
   background: rgba(255, 255, 255, 0.02);
-}
-.sp-dest__chip--active {
-  border-color: var(--sp-mint-line);
-  color: var(--sp-mint);
-  background: var(--sp-mint-soft);
-}
-.sp-dest__note {
-  margin: 12px 0 0;
-  font-size: 12.5px;
-  line-height: 1.5;
-  color: var(--sp-muted);
 }
 
 /* ── motion ────────────────────────────────────────────────────────────── */
@@ -922,6 +1076,532 @@
   }
 }
 
+/* ═══════════════════════════════════════════════════════════════════════════
+ * MOBILE single-column pass (< 960px) — layout/responsive ONLY.
+ *
+ * The desktop three-panel console (≥ 960px) is byte-identical: everything below
+ * is additive, gated under `max-width: 959.98px`, and never edits a base or a
+ * `min-width: 960px` rule. The same markup + the SAME real components
+ * (AssetPreviewFrame, the State-A sections, SegmentedProgress) reflow into the
+ * locked mobile pattern:
+ *   slim sticky chrome  →  pinned segmented progress  →  one editor block  →
+ *   the live "What sellers see" preview card directly beneath  →  a sticky
+ *   bottom action (Save & continue / Back) above the home indicator.
+ * Three calm tonal zones carry from desktop: page (editor) · stage (preview) ·
+ * the translucent chrome/action bars.
+ * ═══════════════════════════════════════════════════════════════════════════ */
+@media (max-width: 959.98px) {
+  /* ═══ MOBILE four-state shell — BROWSE ════════════════════════════════════
+     The mobile shell supersedes the A-D pass's mobile intro/progress with the
+     Browse / Focus / Expanded / Saved model (the mobile expression of the
+     desktop 3-panel console). Desktop (>=960px) is untouched. */
+
+  /* The desktop wordmark header is replaced on mobile by the in-bar top chrome. */
+  .sp--console > .sp__topbar {
+    display: none;
+  }
+
+  /* Top chrome: "Set up Studio once" + "Step N of 6 · {phase}" + a thin
+     segmented progress bar (two phase groups of three, a gap between). Pinned. */
+  .sp__bar {
+    position: sticky;
+    top: 0;
+    z-index: 4;
+    display: flex;
+    flex-direction: column;
+    gap: 11px;
+    padding: calc(12px + env(safe-area-inset-top)) 18px 12px;
+    background: color-mix(in srgb, var(--sp-page) 94%, transparent);
+    backdrop-filter: blur(10px);
+    border-bottom: 1px solid var(--sp-hairline);
+  }
+  .sp__m-chrome {
+    display: flex;
+    flex-direction: column;
+    gap: 2px;
+  }
+  .sp__m-title {
+    margin: 0;
+    font-size: 15px;
+    font-weight: 600;
+    letter-spacing: 0.01em;
+    color: var(--sp-header);
+  }
+  .sp__m-step {
+    margin: 0;
+    font-size: 12px;
+    font-weight: 500;
+    color: var(--sp-muted);
+  }
+  /* thin segmented bar: 3 + 3 with a gap between the two phases */
+  .sp__bar .sp-progress--bar {
+    display: flex;
+    flex-direction: row;
+    gap: 16px;
+  }
+  .sp__bar .sp-progress__phase {
+    flex: 1;
+    margin: 0;
+  }
+  .sp__bar .sp-progress__phase + .sp-progress__phase {
+    margin: 0;
+  }
+  .sp__bar .sp-progress__phase-label {
+    display: none;
+  }
+  .sp__bar .sp-progress__list {
+    display: flex;
+    flex-direction: row;
+    flex-wrap: nowrap;
+    gap: 5px;
+  }
+  .sp__bar .sp-progress__list > li {
+    flex: 1;
+    min-width: 0;
+  }
+  .sp__bar .sp-seg {
+    display: block;
+    width: 100%;
+    height: 4px;
+    padding: 0;
+    border-radius: 999px;
+    background: var(--sp-hairline-strong);
+  }
+  .sp__bar .sp-seg__mark,
+  .sp__bar .sp-seg__label {
+    display: none;
+  }
+  .sp__bar .sp-seg--done,
+  .sp__bar .sp-seg--active {
+    background: var(--sp-mint);
+  }
+  .sp__bar .sp-seg--active {
+    box-shadow: 0 0 0 2px var(--sp-mint-soft);
+  }
+  .sp__bar .sp-reassure--bar {
+    display: none;
+  }
+
+  /* editor block — full width within comfortable gutters */
+  .sp__center {
+    padding: 22px 18px 28px;
+  }
+
+  /* live preview = its own tonal stage zone beneath the editor (Browse) */
+  .sp__preview {
+    display: flex;
+    flex-direction: column;
+    align-items: center;
+    background: var(--sp-stage);
+    border-top: 1px solid var(--sp-hairline);
+    padding: 22px 18px calc(96px + env(safe-area-inset-bottom));
+  }
+  .sp__stage {
+    margin: 0 auto;
+    width: 100%;
+    max-width: 420px;
+  }
+  .sp-expand {
+    appearance: none;
+    margin: 14px auto 0;
+    display: inline-flex;
+    align-items: center;
+    gap: 6px;
+    background: rgba(255, 255, 255, 0.04);
+    border: 1px solid var(--sp-hairline-strong);
+    color: var(--sp-ink);
+    border-radius: 999px;
+    padding: 8px 16px;
+    font-size: 13px;
+    font-weight: 600;
+    cursor: pointer;
+  }
+
+  /* sticky bottom action (Browse) — primary always thumb-reachable. Scoped to
+     .sp--console so the centered intro/milestone/launch keep inline actions. */
+  .sp--console .sp-actions {
+    position: fixed;
+    left: 0;
+    right: 0;
+    bottom: 0;
+    z-index: 6;
+    margin: 0;
+    gap: 10px;
+    flex-wrap: nowrap;
+    flex-direction: row-reverse;
+    padding: 12px 18px calc(12px + env(safe-area-inset-bottom));
+    background: color-mix(in srgb, var(--sp-page) 92%, transparent);
+    backdrop-filter: blur(10px);
+    border-top: 1px solid var(--sp-hairline);
+  }
+  .sp--console .sp-actions .sp-btn--primary {
+    flex: 1;
+    justify-content: center;
+  }
+  .sp--console .sp-actions .sp-btn--ghost {
+    flex: none;
+  }
+
+  /* ═══ EXPANDED — the bottom-sheet preview ═════════════════════════════════ */
+  .sp-sheet__backdrop {
+    position: fixed;
+    inset: 0;
+    z-index: 60;
+    display: flex;
+    align-items: flex-end;
+    background: rgba(0, 0, 0, 0.55);
+    animation: sp-fade 0.2s ease both;
+  }
+  .sp-sheet {
+    position: relative;
+    width: 100%;
+    max-height: 88vh;
+    overflow-y: auto;
+    background: var(--sp-panel);
+    border-top: 1px solid var(--sp-hairline-strong);
+    border-radius: 20px 20px 0 0;
+    padding: 10px 18px calc(26px + env(safe-area-inset-bottom));
+    animation: sp-sheet-up 0.26s cubic-bezier(0.2, 0.7, 0.2, 1) both;
+  }
+  .sp-sheet__grip {
+    display: block;
+    width: 40px;
+    height: 4px;
+    border-radius: 999px;
+    background: var(--sp-hairline-strong);
+    margin: 4px auto 16px;
+  }
+  .sp-sheet__close {
+    position: absolute;
+    top: 12px;
+    right: 14px;
+    appearance: none;
+    background: none;
+    border: none;
+    color: var(--sp-muted);
+    font-size: 26px;
+    line-height: 1;
+    cursor: pointer;
+    padding: 0 4px;
+  }
+  .sp-sheet__eyebrow {
+    margin: 0 0 12px;
+    font-size: 11px;
+    font-weight: 600;
+    text-transform: uppercase;
+    letter-spacing: 0.14em;
+    color: var(--sp-muted);
+  }
+  .sp-sheet__used {
+    margin: 16px 0 0;
+    font-size: 13px;
+    font-weight: 600;
+    color: var(--sp-ink);
+  }
+  .sp-sheet__note {
+    margin: 6px 0 0;
+    font-size: 13px;
+    line-height: 1.5;
+    color: var(--sp-muted);
+  }
+}
+
+/* ═══════════════════════════════════════════════════════════════════════════
+ * STEP 1 (You) SECTION DECK — the stable-section + subsection prompt deck that
+ * replaces the region-cropping Focus Lens. An IN-PLACE fixed column sized to the
+ * visual viewport (--sp-vvh / --sp-vvt, published on the console root from JS).
+ * The section preview is ONE element SCALED to fit (never windowed, translated,
+ * or zoomed); the prompt deck holds exactly one subsection at a time and slides
+ * in; the CTA pins above the keyboard. No page scroll, no dim-the-rest. Mobile
+ * only — the desktop console and steps 2–6 are untouched.
+ * ═══════════════════════════════════════════════════════════════════════════ */
+@media (max-width: 959.98px) {
+  .sp-deck {
+    position: fixed;
+    top: var(--sp-vvt, 0);
+    left: 0;
+    right: 0;
+    height: var(--sp-vvh, 100dvh);
+    min-height: 0; /* override the .sp 100vh floor, else it runs under the keyboard */
+    z-index: 50;
+    display: flex;
+    flex-direction: column;
+    overflow: hidden;
+    background: var(--sp-page);
+    padding: calc(8px + env(safe-area-inset-top)) 18px
+      calc(12px + env(safe-area-inset-bottom));
+    gap: 12px;
+  }
+
+  /* compact header + the SINGLE 6-step progress scale */
+  .sp-deck__head {
+    flex: 0 0 auto;
+  }
+  .sp-deck__title {
+    margin: 0 0 8px;
+    font-size: 13px;
+    font-weight: 600;
+    color: var(--sp-header);
+  }
+  .sp-deck__progress {
+    display: flex;
+    gap: 5px;
+  }
+  .sp-deck__seg {
+    flex: 1;
+    height: 4px;
+    border-radius: 999px;
+    background: var(--sp-hairline-strong);
+  }
+  .sp-deck__seg.is-done,
+  .sp-deck__seg.is-active {
+    background: var(--sp-mint);
+  }
+  .sp-deck__seg.is-break {
+    margin-left: 14px; /* the gap between the two phases */
+  }
+
+  /* THE STABLE SECTION — scaled to fit, never windowed. Two compositions:
+     RESTING (no keyboard) — the preview sits in the upper region and the prompt +
+     CTA group directly beneath it, content packed from the top so the remainder is
+     balanced breathing room (never bottom-stuck). EDITING (keyboard up, see
+     .sp-deck--editing) — the group sinks to the visualViewport band with Save
+     just above the keyboard. */
+  /* The preview is a FIXED-HEIGHT band (a fraction of the visual viewport) that
+     clips overflow; the inner .sp-deck__fit is measured + transform-scaled by JS
+     to CONTAIN its framing (or width-fit a tall top-slice). margin-top places the
+     band in the upper region at rest; .sp-deck--editing bottom-anchors it so Save
+     clears the keyboard. Band height (not vh/dvh) tracks --sp-vvh, set from JS. */
+  .sp-deck__preview {
+    flex: 0 0 auto;
+    position: relative;
+    overflow: hidden;
+    height: calc(var(--sp-vvh, 100dvh) * 0.3);
+    margin-top: calc(var(--sp-vvh, 100dvh) * 0.06);
+    display: flex;
+    justify-content: center;
+  }
+  .sp-deck--editing .sp-deck__preview {
+    /* Keep the preview near its resting size when the keyboard is up — a generous
+       budget so it reads professionally, not a dramatic shrink. flex-shrink lets
+       it give back space only on a genuinely tight band, never overlapping Save. */
+    height: calc(var(--sp-vvh, 100dvh) * 0.42);
+    flex: 0 1 auto;
+    margin-top: auto; /* bottom-anchor so Save clears the keyboard */
+  }
+  /* contain = fully visible, vertically centered; top-slice = width-fit, top in
+     view (tall sections), the rest clipped legibly rather than shrunk to a smudge. */
+  .sp-deck__preview[data-framing="contain"] {
+    align-items: center;
+  }
+  .sp-deck__preview[data-framing="top-slice"] {
+    align-items: flex-start;
+  }
+  .sp-deck__fit {
+    flex: 0 0 auto;
+    width: 360px; /* the stable design width; JS scales this to fit the band */
+  }
+  .sp-deck__preview[data-framing="contain"] .sp-deck__fit {
+    transform-origin: center center;
+  }
+  .sp-deck__preview[data-framing="top-slice"] .sp-deck__fit {
+    transform-origin: top center;
+  }
+  .sp-deck__fit .sp-asset {
+    width: 100%;
+    max-width: none;
+  }
+  .sp-deck__fit .sp-asset__page {
+    min-height: 0;
+    width: 100%;
+  }
+
+  /* THE PROMPT DECK — exactly one subsection in the DOM at a time; slides in on
+     change. The section preview above stays anchored throughout. */
+  .sp-deck__prompt {
+    flex: 0 0 auto;
+    display: flex;
+    flex-direction: column;
+    gap: 8px;
+  }
+  .sp-deck__prompt--fwd {
+    animation: sp-deck-in-right 0.22s ease both;
+  }
+  .sp-deck__prompt--back {
+    animation: sp-deck-in-left 0.22s ease both;
+  }
+  /* MEDIA subsections (the headshot) FADE, never slide: a retained slide transform
+     would make this block a containing block for the crop modal's position:fixed,
+     pushing its confirm/cancel off-screen. Fade keeps no transform. (Must follow
+     the --fwd/--back rules so it wins the animation-name.) */
+  .sp-deck__prompt--media {
+    animation-name: sp-deck-fade;
+  }
+  .sp-deck__count {
+    margin: 0;
+    font-size: 11px;
+    font-weight: 600;
+    letter-spacing: 0.12em;
+    text-transform: uppercase;
+    color: var(--sp-mint);
+  }
+  .sp-deck__label {
+    margin: 0;
+    font-size: 15px;
+    font-weight: 600;
+    color: var(--sp-header);
+  }
+  .sp-deck__input {
+    width: 100%;
+  }
+  /* preview-only beat (Recent work): calm explanatory copy, no input */
+  .sp-deck__beat {
+    margin: 0;
+    font-size: 14px;
+    line-height: 1.5;
+    color: var(--sp-muted);
+  }
+  /* Proof preview: drop the teal quotation glyphs (--teal-700) — in the studio
+     deck they read as a stray blue artifact beside the review. Studio-scoped only;
+     the real seller page + the desktop console preview keep them. */
+  .sp-deck .sa-quote__q .mark {
+    display: none;
+  }
+
+  .sp-deck__toast {
+    flex: 0 0 auto;
+    margin: 0;
+    font-size: 13px;
+    line-height: 1.45;
+    color: var(--sp-ink);
+  }
+
+  /* CTA pinned above the keyboard (same primary+ghost pattern as the console) */
+  .sp-deck__cta {
+    flex: 0 0 auto;
+    display: flex;
+    flex-direction: row-reverse;
+    gap: 10px;
+  }
+  .sp-deck__cta .sp-btn--primary {
+    flex: 1;
+    justify-content: center;
+  }
+  .sp-deck__cta .sp-btn--ghost {
+    flex: none;
+  }
+}
+
+@keyframes sp-deck-in-right {
+  from {
+    opacity: 0;
+    transform: translateX(16px);
+  }
+  to {
+    opacity: 1;
+    transform: translateX(0);
+  }
+}
+@keyframes sp-deck-in-left {
+  from {
+    opacity: 0;
+    transform: translateX(-16px);
+  }
+  to {
+    opacity: 1;
+    transform: translateX(0);
+  }
+}
+/* reduced-motion: cross-fade only, no slide */
+@media (prefers-reduced-motion: reduce) {
+  .sp-deck__prompt--fwd,
+  .sp-deck__prompt--back {
+    animation: sp-deck-fade 0.18s ease both;
+  }
+}
+@keyframes sp-deck-fade {
+  from {
+    opacity: 0;
+  }
+  to {
+    opacity: 1;
+  }
+}
+
+/* ── client-ready checkpoint progress (3 of 6) — full-screen both surfaces ─── */
+.sp-ckpt-progress {
+  position: relative;
+  height: 6px;
+  border-radius: 999px;
+  background: var(--sp-hairline);
+  margin: 6px 0 26px;
+}
+.sp-ckpt-progress__fill {
+  display: block;
+  height: 100%;
+  width: 50%; /* 3 of 6 */
+  border-radius: 999px;
+  background: var(--sp-mint);
+}
+.sp-ckpt-progress__count {
+  position: absolute;
+  top: 12px;
+  left: 0;
+  font-size: 12px;
+  font-weight: 600;
+  color: var(--sp-muted);
+}
+
+/* ── four-state shell motion ───────────────────────────────────────────────── */
+@keyframes sp-focus-glow {
+  0% {
+    box-shadow:
+      0 0 0 6px rgba(255, 255, 255, 0.7),
+      0 0 0 10px rgba(70, 222, 194, 0.45),
+      -9px 0 0 -6px rgba(3, 114, 144, 0.55),
+      8px 10px 22px -8px rgba(0, 0, 0, 0.18);
+  }
+  100% {
+    box-shadow:
+      0 0 0 6px rgba(255, 255, 255, 0.7),
+      0 0 0 7px rgba(20, 30, 25, 0.08),
+      -9px 0 0 -6px rgba(3, 114, 144, 0.55),
+      8px 10px 22px -8px rgba(0, 0, 0, 0.18);
+  }
+}
+@keyframes sp-focus-glow-dark {
+  0% {
+    box-shadow:
+      0 0 0 5px rgba(255, 255, 255, 0.07),
+      0 0 0 10px rgba(70, 222, 194, 0.5),
+      -9px 0 0 -6px var(--sp-mint),
+      8px 10px 22px -8px rgba(0, 0, 0, 0.4);
+  }
+  100% {
+    box-shadow:
+      0 0 0 5px rgba(255, 255, 255, 0.07),
+      0 0 0 6px rgba(70, 222, 194, 0.4),
+      -9px 0 0 -6px var(--sp-mint),
+      8px 10px 22px -8px rgba(0, 0, 0, 0.4);
+  }
+}
+@keyframes sp-fade {
+  from {
+    opacity: 0;
+  }
+  to {
+    opacity: 1;
+  }
+}
+@keyframes sp-sheet-up {
+  from {
+    transform: translateY(100%);
+  }
+  to {
+    transform: translateY(0);
+  }
+}
+
 @media (prefers-reduced-motion: reduce) {
   .sp-asset--saved,
   .sp-toast,
@@ -929,7 +1609,11 @@
   .sp-ms,
   .sp-seal--anim,
   .sp-seal--anim .sp-seal__ring,
-  .sp-seal--anim .sp-seal__check {
+  .sp-seal--anim .sp-seal__check,
+  .sp-sheet,
+  .sp-sheet__backdrop,
+  .sp-deck,
+  .sp-deck .sp-asset * {
     animation: none !important;
     transition: none !important;
   }

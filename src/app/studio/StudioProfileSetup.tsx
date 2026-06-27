@@ -14,7 +14,10 @@ import {
   recentListingsToPublishInput,
   RECENT_LISTINGS_CAP,
 } from "@/lib/seller-presentation/recent-listings";
-import type { PublicRecentListing } from "@/tools/seller-presentation/output/public-payload";
+import type {
+  PublicPayload,
+  PublicRecentListing,
+} from "@/tools/seller-presentation/output/public-payload";
 import {
   LEAD_EMPHASIS_LABELS,
   LEAD_EMPHASIS_PRIMARY,
@@ -35,6 +38,7 @@ import {
   isClientReady,
   isFullyComplete,
   isProofDone,
+  isBrandDone,
   EMPTY_WHYUS,
   type SegmentKey,
 } from "@/lib/studio-profile/setup-state";
@@ -45,6 +49,14 @@ import {
 } from "@/lib/studio-profile/setup-storage";
 import { SegmentedProgress } from "./SegmentedProgress";
 import { AssetPreviewFrame } from "./AssetPreviewFrame";
+import {
+  SectionDeck,
+  YOU_SECTION,
+  REACH_SECTION,
+  PROOF_SECTION,
+  WORK_SECTION,
+  type SectionConfig,
+} from "./SectionDeck";
 import "./studio.css";
 
 /**
@@ -71,6 +83,77 @@ import "./studio.css";
 
 type Screen = "intro" | SegmentKey | "clientready" | "launch";
 const STEP_ORDER: SegmentKey[] = ["you", "reach", "proof", "sell", "work", "brand"];
+
+/**
+ * BRAND_SECTION lives here (not in SectionDeck) because its controls are the
+ * console-local SignatureColorField + the shared ImageUploadField — importing them
+ * into SectionDeck would be a circular dependency. Signature color renders as a
+ * (keyboardless) custom control; logo is an optional media subsection.
+ */
+const BRAND_SECTION: SectionConfig = {
+  id: "brand",
+  satisfied: isBrandDone,
+  renderSection: (payload, reducedMotion, saved) => (
+    <AssetPreviewFrame
+      payload={payload}
+      asset="brand"
+      saved={saved}
+      reducedMotion={reducedMotion}
+      trimHeadline
+    />
+  ),
+  subsections: [
+    {
+      // A non-keyboard CONTROL (color picker), not a photo upload — so its CTA is
+      // "Save & continue" (1 of 2), not the media "Use this photo".
+      key: "color",
+      prompt: "Signature color",
+      kind: "control",
+      required: false,
+      read: (b) => b.brandAccent ?? "",
+      write: () => ({}),
+      renderMedia: (effective, setField) => (
+        <SignatureColorField
+          value={effective.brandAccent ?? EDITORIAL_BRAND_DEFAULTS.accent}
+          onChange={(hex) => setField({ brandAccent: hex })}
+        />
+      ),
+    },
+    {
+      key: "logo",
+      prompt: "Logo (optional)",
+      kind: "media",
+      required: false,
+      read: (b) => b.logoDataUrl ?? "",
+      write: () => ({}),
+      renderMedia: (effective, setField) => (
+        <ImageUploadField
+          label="Logo"
+          value={effective.logoDataUrl ?? ""}
+          onChange={(url) => setField({ logoDataUrl: url || null })}
+          folder="brand-logo"
+          testIdPrefix="sp-logo"
+          previewAspect="aspect-[5/1]"
+          previewFit="contain"
+        />
+      ),
+    },
+  ],
+};
+
+/**
+ * The MOBILE SectionDeck steps (stable-section + subsection prompt deck). "How you
+ * sell" (sell) is the deliberate EXCEPTION: it keeps the populated multi-point
+ * console editor with the working preview BELOW the fields, so it is absent here
+ * and falls through to the console render on mobile (no in-place focus shell).
+ */
+const DECK_SECTIONS: Partial<Record<SegmentKey, SectionConfig>> = {
+  you: YOU_SECTION,
+  reach: REACH_SECTION,
+  proof: PROOF_SECTION,
+  work: WORK_SECTION,
+  brand: BRAND_SECTION,
+};
 const SAVE_ANIM_MS = 1100;
 /** Fallback attribution so the review preview renders from the body alone. */
 const DEFAULT_REVIEW_ATTRIBUTION = "A past client";
@@ -99,12 +182,12 @@ const PREV_SCREEN: Record<SegmentKey, Screen> = {
 
 /** The reuse-teaching confirmation per step (the "thankful" moment). */
 const SAVE_TOAST: Record<SegmentKey, string> = {
-  you: "Saved. Your pages will now open with your face and name.",
-  reach: "Saved. Every page now has a clear way to reach you.",
-  proof: "Saved. Studio will reuse this on every seller page and follow-up.",
-  sell: "Studio can now explain how you get homes seen.",
-  work: "Your showcase now shows real reach.",
-  brand: "Your brand color now carries every page.",
+  you: "Saved. Studio will introduce you this way across your pages.",
+  reach: "Saved. Sellers can reach you from every page now.",
+  proof: "Saved. Studio will reuse this proof on your seller pages and follow-ups.",
+  sell: "Saved. Studio will explain how you sell across your pages.",
+  work: "Saved. Your recent work now shows up everywhere Studio introduces you.",
+  brand: "Saved. Your brand color now carries across Studio assets.",
 };
 
 const STEP_FRAME: Record<
@@ -114,7 +197,7 @@ const STEP_FRAME: Record<
   you: {
     eyebrow: "You",
     title: "Make your pages feel like you.",
-    sub: "Your name, face, and brokerage open every seller page you send.",
+    sub: "Your name, face, and brokerage appear anywhere Studio introduces you.",
   },
   reach: {
     eyebrow: "Reach",
@@ -163,6 +246,15 @@ export function StudioProfileSetup({ ownerEmail }: { ownerEmail: string | null }
   const startedAtRef = useRef<number>(0);
   const hydratedRef = useRef(false);
 
+  // ── MOBILE rendering ──────────────────────────────────────────────────────
+  // Desktop stays the 3-panel console untouched: the mobile-only DOM (the Expand
+  // affordance, the expanded sheet) is gated on isMobile so it never enters the
+  // desktop tree, and the deck (the five deck steps) replaces the console on
+  // mobile via an early return below.
+  const isMobile = useIsMobile();
+  const [expanded, setExpanded] = useState(false);
+  const rootRef = useRef<HTMLDivElement>(null);
+
   // One-time hydrate from the crash-safety buffer, then announce start.
   useEffect(() => {
     if (hydratedRef.current) return;
@@ -187,6 +279,12 @@ export function StudioProfileSetup({ ownerEmail }: { ownerEmail: string | null }
     ? (screen as SegmentKey)
     : null;
 
+  // Deck steps render the mobile SECTION DECK (early return below). "How you sell"
+  // is the one mobile console step (a plain scrollable form). Desktop always uses
+  // the console.
+  const deckSection = activeStep ? DECK_SECTIONS[activeStep] : undefined;
+  const mobileDeck = isMobile && !!deckSection;
+
   // Per-step entry instrumentation.
   useEffect(() => {
     if (activeStep) emitStudioEvent(STUDIO_EVENTS.stepEntered, { step: activeStep });
@@ -200,6 +298,44 @@ export function StudioProfileSetup({ ownerEmail }: { ownerEmail: string | null }
     if (typeof window === "undefined") return;
     window.scrollTo({ top: 0, behavior: reducedMotion ? "auto" : "smooth" });
   }, [screen, reducedMotion]);
+
+  // Leaving a step (advance / back / checkpoint) drops the expanded sheet and, on
+  // mobile, neutralizes any autofocus so a step never opens with the keyboard up.
+  useEffect(() => {
+    setExpanded(false);
+    if (!isMobile || typeof document === "undefined") return;
+    const ae = document.activeElement as HTMLElement | null;
+    if (
+      ae &&
+      rootRef.current?.contains(ae) &&
+      (ae.tagName === "INPUT" || ae.tagName === "TEXTAREA")
+    ) {
+      ae.blur();
+    }
+  }, [screen, isMobile]);
+
+  // Keyboard-safe sizing: mirror the visual viewport (which shrinks when the soft
+  // keyboard opens) into CSS vars (--sp-vvh / --sp-vvt) so the mobile SectionDeck
+  // can be a fixed, exactly-keyboard-tall flex column with no page scroll. Degrades
+  // gracefully: if visualViewport is unavailable the deck falls back to 100dvh.
+  useEffect(() => {
+    if (!isMobile || typeof window === "undefined") return;
+    const vv = window.visualViewport;
+    if (!vv) return;
+    const apply = () => {
+      const el = rootRef.current;
+      if (!el) return;
+      el.style.setProperty("--sp-vvh", `${Math.round(vv.height)}px`);
+      el.style.setProperty("--sp-vvt", `${Math.round(vv.offsetTop)}px`);
+    };
+    apply();
+    vv.addEventListener("resize", apply);
+    vv.addEventListener("scroll", apply);
+    return () => {
+      vv.removeEventListener("resize", apply);
+      vv.removeEventListener("scroll", apply);
+    };
+  }, [isMobile]);
 
   const setField = (patch: Partial<BrandSettings>) =>
     setOverlay((o) => ({ ...o, ...patch }));
@@ -221,10 +357,15 @@ export function StudioProfileSetup({ ownerEmail }: { ownerEmail: string | null }
 
   const elapsed = () => Math.max(0, Date.now() - startedAtRef.current);
 
-  const done = useMemo(
-    () => new Set<SegmentKey>(completedSegments(effective)),
-    [effective],
-  );
+  const done = useMemo(() => {
+    const set = new Set<SegmentKey>(completedSegments(effective));
+    // Recent work is the preview-only BEAT (zero subsections, persists nothing), so
+    // completedSegments never includes it. Fill its progress segment once the user
+    // has advanced PAST it (on/after Brand) — completion-on-continue for the beat.
+    // Other steps are untouched; they still fill from saved data.
+    if (screen === "brand" || screen === "launch") set.add("work");
+    return set;
+  }, [effective, screen]);
 
   // PREVIEW-ONLY normalization (never persisted, never touches the editor): make
   // every preview render full from defaults/sample context so the agent always
@@ -299,8 +440,34 @@ export function StudioProfileSetup({ ownerEmail }: { ownerEmail: string | null }
       const merged = [...own, ...samples.slice(0, fill)].slice(0, RECENT_LISTINGS_CAP);
       payload = { ...payload, recentListings: merged };
     }
+    if (activeStep === "you") {
+      // PREVIEW-ONLY: the You step previews the AgentBand identity, which renders
+      // nothing without a name. Seed a placeholder so the identity asset is never
+      // blank; the agent's typed values flow through `effective` and override it
+      // the moment they type. MOBILE (the section deck) uses neutral "Your Name" /
+      // "Your Brokerage" placeholders — never a fake sample identity. DESKTOP keeps
+      // the original sample so its console preview stays byte-identical. These
+      // strings are render-only and are NEVER written back to the brand record.
+      const ag = payload.agent;
+      payload = {
+        ...payload,
+        agent: {
+          ...ag,
+          name: ag.name?.trim()
+            ? ag.name
+            : isMobile
+              ? "Your Name"
+              : "Aaron Thomas",
+          brokerage: ag.brokerage?.trim()
+            ? ag.brokerage
+            : isMobile
+              ? "Your Brokerage"
+              : "Windermere · Tacoma",
+        },
+      };
+    }
     return payload;
-  }, [basePayload, activeStep, effective.recentListings, effective.logoDataUrl]);
+  }, [basePayload, activeStep, effective.recentListings, effective.logoDataUrl, isMobile]);
 
   // Pre-populate the How-you-sell step: the moment it opens, seed the default
   // marketing approach so the editor "arrives done" (3 cards to keep + edit) and
@@ -378,44 +545,59 @@ export function StudioProfileSetup({ ownerEmail }: { ownerEmail: string | null }
   /* ───────────────────────── intro / continue / launch ───────────────────── */
 
   if (screen === "intro") {
+    // B — a confident, full-screen entrance (referencing the old /welcome
+    // composition: wordmark anchored top, a vertically-centered eyebrow +
+    // headline + subline, the six steps as a crafted list, full-width stacked
+    // actions, generous balanced whitespace) so the first screen feels like a
+    // crafted, high-end app, not a bordered card floating mid-screen. Evergreen
+    // copy is preserved.
     return (
-      <CenteredScreen testid="sp-intro">
-        <p className="sp-eyebrow">Studio Profile</p>
-        <h1 className="sp-title">Set up Studio once.</h1>
-        <p className="sp-sub">
-          Most agents finish in 5–8 minutes. Studio reuses these details across
-          your seller pages, listing promos, follow-ups, and every new tool you
-          create later, so you never rebuild them per page.
-        </p>
-        <ol className="sp-map" data-testid="sp-intro-map">
-          {["You", "Reach", "Proof", "How you sell", "Recent work", "Brand"].map(
-            (label, i) => (
-              <li className="sp-map__item" key={label}>
-                <span className="sp-map__num">{i + 1}</span>
-                {label}
-              </li>
-            ),
-          )}
-        </ol>
-        <div className="sp-actions">
-          <button
-            type="button"
-            className="sp-btn sp-btn--primary"
-            data-testid="sp-intro-start"
-            onClick={() => setScreen("you")}
-          >
-            Start setup
-          </button>
-          <button
-            type="button"
-            className="sp-btn sp-btn--ghost"
-            data-testid="sp-intro-later"
-            onClick={onLater}
-          >
-            I&rsquo;ll do this later
-          </button>
+      <div className="sp sp--intro" data-testid="sp-intro">
+        <div className="sp-intro__inner">
+          <header className="sp-intro__top">
+            <span className="sp__wordmark">
+              Studio <em>SEP</em>
+            </span>
+          </header>
+          <div className="sp-intro__body">
+            <p className="sp-eyebrow">Studio Profile</p>
+            <h1 className="sp-intro__title">Set up Studio once.</h1>
+            <p className="sp-intro__sub">
+              Most agents finish in 5 to 8 minutes. Studio reuses these details
+              across your seller pages, listing promos, follow-ups, and every new
+              tool you create later, so you never rebuild them per page.
+            </p>
+            <ol className="sp-intro__steps" data-testid="sp-intro-map">
+              {["You", "Reach", "Proof", "How you sell", "Recent work", "Brand"].map(
+                (label, i) => (
+                  <li className="sp-intro__step" key={label}>
+                    <span className="sp-intro__step-num">{i + 1}</span>
+                    <span className="sp-intro__step-label">{label}</span>
+                  </li>
+                ),
+              )}
+            </ol>
+            <div className="sp-intro__actions">
+              <button
+                type="button"
+                className="sp-btn sp-btn--primary"
+                data-testid="sp-intro-start"
+                onClick={() => setScreen("you")}
+              >
+                Start setup
+              </button>
+              <button
+                type="button"
+                className="sp-btn sp-btn--ghost"
+                data-testid="sp-intro-later"
+                onClick={onLater}
+              >
+                I&rsquo;ll do this later
+              </button>
+            </div>
+          </div>
         </div>
-      </CenteredScreen>
+      </div>
     );
   }
 
@@ -432,35 +614,51 @@ export function StudioProfileSetup({ ownerEmail }: { ownerEmail: string | null }
         <p className="sp-eyebrow sp-ms sp-ms--1">Milestone</p>
         <h1 className="sp-title sp-ms sp-ms--2">You&rsquo;re client-ready.</h1>
         <p className="sp-sub sp-ms sp-ms--3">
-          Your seller page now has you, a way to reach you, and proof sellers can
-          trust. A few more steps make every page stronger.
+          Your first seller page now has you, a way to reach you, and proof
+          sellers can trust. Finish the next 3 steps so every Studio tool starts
+          stronger.
         </p>
-        <div className="sp-actions sp-ms sp-ms--4">
-          <button
-            type="button"
-            className="sp-btn sp-btn--primary"
-            data-testid="sp-clientready-continue"
-            onClick={() => setScreen("sell")}
-          >
-            Keep going
-          </button>
+        <div className="sp-ms sp-ms--4" style={{ width: "100%" }}>
+          <div className="sp-ckpt-progress" data-testid="sp-clientready-progress" aria-hidden="true">
+            <span className="sp-ckpt-progress__fill" />
+            <span className="sp-ckpt-progress__count">3 of 6</span>
+          </div>
+          <div className="sp-actions">
+            <button
+              type="button"
+              className="sp-btn sp-btn--primary"
+              data-testid="sp-clientready-continue"
+              onClick={() => setScreen("sell")}
+            >
+              Finish setup
+            </button>
+          </div>
         </div>
-        <p className="sp-reassure sp-ms sp-ms--5">{REASSURANCE}</p>
       </CenteredScreen>
     );
   }
 
   if (screen === "launch") {
+    // D — the finish reward: reuse the mid-flow milestone checkmark entrance
+    // (the beat Dallen liked) so completing the flow lands with delight — the
+    // seal draws on as the hero, then the copy settles in. Plays once on mount;
+    // prefers-reduced-motion just appears, fully drawn.
     return (
-      <CenteredScreen testid="sp-launch">
-        <p className="sp-eyebrow">You&rsquo;re set</p>
-        <h1 className="sp-title">Your seller page is ready.</h1>
-        <p className="sp-sub">
+      <CenteredScreen testid="sp-launch" milestone>
+        <span className="sp-seal sp-seal--anim" data-testid="sp-launch-seal" aria-hidden="true">
+          <svg className="sp-seal__svg" viewBox="0 0 52 52">
+            <circle className="sp-seal__ring" cx="26" cy="26" r="24" />
+            <path className="sp-seal__check" d="M15 27 l7 7 l15 -16" />
+          </svg>
+        </span>
+        <p className="sp-eyebrow sp-ms sp-ms--1">You&rsquo;re set</p>
+        <h1 className="sp-title sp-ms sp-ms--2">Your seller page is ready.</h1>
+        <p className="sp-sub sp-ms sp-ms--3">
           Studio will carry your identity, proof, marketing, recent work, and
           brand into every page you create. Extras for your full presentation and
           pre-listing page live in Settings whenever you want.
         </p>
-        <div className="sp-actions">
+        <div className="sp-actions sp-ms sp-ms--4">
           <button
             type="button"
             className="sp-btn sp-btn--primary"
@@ -508,8 +706,53 @@ export function StudioProfileSetup({ ownerEmail }: { ownerEmail: string | null }
   // rather than a void.
   const doneCount = STEP_ORDER.filter((s) => done.has(s)).length;
 
+  // Mobile top-chrome context: "Step N of 6 · {phase}", and the expand
+  // affordance only appears once the asset is worth enlarging (step 3 on).
+  const stepIndex = STEP_ORDER.indexOf(step);
+  const stepNum = stepIndex + 1;
+  const phaseLabel = stepIndex < 3 ? "Client-ready" : "Finish your profile";
+  const expandable = stepIndex >= 2;
+
+  // MOBILE deck steps (You, Reach): the stable-section + subsection prompt deck
+  // replaces the whole console for this step (no Browse/Focus split, no lens
+  // overlay). rootRef still hosts it so the visualViewport → --sp-vvh/--sp-vvt
+  // publishing applies and the deck (a child) inherits the keyboard-safe vars.
+  if (mobileDeck && deckSection) {
+    return (
+      <div
+        ref={rootRef}
+        className="sp sp--console sp--deck-host"
+        data-testid="sp-console"
+        data-step={step}
+      >
+        {/* key by step so each section REMOUNTS at subIndex 0 — otherwise the deck
+            reuses one instance and carries the prior section's subIndex (e.g. You's
+            "3 of 3" into Reach, opening it on the last subsection). */}
+        <SectionDeck
+          key={step}
+          section={deckSection}
+          effective={effective}
+          setField={setField}
+          previewPayload={previewPayload}
+          reducedMotion={reducedMotion}
+          done={done}
+          saving={savedAsset !== null}
+          savedNow={savedAsset === step}
+          toast={toast}
+          onFinish={() => commitAndAdvance(step)}
+          onBack={() => goTo(PREV_SCREEN[step])}
+        />
+      </div>
+    );
+  }
+
   return (
-    <div className="sp sp--console" data-testid="sp-console">
+    <div
+      ref={rootRef}
+      className="sp sp--console"
+      data-testid="sp-console"
+      data-step={step}
+    >
       {/* Item 11 — light anchoring chrome so the console feels like a place. */}
       <header className="sp__topbar">
         <span className="sp__wordmark">
@@ -549,6 +792,17 @@ export function StudioProfileSetup({ ownerEmail }: { ownerEmail: string | null }
         </aside>
 
         <div className="sp__bar">
+          {/* Mobile top chrome (mobile-only; in Focus it collapses to the thin
+              segmented bar). Gated on isMobile so it never enters the desktop
+              tree, keeping the desktop console byte-identical. */}
+          {isMobile && (
+            <div className="sp__m-chrome" aria-hidden="true">
+              <p className="sp__m-title">Set up Studio once</p>
+              <p className="sp__m-step">
+                Step {stepNum} of {STEP_ORDER.length} &middot; {phaseLabel}
+              </p>
+            </div>
+          )}
           <SegmentedProgress
             done={done}
             active={step}
@@ -556,7 +810,6 @@ export function StudioProfileSetup({ ownerEmail }: { ownerEmail: string | null }
             selectable={reachable}
             onSelect={goTo}
           />
-          <p className="sp-reassure sp-reassure--bar">{REASSURANCE}</p>
         </div>
 
         <main className="sp__center" data-testid={`sp-step-${step}`}>
@@ -565,7 +818,9 @@ export function StudioProfileSetup({ ownerEmail }: { ownerEmail: string | null }
         <p className="sp-sub">{frame.sub}</p>
 
         <div className="sp-fields">
-          {step === "you" && <YouFields effective={effective} setField={setField} />}
+          {step === "you" && (
+            <YouFields effective={effective} setField={setField} />
+          )}
           {step === "reach" && (
             <ReachFields effective={effective} setField={setField} />
           )}
@@ -614,33 +869,69 @@ export function StudioProfileSetup({ ownerEmail }: { ownerEmail: string | null }
         <section className="sp__preview" data-testid="sp-preview">
           <div className="sp__stage">
             <p className="sp__stage-eyebrow" aria-hidden="true">
-              What sellers see
+              {/* Mobile keeps a quiet "Live preview" label (the loud "WHAT SELLERS
+                  SEE" competes with the step headline on a phone); desktop stays
+                  byte-identical. */}
+              {isMobile ? "Live preview" : "What sellers see"}
             </p>
             <AssetPreviewFrame
               payload={previewPayload}
               asset={step}
               saved={savedAsset === step}
               reducedMotion={reducedMotion}
+              youIdentity={isMobile}
             />
-            {/* Item 9 — the "one input → many outputs" idea, given a real
-                treatment: a caption that ties the previewed asset to the other
-                surfaces it reuses, with grouped, well-spaced pills. */}
+            {/* Expanded preview affordance (mobile, from step 3 on) — opens the
+                isolated asset larger with its reuse context. */}
+            {isMobile && expandable && (
+              <button
+                type="button"
+                className="sp-expand"
+                data-testid="sp-expand"
+                onClick={() => setExpanded(true)}
+              >
+                Expand preview
+              </button>
+            )}
+            {/* Item 9 (A2) — one complete thought: the detail entered here is
+                reused across every surface. The three surfaces read as an EQUAL,
+                informational set (not a tab control), so nothing implies a
+                selected destination or a switch. */}
             <div className="sp-dest" data-testid="sp-destinations">
-              <p className="sp-dest__label">This also appears on</p>
-              <div className="sp-dest__chips" aria-hidden="true">
-                <span className="sp-dest__chip sp-dest__chip--active">
-                  Seller page
-                </span>
-                <span className="sp-dest__chip">Follow-up</span>
+              <p className="sp-dest__label">Reused everywhere you show up</p>
+              <div className="sp-dest__set" aria-hidden="true">
+                <span className="sp-dest__chip">Seller pages</span>
+                <span className="sp-dest__chip">Follow-ups</span>
                 <span className="sp-dest__chip">Pre-listing</span>
               </div>
-              <p className="sp-dest__note">
-                One input — reused everywhere you show up.
-              </p>
             </div>
           </div>
         </section>
       </div>
+
+      {/* Expanded preview sheet (mobile) — the isolated asset larger, with the
+          reuse context. Swipe down or tap X / the backdrop to dismiss. */}
+      {isMobile && expanded && (
+        <ExpandedSheet onClose={() => setExpanded(false)}>
+          <p className="sp-sheet__eyebrow">What sellers see</p>
+          <div className="sp-sheet__asset">
+            <AssetPreviewFrame
+              payload={previewPayload}
+              asset={step}
+              saved={false}
+              reducedMotion={reducedMotion}
+              youIdentity={isMobile}
+            />
+          </div>
+          <p className="sp-sheet__used">
+            Used in: Seller page &middot; Follow-up &middot; Pre-listing
+          </p>
+          <p className="sp-sheet__note">
+            This updates automatically anywhere Studio uses your profile.
+          </p>
+        </ExpandedSheet>
+      )}
+
     </div>
   );
 }
@@ -654,22 +945,28 @@ function YouFields({
   effective: BrandSettings;
   setField: (patch: Partial<BrandSettings>) => void;
 }) {
+  // DESKTOP console editing surface (real inputs). MOBILE Step 1 is the section
+  // deck (see SectionDeck), which never renders YouFields — so this is the single
+  // desktop path, byte-identical to before.
+  const nameVal = effective.agentName ?? "";
+  const brokerageVal = effective.brokerage ?? "";
   return (
     <>
-      <label className="sp-field">
+      <label className="sp-field sp-field--primary" data-region="name">
         <span className="sp-label">Your name</span>
         <input
           className="sp-input"
           data-testid="sp-input-name"
           type="text"
           autoFocus
-          value={effective.agentName ?? ""}
+          value={nameVal}
           placeholder="Aaron Thomas"
           onChange={(e) => setField({ agentName: e.target.value })}
         />
       </label>
 
-      <div className="sp-field">
+      <div className="sp-you-secondary">
+      <div className="sp-field" data-region="avatar">
         <span className="sp-label">Your headshot</span>
         <p className="sp-hint">Clean initials work beautifully until you add one.</p>
         <HeadshotField
@@ -697,17 +994,18 @@ function YouFields({
         />
       </div>
 
-      <label className="sp-field">
+      <label className="sp-field" data-region="brokerage">
         <span className="sp-label">Brokerage</span>
         <input
           className="sp-input"
           data-testid="sp-input-brokerage"
           type="text"
-          value={effective.brokerage ?? ""}
+          value={brokerageVal}
           placeholder="Windermere · Tacoma"
           onChange={(e) => setField({ brokerage: e.target.value })}
         />
       </label>
+      </div>
     </>
   );
 }
@@ -721,7 +1019,7 @@ function ReachFields({
 }) {
   return (
     <>
-      <label className="sp-field">
+      <label className="sp-field" data-region="email">
         <span className="sp-label">Email</span>
         <input
           className="sp-input"
@@ -734,7 +1032,7 @@ function ReachFields({
         />
       </label>
 
-      <label className="sp-field">
+      <label className="sp-field" data-region="phone">
         <span className="sp-label">Phone</span>
         <PhoneInput
           className="sp-input"
@@ -747,7 +1045,7 @@ function ReachFields({
         />
       </label>
 
-      <label className="sp-field">
+      <label className="sp-field" data-region="schedule">
         <span className="sp-label">Scheduling link (optional)</span>
         <input
           className="sp-input"
@@ -796,7 +1094,7 @@ function ProofFields({
 
   return (
     <>
-      <div className="sp-field">
+      <div className="sp-field" data-region="review">
         <span className="sp-label">Paste a review (recommended)</span>
         <p className="sp-hint">A few words a past seller gave you.</p>
         <textarea
@@ -828,7 +1126,7 @@ function ProofFields({
 
       {/* Always visible (not collapsed): the review is primary, and these add to
           it. Both optional. */}
-      <div className="sp-extras" data-testid="sp-proof-extras">
+      <div className="sp-extras" data-testid="sp-proof-extras" data-region="review">
         <p className="sp-extras__head">Add these too (optional)</p>
         <label className="sp-field">
           <span className="sp-label">Years of experience</span>
@@ -881,7 +1179,7 @@ function SellFields({
 
   return (
     <>
-      <div className="sp-field">
+      <div className="sp-field" data-region="sell">
         <span className="sp-label">What gets buyers in?</span>
         <p className="sp-hint">
           Pick the angle you lead with. It becomes your page&rsquo;s
@@ -902,7 +1200,7 @@ function SellFields({
         </div>
       </div>
 
-      <div className="sp-field" data-testid="sp-marketing">
+      <div className="sp-field" data-testid="sp-marketing" data-region="sell">
         {/* Label matches the prominent eyebrow the preview renders. */}
         <span className="sp-label">How I&rsquo;ll get your home seen</span>
         <p className="sp-hint">
@@ -981,7 +1279,7 @@ function WorkFields({
 }) {
   return (
     <>
-      <div className="sp-field">
+      <div className="sp-field" data-region="work">
         <span className="sp-label">Sample listing photo (optional)</span>
         <p className="sp-hint">
           Your best listing photography. It leads your &ldquo;How I&rsquo;ll get
@@ -1022,7 +1320,7 @@ function WorkFields({
         )}
       </div>
 
-      <div className="sp-field">
+      <div className="sp-field" data-region="work">
         <span className="sp-label">Sample video tour (optional)</span>
         <p className="sp-hint">A recent tour you produced, shown in the showcase.</p>
         <VideoUploadField
@@ -1047,7 +1345,7 @@ function WorkFields({
             small follow-on, not a redesign. */}
       </div>
 
-      <div className="sp-embed" data-testid="sp-recent-listings">
+      <div className="sp-embed" data-testid="sp-recent-listings" data-region="work">
         <RecentListingsEditor
           listings={effective.recentListings ?? []}
           onChange={(next) => setField({ recentListings: next })}
@@ -1068,7 +1366,7 @@ function BrandFields({
 }) {
   return (
     <>
-      <div className="sp-field">
+      <div className="sp-field" data-region="brand">
         <span className="sp-label">Signature color</span>
         <p className="sp-hint">Carries across every page, promo, and follow-up.</p>
         <SignatureColorField
@@ -1076,7 +1374,7 @@ function BrandFields({
           onChange={(hex) => setField({ brandAccent: hex })}
         />
       </div>
-      <div className="sp-field">
+      <div className="sp-field" data-region="brand">
         <span className="sp-label">Logo (optional)</span>
         <ImageUploadField
           label="Logo"
@@ -1177,6 +1475,72 @@ function SignatureColorField({
 
 /* ───────────────────────────── shared chrome ───────────────────────────── */
 
+/**
+ * ExpandedSheet — the mobile "Expanded" state: a bottom sheet showing the
+ * isolated asset larger with its reuse context. Dismiss via the X, the backdrop,
+ * or a downward swipe on the sheet. Esc also closes (keyboard users).
+ */
+function ExpandedSheet({
+  children,
+  onClose,
+}: {
+  children: React.ReactNode;
+  onClose: () => void;
+}) {
+  const startY = useRef<number | null>(null);
+  const [drag, setDrag] = useState(0);
+
+  useEffect(() => {
+    const onKey = (e: KeyboardEvent) => {
+      if (e.key === "Escape") onClose();
+    };
+    window.addEventListener("keydown", onKey);
+    return () => window.removeEventListener("keydown", onKey);
+  }, [onClose]);
+
+  return (
+    <div
+      className="sp-sheet__backdrop"
+      data-testid="sp-sheet-backdrop"
+      onClick={onClose}
+    >
+      <div
+        className="sp-sheet"
+        data-testid="sp-sheet"
+        role="dialog"
+        aria-modal="true"
+        style={drag ? { transform: `translateY(${drag}px)` } : undefined}
+        onClick={(e) => e.stopPropagation()}
+        onTouchStart={(e) => {
+          startY.current = e.touches[0]?.clientY ?? null;
+        }}
+        onTouchMove={(e) => {
+          if (startY.current == null) return;
+          const dy = (e.touches[0]?.clientY ?? 0) - startY.current;
+          setDrag(Math.max(0, dy));
+        }}
+        onTouchEnd={() => {
+          if (drag > 70) onClose();
+          else setDrag(0);
+          startY.current = null;
+        }}
+      >
+        <button
+          type="button"
+          className="sp-sheet__close"
+          data-testid="sp-sheet-close"
+          aria-label="Close preview"
+          onClick={onClose}
+        >
+          &times;
+        </button>
+        <span className="sp-sheet__grip" aria-hidden="true" />
+        {children}
+      </div>
+    </div>
+  );
+}
+
 function CenteredScreen({
   children,
   testid,
@@ -1193,6 +1557,24 @@ function CenteredScreen({
       </div>
     </div>
   );
+}
+
+/**
+ * True below the 960px console breakpoint. Starts false so SSR + the desktop
+ * tree are identical; flips on the client only on a real phone-width viewport,
+ * which is what gates every mobile-only node + behavior of the four-state shell.
+ */
+function useIsMobile(): boolean {
+  const [mobile, setMobile] = useState(false);
+  useEffect(() => {
+    if (typeof window === "undefined" || !window.matchMedia) return;
+    const mq = window.matchMedia("(max-width: 959.98px)");
+    setMobile(mq.matches);
+    const onChange = () => setMobile(mq.matches);
+    mq.addEventListener("change", onChange);
+    return () => mq.removeEventListener("change", onChange);
+  }, []);
+  return mobile;
 }
 
 function usePrefersReducedMotion(): boolean {

@@ -236,7 +236,11 @@ export function HeadshotCropEditor({
         aria-label={title}
         tabIndex={-1}
         data-testid={tid("editor")}
-        className="flex h-full w-full flex-col bg-neutral-950 outline-none sm:h-auto sm:max-w-[420px] sm:rounded-2xl sm:border sm:border-neutral-800 sm:shadow-2xl"
+        /* Mobile: size to the DYNAMIC (visible) viewport, not h-full/100vh — on
+           iOS the large layout viewport pushes the footer behind the toolbar and
+           the Apply/Cancel controls become unreachable. h-[100dvh] tracks the
+           visible band; desktop keeps the centered auto-height card. */
+        className="flex h-[100dvh] w-full flex-col bg-neutral-950 outline-none sm:h-auto sm:max-w-[420px] sm:rounded-2xl sm:border sm:border-neutral-800 sm:shadow-2xl"
       >
         <div className="flex items-center justify-between border-b border-neutral-900 px-5 py-4">
           <h2 className="text-sm font-medium text-neutral-100">{title}</h2>
@@ -361,7 +365,7 @@ export function HeadshotCropEditor({
           </div>
         </div>
 
-        <div className="flex items-center justify-end gap-3 border-t border-neutral-900 px-5 py-4">
+        <div className="flex items-center justify-end gap-3 border-t border-neutral-900 px-5 pt-4 pb-[calc(1rem+env(safe-area-inset-bottom))]">
           <button
             type="button"
             onClick={onCancel}
