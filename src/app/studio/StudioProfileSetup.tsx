@@ -190,56 +190,6 @@ const SAVE_TOAST: Record<SegmentKey, string> = {
   brand: "Saved. Your brand color now carries across Studio assets.",
 };
 
-/**
- * MOBILE focus model (the four-state shell). Each editor field carries a
- * `data-region` so the shell can (a) name the thing being edited in the
- * "Editing your {label}" caption and (b) scroll/highlight the matching sub-region
- * of the REAL isolated asset. The highlight + de-emphasis themselves are pure
- * CSS keyed off `data-focus-region` on the console root (see studio.css), so the
- * flagship components stay untouched (no consumer-page impact). This map is the
- * field-region → asset-selector anchor used only to scroll the region into view.
- */
-const REGION_SELECTOR: Record<string, string> = {
-  // You = the isolated AgentBand identity (see AssetPreviewFrame). The mobile You
-  // preview is TRIMMED to the identity card (no big serif "{name}." headline), so
-  // the name region is the card name (.agent__who .n), the avatar, and the role
-  // line (brokerage) — the three parts of the trimmed identity.
-  name: ".agent__who .n",
-  avatar: ".agent__avatar",
-  brokerage: ".agent__who .r",
-  email: '[data-testid="fs-sa-confirm-email"]',
-  phone: '[data-testid="fs-sa-confirm-phone"]',
-  schedule: '[data-testid="fs-sa-confirm-schedule"]',
-  review: ".sa-quote__q",
-  sell: ".sa-frame--lead",
-  work: ".sa-cf__card",
-  brand: ".agent .btn--primary",
-};
-
-/** The human label for the "Editing your {label}" focus caption. */
-const REGION_LABEL: Record<string, string> = {
-  name: "name",
-  avatar: "headshot",
-  brokerage: "brokerage",
-  email: "email",
-  phone: "phone",
-  schedule: "scheduling link",
-  review: "review",
-  sell: "marketing approach",
-  work: "recent work",
-  brand: "brand color",
-};
-
-/**
- * Focus-mode preview is a COMPACT, height-bounded region window (not a dimmed
- * full-height asset): the real component still renders in full inside it, but the
- * window clips to this height and the inner asset is translated so the active
- * region sits centered. A bounded window is what guarantees the field + Save
- * always have room above the keyboard. Kept in sync with `.sp--focus .sp-asset`
- * height in studio.css.
- */
-const FOCUS_WINDOW_H = 150;
-
 const STEP_FRAME: Record<
   SegmentKey,
   { eyebrow: string; title: string; sub: string }
@@ -296,21 +246,14 @@ export function StudioProfileSetup({ ownerEmail }: { ownerEmail: string | null }
   const startedAtRef = useRef<number>(0);
   const hydratedRef = useRef(false);
 
-  // ── MOBILE four-state shell (Browse / Focus / Expanded / Saved) ───────────
-  // Desktop stays the 3-panel console untouched: all of the below only takes
-  // effect when isMobile, and the focus visuals live behind a mobile media query
-  // so the desktop render is byte-identical. New mobile-only DOM (the focus
-  // caption, the Expand affordance, the expanded sheet) is gated on isMobile so
-  // it never enters the desktop tree at all.
+  // ── MOBILE rendering ──────────────────────────────────────────────────────
+  // Desktop stays the 3-panel console untouched: the mobile-only DOM (the Expand
+  // affordance, the expanded sheet) is gated on isMobile so it never enters the
+  // desktop tree, and the deck (the five deck steps) replaces the console on
+  // mobile via an early return below.
   const isMobile = useIsMobile();
-  const [focusField, setFocusField] = useState<string | null>(null);
   const [expanded, setExpanded] = useState(false);
   const rootRef = useRef<HTMLDivElement>(null);
-  // Browse scroll offset captured at focus-in (before the console goes
-  // position:fixed and the browser clamps scrollY to 0), so it can be restored
-  // when Focus closes.
-  const browseScrollRef = useRef(0);
-  const focusActive = isMobile && focusField !== null;
 
   // One-time hydrate from the crash-safety buffer, then announce start.
   useEffect(() => {
@@ -336,12 +279,11 @@ export function StudioProfileSetup({ ownerEmail }: { ownerEmail: string | null }
     ? (screen as SegmentKey)
     : null;
 
-  // Deck steps (You, Reach) use the mobile SECTION DECK, so they never enter the
-  // in-place focus shell. The remaining steps keep the legacy in-place shell;
-  // `inPlaceFocus` gates it to those non-deck steps only.
+  // Deck steps render the mobile SECTION DECK (early return below). "How you sell"
+  // is the one mobile console step (a plain scrollable form). Desktop always uses
+  // the console.
   const deckSection = activeStep ? DECK_SECTIONS[activeStep] : undefined;
   const mobileDeck = isMobile && !!deckSection;
-  const inPlaceFocus = focusActive && !mobileDeck;
 
   // Per-step entry instrumentation.
   useEffect(() => {
@@ -357,12 +299,9 @@ export function StudioProfileSetup({ ownerEmail }: { ownerEmail: string | null }
     window.scrollTo({ top: 0, behavior: reducedMotion ? "auto" : "smooth" });
   }, [screen, reducedMotion]);
 
-  // Leaving a step (advance / back / checkpoint) drops focus mode + the sheet.
-  // On mobile, each step starts in Browse (no auto keyboard): neutralize the
-  // name field's autoFocus (which desktop keeps) so the four-state shell begins
-  // in Browse and the user taps to enter Focus.
+  // Leaving a step (advance / back / checkpoint) drops the expanded sheet and, on
+  // mobile, neutralizes any autofocus so a step never opens with the keyboard up.
   useEffect(() => {
-    setFocusField(null);
     setExpanded(false);
     if (!isMobile || typeof document === "undefined") return;
     const ae = document.activeElement as HTMLElement | null;
@@ -375,10 +314,10 @@ export function StudioProfileSetup({ ownerEmail }: { ownerEmail: string | null }
     }
   }, [screen, isMobile]);
 
-  // Keyboard-safe sizing: mirror the visual viewport (which shrinks when the
-  // soft keyboard opens) into CSS vars so the focused shell can be a fixed,
-  // exactly-keyboard-tall flex column with no page scroll. Degrades gracefully:
-  // if visualViewport is unavailable the focus container falls back to 100dvh.
+  // Keyboard-safe sizing: mirror the visual viewport (which shrinks when the soft
+  // keyboard opens) into CSS vars (--sp-vvh / --sp-vvt) so the mobile SectionDeck
+  // can be a fixed, exactly-keyboard-tall flex column with no page scroll. Degrades
+  // gracefully: if visualViewport is unavailable the deck falls back to 100dvh.
   useEffect(() => {
     if (!isMobile || typeof window === "undefined") return;
     const vv = window.visualViewport;
@@ -397,99 +336,6 @@ export function StudioProfileSetup({ ownerEmail }: { ownerEmail: string | null }
       vv.removeEventListener("scroll", apply);
     };
   }, [isMobile]);
-
-  // FRAME the active region inside the compact focus window (replaces the old
-  // page-level scrollIntoView, which scrolled the whole page and fought iOS).
-  // We measure the [data-region] target's offset within the asset and translate
-  // the inner asset so the region is vertically centered in the fixed-height
-  // window. A ResizeObserver re-frames as the asset's content height changes
-  // (e.g. the review quote appearing/growing as the agent types).
-  useEffect(() => {
-    if (!inPlaceFocus || !focusField || typeof window === "undefined") return;
-    const sel = REGION_SELECTOR[focusField];
-    const asset = document.querySelector<HTMLElement>(".sp__preview .sp-asset");
-    const page = document.querySelector<HTMLElement>(".sp__preview .sp-asset__page");
-    if (!asset || !page) return;
-    const frame = () => {
-      // Measure untranslated, then compute + apply the centering translate.
-      asset.style.setProperty("--sp-frame-y", "0px");
-      const region = sel ? page.querySelector<HTMLElement>(sel) : null;
-      if (!region) return; // no target yet (e.g. empty review) → asset sits at top
-      const pageRect = page.getBoundingClientRect();
-      const rRect = region.getBoundingClientRect();
-      const regionCenter = rRect.top - pageRect.top + rRect.height / 2;
-      const pageH = page.scrollHeight;
-      // Center against the ACTUAL bounded window height (the .sp-asset clientHeight
-      // in focus), so it stays correct whatever a step sets the window height to.
-      const winH = asset.clientHeight || FOCUS_WINDOW_H;
-      let ty = winH / 2 - regionCenter;
-      ty = Math.max(Math.min(0, winH - pageH), Math.min(0, ty));
-      asset.style.setProperty("--sp-frame-y", `${Math.round(ty)}px`);
-    };
-    const id = window.requestAnimationFrame(frame);
-    const t = window.setTimeout(frame, 220);
-    let ro: ResizeObserver | null = null;
-    if (typeof ResizeObserver !== "undefined") {
-      ro = new ResizeObserver(frame);
-      ro.observe(page);
-    }
-    return () => {
-      window.cancelAnimationFrame(id);
-      window.clearTimeout(t);
-      ro?.disconnect();
-    };
-  }, [inPlaceFocus, focusField]);
-
-  // Lock body scroll while Focus owns the visual viewport, so iOS Safari can't
-  // scroll the input out from under the keyboard-pinned column. The position:fixed
-  // lock would reset the page to the top, so we PRESERVE the Browse scroll offset
-  // (shift the body up by scrollY while locked) and RESTORE it on exit — otherwise
-  // Browse jumps to the top every time the keyboard dismisses.
-  useEffect(() => {
-    if (!inPlaceFocus || typeof document === "undefined") return;
-    const body = document.body;
-    // Use the offset captured at focus-in (window.scrollY is already 0 here, the
-    // console having gone position:fixed in this render).
-    const scrollY = browseScrollRef.current;
-    const prev = {
-      position: body.style.position,
-      top: body.style.top,
-      left: body.style.left,
-      right: body.style.right,
-      width: body.style.width,
-      overflow: body.style.overflow,
-    };
-    body.style.position = "fixed";
-    body.style.top = `-${scrollY}px`;
-    body.style.left = "0";
-    body.style.right = "0";
-    body.style.width = "100%";
-    body.style.overflow = "hidden";
-    return () => {
-      body.style.position = prev.position;
-      body.style.top = prev.top;
-      body.style.left = prev.left;
-      body.style.right = prev.right;
-      body.style.width = prev.width;
-      body.style.overflow = prev.overflow;
-      window.scrollTo(0, scrollY);
-    };
-  }, [inPlaceFocus]);
-
-  // Focus controller — DISABLED. The five deck steps own their own focus, and the
-  // one remaining console step on mobile ("How you sell") is a deliberately plain,
-  // scrollable populated form (its full preview sits BELOW the fields), NOT the old
-  // in-place region-crop shell. So no step enters in-place Focus; this stays a
-  // no-op (the shell code below is inert). Desktop never used the shell visually.
-  const onCenterFocus = (_e: React.FocusEvent<HTMLElement>) => {
-    return;
-  };
-  const onCenterBlur = (e: React.FocusEvent<HTMLElement>) => {
-    if (activeStep && DECK_SECTIONS[activeStep]) return;
-    const next = e.relatedTarget as HTMLElement | null;
-    const region = next?.closest?.("[data-region]")?.getAttribute("data-region");
-    setFocusField(region ?? null);
-  };
 
   const setField = (patch: Partial<BrandSettings>) =>
     setOverlay((o) => ({ ...o, ...patch }));
@@ -903,10 +749,9 @@ export function StudioProfileSetup({ ownerEmail }: { ownerEmail: string | null }
   return (
     <div
       ref={rootRef}
-      className={`sp sp--console${inPlaceFocus ? " sp--focus" : ""}`}
+      className="sp sp--console"
       data-testid="sp-console"
       data-step={step}
-      data-focus-region={inPlaceFocus ? (focusField ?? undefined) : undefined}
     >
       {/* Item 11 — light anchoring chrome so the console feels like a place. */}
       <header className="sp__topbar">
@@ -967,22 +812,10 @@ export function StudioProfileSetup({ ownerEmail }: { ownerEmail: string | null }
           />
         </div>
 
-        <main
-          className="sp__center"
-          data-testid={`sp-step-${step}`}
-          onFocusCapture={onCenterFocus}
-          onBlurCapture={onCenterBlur}
-        >
+        <main className="sp__center" data-testid={`sp-step-${step}`}>
         <p className="sp-eyebrow">{frame.eyebrow}</p>
         <h1 className="sp-step-title">{frame.title}</h1>
         <p className="sp-sub">{frame.sub}</p>
-
-        {/* Focus-mode caption (mobile only): replaces the field label. */}
-        {isMobile && focusField && (
-          <p className="sp-focus-cap" data-testid="sp-focus-caption">
-            Editing your {REGION_LABEL[focusField] ?? "profile"}
-          </p>
-        )}
 
         <div className="sp-fields">
           {step === "you" && (
