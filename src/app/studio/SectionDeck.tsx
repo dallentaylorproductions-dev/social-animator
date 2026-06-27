@@ -603,11 +603,17 @@ export function SectionDeck({
       )}
 
       <div className="sp-deck__cta">
+        {/* preventDefault on mousedown so tapping the button does NOT blur the
+            focused input: otherwise the keyboard dismisses + the layout re-anchors
+            (editing -> resting) and the button MOVES before the click resolves, so
+            the first tap is lost (needs two taps). Keeping focus keeps the button
+            stationary; goToSub handles focus/keyboard for the next subsection. */}
         <button
           type="button"
           className="sp-btn sp-btn--primary"
           data-testid="sp-deck-cta"
           disabled={!canAdvance || saving}
+          onMouseDown={(e) => e.preventDefault()}
           onClick={onCta}
         >
           {ctaLabel}
@@ -617,6 +623,7 @@ export function SectionDeck({
           className="sp-btn sp-btn--ghost"
           data-testid="sp-deck-back"
           disabled={saving}
+          onMouseDown={(e) => e.preventDefault()}
           onClick={onBackCta}
         >
           Back
