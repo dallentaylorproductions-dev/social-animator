@@ -36,6 +36,13 @@ const MAX_REVIEWS = 6;
  */
 export function BrandProfileForm() {
   const [s, setS] = useState<BrandSettings | null>(null);
+  // The LATEST committed settings, kept in sync with `s`. `persist` merges each
+  // patch against this (not a render-captured `s`), so an ASYNC write that fires
+  // after an intervening edit can't clobber it. Concretely: the video field's
+  // auto-poster capture resolves a few hundred ms after the video URL was saved,
+  // and a stale `{ ...s, poster }` merge used to drop the just-saved sampleVideoUrl
+  // (the video "vanished"). Merging against the ref makes every field race-safe.
+  const sRef = useRef<BrandSettings | null>(null);
   const fileRef = useRef<HTMLInputElement>(null);
   // Flips true the instant the agent touches any field, so the async
   // server-fetch resolve below can never stomp an edit already in progress.
@@ -59,6 +66,13 @@ export function BrandProfileForm() {
   useEffect(() => {
     setS(loadBrandSettings());
   }, []);
+
+  // Mirror `s` into the ref so `persist` always merges against the latest value
+  // (covers the load + cross-tab/server adopt paths; `persist` also updates the
+  // ref itself for synchronous edit chains).
+  useEffect(() => {
+    sRef.current = s;
+  }, [s]);
 
   // SERVER_BRAND_SETTINGS cold-start render fix. This form seeds its state
   // ONCE on mount from localStorage (the SSR-safe hydration pattern). On a
@@ -118,8 +132,14 @@ export function BrandProfileForm() {
   // through to localStorage, and — when the feature is ON — debounced-autosaves
   // to the server so the edit syncs cross-device. Flag-off is byte-identical to
   // the prior inline setS + saveBrandSettings pairs (no server write).
-  const persist = (next: BrandSettings) => {
+  const persist = (patch: Partial<BrandSettings>) => {
     editedRef.current = true;
+    // Merge against the LATEST committed settings (the ref), never a render-stale
+    // `s`, so a late async write (e.g. the video auto-poster) can't drop a field
+    // saved by an edit that landed in between.
+    const base = sRef.current ?? s!;
+    const next: BrandSettings = { ...base, ...patch };
+    sRef.current = next;
     setS(next);
     saveBrandSettings(next);
 
@@ -181,7 +201,7 @@ export function BrandProfileForm() {
     key: K,
     value: BrandSettings[K]
   ) => {
-    persist({ ...s, [key]: value });
+    persist({ [key]: value } as Partial<BrandSettings>);
   };
 
   const handleLogoFile = (file: File) => {
@@ -357,14 +377,12 @@ export function BrandProfileForm() {
             // UX-2b — a brand-new image (or a Replace/Remove) starts centered.
             // Clear any prior reposition so the focal point from an old photo
             // can't carry onto a different one.
-            const next: BrandSettings = {
-              ...s,
+            persist({
               agentPhotoUrl: url || undefined,
               agentHeadshotFocalX: undefined,
               agentHeadshotFocalY: undefined,
               agentHeadshotScale: undefined,
-            };
-            persist(next);
+            });
           }}
           onCropChange={({ focalX, focalY, scale }) => {
             // A centered, un-zoomed crop (the editor's "Reset to centered")
@@ -373,13 +391,11 @@ export function BrandProfileForm() {
             // agent who repositioned-then-reset byte-identical to a pre-UX-2b
             // publish (and renders the byte-identical default avatar).
             const centered = focalX === 50 && focalY === 50 && scale === 1;
-            const next: BrandSettings = {
-              ...s,
+            persist({
               agentHeadshotFocalX: centered ? undefined : focalX,
               agentHeadshotFocalY: centered ? undefined : focalY,
               agentHeadshotScale: centered ? undefined : scale,
-            };
-            persist(next);
+            });
           }}
         />
 
@@ -469,11 +485,14 @@ export function BrandProfileForm() {
           valuationMessage={s.valuationMessage}
           welcomeLine={s.welcomeLine}
           sampleListingPhotoUrl={s.sampleListingPhotoUrl}
+          sampleListingPhotoFocalX={s.sampleListingPhotoFocalX}
+          sampleListingPhotoFocalY={s.sampleListingPhotoFocalY}
+          sampleListingPhotoScale={s.sampleListingPhotoScale}
           sampleVideoUrl={s.sampleVideoUrl}
           sampleVideoPosterUrl={s.sampleVideoPosterUrl}
           recentListings={s.recentListings}
           onChange={(patch) => {
-            persist({ ...s, ...patch });
+            persist(patch);
           }}
         />
       </SPEntitlementProvider>

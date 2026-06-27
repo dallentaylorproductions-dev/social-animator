@@ -100,6 +100,11 @@ const ALLOWED_TYPES = VIDEO_CONTENT_TYPES;
 const ALLOWED_FOLDERS = new Set<string>([
   "uploads",
   "seller-presentation-video",
+  // The agent's reusable "sample video tour" (Settings prepared-invitation +
+  // Studio Profile WorkFields). Same auth + token handshake + caps as the
+  // seller-presentation video; it was simply never added here, so its handshake
+  // was rejected ("Folder not allowed") and surfaced as a misleading session error.
+  "agent-sample-video",
 ]);
 
 function isE2EBypassActive(): boolean {
