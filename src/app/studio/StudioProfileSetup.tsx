@@ -38,6 +38,7 @@ import {
   isClientReady,
   isFullyComplete,
   isProofDone,
+  isBrandDone,
   EMPTY_WHYUS,
   type SegmentKey,
 } from "@/lib/studio-profile/setup-state";
@@ -52,6 +53,9 @@ import {
   SectionDeck,
   YOU_SECTION,
   REACH_SECTION,
+  PROOF_SECTION,
+  SELL_SECTION,
+  WORK_SECTION,
   type SectionConfig,
 } from "./SectionDeck";
 import "./studio.css";
@@ -82,13 +86,70 @@ type Screen = "intro" | SegmentKey | "clientready" | "launch";
 const STEP_ORDER: SegmentKey[] = ["you", "reach", "proof", "sell", "work", "brand"];
 
 /**
- * Steps converted to the MOBILE SectionDeck (stable-section + subsection prompt
- * deck). You + Reach are live; Proof/Sell/Work/Brand are the follow-on config
- * pass and keep the legacy in-place focus shell until then.
+ * BRAND_SECTION lives here (not in SectionDeck) because its controls are the
+ * console-local SignatureColorField + the shared ImageUploadField — importing them
+ * into SectionDeck would be a circular dependency. Signature color renders as a
+ * (keyboardless) custom control; logo is an optional media subsection.
+ */
+const BRAND_SECTION: SectionConfig = {
+  id: "brand",
+  satisfied: isBrandDone,
+  renderSection: (payload, reducedMotion, saved) => (
+    <AssetPreviewFrame
+      payload={payload}
+      asset="brand"
+      saved={saved}
+      reducedMotion={reducedMotion}
+    />
+  ),
+  subsections: [
+    {
+      key: "color",
+      prompt: "Signature color",
+      kind: "media",
+      required: false,
+      read: (b) => b.brandAccent ?? "",
+      write: () => ({}),
+      renderMedia: (effective, setField) => (
+        <SignatureColorField
+          value={effective.brandAccent ?? EDITORIAL_BRAND_DEFAULTS.accent}
+          onChange={(hex) => setField({ brandAccent: hex })}
+        />
+      ),
+    },
+    {
+      key: "logo",
+      prompt: "Logo (optional)",
+      kind: "media",
+      required: false,
+      read: (b) => b.logoDataUrl ?? "",
+      write: () => ({}),
+      renderMedia: (effective, setField) => (
+        <ImageUploadField
+          label="Logo"
+          value={effective.logoDataUrl ?? ""}
+          onChange={(url) => setField({ logoDataUrl: url || null })}
+          folder="brand-logo"
+          testIdPrefix="sp-logo"
+          previewAspect="aspect-[5/1]"
+          previewFit="contain"
+        />
+      ),
+    },
+  ],
+};
+
+/**
+ * All six steps now route through the MOBILE SectionDeck (stable-section +
+ * subsection prompt deck). No legacy in-place focus shell remains on mobile.
  */
 const DECK_SECTIONS: Partial<Record<SegmentKey, SectionConfig>> = {
   you: YOU_SECTION,
   reach: REACH_SECTION,
+  proof: PROOF_SECTION,
+  sell: SELL_SECTION,
+  work: WORK_SECTION,
+  brand: BRAND_SECTION,
 };
 const SAVE_ANIM_MS = 1100;
 /** Fallback attribution so the review preview renders from the body alone. */

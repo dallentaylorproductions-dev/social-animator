@@ -7,12 +7,15 @@ import {
   formatPhone,
   type BrandSettings,
 } from "@/lib/brand";
+import { defaultWhyUs } from "@/lib/whyus";
 import type { PublicPayload } from "@/tools/seller-presentation/output/public-payload";
 import { HeadshotField } from "@/app/settings/HeadshotField";
 import type { HeadshotCropValue } from "@/app/settings/HeadshotCropEditor";
 import {
   SEGMENTS,
+  isProofDone,
   isReachDone,
+  isSellDone,
   isYouDone,
   type SegmentKey,
 } from "@/lib/studio-profile/setup-state";
@@ -56,8 +59,9 @@ export interface SubsectionConfig {
   inputMode?: "text" | "email" | "url" | "tel" | "numeric";
   /** Current REAL value ("" when unset) — drives Save-enable + the {value,isDefault} model. */
   read: (b: BrandSettings) => string;
-  /** Patch for setField when a text subsection changes. */
-  write: (value: string) => Partial<BrandSettings>;
+  /** Patch for setField when a text subsection changes (b = the current overlay,
+      for composite fields that must preserve a sibling value, e.g. review body+name). */
+  write: (value: string, b: BrandSettings) => Partial<BrandSettings>;
   /** Media subsections render their own control (e.g. HeadshotField) inline. */
   renderMedia?: (
     effective: BrandSettings,
@@ -67,15 +71,30 @@ export interface SubsectionConfig {
 
 export interface SectionConfig {
   id: SegmentKey;
-  /** The ONE stable section element + its single framing (whole identity card). */
+  /** The ONE stable section element + its single framing, mounted once. */
   renderSection: (payload: PublicPayload, reducedMotion: boolean, saved: boolean) => ReactNode;
   subsections: SubsectionConfig[];
+  /**
+   * The ONE framing for this section, chosen once and stable across subsections:
+   *  - "contain" (default): scale the whole component to be FULLY visible.
+   *  - "top-slice": for TALL sections (marketing) — fit the width so the top
+   *    (the lead card / hero band) reads legibly; the rest is clipped, not shrunk
+   *    into an unreadable smudge.
+   * Never a per-subsection re-crop/zoom.
+   */
+  framing?: "contain" | "top-slice";
   /**
    * The section's quality bar. When already met (a returning agent whose data is
    * set), required-subsection gating relaxes so they can advance/finish without
    * re-typing. Mirrors the step's "done" predicate (isYouDone / isReachDone).
    */
   satisfied?: (b: BrandSettings) => boolean;
+  /**
+   * A preview-only BEAT: a section with zero input subsections (e.g. Recent work).
+   * Shows the stable preview + this copy + a single "Save & continue"; persists
+   * nothing.
+   */
+  beatCopy?: string;
 }
 
 /* ───────────────────────────── Step 1 (You) config ───────────────────────────── */
@@ -211,6 +230,181 @@ export const REACH_SECTION: SectionConfig = {
   ],
 };
 
+/* ───────────────────────────── Step 3 (Proof) config ───────────────────────────── */
+
+/**
+ * PROOF_SECTION — the cream testimonial (TrustStrip), shown whole. Review is the
+ * required lead; reviewer name + reviews link are additive. Review body is stored
+ * RAW (trimmed + empty-name-defaulted at commit, same as the desktop console), so
+ * the spacebar isn't swallowed mid-type.
+ */
+export const PROOF_SECTION: SectionConfig = {
+  id: "proof",
+  satisfied: isProofDone,
+  renderSection: (payload, reducedMotion, saved) => (
+    <AssetPreviewFrame
+      payload={payload}
+      asset="proof"
+      saved={saved}
+      reducedMotion={reducedMotion}
+    />
+  ),
+  subsections: [
+    {
+      key: "review",
+      prompt: "Paste a review",
+      kind: "text",
+      required: true,
+      placeholder: "They made the whole sale feel easy…",
+      read: (b) => b.agentReviews?.[0]?.body ?? "",
+      write: (v, b) => ({
+        agentReviews: v.trim()
+          ? [{ body: v, attributionName: b.agentReviews?.[0]?.attributionName ?? "" }]
+          : undefined,
+      }),
+    },
+    {
+      key: "reviewer",
+      prompt: "Who said it (optional)",
+      kind: "text",
+      required: false,
+      placeholder: "e.g. J. Mendoza",
+      read: (b) => b.agentReviews?.[0]?.attributionName ?? "",
+      // Preserve the body; a name alone (no body) writes no review.
+      write: (v, b) => {
+        const body = b.agentReviews?.[0]?.body;
+        return body ? { agentReviews: [{ body, attributionName: v }] } : {};
+      },
+    },
+    {
+      key: "reviewsLink",
+      prompt: "Link to all your reviews (optional)",
+      kind: "text",
+      required: false,
+      type: "url",
+      inputMode: "url",
+      placeholder: "Zillow profile, etc.",
+      read: (b) => b.reviewsOutlinkUrl ?? "",
+      write: (v) => ({ reviewsOutlinkUrl: v }),
+    },
+  ],
+};
+
+/* ───────────────────────────── Step 4 (How you sell) config ───────────────────────────── */
+
+/**
+ * SELL_SECTION — the marketing zone (CampaignSpread) is TALL, so its framing is a
+ * legible TOP SLICE (the lead "how I'll get your home seen" card), not the whole
+ * section shrunk to a smudge. One prompt edits the lead marketing point's title,
+ * which updates the slice live. The marketing-point ICONS are intentionally
+ * untouched here (separate production-scoped pass). The parent seeds the default
+ * marketing approach on entry, so this reads as "refine", never blank.
+ */
+export const SELL_SECTION: SectionConfig = {
+  id: "sell",
+  framing: "top-slice",
+  satisfied: isSellDone,
+  renderSection: (payload, reducedMotion, saved) => (
+    <AssetPreviewFrame
+      payload={payload}
+      asset="sell"
+      saved={saved}
+      reducedMotion={reducedMotion}
+    />
+  ),
+  subsections: [
+    {
+      key: "approach",
+      prompt: "Your strongest marketing point",
+      kind: "text",
+      required: false,
+      placeholder: "Professional photography & video",
+      read: (b) => b.whyUs?.marketingApproach?.[0]?.title ?? "",
+      write: (v, b) => {
+        const why = b.whyUs ?? defaultWhyUs();
+        const pts = [...(why.marketingApproach ?? [])];
+        pts[0] = { ...(pts[0] ?? { title: "", detail: "" }), title: v };
+        return { whyUs: { ...why, marketingApproach: pts } };
+      },
+    },
+  ],
+};
+
+/* ───────────────────────────── Step 5 (Recent work) config ───────────────────────────── */
+
+/**
+ * WORK_SECTION — a preview-only BEAT: the recent-listings coverflow with the
+ * existing SAMPLE listings, no input subsections, persists nothing. The real
+ * recent-listings editor stays in Settings. Uses the coverflow-only CampaignSpread
+ * variant so the relevant slice (the cards) is what shows, contained and legible.
+ */
+export const WORK_SECTION: SectionConfig = {
+  id: "work",
+  beatCopy:
+    "Your recent work shows here. Add your own listings anytime in Settings.",
+  renderSection: (payload, reducedMotion, saved) => (
+    <AssetPreviewFrame
+      payload={payload}
+      asset="work"
+      campaignVariant="coverflow-only"
+      saved={saved}
+      reducedMotion={reducedMotion}
+    />
+  ),
+  subsections: [],
+};
+
+/* ───────────────────────────── scale-to-contain ───────────────────────────── */
+
+/**
+ * useContainScale — the ONE framing mechanism. Measures the section's natural size
+ * (the inner box's pre-transform offset size) against the available band, and
+ * returns a scale that makes it FULLY visible ("contain") or width-legible with
+ * the top in view ("top-slice"). Never zooms in (clamped ≤ 1), never clips a
+ * contained section. rAF-batched + ResizeObserver so live edits (the section
+ * growing as the user types) and the keyboard band shrinking both re-fit.
+ */
+function useContainScale(framing: "contain" | "top-slice") {
+  const frameRef = useRef<HTMLDivElement>(null);
+  const innerRef = useRef<HTMLDivElement>(null);
+  const [scale, setScale] = useState(1);
+  useEffect(() => {
+    if (typeof window === "undefined") return;
+    const frame = frameRef.current;
+    const inner = innerRef.current;
+    if (!frame || !inner) return;
+    let raf = 0;
+    const measure = () => {
+      const availW = frame.clientWidth;
+      const availH = frame.clientHeight;
+      const natW = inner.offsetWidth;
+      const natH = inner.offsetHeight;
+      if (!availW || !natW || !natH) return;
+      const s =
+        framing === "top-slice"
+          ? Math.min(availW / natW, 1)
+          : Math.min(availW / natW, availH / natH, 1);
+      setScale((prev) => (Math.abs(prev - s) < 0.004 ? prev : s));
+    };
+    const schedule = () => {
+      if (raf) cancelAnimationFrame(raf);
+      raf = requestAnimationFrame(measure);
+    };
+    schedule();
+    const ro = new ResizeObserver(schedule);
+    ro.observe(frame);
+    ro.observe(inner);
+    const vv = window.visualViewport;
+    vv?.addEventListener("resize", schedule);
+    return () => {
+      if (raf) cancelAnimationFrame(raf);
+      ro.disconnect();
+      vv?.removeEventListener("resize", schedule);
+    };
+  }, [framing]);
+  return { frameRef, innerRef, scale };
+}
+
 /* ───────────────────────────── the deck shell ───────────────────────────── */
 
 export function SectionDeck({
@@ -279,21 +473,29 @@ export function SectionDeck({
   const [editing, setEditing] = useState(false);
   const inputRef = useRef<HTMLInputElement>(null);
 
-  const sub = subs[subIndex];
-  const value = sub.read(effective);
+  const framing = section.framing ?? "contain";
+  const { frameRef, innerRef, scale } = useContainScale(framing);
+
+  // A preview-only BEAT (Recent work) has zero input subsections: preview + copy
+  // + a single "Save & continue".
+  const isBeat = subs.length === 0;
+  const sub = isBeat ? null : subs[subIndex];
+  const value = sub ? sub.read(effective) : "";
   const hasValue = value.trim().length > 0;
-  const isLast = subIndex === subs.length - 1;
+  const isLast = !isBeat && subIndex === subs.length - 1;
   // Required gates Save until a real value exists; optional always advances (Skip
   // when empty). A returning agent whose section is already satisfied (e.g. a
   // contact already on file) is never forced to re-type — gating relaxes.
   const sectionSatisfied = section.satisfied?.(effective) ?? false;
-  const canAdvance = !sub.required || hasValue || sectionSatisfied;
+  const canAdvance = isBeat || !sub!.required || hasValue || sectionSatisfied;
 
   // CTA label by context (one button style across the small set).
   let ctaLabel: string;
-  if (sub.kind === "media") {
+  if (isBeat) {
+    ctaLabel = "Save & continue";
+  } else if (sub!.kind === "media") {
     ctaLabel = hasValue ? "Use this photo" : "Skip for now";
-  } else if (!sub.required && !hasValue) {
+  } else if (!sub!.required && !hasValue) {
     ctaLabel = "Skip for now";
   } else {
     ctaLabel = isLast ? "Finish section" : "Save & continue";
@@ -321,7 +523,7 @@ export function SectionDeck({
 
   const onCta = () => {
     if (!canAdvance || saving) return;
-    if (isLast) onFinish();
+    if (isBeat || isLast) onFinish();
     else goToSub(subIndex + 1);
   };
 
@@ -336,7 +538,7 @@ export function SectionDeck({
       className={`sp sp-deck${editing ? " sp-deck--editing" : ""}`}
       data-testid="sp-deck"
       data-section={section.id}
-      data-sub={sub.key}
+      data-sub={sub?.key}
       data-editing={editing ? "true" : "false"}
     >
       {/* compact header + 6-step progress (one progress scale; the subsection
@@ -355,52 +557,73 @@ export function SectionDeck({
         </div>
       </header>
 
-      {/* THE STABLE SECTION — one element, one framing, mounted once. It updates
-          live and is only SCALED to fit; it is never re-cropped or re-framed per
-          subsection, and it does not zoom. */}
-      <div className="sp-deck__preview" data-testid="sp-deck-preview">
-        {section.renderSection(previewPayload, reducedMotion, savedNow)}
+      {/* THE STABLE SECTION — one element, one framing, mounted once. The inner
+          box is SCALED to fit (scale-to-contain, or width-legible top-slice for a
+          tall section); it is never re-cropped/re-framed per subsection and never
+          zooms in. */}
+      <div
+        className="sp-deck__preview"
+        data-testid="sp-deck-preview"
+        data-framing={framing}
+        ref={frameRef}
+      >
+        <div
+          className="sp-deck__fit"
+          ref={innerRef}
+          style={{ transform: `scale(${scale})` }}
+        >
+          {section.renderSection(previewPayload, reducedMotion, savedNow)}
+        </div>
       </div>
 
-      {/* THE PROMPT DECK — exactly one subsection prompt in the DOM at a time. The
-          key remounts the block per subsection so the slide-in animation plays;
-          the section preview above stays anchored. */}
-      <div
-        key={sub.key}
-        className={`sp-deck__prompt sp-deck__prompt--${dir} sp-deck__prompt--${sub.kind}`}
-        data-testid="sp-deck-prompt"
-      >
-        <p className="sp-deck__count" data-testid="sp-deck-count">
-          {subIndex + 1} of {subs.length}
-        </p>
-        <p className="sp-deck__label">{sub.prompt}</p>
-        {sub.kind === "text" ? (
-          <input
-            ref={inputRef}
-            className="sp-input sp-deck__input"
-            data-testid="sp-deck-input"
-            type={sub.type ?? "text"}
-            inputMode={sub.inputMode}
-            value={value}
-            placeholder={sub.placeholder}
-            aria-label={sub.prompt}
-            onChange={(e) => setField(sub.write(e.target.value))}
-            onFocus={() => setEditing(true)}
-            onBlur={(e) => {
-              // Tapping Save/Back must not flip the composition mid-commit; goToSub
-              // owns the editing flag for those. Any other blur (keyboard dismiss)
-              // returns to the resting composition.
-              const next = e.relatedTarget as HTMLElement | null;
-              if (next?.closest?.(".sp-deck__cta")) return;
-              setEditing(false);
-            }}
-          />
-        ) : (
-          <div className="sp-deck__media" data-testid="sp-deck-media">
-            {sub.renderMedia?.(effective, setField)}
-          </div>
-        )}
-      </div>
+      {/* THE PROMPT DECK — exactly one subsection prompt in the DOM at a time (or
+          a preview-only beat with none). The key remounts the block per subsection
+          so the slide-in animation plays; the section preview above stays anchored. */}
+      {isBeat ? (
+        <div
+          className="sp-deck__prompt sp-deck__prompt--beat"
+          data-testid="sp-deck-prompt"
+        >
+          <p className="sp-deck__beat">{section.beatCopy}</p>
+        </div>
+      ) : (
+        <div
+          key={sub!.key}
+          className={`sp-deck__prompt sp-deck__prompt--${dir} sp-deck__prompt--${sub!.kind}`}
+          data-testid="sp-deck-prompt"
+        >
+          <p className="sp-deck__count" data-testid="sp-deck-count">
+            {subIndex + 1} of {subs.length}
+          </p>
+          <p className="sp-deck__label">{sub!.prompt}</p>
+          {sub!.kind === "text" ? (
+            <input
+              ref={inputRef}
+              className="sp-input sp-deck__input"
+              data-testid="sp-deck-input"
+              type={sub!.type ?? "text"}
+              inputMode={sub!.inputMode}
+              value={value}
+              placeholder={sub!.placeholder}
+              aria-label={sub!.prompt}
+              onChange={(e) => setField(sub!.write(e.target.value, effective))}
+              onFocus={() => setEditing(true)}
+              onBlur={(e) => {
+                // Tapping Save/Back must not flip the composition mid-commit; goToSub
+                // owns the editing flag for those. Any other blur (keyboard dismiss)
+                // returns to the resting composition.
+                const next = e.relatedTarget as HTMLElement | null;
+                if (next?.closest?.(".sp-deck__cta")) return;
+                setEditing(false);
+              }}
+            />
+          ) : (
+            <div className="sp-deck__media" data-testid="sp-deck-media">
+              {sub!.renderMedia?.(effective, setField)}
+            </div>
+          )}
+        </div>
+      )}
 
       {toast && (
         <p className="sp-deck__toast" data-testid="sp-deck-toast" role="status">

@@ -1627,42 +1627,49 @@
      balanced breathing room (never bottom-stuck). EDITING (keyboard up, see
      .sp-deck--editing) — the group sinks to the visualViewport band with Save
      just above the keyboard. */
+  /* The preview is a FIXED-HEIGHT band (a fraction of the visual viewport) that
+     clips overflow; the inner .sp-deck__fit is measured + transform-scaled by JS
+     to CONTAIN its framing (or width-fit a tall top-slice). margin-top places the
+     band in the upper region at rest; .sp-deck--editing bottom-anchors it so Save
+     clears the keyboard. Band height (not vh/dvh) tracks --sp-vvh, set from JS. */
   .sp-deck__preview {
-    flex: 0 1 auto;
-    min-height: 0;
+    flex: 0 0 auto;
+    position: relative;
+    overflow: hidden;
+    height: calc(var(--sp-vvh, 100dvh) * 0.3);
     margin-top: calc(var(--sp-vvh, 100dvh) * 0.06);
     display: flex;
-    align-items: center;
     justify-content: center;
   }
   .sp-deck--editing .sp-deck__preview {
-    margin-top: auto; /* keyboard band: bottom-anchor so Save clears the keyboard */
+    height: calc(var(--sp-vvh, 100dvh) * 0.24); /* ≤24% in the keyboard band */
+    margin-top: auto; /* bottom-anchor so Save clears the keyboard */
   }
-  .sp-deck__preview .sp-asset {
-    width: 100%;
-    max-width: 340px;
-    /* ≤32% before-tap; flex squeezes it further (≤24%) once the keyboard shrinks
-       --sp-vvh. Capped against the ACTUAL visual viewport, never vh/dvh. */
-    max-height: calc(var(--sp-vvh, 100dvh) * 0.32);
-    display: flex;
+  /* contain = fully visible, vertically centered; top-slice = width-fit, top in
+     view (tall sections), the rest clipped legibly rather than shrunk to a smudge. */
+  .sp-deck__preview[data-framing="contain"] {
     align-items: center;
-    justify-content: center;
   }
-  .sp-deck__preview .sp-asset__page {
+  .sp-deck__preview[data-framing="top-slice"] {
+    align-items: flex-start;
+  }
+  .sp-deck__fit {
+    flex: 0 0 auto;
+    width: 360px; /* the stable design width; JS scales this to fit the band */
+  }
+  .sp-deck__preview[data-framing="contain"] .sp-deck__fit {
+    transform-origin: center center;
+  }
+  .sp-deck__preview[data-framing="top-slice"] .sp-deck__fit {
+    transform-origin: top center;
+  }
+  .sp-deck__fit .sp-asset {
+    width: 100%;
+    max-width: none;
+  }
+  .sp-deck__fit .sp-asset__page {
     min-height: 0;
     width: 100%;
-  }
-  /* compact the identity card so it sits comfortably within the band */
-  .sp-deck .sp-asset[data-testid="sp-asset-you"] .agent.section {
-    padding: 8px 12px;
-  }
-  .sp-deck .sp-asset[data-testid="sp-asset-you"] .agent__card {
-    padding: 11px 13px;
-  }
-  .sp-deck .sp-asset[data-testid="sp-asset-you"] .agent__avatar {
-    width: 44px;
-    height: 44px;
-    font-size: 16px;
   }
 
   /* THE PROMPT DECK — exactly one subsection in the DOM at a time; slides in on
@@ -1702,6 +1709,19 @@
   }
   .sp-deck__input {
     width: 100%;
+  }
+  /* preview-only beat (Recent work): calm explanatory copy, no input */
+  .sp-deck__beat {
+    margin: 0;
+    font-size: 14px;
+    line-height: 1.5;
+    color: var(--sp-muted);
+  }
+  /* Proof preview: drop the teal quotation glyphs (--teal-700) — in the studio
+     deck they read as a stray blue artifact beside the review. Studio-scoped only;
+     the real seller page + the desktop console preview keep them. */
+  .sp-deck .sa-quote__q .mark {
+    display: none;
   }
 
   .sp-deck__toast {

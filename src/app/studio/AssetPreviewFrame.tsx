@@ -58,6 +58,7 @@ export function AssetPreviewFrame({
   saved,
   reducedMotion,
   youIdentity = false,
+  campaignVariant,
 }: {
   payload: PublicPayload;
   asset: SegmentKey;
@@ -70,6 +71,12 @@ export function AssetPreviewFrame({
    * StateAHero hero — so the desktop console preview is byte-identical to before.
    */
   youIdentity?: boolean;
+  /**
+   * MOBILE-only: override the CampaignSpread variant for the sell/work asset
+   * (e.g. "coverflow-only" so the Recent-work beat frames just the listings).
+   * Undefined keeps the default "full" — so the desktop console stays byte-identical.
+   */
+  campaignVariant?: "full" | "coverflow-only";
 }) {
   const roleVars = consumerRoleVars(
     deriveConsumerRoles(payload.brandColors?.accent),
@@ -105,12 +112,13 @@ export function AssetPreviewFrame({
     else ghost = "The proof a seller can trust appears here once you add a review.";
   } else if (asset === "sell") {
     // The redesigned marketing zone (payload carries marketingZoneRedesign).
-    body = <CampaignSpread payload={payload} />;
+    body = <CampaignSpread payload={payload} variant={campaignVariant} />;
   } else if (asset === "work") {
     // Full marketing zone so EVERY field this step captures is visible: the
     // sample photo/video in "the work" showcase AND the recent-listings
-    // coverflow (the redesigned zone renders both).
-    body = <CampaignSpread payload={payload} />;
+    // coverflow (the redesigned zone renders both). The mobile Recent-work beat
+    // passes "coverflow-only" to frame just the listings.
+    body = <CampaignSpread payload={payload} variant={campaignVariant} />;
   } else if (asset === "brand") {
     // The agent band — accent-colored CTA buttons + the logo lockup — so the
     // signature color AND the logo are both plainly visible as they change.
