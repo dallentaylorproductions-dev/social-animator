@@ -38,6 +38,7 @@ const useIsomorphicLayoutEffect =
 export function DashboardEntry({
   ownerEmail,
   onboardingFirstRun,
+  studioProfileSetup = false,
   agentProfile,
   dashboardV2,
   todaySeam = false,
@@ -51,6 +52,13 @@ export function DashboardEntry({
    */
   ownerEmail: string;
   onboardingFirstRun: boolean;
+  /**
+   * STUDIO_PROFILE_SETUP — when ON, the first-run gate routes a brand-new agent to
+   * /studio instead of /welcome. Also arms the gate on its own, so studio routing
+   * works even with every /welcome onboarding flag off. Default false → flag-off is
+   * byte-identical (gate mounts only for the onboarding flags, destination /welcome).
+   */
+  studioProfileSetup?: boolean;
   agentProfile: AgentProfile;
   dashboardV2: boolean;
   /** DASHBOARD_TODAY_SEAM (Pass 3) — server-resolved; forwarded untouched. */
@@ -69,7 +77,9 @@ export function DashboardEntry({
     reconcileAccountOwnership(ownerEmail);
   }, [ownerEmail]);
 
-  if (!onboardingFirstRun) {
+  // The gate exists only when a first-run flow is armed (any /welcome onboarding
+  // flag, OR studio setup). With all off this is a pure pass-through — byte-identical.
+  if (!onboardingFirstRun && !studioProfileSetup) {
     return (
       <DashboardClient
         agentProfile={agentProfile}
@@ -81,6 +91,9 @@ export function DashboardEntry({
   }
   return (
     <OnboardingEntryGate
+      // STUDIO_PROFILE_SETUP wins the destination when on (the new guided setup);
+      // otherwise the unchanged /welcome onboarding.
+      destination={studioProfileSetup ? '/studio' : '/welcome'}
       dashboard={
         <DashboardClient
           agentProfile={agentProfile}
@@ -105,7 +118,14 @@ type GateDecision = 'deciding' | 'stay';
  * placeholder (same testid), so a new agent never flashes the cold dashboard
  * before the redirect lands.
  */
-function OnboardingEntryGate({ dashboard }: { dashboard: React.ReactNode }) {
+function OnboardingEntryGate({
+  dashboard,
+  destination,
+}: {
+  dashboard: React.ReactNode;
+  /** Where a brand-new agent is routed: /studio (studio setup) or /welcome. */
+  destination: string;
+}) {
   const router = useRouter();
   const activity = useOwnerPagesActivity();
   const [decision, setDecision] = useState<GateDecision>('deciding');
@@ -121,12 +141,12 @@ function OnboardingEntryGate({ dashboard }: { dashboard: React.ReactNode }) {
     // Brand-new agent: route into the first-run flow. Stay in 'deciding'
     // (placeholder) until the client nav lands so the dashboard never flashes.
     if (activity.status === 'ready' && activity.totalPages === 0) {
-      router.replace('/welcome');
+      router.replace(destination);
       return;
     }
     // Returning agent or unavailable source - fall through to the dashboard.
     setDecision('stay');
-  }, [activity, router]);
+  }, [activity, router, destination]);
 
   if (decision === 'deciding') {
     return (

@@ -10,6 +10,7 @@ import { parseSeamPreview } from "./today-state";
 import { isOnboardingFirstRunEnabled } from "@/lib/config/onboarding-first-run";
 import { isOnboardingFirstRunV2Enabled } from "@/lib/config/onboarding-first-run-v2";
 import { isOnboardingHybridV3Enabled } from "@/lib/config/onboarding-first-run-v3";
+import { isStudioProfileSetupEnabled } from "@/lib/config/studio-profile";
 import { DashboardEntry } from "./DashboardEntry";
 import "./sep-studio.css";
 
@@ -83,6 +84,13 @@ export default async function DashboardPage({
     isOnboardingFirstRunV2Enabled() ||
     isOnboardingHybridV3Enabled();
 
+  // STUDIO_PROFILE_SETUP — read server-side, threaded the same way. When ON, the
+  // first-run gate routes a brand-new agent to /studio (the new guided setup)
+  // instead of /welcome. When OFF this is byte-identical to today: the gate's
+  // destination stays /welcome and, if every onboarding flag is also off, the gate
+  // never mounts at all (pure pass-through).
+  const studioProfileSetup = isStudioProfileSetupEnabled();
+
   return (
     <main
       className="sep-studio"
@@ -137,6 +145,7 @@ export default async function DashboardPage({
         <DashboardEntry
           ownerEmail={email}
           onboardingFirstRun={onboardingFirstRun}
+          studioProfileSetup={studioProfileSetup}
           agentProfile={agentProfile}
           dashboardV2={dashboardHomeV2}
           todaySeam={dashboardTodaySeam}
