@@ -7,15 +7,14 @@ import {
   formatPhone,
   type BrandSettings,
 } from "@/lib/brand";
-import { defaultWhyUs } from "@/lib/whyus";
 import type { PublicPayload } from "@/tools/seller-presentation/output/public-payload";
+import { SAMPLE_RECENT_LISTINGS } from "@/lib/onboarding/sample-listing-draft";
 import { HeadshotField } from "@/app/settings/HeadshotField";
 import type { HeadshotCropValue } from "@/app/settings/HeadshotCropEditor";
 import {
   SEGMENTS,
   isProofDone,
   isReachDone,
-  isSellDone,
   isYouDone,
   type SegmentKey,
 } from "@/lib/studio-profile/setup-state";
@@ -41,13 +40,17 @@ import { AssetPreviewFrame } from "./AssetPreviewFrame";
  * desktop console and steps 2–6 are untouched (this renders only for mobile You).
  */
 
-export type SubKind = "text" | "media";
+export type SubKind = "text" | "media" | "control";
 
 export interface SubsectionConfig {
   key: string;
   /** The single prompt shown for this subsection (the field label / question). */
   prompt: string;
-  /** text → keyboard input; media → inline upload/adjust, never a keyboard. */
+  /**
+   * text → keyboard input; media → inline photo upload/adjust (photo CTA labels);
+   * control → a custom non-keyboard control that is NOT a photo upload (e.g. the
+   * color picker), so it gets the text-style "Save & continue" CTA.
+   */
   kind: SubKind;
   /** Optional subsections offer "Skip for now" instead of gating Save. */
   required: boolean;
@@ -290,53 +293,17 @@ export const PROOF_SECTION: SectionConfig = {
   ],
 };
 
-/* ───────────────────────────── Step 4 (How you sell) config ───────────────────────────── */
-
-/**
- * SELL_SECTION — the marketing zone (CampaignSpread) is TALL, so its framing is a
- * legible TOP SLICE (the lead "how I'll get your home seen" card), not the whole
- * section shrunk to a smudge. One prompt edits the lead marketing point's title,
- * which updates the slice live. The marketing-point ICONS are intentionally
- * untouched here (separate production-scoped pass). The parent seeds the default
- * marketing approach on entry, so this reads as "refine", never blank.
- */
-export const SELL_SECTION: SectionConfig = {
-  id: "sell",
-  framing: "top-slice",
-  satisfied: isSellDone,
-  renderSection: (payload, reducedMotion, saved) => (
-    <AssetPreviewFrame
-      payload={payload}
-      asset="sell"
-      saved={saved}
-      reducedMotion={reducedMotion}
-    />
-  ),
-  subsections: [
-    {
-      key: "approach",
-      prompt: "Your strongest marketing point",
-      kind: "text",
-      required: false,
-      placeholder: "Professional photography & video",
-      read: (b) => b.whyUs?.marketingApproach?.[0]?.title ?? "",
-      write: (v, b) => {
-        const why = b.whyUs ?? defaultWhyUs();
-        const pts = [...(why.marketingApproach ?? [])];
-        pts[0] = { ...(pts[0] ?? { title: "", detail: "" }), title: v };
-        return { whyUs: { ...why, marketingApproach: pts } };
-      },
-    },
-  ],
-};
-
-/* ───────────────────────────── Step 5 (Recent work) config ───────────────────────────── */
+/* ───────────────────────────── Step 5 (Recent work) config ─────────────────────────────
+ * (Step 4 "How you sell" is the deliberate deck EXCEPTION — it keeps the populated
+ * multi-point console editor + a bottom preview, so it is NOT a SectionConfig.) */
 
 /**
  * WORK_SECTION — a preview-only BEAT: the recent-listings coverflow with the
  * existing SAMPLE listings, no input subsections, persists nothing. The real
  * recent-listings editor stays in Settings. Uses the coverflow-only CampaignSpread
  * variant so the relevant slice (the cards) is what shows, contained and legible.
+ * The preview forces the curated SAMPLE_RECENT_LISTINGS (all photo + address +
+ * views) so a photoless real listing can never leak a blank card into the beat.
  */
 export const WORK_SECTION: SectionConfig = {
   id: "work",
@@ -344,7 +311,7 @@ export const WORK_SECTION: SectionConfig = {
     "Your recent work shows here. Add your own listings anytime in Settings.",
   renderSection: (payload, reducedMotion, saved) => (
     <AssetPreviewFrame
-      payload={payload}
+      payload={{ ...payload, recentListings: SAMPLE_RECENT_LISTINGS }}
       asset="work"
       campaignVariant="coverflow-only"
       saved={saved}
@@ -489,12 +456,16 @@ export function SectionDeck({
   const sectionSatisfied = section.satisfied?.(effective) ?? false;
   const canAdvance = isBeat || !sub!.required || hasValue || sectionSatisfied;
 
-  // CTA label by context (one button style across the small set).
+  // CTA label by context (one button style across the small set). The label
+  // derives from the CURRENT subsection's kind: a control (color) reads like text
+  // ("Save & continue"), never the photo CTA.
   let ctaLabel: string;
   if (isBeat) {
     ctaLabel = "Save & continue";
   } else if (sub!.kind === "media") {
     ctaLabel = hasValue ? "Use this photo" : "Skip for now";
+  } else if (sub!.kind === "control") {
+    ctaLabel = isLast ? "Finish section" : "Save & continue";
   } else if (!sub!.required && !hasValue) {
     ctaLabel = "Skip for now";
   } else {

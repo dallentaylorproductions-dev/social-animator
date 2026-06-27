@@ -59,6 +59,7 @@ export function AssetPreviewFrame({
   reducedMotion,
   youIdentity = false,
   campaignVariant,
+  trimHeadline = false,
 }: {
   payload: PublicPayload;
   asset: SegmentKey;
@@ -77,6 +78,13 @@ export function AssetPreviewFrame({
    * Undefined keeps the default "full" — so the desktop console stays byte-identical.
    */
   campaignVariant?: "full" | "coverflow-only";
+  /**
+   * MOBILE-only: trim the AgentBand headline (the "06 · YOUR AGENT" eyebrow + the
+   * big serif "{name}." — which also doubles a trailing period on names like
+   * "Dallen T."). Used by the Brand deck preview. Default false → desktop console
+   * byte-identical.
+   */
+  trimHeadline?: boolean;
 }) {
   const roleVars = consumerRoleVars(
     deriveConsumerRoles(payload.brandColors?.accent),
@@ -121,8 +129,10 @@ export function AssetPreviewFrame({
     body = <CampaignSpread payload={payload} variant={campaignVariant} />;
   } else if (asset === "brand") {
     // The agent band — accent-colored CTA buttons + the logo lockup — so the
-    // signature color AND the logo are both plainly visible as they change.
-    body = <AgentBand payload={payload} />;
+    // signature color AND the logo are both plainly visible as they change. The
+    // mobile Brand deck passes trimHeadline to drop the "06 · YOUR AGENT" eyebrow
+    // + the big serif name (and its doubled trailing period).
+    body = <AgentBand payload={payload} showHeadline={!trimHeadline} />;
   }
 
   const animate = saved && !reducedMotion;

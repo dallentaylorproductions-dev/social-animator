@@ -1642,7 +1642,11 @@
     justify-content: center;
   }
   .sp-deck--editing .sp-deck__preview {
-    height: calc(var(--sp-vvh, 100dvh) * 0.24); /* ≤24% in the keyboard band */
+    /* Keep the preview near its resting size when the keyboard is up — a generous
+       budget so it reads professionally, not a dramatic shrink. flex-shrink lets
+       it give back space only on a genuinely tight band, never overlapping Save. */
+    height: calc(var(--sp-vvh, 100dvh) * 0.42);
+    flex: 0 1 auto;
     margin-top: auto; /* bottom-anchor so Save clears the keyboard */
   }
   /* contain = fully visible, vertically centered; top-slice = width-fit, top in

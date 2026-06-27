@@ -54,7 +54,6 @@ import {
   YOU_SECTION,
   REACH_SECTION,
   PROOF_SECTION,
-  SELL_SECTION,
   WORK_SECTION,
   type SectionConfig,
 } from "./SectionDeck";
@@ -100,13 +99,16 @@ const BRAND_SECTION: SectionConfig = {
       asset="brand"
       saved={saved}
       reducedMotion={reducedMotion}
+      trimHeadline
     />
   ),
   subsections: [
     {
+      // A non-keyboard CONTROL (color picker), not a photo upload — so its CTA is
+      // "Save & continue" (1 of 2), not the media "Use this photo".
       key: "color",
       prompt: "Signature color",
-      kind: "media",
+      kind: "control",
       required: false,
       read: (b) => b.brandAccent ?? "",
       write: () => ({}),
@@ -140,14 +142,15 @@ const BRAND_SECTION: SectionConfig = {
 };
 
 /**
- * All six steps now route through the MOBILE SectionDeck (stable-section +
- * subsection prompt deck). No legacy in-place focus shell remains on mobile.
+ * The MOBILE SectionDeck steps (stable-section + subsection prompt deck). "How you
+ * sell" (sell) is the deliberate EXCEPTION: it keeps the populated multi-point
+ * console editor with the working preview BELOW the fields, so it is absent here
+ * and falls through to the console render on mobile (no in-place focus shell).
  */
 const DECK_SECTIONS: Partial<Record<SegmentKey, SectionConfig>> = {
   you: YOU_SECTION,
   reach: REACH_SECTION,
   proof: PROOF_SECTION,
-  sell: SELL_SECTION,
   work: WORK_SECTION,
   brand: BRAND_SECTION,
 };
@@ -473,24 +476,13 @@ export function StudioProfileSetup({ ownerEmail }: { ownerEmail: string | null }
     };
   }, [inPlaceFocus]);
 
-  // Focus controller: a field gaining focus enters Focus mode for its region; a
-  // blur that doesn't land on another field (keyboard dismiss, tapping Save)
-  // exits. Reading the region from the nearest [data-region] handles embedded
-  // editors (Recent work) and multi-input fields (Proof) cleanly.
-  // Not gated on isMobile: focusField is harmless on desktop (focusActive =
-  // isMobile && focusField, and only focusActive applies the shell), and leaving
-  // it ungated means a focus that fires before the isMobile flip still resolves
-  // into Focus once mobile is known.
-  const onCenterFocus = (e: React.FocusEvent<HTMLElement>) => {
-    if (activeStep && DECK_SECTIONS[activeStep]) return; // deck steps own their focus
-    const region = e.target.closest?.("[data-region]")?.getAttribute("data-region");
-    if (!region) return;
-    // Capture the Browse scroll BEFORE entering Focus (focusActive still false),
-    // i.e. before the console becomes position:fixed and scrollY clamps to 0.
-    if (!focusActive && typeof window !== "undefined") {
-      browseScrollRef.current = window.scrollY;
-    }
-    setFocusField(region);
+  // Focus controller — DISABLED. The five deck steps own their own focus, and the
+  // one remaining console step on mobile ("How you sell") is a deliberately plain,
+  // scrollable populated form (its full preview sits BELOW the fields), NOT the old
+  // in-place region-crop shell. So no step enters in-place Focus; this stays a
+  // no-op (the shell code below is inert). Desktop never used the shell visually.
+  const onCenterFocus = (_e: React.FocusEvent<HTMLElement>) => {
+    return;
   };
   const onCenterBlur = (e: React.FocusEvent<HTMLElement>) => {
     if (activeStep && DECK_SECTIONS[activeStep]) return;
