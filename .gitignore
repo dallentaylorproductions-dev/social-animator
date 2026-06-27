@@ -46,3 +46,6 @@ next-env.d.ts
 
 # Local design/scratch artifacts — never commit
 Building Tools/
+
+# Disposable scratch dir (regenerated as needed)
+.tmp/
