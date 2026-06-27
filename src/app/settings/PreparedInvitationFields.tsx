@@ -128,21 +128,28 @@ export function PreparedInvitationFields({
           helpText="Your best listing photography, not this home. Shows how you shoot every listing."
         />
         {sampleListingPhotoUrl && (
-          <ListingPhotoCrop
-            photoUrl={sampleListingPhotoUrl}
-            focalX={sampleListingPhotoFocalX}
-            focalY={sampleListingPhotoFocalY}
-            scale={sampleListingPhotoScale}
-            aspect={4 / 3}
-            testIdPrefix="brand-sample-photo"
-            onChange={(p) =>
-              onChange({
-                ...("focalX" in p ? { sampleListingPhotoFocalX: p.focalX } : {}),
-                ...("focalY" in p ? { sampleListingPhotoFocalY: p.focalY } : {}),
-                ...("scale" in p ? { sampleListingPhotoScale: p.scale } : {}),
-              })
-            }
-          />
+          <>
+            <ListingPhotoCrop
+              photoUrl={sampleListingPhotoUrl}
+              focalX={sampleListingPhotoFocalX}
+              focalY={sampleListingPhotoFocalY}
+              scale={sampleListingPhotoScale}
+              aspect={4 / 3}
+              testIdPrefix="brand-sample-photo"
+              onChange={(p) =>
+                onChange({
+                  ...("focalX" in p ? { sampleListingPhotoFocalX: p.focalX } : {}),
+                  ...("focalY" in p ? { sampleListingPhotoFocalY: p.focalY } : {}),
+                  ...("scale" in p ? { sampleListingPhotoScale: p.scale } : {}),
+                })
+              }
+            />
+            {/* Settings has no live seller-page preview; the crop applies on the
+                published State-A page (the thumbnail above reflects the adjustment). */}
+            <p className="text-[11px] text-neutral-600 leading-relaxed">
+              Shows on your prepared-invitation page.
+            </p>
+          </>
         )}
       </div>
 
