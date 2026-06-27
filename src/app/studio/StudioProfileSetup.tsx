@@ -879,7 +879,11 @@ export function StudioProfileSetup({ ownerEmail }: { ownerEmail: string | null }
         data-testid="sp-console"
         data-step={step}
       >
+        {/* key by step so each section REMOUNTS at subIndex 0 — otherwise the deck
+            reuses one instance and carries the prior section's subIndex (e.g. You's
+            "3 of 3" into Reach, opening it on the last subsection). */}
         <SectionDeck
+          key={step}
           section={deckSection}
           effective={effective}
           setField={setField}
