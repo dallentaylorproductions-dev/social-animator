@@ -6,6 +6,7 @@ import {
   STREET_VIEW_PITCH,
 } from "@/lib/seller-presentation/street-view";
 import { ListingCardPhoto } from "./ListingCardPhoto";
+import { GLYPHS, pickIcon } from "./icons";
 import {
   CAMPAIGN_GHOST_SUB,
   CAMPAIGN_HEADLINE_BY_EMPHASIS,
@@ -735,7 +736,7 @@ function IncludedList({
         {items.map((m, i) => (
           <li className="sa-incl__row" key={i} data-testid={`fs-sa-incl-${i}`}>
             <span className="sa-incl__icon" aria-hidden="true">
-              <IncludedIcon index={i} />
+              <IncludedIcon title={m.title} detail={m.detail} />
             </span>
             <div className="sa-incl__text">
               <span className="sa-incl__title">{m.title}</span>
@@ -751,46 +752,15 @@ function IncludedList({
 }
 
 /**
- * Decorative teal icon for a WHAT'S INCLUDED row, by position. The three default
- * capabilities map to camera (photography & video) · broadcast (ad funnel) · badge
- * (featured placement); a 4th+ falls back to the badge. Stroke uses currentColor
- * so the teal is set once on `.sa-incl__icon`. Aria-hidden — purely ornamental.
+ * Decorative teal icon for a WHAT'S INCLUDED row, derived from the row's CONTENT
+ * (not its position). Reuses the production keyword→icon engine — `pickIcon` runs
+ * the same ordered RULES that auto-icon the "How we market" cards (title first,
+ * detail as tiebreaker, first match wins, neutral `sparkle` fallback). So
+ * "Professional photography" resolves to the camera glyph wherever it lands, and
+ * an unmatched row gets the sparkle rather than a position-mismatched shape. The
+ * returned `GLYPHS` are stroke-matched to the design; their `currentColor` picks
+ * up the teal set once on `.sa-incl__icon`. Aria-hidden — purely ornamental.
  */
-function IncludedIcon({ index }: { index: number }) {
-  const common = {
-    width: 18,
-    height: 18,
-    viewBox: "0 0 24 24",
-    fill: "none",
-    stroke: "currentColor",
-    strokeWidth: 1.7,
-    strokeLinecap: "round" as const,
-    strokeLinejoin: "round" as const,
-  };
-  if (index === 0) {
-    // camera — photography & video
-    return (
-      <svg {...common}>
-        <path d="M3 8.5A1.5 1.5 0 0 1 4.5 7h2l1.2-1.8A1 1 0 0 1 8.5 5h7a1 1 0 0 1 .8.4L17.5 7h2A1.5 1.5 0 0 1 21 8.5v9A1.5 1.5 0 0 1 19.5 19h-15A1.5 1.5 0 0 1 3 17.5z" />
-        <circle cx="12" cy="13" r="3.2" />
-      </svg>
-    );
-  }
-  if (index === 1) {
-    // broadcast — targeted digital ad funnel
-    return (
-      <svg {...common}>
-        <path d="M4 9v6l11 4V5z" />
-        <path d="M15 8a4 4 0 0 1 0 8" />
-        <path d="M4 12H3" />
-      </svg>
-    );
-  }
-  // badge — featured placement & syndication
-  return (
-    <svg {...common}>
-      <path d="M12 3l2.4 1.8 3 .2.2 3L19.4 11.4 18 14l1.6 2.6-2.8 1.2-1 2.8-3-1.2-3 1.2-1-2.8-2.8-1.2L5.6 14 4.2 11.4 5.4 8.2l.2-3 3-.2z" />
-      <path d="M9.5 12l1.8 1.8L15 10" />
-    </svg>
-  );
+function IncludedIcon({ title, detail }: { title: string; detail?: string }) {
+  return GLYPHS[pickIcon(title, detail)];
 }
