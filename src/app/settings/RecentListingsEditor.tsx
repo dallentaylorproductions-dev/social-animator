@@ -6,10 +6,12 @@ import { ListingPhotoCrop } from "@/components/ListingPhotoCrop";
 import { NumberInput } from "@/components/inputs";
 import { useSPEntitlement } from "@/tools/seller-presentation/components/SPEntitlementContext";
 import { resolveCompCoverage } from "@/lib/seller-presentation/street-view";
+import { ListingCardPreview } from "@/tools/seller-presentation/output/flagship/CampaignSpread";
 import {
   type SettingsRecentListing,
   RECENT_LISTINGS_CAP,
   emptyRecentListing,
+  settingsListingToPublicCard,
 } from "@/lib/seller-presentation/recent-listings";
 
 /**
@@ -227,6 +229,28 @@ export function RecentListingsEditor({
                   })
                 }
               />
+            )}
+
+            {/* "Shows as" — the REAL published coverflow card mounted read-only,
+                so the agent sees the genuine framed result (photo crop + dark band
+                + address + views) instead of cropping blind against the small
+                modal thumbnail. Same condition as the crop control above (an
+                uploaded photo); the raw source image + Replace/Remove are
+                untouched above. Reflects the crop the moment it is applied. */}
+            {enablePhotoPosition && listing.photoUrl && (
+              <div
+                className="space-y-1.5"
+                data-testid={`brand-listing-preview-${idx}`}
+              >
+                <span className="block text-[10px] uppercase tracking-[0.15em] text-neutral-500">
+                  Shows as
+                </span>
+                <div className="rounded border border-neutral-800 bg-neutral-950 p-3">
+                  <ListingCardPreview
+                    listing={settingsListingToPublicCard(listing)}
+                  />
+                </div>
+              </div>
             )}
 
             <div>
