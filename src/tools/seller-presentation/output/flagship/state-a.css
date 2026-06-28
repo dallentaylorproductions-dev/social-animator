@@ -2240,6 +2240,14 @@
   background: color-mix(in oklab, var(--sa-mz-teal) 12%, var(--white));
   border: 1px solid color-mix(in oklab, var(--sa-mz-teal) 22%, var(--line));
 }
+/* The GLYPHS from the shared icon engine carry width/height:100%; pin them to
+   18px here (the size of the prior inline SVGs) so they sit centered in the
+   36px chip rather than filling it. Mirrors flagship's `.card-mark svg` rule. */
+.fs-page .sa-incl__icon svg {
+  width: 18px;
+  height: 18px;
+  display: block;
+}
 .fs-page .sa-incl__text {
   display: flex;
   flex-direction: column;

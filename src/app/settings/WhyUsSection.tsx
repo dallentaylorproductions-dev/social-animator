@@ -57,7 +57,7 @@ export function WhyUsSection({
         <span className="text-xs uppercase tracking-[0.18em] text-neutral-400">
           Why us
         </span>
-        <span aria-hidden className="text-base leading-none text-neutral-400">
+        <span aria-hidden className="text-base leading-none text-mint">
           {open ? "▾" : "▸"}
         </span>
       </button>
