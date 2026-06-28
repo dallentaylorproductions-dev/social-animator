@@ -48,7 +48,15 @@ export interface GenerateInput {
 
 export type GenerateResult =
   | { ok: true; draft: PreparedDraft; tokenCapHit: boolean }
-  | { ok: false; reason: "missing-key" | "timeout" | "malformed" | "error" };
+  | {
+      ok: false;
+      reason: "missing-key" | "timeout" | "malformed" | "error";
+      // TEMP (remove before flag flip): surface the caught exception so the
+      // prepare route's PREPARED_NEXT walk log can record WHY a gen_exception
+      // failed. Diagnostic only — the route never branches on these fields.
+      errorName?: string;
+      errorMessage?: string;
+    };
 
 const SYSTEM_PROMPT = [
   "You draft a short follow-up text message and a short follow-up email for a real estate agent to review before sending.",
@@ -123,7 +131,13 @@ export async function generateFollowUpDraft(
     client = getAnthropicClient();
   } catch (err) {
     if (err instanceof MissingAnthropicKeyError) return { ok: false, reason: "missing-key" };
-    return { ok: false, reason: "error" };
+    // TEMP (remove before flag flip): carry the exception detail for the walk log.
+    return {
+      ok: false,
+      reason: "error",
+      errorName: err instanceof Error ? err.name : "Unknown",
+      errorMessage: err instanceof Error ? err.message : String(err),
+    };
   }
 
   const controller = new AbortController();
@@ -144,10 +158,16 @@ export async function generateFollowUpDraft(
     if (!draft) return { ok: false, reason: "malformed" };
     return { ok: true, draft, tokenCapHit: result.stop_reason === "max_tokens" };
   } catch (err) {
+    // TEMP (remove before flag flip): carry the exception detail for the walk log.
     if (err instanceof Error && err.name === "AbortError") {
-      return { ok: false, reason: "timeout" };
+      return { ok: false, reason: "timeout", errorName: err.name, errorMessage: err.message };
     }
-    return { ok: false, reason: "error" };
+    return {
+      ok: false,
+      reason: "error",
+      errorName: err instanceof Error ? err.name : "Unknown",
+      errorMessage: err instanceof Error ? err.message : String(err),
+    };
   } finally {
     clearTimeout(timer);
   }
