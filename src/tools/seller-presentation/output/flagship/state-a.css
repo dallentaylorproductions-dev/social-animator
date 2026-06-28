@@ -308,15 +308,30 @@
   right: 0;
   text-align: center;
   font-family: var(--f-mono);
-  font-size: 10.5px;
+  /* Scales down on a narrow cover BEFORE it ever needs to wrap. Clamps to the
+     10.5px max at full width, so the desktop seller page is byte-identical; the
+     cqi tracks the `.fs-frame` page container (container-type: inline-size), so
+     the narrow `.fs-static` wizard preview, the `.sep-embed` settings embed, and
+     mobile shrink gracefully. */
+  font-size: clamp(8.5px, 1.8cqi, 10.5px);
   letter-spacing: 0.22em;
   text-transform: uppercase;
   color: var(--t-pap);
   display: flex;
   align-items: center;
   justify-content: center;
-  gap: 10px;
+  /* Allow a clean two-line fallback (the "For {family}" phrase drops to its own
+     centered line) instead of a mid-word break when even the floored font is too
+     wide. Column gap stays 10px (single-line layout unchanged); the tight row gap
+     only applies once it wraps. */
+  flex-wrap: wrap;
+  gap: 4px 10px;
   text-shadow: 0 1px 3px rgba(8, 15, 18, 0.6);
+}
+/* Each phrase is an atomic unit: it never breaks mid-word, so wrapping always
+   happens at the phrase boundary (a tidy designed two-line state). */
+.fs-page.state-a .sa-hero__pers-phrase {
+  white-space: nowrap;
 }
 .fs-page.state-a .sa-hero__pers::before {
   content: "";

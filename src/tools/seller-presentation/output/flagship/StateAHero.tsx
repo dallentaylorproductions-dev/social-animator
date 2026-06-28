@@ -67,10 +67,15 @@ export function StateAHero({
           <div className="sa-hero__fallback" aria-hidden="true" />
         )}
         {family && (
+          // Two atomic phrases + a separator dot. Each phrase is its own
+          // `nowrap` span so a long family name can never break mid-word; the
+          // flex row wraps as a UNIT (the "For {family}" phrase drops to a clean
+          // centered second line) when the cover is too narrow for one line. See
+          // `.sa-hero__pers` in state-a.css for the wrap + cqi font scaling.
           <div className="sa-hero__pers" data-testid="fs-sa-hero-pers">
-            Prepared privately
+            <span className="sa-hero__pers-phrase">Prepared privately</span>
             <span className="sa-hero__pers-dot" aria-hidden="true" />
-            For {family}
+            <span className="sa-hero__pers-phrase">For {family}</span>
           </div>
         )}
       </div>
