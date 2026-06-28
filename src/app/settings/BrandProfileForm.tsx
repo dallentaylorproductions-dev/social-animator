@@ -490,6 +490,9 @@ export function BrandProfileForm() {
           sampleListingPhotoScale={s.sampleListingPhotoScale}
           sampleVideoUrl={s.sampleVideoUrl}
           sampleVideoPosterUrl={s.sampleVideoPosterUrl}
+          sampleVideoPosterFocalX={s.sampleVideoPosterFocalX}
+          sampleVideoPosterFocalY={s.sampleVideoPosterFocalY}
+          sampleVideoPosterScale={s.sampleVideoPosterScale}
           recentListings={s.recentListings}
           onChange={(patch) => {
             persist(patch);

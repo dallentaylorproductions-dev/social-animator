@@ -95,6 +95,9 @@ export function brandToPublishInputs(brand: BrandSettings) {
     sampleListingPhotoScale: brand.sampleListingPhotoScale,
     sampleVideoUrl: brand.sampleVideoUrl,
     sampleVideoPosterUrl: brand.sampleVideoPosterUrl,
+    sampleVideoPosterFocalX: brand.sampleVideoPosterFocalX,
+    sampleVideoPosterFocalY: brand.sampleVideoPosterFocalY,
+    sampleVideoPosterScale: brand.sampleVideoPosterScale,
     // Seller State A · Pass 2b — the set-once lead emphasis (onboarding BEAT 5),
     // same provenance/channel as the other State A brand-constants; the projector
     // emits it ONLY in a State A invitation publish and clamps it to a known key.
@@ -128,6 +131,37 @@ export function isDraftSparse(draft: SellerPresentationDraft): boolean {
 }
 
 /**
+ * "Sample property, real you" — the agent-constant CAPABILITY assets (their
+ * sample listing photo + video poster) that override the fixture's demo media in
+ * the sparse Example preview, so an agent who uploaded + cropped them sees THEIR
+ * assets framed, not the fixture's. The sample PROPERTY (address, comps, price)
+ * stays the fixture. URL + focal travel as a UNIT: carrying focal alone would
+ * wrongly frame the fixture's photo. Each asset overrides only when the agent
+ * actually uploaded it; otherwise the fixture's demo media stands (so an empty
+ * brand still shows a complete example). The published page + real-draft preview
+ * already read these from the real draft, so they are unaffected.
+ */
+function agentCapabilityOverride(brand: BrandSettings): Partial<PublicPayload> {
+  const out: Partial<PublicPayload> = {};
+  if (brand.sampleListingPhotoUrl) {
+    out.sampleListingPhotoUrl = brand.sampleListingPhotoUrl;
+    out.sampleListingPhotoFocalX = brand.sampleListingPhotoFocalX;
+    out.sampleListingPhotoFocalY = brand.sampleListingPhotoFocalY;
+    out.sampleListingPhotoScale = brand.sampleListingPhotoScale;
+  }
+  if (brand.sampleVideoUrl) {
+    out.sampleVideoUrl = brand.sampleVideoUrl;
+  }
+  if (brand.sampleVideoPosterUrl) {
+    out.sampleVideoPosterUrl = brand.sampleVideoPosterUrl;
+    out.sampleVideoPosterFocalX = brand.sampleVideoPosterFocalX;
+    out.sampleVideoPosterFocalY = brand.sampleVideoPosterFocalY;
+    out.sampleVideoPosterScale = brand.sampleVideoPosterScale;
+  }
+  return out;
+}
+
+/**
  * The fully-filled sample (the SAME fixture the brand-kit preview uses), in the
  * agent's brand color. No brandAccent set → `brandColors` is omitted and the
  * flagship derives its blue default (#037290, F3) — NEVER a terracotta sample.
@@ -142,6 +176,9 @@ export function samplePayload(brand: BrandSettings): PublicPayload {
     // builds the EXAMPLE-badged preview, never a real published payload (the
     // publish path goes through toPublicPayload directly, flag-gated).
     recentListings: SAMPLE_RECENT_LISTINGS,
+    // "Sample property, real you" — the agent's own capability media (with crop)
+    // when uploaded, else the fixture's demo media stays.
+    ...agentCapabilityOverride(brand),
   } as PublicPayload;
 }
 
@@ -188,6 +225,11 @@ export function sampleStateAPayload(
     valuationRange: valuationRedesign
       ? computeValuationRange(STATE_A_FULL_PAYLOAD.comps)
       : undefined,
+    // "Sample property, real you" — the agent's own capability media (sample
+    // listing photo + video poster, with their crop) when uploaded, so the
+    // State-A Example preview shows THEIR framed assets, not the fixture's demo
+    // media. Else the fixture's media stands (complete example for an empty brand).
+    ...agentCapabilityOverride(brand),
   } as PublicPayload;
 }
 
