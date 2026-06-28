@@ -36,6 +36,19 @@ export function StateAHero({
   // faint grid), never the subject's address imagery. (The Appointment Brief's
   // mini cards do use Street View, but of OTHER sold comps, which is fine.)
   const hero = property.heroPhotoUrl;
+  // Cover-photo crop — the SAME `property.heroCropFocal*` fields the State-B
+  // `Hero` cover reads, so one crop in the wizard drives both renders. DEFAULT
+  // (no crop) leaves only `backgroundImage` inline so the stylesheet's
+  // `background-size: cover; background-position: center` carries it, byte-
+  // identical to the pre-crop render; a crop adds an inline focal position +
+  // (when zoomed) a focal-anchored scale, a pure display transform.
+  const heroFx =
+    typeof property.heroCropFocalX === "number" ? property.heroCropFocalX : 50;
+  const heroFy =
+    typeof property.heroCropFocalY === "number" ? property.heroCropFocalY : 50;
+  const heroScale =
+    typeof property.heroCropScale === "number" ? property.heroCropScale : 1;
+  const heroRepositioned = heroFx !== 50 || heroFy !== 50 || heroScale > 1;
   const family = preparedFor?.trim();
   const addr = property.address || "Your home";
   const location = [
@@ -58,6 +71,17 @@ export function StateAHero({
             data-testid="fs-sa-hero-photo"
             style={{
               backgroundImage: `url("${hero.replace(/"/g, '\\"')}")`,
+              ...(heroRepositioned
+                ? {
+                    backgroundPosition: `${heroFx}% ${heroFy}%`,
+                    ...(heroScale > 1
+                      ? {
+                          transform: `scale(${heroScale})`,
+                          transformOrigin: `${heroFx}% ${heroFy}%`,
+                        }
+                      : null),
+                  }
+                : null),
             }}
           />
         ) : (

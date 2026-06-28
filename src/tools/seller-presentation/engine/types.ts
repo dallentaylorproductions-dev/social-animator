@@ -287,6 +287,17 @@ export interface SellerPresentationDraft {
   propertyZip?: string;
   /** A7a — hero photo (data URL or external URL). Nullable → renderer falls back to monogram. */
   heroPhotoUrl?: string;
+  /**
+   * Cover-photo crop — object-position % (0–100) + zoom (1–2), the same
+   * pure-display reposition the headshot / sample-listing crops use. ABSENT ⇒
+   * centered (`background-position: center`, byte-identical to a pre-crop
+   * draft). A SINGLE focal drives BOTH renders: the State-A prepared-invitation
+   * hero (`StateAHero`) AND the State-B full-presentation hero (`Hero`), since
+   * both paint the cover with `background-size: cover`. Image bytes untouched.
+   */
+  heroCropFocalX?: number;
+  heroCropFocalY?: number;
+  heroCropScale?: number;
 
   // ---- Phase A foundation: optional subject-property details ----
   // String | undefined (consistent with the other optional Step 1
@@ -527,6 +538,12 @@ export function clampDraft(
     propertyState: clampString(raw.propertyState),
     propertyZip: clampString(raw.propertyZip),
     heroPhotoUrl: clampString(raw.heroPhotoUrl),
+    // Cover-photo crop — clamp focal % into [0,100] and zoom into [1,2]; any
+    // non-numeric / out-of-range value (incl. a hand-tampered draft) drops to
+    // undefined so the renderer falls back to center, byte-identical.
+    heroCropFocalX: clampFramingNumber(raw.heroCropFocalX, 0, 100),
+    heroCropFocalY: clampFramingNumber(raw.heroCropFocalY, 0, 100),
+    heroCropScale: clampFramingNumber(raw.heroCropScale, 1, 2),
     subjectBedrooms: clampString(raw.subjectBedrooms),
     subjectBaths: clampString(raw.subjectBaths),
     subjectSqft: clampString(raw.subjectSqft),

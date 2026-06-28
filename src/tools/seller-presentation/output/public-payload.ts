@@ -316,6 +316,14 @@ export interface PublicProperty {
   state?: string;
   zip?: string;
   heroPhotoUrl?: string;
+  /**
+   * Cover-photo crop — object-position % (0–100) + zoom (1–2). Absent ⇒
+   * centered (byte-identical to a pre-crop payload). A single focal drives both
+   * the State-A and State-B hero renders (both use `background-size: cover`).
+   */
+  heroCropFocalX?: number;
+  heroCropFocalY?: number;
+  heroCropScale?: number;
   recommendedList: string;
   /**
    * UX-2a — optional recommended-price RANGE. Present (both set) ONLY when
@@ -1447,6 +1455,12 @@ export function toPublicPayload(
       state: draft.propertyState,
       zip: draft.propertyZip,
       heroPhotoUrl: draft.heroPhotoUrl,
+      // Cover-photo crop — clamped at projection; undefined values are dropped
+      // by JSON.stringify, so an un-cropped cover emits no focal/scale keys and
+      // the published record is byte-identical to a pre-crop publish.
+      heroCropFocalX: clampHeadshotPct(draft.heroCropFocalX),
+      heroCropFocalY: clampHeadshotPct(draft.heroCropFocalY),
+      heroCropScale: clampHeadshotScale(draft.heroCropScale),
       recommendedList: recommendedPrice,
       ...recommendedRange,
       rationaleShort: priceRationale,
@@ -1876,6 +1890,11 @@ function clampPublicProperty(
     zip: typeof r.zip === "string" ? r.zip : undefined,
     heroPhotoUrl:
       typeof r.heroPhotoUrl === "string" ? r.heroPhotoUrl : undefined,
+    // Cover-photo crop — read-side clamp; out-of-range / tampered values drop to
+    // undefined so the hero falls back to center.
+    heroCropFocalX: clampHeadshotPct(r.heroCropFocalX),
+    heroCropFocalY: clampHeadshotPct(r.heroCropFocalY),
+    heroCropScale: clampHeadshotScale(r.heroCropScale),
     recommendedList:
       typeof r.recommendedList === "string"
         ? r.recommendedList
