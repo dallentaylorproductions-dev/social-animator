@@ -6,7 +6,7 @@ import {
   STREET_VIEW_PITCH,
 } from "@/lib/seller-presentation/street-view";
 import { ListingCardPhoto } from "./ListingCardPhoto";
-import { GLYPHS, pickIcon } from "./icons";
+import { GLYPHS, pickDistinctIcons, type IconName } from "./icons";
 import {
   CAMPAIGN_GHOST_SUB,
   CAMPAIGN_HEADLINE_BY_EMPHASIS,
@@ -729,6 +729,10 @@ function IncludedList({
 }: {
   items: ReadonlyArray<{ title: string; detail?: string }>;
 }) {
+  // Resolve a DISTINCT icon per row at the SET level — pickIcon maps each card
+  // independently, so two similar cards (e.g. "Zillow preferred partner" +
+  // "Featured placement & syndication") would otherwise land the same glyph.
+  const icons = pickDistinctIcons(items);
   return (
     <div className="sa-incl reveal" data-testid="fs-sa-incl">
       <span className="sa-incl__eyebrow">{INCLUDED_EYEBROW}</span>
@@ -736,7 +740,7 @@ function IncludedList({
         {items.map((m, i) => (
           <li className="sa-incl__row" key={i} data-testid={`fs-sa-incl-${i}`}>
             <span className="sa-incl__icon" aria-hidden="true">
-              <IncludedIcon title={m.title} detail={m.detail} />
+              <IncludedIcon name={icons[i]} />
             </span>
             <div className="sa-incl__text">
               <span className="sa-incl__title">{m.title}</span>
@@ -753,14 +757,13 @@ function IncludedList({
 
 /**
  * Decorative teal icon for a WHAT'S INCLUDED row, derived from the row's CONTENT
- * (not its position). Reuses the production keyword→icon engine — `pickIcon` runs
- * the same ordered RULES that auto-icon the "How we market" cards (title first,
- * detail as tiebreaker, first match wins, neutral `sparkle` fallback). So
- * "Professional photography" resolves to the camera glyph wherever it lands, and
- * an unmatched row gets the sparkle rather than a position-mismatched shape. The
- * returned `GLYPHS` are stroke-matched to the design; their `currentColor` picks
- * up the teal set once on `.sa-incl__icon`. Aria-hidden — purely ornamental.
+ * (not its position). The icon NAME is resolved upstream by `pickDistinctIcons`
+ * over the whole set — content-correct via the same keyword RULES that auto-icon
+ * the "How we market" cards ("Professional photography" → camera), with a
+ * set-level de-dup so no two rows share a glyph. The `GLYPHS` are stroke-matched
+ * to the design; their `currentColor` picks up the teal set once on
+ * `.sa-incl__icon`. Aria-hidden — purely ornamental.
  */
-function IncludedIcon({ title, detail }: { title: string; detail?: string }) {
-  return GLYPHS[pickIcon(title, detail)];
+function IncludedIcon({ name }: { name: IconName }) {
+  return GLYPHS[name];
 }

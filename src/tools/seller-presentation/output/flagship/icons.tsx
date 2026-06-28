@@ -52,7 +52,7 @@ export const GLYPHS: Record<IconName, ReactElement> = {
 export const RULES: ReadonlyArray<{ icon: IconName; kw: readonly string[] }> = [
   { icon: "camera", kw: ["photo", "photograph", "video", "film", "shoot", "twilight", "imagery", "drone", "media", "picture"] },
   { icon: "target", kw: ["digital ad", "targeted", "retarget", "paid", "ppc", "ad funnel", "campaign", " ads", "online ad"] },
-  { icon: "broadcast", kw: ["syndicat", "portal", "mls", "feature", "placement", "feed", "distribut", "broadcast", "listing site"] },
+  { icon: "broadcast", kw: ["syndicat", "portal", "mls", "feature", "placement", "feed", "distribut", "broadcast", "listing site", "zillow", "realtor.com", "redfin", "preferred partner"] },
   // "launch" sits on this MARKETING rule (and ahead of `tag`) so "A launch built
   // around the first weekend." gets a megaphone — not the price-tag its body word
   // "compress" would otherwise trip via the `tag` rule's "comp" keyword.
@@ -99,6 +99,46 @@ export function matchIcon(
 
 export function pickIcon(title?: string, body?: string): IconName {
   return matchIcon(title, body).icon;
+}
+
+/**
+ * Curated distinct-fallback order for the set-level de-dup pass below. Marketing
+ * glyphs lead (these card sets are marketing capabilities), then the
+ * service/relationship glyphs, sparkle last. On the rare collision a distinct
+ * icon per card reads better than two cards sharing a glyph, even if the
+ * fallback is a notch less literal than the primary keyword match.
+ */
+const DISTINCT_FALLBACK_ORDER: readonly IconName[] = [
+  "broadcast", "target", "megaphone", "camera", "chart", "tag",
+  "home", "key", "people", "star", "medal", "shield", "chat", "phone", "doc", "heart",
+  "sparkle",
+];
+
+/**
+ * Resolve a DISTINCT icon for every item in a card set, so no two cards ever
+ * show the same glyph (e.g. "Zillow preferred partner" and "Featured placement
+ * & syndication" both primary-match `broadcast` — without this they'd render
+ * identical icons). Each item's primary icon is the content-correct `pickIcon`
+ * result; on a collision the item falls to the next unused glyph in
+ * DISTINCT_FALLBACK_ORDER. `matchIcon` is first-match-wins (it exposes no RANKED
+ * matches), so the collision path uses this curated order rather than the item's
+ * own next-best. Sparkle only if the ~17-glyph pool is exhausted — never for a
+ * typical 3-5 card set.
+ */
+export function pickDistinctIcons(
+  items: ReadonlyArray<{ title?: string; detail?: string }>,
+): IconName[] {
+  const used = new Set<IconName>();
+  return items.map((m) => {
+    const primary = pickIcon(m.title, m.detail);
+    if (!used.has(primary)) {
+      used.add(primary);
+      return primary;
+    }
+    const alt = DISTINCT_FALLBACK_ORDER.find((g) => !used.has(g)) ?? "sparkle";
+    used.add(alt);
+    return alt;
+  });
 }
 
 /**
