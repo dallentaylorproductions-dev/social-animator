@@ -39,6 +39,9 @@ export function PreparedInvitationFields({
   sampleListingPhotoScale,
   sampleVideoUrl,
   sampleVideoPosterUrl,
+  sampleVideoPosterFocalX,
+  sampleVideoPosterFocalY,
+  sampleVideoPosterScale,
   recentListings,
   onChange,
 }: {
@@ -51,6 +54,9 @@ export function PreparedInvitationFields({
   sampleListingPhotoScale?: number;
   sampleVideoUrl?: string;
   sampleVideoPosterUrl?: string;
+  sampleVideoPosterFocalX?: number;
+  sampleVideoPosterFocalY?: number;
+  sampleVideoPosterScale?: number;
   recentListings?: SettingsRecentListing[];
   /** Merge + persist a patch onto BrandSettings (atomic for multi-field clears). */
   onChange: (patch: {
@@ -63,6 +69,9 @@ export function PreparedInvitationFields({
     sampleListingPhotoScale?: number;
     sampleVideoUrl?: string;
     sampleVideoPosterUrl?: string;
+    sampleVideoPosterFocalX?: number;
+    sampleVideoPosterFocalY?: number;
+    sampleVideoPosterScale?: number;
     recentListings?: SettingsRecentListing[];
   }) => void;
 }) {
@@ -162,22 +171,53 @@ export function PreparedInvitationFields({
           helpText="A recent video tour you produced. Separate from your per-invitation hello in the wizard."
           currentPosterUrl={sampleVideoPosterUrl}
           onChange={(url) => {
-            // Removing the video (url === "") also clears its captured poster —
-            // the frame belongs to a video that no longer exists. Done in one
-            // atomic patch so the two fields never clobber each other.
+            // Removing the video (url === "") also clears its captured poster +
+            // poster framing — the frame belongs to a video that no longer
+            // exists. Done in one atomic patch so the fields never clobber.
             if (!url) {
               onChange({
                 sampleVideoUrl: undefined,
                 sampleVideoPosterUrl: undefined,
+                sampleVideoPosterFocalX: undefined,
+                sampleVideoPosterFocalY: undefined,
+                sampleVideoPosterScale: undefined,
               });
               return;
             }
             onChange({ sampleVideoUrl: url });
           }}
           onPosterChange={(url) =>
-            onChange({ sampleVideoPosterUrl: url || undefined })
+            // A new poster starts centered (mirror the sample-photo reset).
+            onChange({
+              sampleVideoPosterUrl: url || undefined,
+              sampleVideoPosterFocalX: undefined,
+              sampleVideoPosterFocalY: undefined,
+              sampleVideoPosterScale: undefined,
+            })
           }
         />
+        {sampleVideoPosterUrl && (
+          <>
+            <ListingPhotoCrop
+              photoUrl={sampleVideoPosterUrl}
+              focalX={sampleVideoPosterFocalX}
+              focalY={sampleVideoPosterFocalY}
+              scale={sampleVideoPosterScale}
+              aspect={16 / 9}
+              testIdPrefix="brand-sample-video-poster"
+              onChange={(p) =>
+                onChange({
+                  ...("focalX" in p ? { sampleVideoPosterFocalX: p.focalX } : {}),
+                  ...("focalY" in p ? { sampleVideoPosterFocalY: p.focalY } : {}),
+                  ...("scale" in p ? { sampleVideoPosterScale: p.scale } : {}),
+                })
+              }
+            />
+            <p className="text-[11px] text-neutral-600 leading-relaxed">
+              Position the poster still so the subject is not cut off.
+            </p>
+          </>
+        )}
       </div>
 
       {/* Seller State A · Zone 5 — the agent's recent listings (the exposure

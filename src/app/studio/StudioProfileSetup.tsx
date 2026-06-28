@@ -1342,23 +1342,51 @@ function WorkFields({
         <VideoUploadField
           label="Sample video"
           value={effective.sampleVideoUrl ?? ""}
-          onChange={(url) => setField({ sampleVideoUrl: url || undefined })}
+          onChange={(url) =>
+            // Removing the video also clears its captured poster + poster framing.
+            url
+              ? setField({ sampleVideoUrl: url })
+              : setField({
+                  sampleVideoUrl: undefined,
+                  sampleVideoPosterUrl: undefined,
+                  sampleVideoPosterFocalX: undefined,
+                  sampleVideoPosterFocalY: undefined,
+                  sampleVideoPosterScale: undefined,
+                })
+          }
           folder="agent-sample-video"
           testIdPrefix="sp-sample-video"
           currentPosterUrl={effective.sampleVideoPosterUrl}
           onPosterChange={(url) =>
-            setField({ sampleVideoPosterUrl: url || undefined })
+            // A new poster starts centered (mirror the sample-photo reset).
+            setField({
+              sampleVideoPosterUrl: url || undefined,
+              sampleVideoPosterFocalX: undefined,
+              sampleVideoPosterFocalY: undefined,
+              sampleVideoPosterScale: undefined,
+            })
           }
         />
-        {/* VIDEO-THUMBNAIL CROP — follow-on (item 6 scaffold). The same recycled
-            <ListingPhotoCrop> applies cleanly to the poster frame; it needs three
-            new display-only BrandSettings fields (sampleVideoPosterFocalX/Y/Scale)
-            registered + projected the same way sampleListingPhoto* are, then:
-              {effective.sampleVideoPosterUrl && (
-                <ListingPhotoCrop aspect={16/9} photoUrl={effective.sampleVideoPosterUrl} … />
-              )}
-            Deferred here to avoid net-new payload fields in this pass — it is a
-            small follow-on, not a redesign. */}
+        {/* VIDEO-POSTER CROP — the recycled <ListingPhotoCrop> applied to the
+            poster still, writing the display-only sampleVideoPosterFocalX/Y/Scale
+            (independent of video.framing, which frames only the hero inlay). */}
+        {effective.sampleVideoPosterUrl && (
+          <ListingPhotoCrop
+            photoUrl={effective.sampleVideoPosterUrl}
+            focalX={effective.sampleVideoPosterFocalX}
+            focalY={effective.sampleVideoPosterFocalY}
+            scale={effective.sampleVideoPosterScale}
+            aspect={16 / 9}
+            testIdPrefix="sp-sample-video-poster"
+            onChange={(p) =>
+              setField({
+                ...("focalX" in p ? { sampleVideoPosterFocalX: p.focalX } : {}),
+                ...("focalY" in p ? { sampleVideoPosterFocalY: p.focalY } : {}),
+                ...("scale" in p ? { sampleVideoPosterScale: p.scale } : {}),
+              })
+            }
+          />
+        )}
       </div>
 
       <div className="sp-embed" data-testid="sp-recent-listings" data-region="work">

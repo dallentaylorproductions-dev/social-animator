@@ -142,6 +142,17 @@ export interface BrandSettings {
   sampleVideoUrl?: string;
   sampleVideoPosterUrl?: string;
   /**
+   * Studio Profile — display framing for the sample VIDEO POSTER still on the
+   * marketing-zone "the work" showcase. INDEPENDENT of `video.framing` (which
+   * frames only the per-invitation hero <video> playback inlay, never this
+   * poster). Same pattern as `sampleListingPhoto*`: object-position % (0–100,
+   * default 50) + a 1.0–2.0 zoom. Image bytes never altered. All optional;
+   * unset = centered, no zoom (byte-identical to today's centered poster).
+   */
+  sampleVideoPosterFocalX?: number;
+  sampleVideoPosterFocalY?: number;
+  sampleVideoPosterScale?: number;
+  /**
    * Seller State A · Zone 5 — the agent's OWN recent listings for the exposure
    * coverflow ("Recent listings, real reach"). Set-once, agent-constant; same
    * provenance + path as the capability samples above. Each carries a photo
@@ -534,6 +545,10 @@ export function loadBrandSettings(): BrandSettings {
         parsed.sampleVideoPosterUrl.length > 0
           ? parsed.sampleVideoPosterUrl
           : undefined,
+      // Studio Profile — sample-video-poster framing (reuse the headshot clamps).
+      sampleVideoPosterFocalX: clampStoredPct(parsed.sampleVideoPosterFocalX),
+      sampleVideoPosterFocalY: clampStoredPct(parsed.sampleVideoPosterFocalY),
+      sampleVideoPosterScale: clampStoredScale(parsed.sampleVideoPosterScale),
       // Seller State A · Zone 5 — clamp the recent listings to their declared
       // shape + cap on load; undefined means "none". Empty-address rows survive
       // (an in-progress row the agent hasn't filled in yet); the publish

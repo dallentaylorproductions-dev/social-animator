@@ -204,6 +204,10 @@ export interface BrandWhyUsInput {
   sampleListingPhotoScale?: number;
   sampleVideoUrl?: string;
   sampleVideoPosterUrl?: string;
+  /** Sample-video-poster display framing for the showcase still: object-position % (0–100) + 1.0–2.0 zoom. */
+  sampleVideoPosterFocalX?: number;
+  sampleVideoPosterFocalY?: number;
+  sampleVideoPosterScale?: number;
   /**
    * Seller State A · Pass 2b — the agent's chosen lead emphasis (the one
    * exposure lever from onboarding BEAT 5). Same provenance as the capability
@@ -493,6 +497,10 @@ export interface PublicPayload {
   sampleListingPhotoScale?: number;
   sampleVideoUrl?: string;
   sampleVideoPosterUrl?: string;
+  /** Sample-video-poster display framing for the showcase still: object-position % (0–100) + 1.0–2.0 zoom. */
+  sampleVideoPosterFocalX?: number;
+  sampleVideoPosterFocalY?: number;
+  sampleVideoPosterScale?: number;
   /**
    * Seller State A · Pass 2b — the agent's chosen lead emphasis (onboarding
    * BEAT 5), clamped to a known lever key. Emitted ONLY in a State A invitation
@@ -1357,6 +1365,16 @@ export function toPublicPayload(
   const projectedSampleVideoPosterUrl = projectPublicWhyUsText(
     brandWhyUs.sampleVideoPosterUrl,
   );
+  // Sample-video-poster framing: focal % [0,100] + zoom [1,2]; out-of-range drops.
+  const projectedSampleVideoPosterFocalX = clampFocalPct(
+    brandWhyUs.sampleVideoPosterFocalX,
+  );
+  const projectedSampleVideoPosterFocalY = clampFocalPct(
+    brandWhyUs.sampleVideoPosterFocalY,
+  );
+  const projectedSampleVideoPosterScale = clampFocalZoom(
+    brandWhyUs.sampleVideoPosterScale,
+  );
   // Zone 5 — project the recent listings ONLY behind the coverflow flag.
   // Field-by-field, capped, view counts clamped to integers. Emitted at the TOP
   // level of the payload (see the main return), NOT inside the State-A gate, so
@@ -1390,6 +1408,9 @@ export function toPublicPayload(
           sampleListingPhotoScale: projectedSampleListingPhotoScale,
           sampleVideoUrl: projectedSampleVideoUrl,
           sampleVideoPosterUrl: projectedSampleVideoPosterUrl,
+          sampleVideoPosterFocalX: projectedSampleVideoPosterFocalX,
+          sampleVideoPosterFocalY: projectedSampleVideoPosterFocalY,
+          sampleVideoPosterScale: projectedSampleVideoPosterScale,
           // Pass 2b lead emphasis — clamped to a known lever key (undefined drops
           // the key via JSON.stringify, so an agent who never picked one publishes
           // the shipped default headline, byte-identical).
@@ -1676,6 +1697,10 @@ function clampStateAFields(r: Record<string, unknown>): {
   sampleListingPhotoScale?: number;
   sampleVideoUrl?: string;
   sampleVideoPosterUrl?: string;
+  /** Sample-video-poster display framing for the showcase still: object-position % (0–100) + 1.0–2.0 zoom. */
+  sampleVideoPosterFocalX?: number;
+  sampleVideoPosterFocalY?: number;
+  sampleVideoPosterScale?: number;
   leadEmphasis?: LeadEmphasisKey;
 } {
   const valuationStatus = clampValuationStatus(r.valuationStatus);
@@ -1692,6 +1717,9 @@ function clampStateAFields(r: Record<string, unknown>): {
     sampleListingPhotoScale: clampFocalZoom(r.sampleListingPhotoScale),
     sampleVideoUrl: projectPublicWhyUsText(r.sampleVideoUrl),
     sampleVideoPosterUrl: projectPublicWhyUsText(r.sampleVideoPosterUrl),
+    sampleVideoPosterFocalX: clampFocalPct(r.sampleVideoPosterFocalX),
+    sampleVideoPosterFocalY: clampFocalPct(r.sampleVideoPosterFocalY),
+    sampleVideoPosterScale: clampFocalZoom(r.sampleVideoPosterScale),
     // Pass 2b — re-clamp the lead emphasis to a known key on read; survives ONLY
     // alongside an invitation status (a stray value on a revealed record drops).
     leadEmphasis: clampLeadEmphasis(r.leadEmphasis),

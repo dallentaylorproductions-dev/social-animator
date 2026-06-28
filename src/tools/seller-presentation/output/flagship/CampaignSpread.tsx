@@ -134,6 +134,12 @@ export function CampaignSpread({
       sub: CAPABILITY_VIDEO_SUB,
       image: poster,
       kind: poster ? "photo" : "asset",
+      // Poster framing — INDEPENDENT of video.framing (which frames only the
+      // hero <video> inlay). Applied via frameBgStyle just like the photo frame;
+      // unset = centered (byte-identical to today's centered poster).
+      focalX: payload.sampleVideoPosterFocalX,
+      focalY: payload.sampleVideoPosterFocalY,
+      scale: payload.sampleVideoPosterScale,
     });
   }
 
@@ -224,6 +230,11 @@ export function CampaignSpread({
         sub: CAPABILITY_VIDEO_SUB,
         image: poster,
         kind: poster ? "photo" : "asset",
+        // Poster framing — INDEPENDENT of video.framing (see legacy path above);
+        // unset = centered, byte-identical.
+        focalX: payload.sampleVideoPosterFocalX,
+        focalY: payload.sampleVideoPosterFocalY,
+        scale: payload.sampleVideoPosterScale,
       });
     }
     // The capability list reuses the agent's authored marketing items verbatim
