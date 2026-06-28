@@ -18,7 +18,10 @@
  * publish, where `clampViewCount` (a number gate) can accept it.
  */
 
-import { RECENT_LISTINGS_CAP } from "@/tools/seller-presentation/output/public-payload";
+import {
+  RECENT_LISTINGS_CAP,
+  type PublicRecentListing,
+} from "@/tools/seller-presentation/output/public-payload";
 import { stripToDigits } from "@/components/inputs/formatHelpers";
 
 export { RECENT_LISTINGS_CAP };
@@ -187,4 +190,35 @@ export function recentListingsToPublishInput(
     if (typeof l.photoScale === "number") out.photoScale = l.photoScale;
     return out;
   });
+}
+
+/**
+ * Map ONE Settings listing to the public card shape (`PublicRecentListing`) for a
+ * read-only, in-Settings preview that mounts the real coverflow `ListingCard`.
+ *
+ * It mirrors the publish projector's field enumeration but is a DISPLAY
+ * convenience, NOT a public-safe boundary: the publish path still hardens through
+ * `projectRecentListings`. The only transform is the view-count display string
+ * ("41,184") -> integer, the same one `recentListingsToPublishInput` does;
+ * everything else passes through verbatim, and fields the card never reads are
+ * simply omitted. Unset framing stays unset, so the preview centers exactly like
+ * the published card does for a freshly uploaded photo.
+ */
+export function settingsListingToPublicCard(
+  l: SettingsRecentListing,
+): PublicRecentListing {
+  const out: PublicRecentListing = { address: l.address };
+  if (l.city) out.city = l.city;
+  const viewCount = parseStoredViewCount(l.viewCount);
+  if (viewCount !== undefined) out.viewCount = viewCount;
+  if (l.sourceLabel) out.sourceLabel = l.sourceLabel;
+  if (l.photoUrl) out.photoUrl = l.photoUrl;
+  if (l.streetViewPanoId) out.streetViewPanoId = l.streetViewPanoId;
+  if (typeof l.hasStreetView === "boolean") out.hasStreetView = l.hasStreetView;
+  if (l.streetViewHeading !== undefined)
+    out.streetViewHeading = l.streetViewHeading;
+  if (typeof l.photoFocalX === "number") out.photoFocalX = l.photoFocalX;
+  if (typeof l.photoFocalY === "number") out.photoFocalY = l.photoFocalY;
+  if (typeof l.photoScale === "number") out.photoScale = l.photoScale;
+  return out;
 }

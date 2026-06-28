@@ -468,10 +468,18 @@ function ListingCard({
   listing,
   pos,
   index,
+  idPrefix = "fs-sa-cf",
 }: {
   listing: PublicRecentListing;
   pos: CoverflowPos;
   index: number;
+  /**
+   * Test-id namespace. The default keeps the published coverflow byte-identical
+   * (`fs-sa-cf-card-…` / `-photo-…` / `-views-…`). The in-Settings read-only
+   * preview (`ListingCardPreview`) passes a distinct prefix so its card never
+   * duplicates the live page's test ids when both render on one page (Studio).
+   */
+  idPrefix?: string;
 }) {
   // Photo candidates, in priority order: the hosted upload first, then the
   // Street View fallback (requested fresh from Google at view time, same pattern
@@ -500,12 +508,12 @@ function ListingCard({
     <div
       className={`sa-cf__card${pos === "center" ? " sa-cf__card--center" : ""}`}
       data-pos={pos}
-      data-testid={`fs-sa-cf-card-${index}`}
+      data-testid={`${idPrefix}-card-${index}`}
     >
       {photoSources.length > 0 && (
         <ListingCardPhoto
           sources={photoSources}
-          testId={`fs-sa-cf-photo-${index}`}
+          testId={`${idPrefix}-photo-${index}`}
           focalX={listing.photoFocalX}
           focalY={listing.photoFocalY}
           scale={listing.photoScale}
@@ -521,7 +529,7 @@ function ListingCard({
           never shows a bare, identity-less card. */}
       <div className="sa-cf__band">
         {hasViews && (
-          <div className="sa-cf__views" data-testid={`fs-sa-cf-views-${index}`}>
+          <div className="sa-cf__views" data-testid={`${idPrefix}-views-${index}`}>
             <span className="sa-cf__num">
               {listing.viewCount!.toLocaleString("en-US")}
             </span>
@@ -530,6 +538,58 @@ function ListingCard({
         )}
         <div className="sa-cf__addr">{listing.address}</div>
         {listing.city && <div className="sa-cf__city">{listing.city}</div>}
+      </div>
+    </div>
+  );
+}
+
+/**
+ * Read-only, single-card preview of the published coverflow `ListingCard`, for
+ * mounting in Settings so an agent sees the GENUINE card (photo framing + dark
+ * band + address + views) as they adjust the crop — no longer "cropping blind".
+ *
+ * It reuses the exact published `ListingCard` inside the minimal wrapper the
+ * coverflow CSS needs:
+ *   • `.fs-page` — the scope where the State-A design tokens are defined
+ *     (`--sa-proof-cream`, `--line`, the type vars), so the card is not unstyled.
+ *   • `.fs-frame` — carries `container-type/-name: page`, which the card's `cqi`
+ *     units and `@container page` queries resolve against. Without it the card's
+ *     numbers blow up against the viewport.
+ *   • `.sa-cf__fan--n1 > .sa-cf__track` — the single-card track layout.
+ *
+ * The `reveal` class is deliberately OMITTED: the entrance animation keeps cards
+ * hidden until the motion island adds `.in`, which never runs in Settings, so a
+ * static preview must skip it (else the card renders invisible). The `.fs-page`
+ * full-page chrome (min-height:100vh, page background) and the `.fs-frame` shell
+ * chrome (max-width, shadow, radius) are neutralized inline so the preview is
+ * just the card, not a viewport-tall page slab. This does NOT touch the published
+ * seller page render in any way — it only adds a read-only view in Settings.
+ */
+export function ListingCardPreview({
+  listing,
+}: {
+  listing: PublicRecentListing;
+}) {
+  return (
+    <div
+      className="fs-page"
+      style={{ minHeight: 0, margin: 0, background: "transparent" }}
+      data-testid="brand-listing-card-preview"
+    >
+      <div
+        className="fs-frame"
+        style={{ background: "transparent", boxShadow: "none", borderRadius: 0 }}
+      >
+        <div className="sa-cf__fan sa-cf__fan--n1">
+          <div className="sa-cf__track">
+            <ListingCard
+              listing={listing}
+              pos="center"
+              index={0}
+              idPrefix="brand-listing-cardpreview"
+            />
+          </div>
+        </div>
       </div>
     </div>
   );
