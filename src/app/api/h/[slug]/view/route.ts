@@ -12,6 +12,9 @@ import {
   recordEngagement,
   recordView,
 } from "@/lib/seller-presentation/views-store";
+import { isPreparedNextEnabled } from "@/lib/seller-presentation/prepared-next/flag";
+import { viewedSignalMoment } from "@/lib/seller-presentation/prepared-next/moment";
+import { ensureEligibleWorkOrder } from "@/lib/seller-presentation/prepared-next/work-order";
 
 /**
  * POST /api/h/[slug]/view (viewed signal, Phase 1).
@@ -144,5 +147,29 @@ export async function POST(req: Request, { params }: RouteContext) {
   } catch {
     // Best-effort: a transient KV hiccup must never surface to the seller.
   }
+
+  // PREPARED_NEXT (Anticipation v0) — create the `eligible` Work Order for this
+  // qualifying external view (owner + bots already excluded above), idempotently
+  // (SET NX, one WO per page + content version). NO generation here — that waits
+  // for the agent's explicit "Prepare follow-up" click in the cockpit. Flag-off:
+  // skipped entirely, so the seller path is byte-identical (no `prepared:<slug>`
+  // write). Best-effort: a transient KV hiccup never surfaces to the seller.
+  if (isPreparedNextEnabled()) {
+    try {
+      await ensureEligibleWorkOrder({
+        moment: viewedSignalMoment({
+          slug,
+          ownerEmail: record.ownerEmail,
+          handoutUpdatedAt: record.updatedAt ?? "initial",
+          timestamp: new Date().toISOString(),
+        }),
+        accountId: record.ownerEmail,
+        version: record.updatedAt ?? "initial",
+      });
+    } catch {
+      // Inert on failure — the eligible WO is a convenience, not the seller path.
+    }
+  }
+
   return noContent();
 }

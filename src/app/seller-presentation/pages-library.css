@@ -1267,3 +1267,66 @@
      have room, while staying clearly photo-forward. */
   .sep-library .lib-row-thumb { width: 96px; height: 72px; }
 }
+
+/* ===========================================================================
+   PREPARED_NEXT (Anticipation v0) — the inline "Prepare follow-up" review pane.
+   Renders inside the card body (reusing the expand region) only under the flag.
+   Calm + contained: a quiet top divider, comfortable spacing, plain editable
+   fields. Nothing alarming; this is a work tray, not an alert.
+   =========================================================================== */
+.sep-library .lib-prepared {
+  margin-top: 12px;
+  padding-top: 12px;
+  border-top: 1px solid rgba(0, 0, 0, 0.08);
+  display: flex;
+  flex-direction: column;
+  gap: 10px;
+}
+.sep-library .lib-prepared-note {
+  margin: 0;
+  font-size: 13px;
+  line-height: 1.45;
+  color: #4a4a4a;
+}
+.sep-library .lib-prepared-ask {
+  margin: 0;
+  font-size: 12px;
+  color: #6b6b6b;
+}
+.sep-library .lib-prepared-bullets {
+  margin: 0;
+  padding-left: 18px;
+  font-size: 13px;
+  color: #4a4a4a;
+}
+.sep-library .lib-prepared-link {
+  margin: 0;
+  font-size: 12px;
+  color: #6b6b6b;
+  word-break: break-all;
+}
+.sep-library .lib-prepared-field {
+  display: flex;
+  flex-direction: column;
+  gap: 6px;
+}
+.sep-library .lib-prepared-label {
+  font-size: 12px;
+  font-weight: 600;
+  color: #333;
+}
+.sep-library .lib-prepared-textarea {
+  width: 100%;
+  resize: vertical;
+  font: inherit;
+  font-size: 13px;
+  line-height: 1.45;
+  padding: 8px 10px;
+  border: 1px solid rgba(0, 0, 0, 0.16);
+  border-radius: 8px;
+  background: #fff;
+  color: #1a1a1a;
+}
+.sep-library .lib-prepared-error .lib-prepared-note {
+  color: #8a4b2f;
+}
