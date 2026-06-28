@@ -14,17 +14,30 @@
  * allowed value whose TRIMMED length exceeds `MIN_BULLET_CHARS`. Every value read
  * here is already public (it renders on /h/<slug>); no private/stripped field is
  * ever touched (per-comp soldPrice etc. are gone from the payload by construction).
+ *
+ * v0.1 — State-A coverage fix. The readers also cover the State-A prepared-
+ * invitation page's own content (which a State-A publish populates while leaving
+ * the State-B pricing/brand fields empty): the chosen `leadEmphasis` lever and
+ * the agent's `recentListings` reach feed the marketing section, and the personal
+ * `welcomeLine` feeds the agent-plan section. Static template / scaffolding copy
+ * (the "At our meeting" framing etc.), capability-asset URLs, and `appointmentAt`
+ * are deliberately NOT bullet sources (appointment stays an enrichment / ask_field).
  */
 
 import type {
   PublicPayload,
   PublicComp,
   PublicPitchCard,
+  PublicRecentListing,
   PublicWhyUs,
   MarketingPoint,
   ProcessStep,
   AreaStats,
 } from "@/tools/seller-presentation/output/public-payload";
+import {
+  LEAD_EMPHASIS_LABELS,
+  clampLeadEmphasis,
+} from "@/lib/seller-presentation/lead-emphasis";
 import { MIN_BULLET_CHARS, MAX_BULLETS } from "./constants";
 
 /** The four sections, in their fixed priority order. */
@@ -52,16 +65,47 @@ function clean(value: unknown): string {
   return typeof value === "string" ? value.trim() : "";
 }
 
-/** First non-empty cleaned string from a list of candidates. */
+/**
+ * Known static template / scaffolding copy that is identical across pages (the
+ * State-A page renders some of this as fixed framing). It is NOT agent-authored
+ * seller-specific content, so it must never become a bullet — the model would
+ * restate boilerplate as if it were a real point. Matched as a normalized
+ * prefix/equality so an agent line that merely contains a stray word is unharmed.
+ * Conservative + reversible: only the known constant openers are listed.
+ */
+const STATIC_TEMPLATE_FRAGMENTS: readonly string[] = [
+  "at our meeting",
+  "i like to understand the market first",
+  "here is what happens next",
+  "here is what happens at our meeting",
+];
+
+function isStaticTemplate(text: string): boolean {
+  const t = text.trim().toLowerCase();
+  if (!t) return false;
+  return STATIC_TEMPLATE_FRAGMENTS.some((f) => t === f || t.startsWith(f));
+}
+
+/**
+ * A cleaned string, but EMPTY when it is known static-template copy — so
+ * boilerplate never qualifies a section. Used for the prose fields; plain
+ * `clean` stays for non-prose values (addresses, labels) that can't be boilerplate.
+ */
+function meaningful(value: unknown): string {
+  const c = clean(value);
+  return isStaticTemplate(c) ? "" : c;
+}
+
+/** First non-empty, non-boilerplate string from a list of candidates. */
 function firstNonEmpty(...values: unknown[]): string {
   for (const v of values) {
-    const c = clean(v);
+    const c = meaningful(v);
     if (c) return c;
   }
   return "";
 }
 
-/** (1) value / pricing rationale. */
+/** (1) value / pricing rationale. (valuationMessage already covers State-A.) */
 function valueText(p: PublicPayload): string {
   return firstNonEmpty(
     p.priceRationale,
@@ -71,20 +115,52 @@ function valueText(p: PublicPayload): string {
   );
 }
 
-/** (2) marketing / exposure plan — restate the agent's marketing-approach points. */
+/**
+ * (2) marketing / exposure plan. State-B brand marketing-approach PLUS the
+ * State-A invitation's own exposure content: the chosen lead-emphasis lever
+ * (naturalized via its agent-facing label) and the agent's recent listings with
+ * their real buyer-view reach. All public + agent-authored; the model restates,
+ * never invents. Joined so the model gets the fullest honest picture.
+ */
 function marketingText(p: PublicPayload): string {
+  const parts: string[] = [];
+
   const whyUs = p.whyUs as PublicWhyUs | undefined;
   const points = Array.isArray(whyUs?.marketingApproach)
     ? (whyUs!.marketingApproach as MarketingPoint[])
     : [];
-  const lines = points
-    .map((m) => {
-      const title = clean(m?.title);
-      const detail = clean(m?.detail);
-      return [title, detail].filter(Boolean).join(": ");
+  const approach = points
+    .map((m) => [meaningful(m?.title), meaningful(m?.detail)].filter(Boolean).join(": "))
+    .filter(Boolean)
+    .join(". ");
+  if (approach) parts.push(approach);
+
+  // State-A: the one exposure lever the agent picked, as its human label.
+  const lever = clampLeadEmphasis(p.leadEmphasis);
+  if (lever) parts.push(`My exposure plan leads with ${LEAD_EMPHASIS_LABELS[lever].toLowerCase()}.`);
+
+  // State-A: the agent's recent listings + their real buyer-view reach. A listing
+  // qualifies on a non-empty address; the view count (public) rides along when set.
+  const listings = Array.isArray(p.recentListings)
+    ? (p.recentListings as PublicRecentListing[])
+    : [];
+  const listingParts = listings
+    .slice(0, 4)
+    .map((l) => {
+      const addr = clean(l?.address);
+      if (!addr) return "";
+      const views =
+        typeof l?.viewCount === "number" && Number.isFinite(l.viewCount)
+          ? ` (${l.viewCount} buyer views)`
+          : "";
+      return `${addr}${views}`;
     })
     .filter(Boolean);
-  return lines.join(". ");
+  if (listingParts.length) {
+    parts.push(`Recent listings I have put in front of buyers: ${listingParts.join("; ")}`);
+  }
+
+  return parts.join(". ");
 }
 
 /** (3) comparable sales / market evidence — addresses + anonymized area context (all public). */
@@ -110,7 +186,11 @@ function compsText(p: PublicPayload): string {
   return parts.join(". ");
 }
 
-/** (4) agent plan / service promise. */
+/**
+ * (4) agent plan / service promise. State-B brand "why us" content PLUS the
+ * State-A invitation's agent-authored personal hello (`welcomeLine`). All
+ * agent-authored prose; boilerplate is filtered by `firstNonEmpty`/`meaningful`.
+ */
 function agentPlanText(p: PublicPayload): string {
   const whyUs = p.whyUs as PublicWhyUs | undefined;
   const guarantee = clean(whyUs?.guarantee);
@@ -138,6 +218,7 @@ function agentPlanText(p: PublicPayload): string {
     cards,
     p.agentTagline,
     p.signatureLine,
+    p.welcomeLine,
   );
 }
 

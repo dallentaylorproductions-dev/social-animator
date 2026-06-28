@@ -31,6 +31,11 @@ function payload(opts: {
   propertyAddress?: string;
   preparedFor?: string;
   appointmentAt?: string;
+  // ---- State-A invitation sources (v0.1 coverage fix) ----
+  welcomeLine?: string;
+  leadEmphasis?: string;
+  recentListings?: Array<{ address: string; viewCount?: number }>;
+  valuationMessage?: string;
 }): PublicPayload {
   const p: Record<string, unknown> = {};
   if (opts.value !== undefined) p.priceRationale = opts.value;
@@ -50,6 +55,10 @@ function payload(opts: {
   if (opts.propertyAddress !== undefined) p.propertyAddress = opts.propertyAddress;
   if (opts.preparedFor !== undefined) p.preparedFor = opts.preparedFor;
   if (opts.appointmentAt !== undefined) p.appointmentAt = opts.appointmentAt;
+  if (opts.welcomeLine !== undefined) p.welcomeLine = opts.welcomeLine;
+  if (opts.leadEmphasis !== undefined) p.leadEmphasis = opts.leadEmphasis;
+  if (opts.recentListings !== undefined) p.recentListings = opts.recentListings;
+  if (opts.valuationMessage !== undefined) p.valuationMessage = opts.valuationMessage;
   return p as unknown as PublicPayload;
 }
 
@@ -88,6 +97,62 @@ test.describe("extractBulletCandidates", () => {
     const out = extractBulletCandidates(payload({ marketing: longEnough }));
     expect(out).toHaveLength(1);
     expect(out[0].section).toBe<BulletSection>("marketing");
+  });
+});
+
+test.describe("extractBulletCandidates - State-A invitation coverage (v0.1)", () => {
+  const hard = { agentName: "Dana Rae", propertyAddress: "412 Birchwood Lane" };
+  const listings = [{ address: "88 Maple Court", viewCount: 1240 }];
+
+  test("A - bare prepared invitation (welcomeLine + leadEmphasis + recentListings) reaches partial", () => {
+    const p = payload({
+      ...hard,
+      welcomeLine: "I put this together before we meet so you can see how I think.",
+      leadEmphasis: "social-reach",
+      recentListings: listings,
+    });
+    const out = extractBulletCandidates(p);
+    expect(out.length).toBeGreaterThanOrEqual(2);
+    expect(out.map((c) => c.section)).toEqual<BulletSection[]>(["marketing", "agent_plan"]);
+    expect(resolveConfidence(p, out).confidence).toBe("partial");
+  });
+
+  test("D - exposure content only (no comps/valuation/brand) reaches partial", () => {
+    const p = payload({
+      ...hard,
+      welcomeLine: "A quick hello before our meeting so the page feels personal.",
+      leadEmphasis: "buyer-network",
+      recentListings: listings,
+    });
+    const out = extractBulletCandidates(p);
+    expect(out.length).toBeGreaterThanOrEqual(2);
+    expect(resolveConfidence(p, out).confidence).toBe("partial");
+  });
+
+  test("template-only payload stays weak (boilerplate is not a bullet)", () => {
+    const p = payload({
+      ...hard,
+      welcomeLine: "At our meeting we will walk through the whole plan together.",
+      valuationMessage: "I like to understand the market first before we talk price.",
+    });
+    const out = extractBulletCandidates(p);
+    expect(out).toEqual([]);
+    expect(resolveConfidence(p, out).confidence).toBe("weak");
+  });
+
+  test("priority order holds when State-A and State-B fields coexist (first 3)", () => {
+    const p = payload({
+      ...hard,
+      value: longEnough, // value
+      leadEmphasis: "video-story", // marketing
+      comps: "9 Elm Street Northeast", // comps
+      welcomeLine: "A warm personal hello that would otherwise be agent_plan.", // agent_plan, dropped
+    });
+    expect(extractBulletCandidates(p).map((c) => c.section)).toEqual<BulletSection[]>([
+      "value",
+      "marketing",
+      "comps",
+    ]);
   });
 });
 

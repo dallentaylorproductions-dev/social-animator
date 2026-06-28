@@ -176,6 +176,14 @@ export async function POST(req: Request): Promise<NextResponse> {
   const payload = clampPublicPayload(record.data);
   const bullets = extractBulletCandidates(payload);
   const conf = resolveConfidence(payload, bullets, { sellerName: sellerNameOverride });
+  // TEMP (remove before flag flip): PREPARED_NEXT walk verification — confirms
+  // which sections fired on a given slug during the preview device walk.
+  console.log("PREPARED_NEXT walk:", {
+    slug,
+    confidence: conf.confidence,
+    sections: bullets.map((b) => b.section),
+    count: bullets.length,
+  });
   wo = {
     ...wo,
     confidence: conf.confidence,
