@@ -5,6 +5,7 @@ import { useListingProfile } from "@/lib/listing-profile";
 import { CurrencyInput } from "@/components/inputs/CurrencyInput";
 import { NumberInput } from "@/components/inputs/NumberInput";
 import { ImageUploadField } from "@/components/ImageUploadField";
+import { ListingPhotoCrop } from "@/components/ListingPhotoCrop";
 import { isInvitationStatus, type SellerPresentationDraft } from "../engine/types";
 import type { Comp } from "@/tools/seller-intelligence-report/engine/types";
 import { formatAppointment } from "../engine/appointment";
@@ -475,7 +476,19 @@ export function StepProperty({ draft, setDraft }: StepPropertyProps) {
           <ImageUploadField
             label="Cover photo"
             value={settings.heroPhoto}
-            onChange={(url) => update({ heroPhoto: url })}
+            onChange={(url) => {
+              update({ heroPhoto: url });
+              // A new / cleared cover photo invalidates the prior crop focal —
+              // start centered (mirror the sample-listing-photo reset). The
+              // photo URL lives on the shared listing profile; the crop is
+              // per-presentation, so it resets on the draft.
+              setDraft({
+                ...draft,
+                heroCropFocalX: undefined,
+                heroCropFocalY: undefined,
+                heroCropScale: undefined,
+              });
+            }}
             previewAspect="aspect-[16/10]"
             folder="seller-presentation"
             testIdPrefix="step-property-hero"
@@ -486,6 +499,29 @@ export function StepProperty({ draft, setDraft }: StepPropertyProps) {
             }
             emptySubtext="A wide photo of the front of the house works best. It is the first thing buyers see."
           />
+          {/* Cover-photo crop — the cover renders at 4/3 on both the State-A
+              prepared-invitation hero and the State-B full-presentation hero
+              (narrow viewports; desktop stretches taller but still
+              background-size: cover, so a single focal reads on both). The 4/3
+              thumbnail here is the WYSIWYG anchor. */}
+          {settings.heroPhoto && (
+            <ListingPhotoCrop
+              photoUrl={settings.heroPhoto}
+              focalX={draft.heroCropFocalX}
+              focalY={draft.heroCropFocalY}
+              scale={draft.heroCropScale}
+              aspect={4 / 3}
+              testIdPrefix="step-property-hero-crop"
+              onChange={(p) =>
+                setDraft({
+                  ...draft,
+                  ...("focalX" in p ? { heroCropFocalX: p.focalX } : {}),
+                  ...("focalY" in p ? { heroCropFocalY: p.focalY } : {}),
+                  ...("scale" in p ? { heroCropScale: p.scale } : {}),
+                })
+              }
+            />
+          )}
         </div>
 
         {/* ---- Prepared for (per-presentation; writes to the draft) ---- */}
