@@ -450,9 +450,24 @@ test.describe('Seller Presentation — A7b premium page render', () => {
       await page.goto('/seller-presentation-preview?fixture=full');
       await expect(page.getByTestId('sep-why-price')).toBeVisible();
 
+      // Wait for React to FINISH hydrating before mutating the DOM below.
+      // The rationale <p> is server-rendered with the full fixture text; if
+      // we overwrite its textContent while hydration is still in flight, React
+      // sees the live DOM ("A short rationale.") diverge from the server HTML
+      // and regenerates the WhyPriceSection subtree — which momentarily
+      // detaches the sep-comp-* nodes, so boundingBox() returns null and the
+      // assertion flakes (only on slower CI; locally hydration wins the race).
+      // The motion island adds `.in` to every `.reveal` from a useEffect that
+      // runs only AFTER hydration, so it is a reliable "hydrated" signal; we
+      // scroll the paragraph into view first so its IntersectionObserver fires.
+      const rationale = page.locator('.sep-presentation .sec-body.drop-cap');
+      await rationale.scrollIntoViewIfNeeded();
+      await expect(rationale).toHaveClass(/\bin\b/);
+
       // Force the bug-triggering shape: a 1-line rationale. The
       // ::first-letter rule recomputes from the new textContent on
-      // the next style pass.
+      // the next style pass. Safe now that hydration is settled — this
+      // post-hydration mutation is not reconciled away.
       await page.evaluate(() => {
         const p = document.querySelector(
           '.sep-presentation .sec-body.drop-cap',

@@ -97,7 +97,7 @@ export function WhyUsSection({
             className="text-[11px] text-neutral-500 leading-relaxed mb-2"
             data-testid="whyus-stats-help"
           >
-            Optional. Pull these from your portal or agent profile — your
+            Optional. Pull these from your portal or agent profile. Your
             Zillow/MLS dashboard usually shows sale-to-list, days on market, and
             views. Skip any you don&apos;t have; empty stats simply don&apos;t
             show.

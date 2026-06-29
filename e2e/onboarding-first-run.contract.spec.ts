@@ -170,10 +170,15 @@ test.describe('first-run gate - source contract', () => {
       'utf8',
     );
     // Flag-off branch returns DashboardClient directly (no gate, no fetch).
-    expect(src).toContain('if (!onboardingFirstRun)');
+    // Both first-run flags must be off: ONBOARDING_FIRST_RUN *and*
+    // STUDIO_PROFILE_SETUP (the latter arms the gate on its own).
+    expect(src).toContain('if (!onboardingFirstRun && !studioProfileSetup)');
     expect(src).toContain('<DashboardClient');
-    // Flag-on routes a brand-new agent into the flow.
-    expect(src).toContain("router.replace('/welcome')");
+    // Flag-on routes a brand-new agent into the flow. The destination is
+    // resolved by STUDIO_PROFILE_SETUP (/studio) and otherwise the unchanged
+    // /welcome onboarding, then handed to the gate's router.replace.
+    expect(src).toContain('router.replace(destination)');
+    expect(src).toContain("studioProfileSetup ? '/studio' : '/welcome'");
   });
 
   test('the /welcome server shell redirects when the flag is dark', () => {
