@@ -1,5 +1,5 @@
 /**
- * Dashboard tool registry (DASHBOARD_HOME_V2, Pass 1).
+ * Dashboard tool registry (DASHBOARD_HOME_V2, launch model).
  *
  * The single source the V2 dashboard renders from. Today's dashboard
  * decided what to show with hardcoded category filters + per-stage tile
@@ -17,24 +17,28 @@
  * `social-studio`, which is the aggregate flagship marquee, not a single
  * skill.
  *
+ * Launch model (supersedes the earlier "Quick Outputs visible tier" plan):
+ * the home surfaces exactly TWO tools — the Seller Presentation flagship and
+ * Social Studio — and nothing else. Every other built tool (Listing
+ * One-Pager, Listing Flyer, Open House Promo, Open House Prep, SIR, etc.) is
+ * `hidden`: it keeps its registry record so a later anticipation-layer
+ * moment can surface it with a single data flip, but it renders NO card, NO
+ * "Coming soon" tile, NO graveyard.
+ *
  * Availability MODES drive presentation (never greyed flagship cards):
  *   - active-flagship — the one prominent Seller Presentation card.
- *   - active-quick    — a Quick Outputs card (built, job-labeled, clickable).
- *   - active-social   — the Social Studio "Stay visible" flagship.
- *   - coming-next     — a small, quiet "Coming next" line (NOT a tile).
- *   - internal-beta   — hidden from the dashboard entirely.
+ *   - active-social   — the Social Studio secondary section.
+ *   - hidden          — not surfaced; a data flip away from returning later.
  *
  * `tier` carries the pricing-ladder dimension so a later pass can surface
- * upgrade framing — Pass 1 captures it in data ONLY and renders NO
- * paywall/upgrade UI from it (dev_access cohort: no paid framing).
+ * upgrade framing — captured in data ONLY here; renders NO paywall/upgrade
+ * UI (dev_access cohort: no paid framing).
  */
 
 export type ToolAvailability =
   | "active-flagship"
-  | "active-quick"
   | "active-social"
-  | "coming-next"
-  | "internal-beta";
+  | "hidden";
 
 /** Pricing-ladder tier. Data-only in Pass 1 — no UI reads this yet. */
 export type ToolTier = "base" | "pro" | "ai";
@@ -59,14 +63,12 @@ export interface DashboardTool {
   availability: ToolAvailability;
   /** Pricing-ladder dimension. Data-only in Pass 1; no UI surfaces it. */
   tier: ToolTier;
-  /** Primary CTA label for the card (omit for coming-next/internal-beta). */
+  /** Primary CTA label for the card (kept on hidden tools for the later flip). */
   primaryActionLabel: string;
   /** Where the primary CTA points. */
   primaryHref: string;
   /** Job-framed one-liner. */
   description: string;
-  /** Quiet badge for coming-next (e.g. "Coming next"). */
-  statusLabel?: string;
 }
 
 /**
@@ -93,39 +95,7 @@ export const DASHBOARD_TOOLS: DashboardTool[] = [
       "Win the listing appointment with agent prep plus a premium seller-facing page.",
   },
 
-  // ── Quick Outputs (built, active, job-labeled) ──────────────────────
-  {
-    id: "listing-presentation",
-    name: "Listing Presentation One-Pager",
-    category: "Win the listing",
-    availability: "active-quick",
-    tier: "base",
-    primaryActionLabel: "Create one-pager",
-    primaryHref: "/listing-presentation",
-    description: "A one-page leave-behind for the appointment.",
-  },
-  {
-    id: "listing-flyer",
-    name: "Listing Flyer Generator",
-    category: "Launch the marketing",
-    availability: "active-quick",
-    tier: "base",
-    primaryActionLabel: "Create a listing flyer",
-    primaryHref: "/listing-flyer",
-    description: "Create a branded listing flyer in a minute.",
-  },
-  {
-    id: "open-house-promo",
-    name: "Open House Promo Generator",
-    category: "Launch the marketing",
-    availability: "active-quick",
-    tier: "base",
-    primaryActionLabel: "Create open house promo",
-    primaryHref: "/open-house-promo",
-    description: "Create open house promo assets for the event.",
-  },
-
-  // ── Social Studio ("Stay visible" — its own section) ────────────────
+  // ── Social Studio (the secondary "Stay visible" section) ────────────
   {
     id: "social-studio",
     name: "Social Studio",
@@ -137,28 +107,59 @@ export const DASHBOARD_TOOLS: DashboardTool[] = [
     description: "Stay visible with animated social templates. One studio, ten formats.",
   },
 
-  // ── Coming next (quiet; never greyed flagship cards) ────────────────
+  // ── Hidden (built, NOT surfaced at launch) ──────────────────────────
+  // These keep their records so a later anticipation-layer moment can flip
+  // one to a surfaced mode with a data change. At launch they render
+  // nothing: no card, no "Coming soon" tile, no graveyard.
+  {
+    id: "listing-presentation",
+    name: "Listing Presentation One-Pager",
+    category: "Win the listing",
+    availability: "hidden",
+    tier: "base",
+    primaryActionLabel: "Create one-pager",
+    primaryHref: "/listing-presentation",
+    description: "A one-page leave-behind for the appointment.",
+  },
+  {
+    id: "listing-flyer",
+    name: "Listing Flyer Generator",
+    category: "Launch the marketing",
+    availability: "hidden",
+    tier: "base",
+    primaryActionLabel: "Create a listing flyer",
+    primaryHref: "/listing-flyer",
+    description: "Create a branded listing flyer in a minute.",
+  },
+  {
+    id: "open-house-promo",
+    name: "Open House Promo Generator",
+    category: "Launch the marketing",
+    availability: "hidden",
+    tier: "base",
+    primaryActionLabel: "Create open house promo",
+    primaryHref: "/open-house-promo",
+    description: "Create open house promo assets for the event.",
+  },
   {
     id: "seller-intelligence-report",
     name: "Seller Intelligence Report",
     category: "Win the listing",
-    availability: "coming-next",
+    availability: "hidden",
     tier: "pro",
-    primaryActionLabel: "",
+    primaryActionLabel: "Open the report",
     primaryHref: "/seller-intelligence-report",
     description: "Deep market intel to back your pricing.",
-    statusLabel: "Coming next",
   },
   {
     id: "open-house-prep",
     name: "Open House Prep",
     category: "Win the listing",
-    availability: "coming-next",
+    availability: "hidden",
     tier: "base",
-    primaryActionLabel: "",
+    primaryActionLabel: "Open house prep",
     primaryHref: "/open-house-prep",
     description: "Everything ready before the open house.",
-    statusLabel: "Coming next",
   },
 ];
 
@@ -179,12 +180,7 @@ export function socialTool(): DashboardTool | null {
   return DASHBOARD_TOOLS.find((t) => t.availability === "active-social") ?? null;
 }
 
-/** Quick Outputs row, in declared order. */
-export function quickOutputTools(): DashboardTool[] {
-  return toolsByAvailability("active-quick");
-}
-
-/** Quiet "Coming next" items, in declared order. */
-export function comingNextTools(): DashboardTool[] {
-  return toolsByAvailability("coming-next");
+/** Built-but-not-surfaced tools, in declared order (render nothing at launch). */
+export function hiddenTools(): DashboardTool[] {
+  return toolsByAvailability("hidden");
 }

@@ -135,13 +135,18 @@ interface WelcomeSnapshot {
   subtitle: string;
 }
 
-function readWelcomeSnapshot(): WelcomeSnapshot {
+function readWelcomeSnapshot(serverFirstName = ''): WelcomeSnapshot {
   const brand = readJson<{ agentName?: string }>('socanim_brand_settings');
   const fullName = brand?.agentName?.trim() ?? '';
-  // Fallback "Agent" (not "there") when no brand/agent name is set, so the
-  // greeting reads "Welcome back, Agent." instead of "Welcome back, there."
-  // (v1.47 cohort polish — surfaced in production smoke 2026-05-29).
-  const firstName = fullName ? fullName.split(/\s+/)[0] : 'Agent';
+  // Name precedence: the per-device localStorage name (a live, same-session
+  // edit) wins when present; else the server-resolved owner-scoped name (passed
+  // from page.tsx, correct on first paint even when this device's cache is
+  // empty or was just cleared by the account-isolation reconcile); else the
+  // calm "Agent" fallback (not "there") when no name is genuinely set, so the
+  // greeting reads "Welcome back, Agent." (v1.47 cohort polish — surfaced in
+  // production smoke 2026-05-29).
+  const localFirst = fullName ? fullName.split(/\s+/)[0] : '';
+  const firstName = localFirst || serverFirstName || 'Agent';
 
   const parts: string[] = [];
   const listing = readJson<{ address?: string }>('socanim_listing_profile');
@@ -172,15 +177,25 @@ function readWelcomeSnapshot(): WelcomeSnapshot {
 
 export function DashboardClient({
   agentProfile,
+  serverFirstName = '',
   dashboardV2 = false,
   todaySeam = false,
   todaySeamPreview = null,
 }: {
   agentProfile: AgentProfile;
   /**
-   * DASHBOARD_HOME_V2 (Pass 1) — server-resolved. When false (default),
-   * the render below is byte-identical to the v1.47 Lane A dashboard.
-   * When true, the four-tier registry-driven home renders instead.
+   * Greeting first name resolved server-side from the owner-scoped brand record
+   * (page.tsx → DashboardEntry). Seeds the welcome so the real name shows on
+   * first paint, and is the fallback the localStorage read defers to. "" when
+   * unavailable (server brand persistence off / no record), keeping the prior
+   * localStorage-only behavior.
+   */
+  serverFirstName?: string;
+  /**
+   * DASHBOARD_HOME_V2 — server-resolved. When false (default), the render
+   * below is byte-identical to the v1.47 Lane A dashboard. When true, the
+   * launch operating home renders instead (Today → Seller Presentation
+   * hero → Social Studio secondary).
    */
   dashboardV2?: boolean;
   /**
@@ -198,7 +213,9 @@ export function DashboardClient({
   const [activeStates, setActiveStates] = useState<WorkflowState[]>([]);
   const [brandConfigured, setBrandConfigured] = useState<boolean | null>(null);
   const [welcome, setWelcome] = useState<WelcomeSnapshot>({
-    firstName: 'Agent',
+    // Seed from the server-resolved name so the greeting is correct on the
+    // first paint; the localStorage read in the effect refines it.
+    firstName: serverFirstName || 'Agent',
     subtitle: 'Ready when you are.',
   });
   const [resumableSkillIds, setResumableSkillIds] = useState<Set<string>>(
@@ -215,7 +232,7 @@ export function DashboardClient({
   useEffect(() => {
     setActiveStates(detectActiveStates());
     setBrandConfigured(hasBrandProfileConfigured());
-    setWelcome(readWelcomeSnapshot());
+    setWelcome(readWelcomeSnapshot(serverFirstName));
 
     const resumable = new Set<string>();
     if (findLatestInProgress('seller-presentation')) {
@@ -232,7 +249,7 @@ export function DashboardClient({
         })
         .toUpperCase(),
     );
-  }, []);
+  }, [serverFirstName]);
 
   const entitlement: EntitlementContext = useMemo(
     () => resolveEntitlements(agentProfile),
@@ -298,10 +315,11 @@ export function DashboardClient({
     );
   }
 
-  // DASHBOARD_HOME_V2 (Pass 1) — the four-tier registry-driven operating
-  // home. Mounted only when the server-resolved flag is on; the V1 render
-  // below is left byte-identical for the flag-off path. Hooks above run
-  // unconditionally (Rules of Hooks); only the rendered tree branches.
+  // DASHBOARD_HOME_V2 — the launch operating home (Today → Seller
+  // Presentation hero → Social Studio secondary). Mounted only when the
+  // server-resolved flag is on; the V1 render below is left byte-identical
+  // for the flag-off path. Hooks above run unconditionally (Rules of
+  // Hooks); only the rendered tree branches.
   if (dashboardV2) {
     return (
       <DashboardHomeV2

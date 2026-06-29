@@ -40,6 +40,7 @@ export function DashboardEntry({
   onboardingFirstRun,
   studioProfileSetup = false,
   agentProfile,
+  serverFirstName = '',
   dashboardV2,
   todaySeam = false,
   todaySeamPreview = null,
@@ -60,6 +61,13 @@ export function DashboardEntry({
    */
   studioProfileSetup?: boolean;
   agentProfile: AgentProfile;
+  /**
+   * Greeting first name resolved server-side from the owner-scoped brand
+   * record (page.tsx). Forwarded untouched so the welcome shows the real name
+   * on first paint instead of the "Agent" fallback; "" when unavailable, in
+   * which case the client falls back to its localStorage read.
+   */
+  serverFirstName?: string;
   dashboardV2: boolean;
   /** DASHBOARD_TODAY_SEAM (Pass 3) — server-resolved; forwarded untouched. */
   todaySeam?: boolean;
@@ -83,6 +91,7 @@ export function DashboardEntry({
     return (
       <DashboardClient
         agentProfile={agentProfile}
+        serverFirstName={serverFirstName}
         dashboardV2={dashboardV2}
         todaySeam={todaySeam}
         todaySeamPreview={todaySeamPreview}
@@ -97,6 +106,7 @@ export function DashboardEntry({
       dashboard={
         <DashboardClient
           agentProfile={agentProfile}
+          serverFirstName={serverFirstName}
           dashboardV2={dashboardV2}
           todaySeam={todaySeam}
           todaySeamPreview={todaySeamPreview}

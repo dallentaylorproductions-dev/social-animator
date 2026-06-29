@@ -7,12 +7,7 @@ import { StageDot, FormatChips, formatsForOutputs } from './components/Tile';
 import { SocialStudioTile } from './components/SocialStudio';
 import { posterForSkillId } from './components/posters/posterForSkillId';
 import { getSkillById } from '@/skills/registry';
-import {
-  flagshipTool,
-  quickOutputTools,
-  comingNextTools,
-  type DashboardTool,
-} from './tool-registry';
+import { flagshipTool, type DashboardTool } from './tool-registry';
 import {
   useOwnerPagesActivity,
   type OwnerPagesActivity,
@@ -25,19 +20,22 @@ import {
 import { useTodaySeamSignals } from './use-today-seam-signals';
 
 /**
- * DASHBOARD_HOME_V2 — the progressive operating home (Pass 1).
+ * DASHBOARD_HOME_V2 — the launch operating home.
  *
- * Renders the four tiers from the dashboard tool registry, top to bottom:
+ * The launch home is three things, in this order, and nothing else
+ * (this supersedes the earlier four-tier "Quick Outputs visible tier" plan):
  *   1. Today      — dynamic top card (returning → needs-attention into
  *                   Your pages + Create; new → create-first-page).
- *   2. Flagship   — ONE Seller Presentation card with live activity
- *                   (N active · N worth a follow-up) from the SAME
+ *   2. Flagship   — the prominent Seller Presentation hero card with live
+ *                   activity (N active · N worth a follow-up) from the SAME
  *                   owner-scoped source as Your pages.
- *   3. Quick      — the built smaller tools, reframed by their job.
- *      outputs
- *   4. Stay       — Social Studio as its own section (the existing
- *      visible     flagship marquee).
- *   + Coming next — a small, quiet area (never greyed flagship cards).
+ *   3. Stay       — Social Studio as a calmer SECONDARY section beneath the
+ *      visible     hero (the daily-use anchor, not a co-equal flagship).
+ *
+ * Removed at launch: the Quick Outputs tier and every "Coming soon" tile.
+ * The other built tools are `hidden` in the registry — out of the nav
+ * entirely, no greyed cards, no graveyard. They return later as
+ * anticipation-layer moments via a registry data flip.
  *
  * Availability MODE drives the treatment; promoting a tool is a registry
  * data change, not a layout change. Brand kit is no longer the perpetual
@@ -77,8 +75,6 @@ export function DashboardHomeV2({
 }: DashboardHomeV2Props) {
   const activity = useOwnerPagesActivity();
   const flagship = flagshipTool();
-  const quick = quickOutputTools();
-  const comingNext = comingNextTools();
 
   return (
     <>
@@ -109,7 +105,7 @@ export function DashboardHomeV2({
         previewState={todaySeamPreview}
       />
 
-      {/* TIER 2 — FLAGSHIP (Seller Presentation, live activity) */}
+      {/* HERO — FLAGSHIP (Seller Presentation, live activity) */}
       {flagship && (
         <section className="stage" id="stage-win" data-testid="sep-stage-win">
           <StageHeader
@@ -122,55 +118,31 @@ export function DashboardHomeV2({
         </section>
       )}
 
-      {/* TIER 3 — QUICK OUTPUTS (built tools, reframed by job) */}
-      {quick.length > 0 && (
-        <section className="stage" id="stage-launch" data-testid="sep-stage-launch">
-          <StageHeader
-            index={2}
-            label="Launch the marketing"
-            hint="Quick assets the listing creates around it."
-            stage="launch"
-          />
-          <div className="grid grid-quick" data-testid="sep-quick-grid">
-            {quick.map((tool) => (
-              <QuickOutputCard key={tool.id} tool={tool} />
-            ))}
+      {/* SECONDARY — STAY VISIBLE (Social Studio, calmer daily-use anchor).
+          Deliberately NOT a numbered StageHeader: Stay-visible is not step 2
+          of winning a listing, so it reads as a quieter secondary subhead
+          beneath the hero, not a co-equal "Stage 02". The Seller Presentation
+          hero above stays the single numbered primary stage. */}
+      <section
+        className="stage stage-secondary"
+        id="stage-visibility"
+        data-testid="sep-stage-visibility"
+      >
+        <header
+          className="stage-head stage-head-secondary"
+          data-stage="visibility"
+          data-testid="sep-stage-head-visibility"
+        >
+          <div className="stage-text">
+            <div className="stage-label">Stay visible</div>
+            <div className="stage-hint">
+              Cadence content. One studio, ten formats.
+            </div>
           </div>
-        </section>
-      )}
-
-      {/* TIER 4 — STAY VISIBLE (Social Studio, its own section) */}
-      <section className="stage" id="stage-visibility" data-testid="sep-stage-visibility">
-        <StageHeader
-          index={3}
-          label="Stay visible"
-          hint="Cadence content. One studio, ten formats."
-          stage="visibility"
-        />
+          <div className="stage-rule" />
+        </header>
         <SocialStudioTile skills={visibilitySkills} />
       </section>
-
-      {/* COMING NEXT (quiet; never a greyed flagship card) */}
-      {comingNext.length > 0 && (
-        <section className="coming-next" data-testid="sep-coming-next">
-          <div className="coming-next-head">Coming next</div>
-          <ul className="coming-next-list">
-            {comingNext.map((tool) => (
-              <li
-                key={tool.id}
-                className="coming-next-item"
-                data-testid={`sep-coming-${tool.id}`}
-              >
-                <span className="coming-next-name">{tool.name}</span>
-                <span className="coming-next-desc">{tool.description}</span>
-                {tool.statusLabel && (
-                  <span className="coming-next-tag">{tool.statusLabel}</span>
-                )}
-              </li>
-            ))}
-          </ul>
-        </section>
-      )}
 
       <footer className="bottom">
         <span>SEP-S · Dashboard Home v2</span>
@@ -438,40 +410,5 @@ function FlagshipCard({
         </div>
       </div>
     </div>
-  );
-}
-
-/* ───────────────────────────────────────────────────────────────────────── */
-/* TIER 3 — Quick output card                                                 */
-
-/**
- * Quick output card — a built smaller tool, framed by its JOB. Clickable
- * (active, not a coming-soon roadmap tile): the whole card is the link to
- * the tool route declared in the registry. Title / blurb / CTA come from
- * the registry's job reframe, not the skill's raw name.
- */
-function QuickOutputCard({ tool }: { tool: DashboardTool }) {
-  const skill = getSkillById(tool.id);
-  const formats = skill ? formatsForOutputs(skill.outputs) : [];
-
-  return (
-    <Link
-      href={tool.primaryHref}
-      className="quick-card"
-      data-testid={`sep-quick-${tool.id}`}
-    >
-      <div className="quick-card-poster">{posterForSkillId(tool.id)}</div>
-      <div className="quick-card-body">
-        <div className="tile-meta">
-          <StageDot stage={tool.category === 'Win the listing' ? 'win' : 'launch'} />
-          {formats.length > 0 && <FormatChips formats={formats} />}
-        </div>
-        <h3 className="quick-card-title">{tool.name}</h3>
-        <p className="quick-card-blurb">{tool.description}</p>
-        <span className="quick-card-cta" aria-hidden>
-          {tool.primaryActionLabel} →
-        </span>
-      </div>
-    </Link>
   );
 }
