@@ -49,7 +49,15 @@ export interface GenerateInput {
 }
 
 export type GenerateResult =
-  | { ok: true; draft: PreparedDraft; tokenCapHit: boolean }
+  | {
+      ok: true;
+      draft: PreparedDraft;
+      tokenCapHit: boolean;
+      // TEMP (remove before flag flip): raw usage for the debug endpoint so the
+      // walk can verify length directly. The route never branches on these.
+      outputTokens?: number;
+      stopReason?: string;
+    }
   | {
       ok: false;
       reason: "missing-key" | "timeout" | "malformed" | "error";
@@ -66,8 +74,10 @@ const SYSTEM_PROMPT = [
   "Hard rule: never use an em dash. Use periods or commas.",
   "Honesty: restate only the points you are given. Do not add qualifiers, opinions, market claims, statistics, or any detail that is not in the provided sections. Restate, do not embellish.",
   "Never invent a seller name or any personal detail. If no seller name is provided, open without a name (for example: Hi there).",
-  "Keep the text message to a few sentences. Keep the email to a short greeting, two or three sentences, and a sign off with the agent name.",
-  "Keep both variants brief and do not repeat yourself.",
+  "Text message: 2 to 3 sentences, about 40 to 60 words total. One warm opener, the single most relevant point, and stop.",
+  "Email: 3 to 5 sentences, about 90 to 130 words. A short greeting, one or two points, and a light close. No subject line, no headers, no bullet lists, no signature block.",
+  "Do not enumerate. Never list more than one example address or listing. Summarize comparable sales as a count, for example 'a few recent nearby sales' or 'four recent closings nearby', not a list of addresses. Refer to exposure as reach, for example 'recent listings reaching thousands of buyers', not a roster of properties.",
+  "Brevity must not become invention: restate only what the points contain, just more concisely.",
   "Do not write a closing call-to-action line, and do not write any link, URL, or web address. A page link and a closing line are added automatically after your text, so leave them out entirely.",
   'Return ONLY a JSON object of the form {"textVariant": "...", "emailVariant": "..."} with no markdown and no commentary.',
 ].join("\n");
@@ -158,7 +168,14 @@ export async function generateFollowUpDraft(
     const text = block && block.type === "text" ? block.text : "";
     const draft = parseDraft(text);
     if (!draft) return { ok: false, reason: "malformed" };
-    return { ok: true, draft, tokenCapHit: result.stop_reason === "max_tokens" };
+    return {
+      ok: true,
+      draft,
+      tokenCapHit: result.stop_reason === "max_tokens",
+      // TEMP (remove before flag flip): raw usage for the debug endpoint.
+      outputTokens: result.usage?.output_tokens,
+      stopReason: result.stop_reason ?? undefined,
+    };
   } catch (err) {
     // TEMP (remove before flag flip): carry the exception detail for the walk log.
     if (err instanceof Error && err.name === "AbortError") {

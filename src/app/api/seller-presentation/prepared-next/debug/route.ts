@@ -118,8 +118,15 @@ export async function GET(req: Request): Promise<NextResponse> {
     genReason: null as string | null,
     errorName: null as string | null,
     errorMessage: null as string | null,
+    // TEMP (v0.3): raw usage so the walk can verify length directly.
+    outputTokens: null as number | null,
+    stopReason: null as string | null,
+    // On a gate rejection: a ~200-char RAW excerpt (where it tripped).
     textExcerpt: null as string | null,
     emailExcerpt: null as string | null,
+    // On a PASS: the FULL composed variants (model text + appended link + CTA).
+    textVariant: null as string | null,
+    emailVariant: null as string | null,
   };
 
   // weak → the real route never generates (zero spend). Report and stop.
@@ -185,12 +192,19 @@ export async function GET(req: Request): Promise<NextResponse> {
     tokenCapHit: gen.tokenCapHit,
   });
 
+  // Usage is available whenever generation succeeded (validator pass OR fail).
+  const usage = {
+    outputTokens: gen.outputTokens ?? null,
+    stopReason: gen.stopReason ?? null,
+  };
+
   if (!verdict.ok) {
     // On a gate rejection, show the RAW model output (~200 chars) so the walk
     // sees where it tripped (e.g. a truncated tail).
     return noStore(
       {
         ...base,
+        ...usage,
         generated: true,
         failed: true,
         reason: GATE_TO_REASON[verdict.reason],
@@ -202,18 +216,19 @@ export async function GET(req: Request): Promise<NextResponse> {
     );
   }
 
-  // Passed generate + validate. Show the FINAL composed variants (model text +
-  // the code-appended page link + CTA) in FULL so the walk can confirm complete
-  // sentences AND that the link + CTA are present (they ride at the end). The
-  // drafts are short by design; this is the agent's own draft on a dark build.
+  // Passed generate + validate. Return the FINAL composed variants (model text +
+  // the code-appended page link + CTA) in FULL so the walk can read the whole
+  // thing and judge voice + length. Drafts are short by design; this is the
+  // agent's own draft on a dark build.
   const composed = composePreparedDraft(gen.draft, pageUrl);
   return noStore(
     {
       ...base,
+      ...usage,
       generated: true,
       failed: false,
-      textExcerpt: composed.textVariant,
-      emailExcerpt: composed.emailVariant,
+      textVariant: composed.textVariant,
+      emailVariant: composed.emailVariant,
     },
     200,
   );
