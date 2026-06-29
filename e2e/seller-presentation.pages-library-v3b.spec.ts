@@ -45,7 +45,10 @@ test.describe("Pass 3b is flag-gated (flag-off byte-identical)", () => {
   test("the prepared-page placeholder renders only under libraryV3", () => {
     // The ◇ markup is preserved on the flag-off branch; the prepared placeholder
     // (a home glyph) is a separate branch behind `libraryV3`.
-    expect(tsx).toContain("import { ChevronDown, GripVertical, House }");
+    // The prepared placeholder uses the House glyph from lucide-react. Assert
+    // the icon is imported without pinning the exact set (icons get added /
+    // reordered over time; an exact-substring match re-breaks on every change).
+    expect(tsx).toMatch(/import \{[^}]*\bHouse\b[^}]*\} from "lucide-react"/);
     expect(tsx).toContain(") : libraryV3 ? (");
     expect(tsx).toContain(
       'className="lib-poster-empty lib-poster-prepared"',
