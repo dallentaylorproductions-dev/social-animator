@@ -11,7 +11,7 @@ import {
 } from "react";
 import { createPortal } from "react-dom";
 import { Reorder, useDragControls, useReducedMotion } from "framer-motion";
-import { ChevronDown, GripVertical, House } from "lucide-react";
+import { Check, ChevronDown, GripVertical, House, Pencil } from "lucide-react";
 import {
   cacheInstance,
   createInstance,
@@ -2683,7 +2683,6 @@ function PageCardView({
           <PreparedFollowUpPane
             pane={preparedPane}
             busy={busy}
-            copied={copied}
             onRetry={onPrepareRetry}
             onDismiss={onDismissPrepared}
             onCopy={onCopyPrepared}
@@ -2705,14 +2704,12 @@ function PageCardView({
 function PreparedFollowUpPane({
   pane,
   busy,
-  copied,
   onRetry,
   onDismiss,
   onCopy,
 }: {
   pane: PreparedPaneState;
   busy: boolean;
-  copied: boolean;
   onRetry?: () => void;
   onDismiss?: () => void;
   onCopy?: (text: string) => void;
@@ -2727,6 +2724,27 @@ function PreparedFollowUpPane({
     if (typeof seedText === "string") setTextDraft(seedText);
     if (typeof seedEmail === "string") setEmailDraft(seedEmail);
   }, [seedText, seedEmail]);
+
+  // Auto-height: each field grows to fit its full message (no inner scrollbar)
+  // and re-fits as the agent edits. Presentation only.
+  const textRef = useRef<HTMLTextAreaElement>(null);
+  const emailRef = useRef<HTMLTextAreaElement>(null);
+  const fit = (el: HTMLTextAreaElement | null) => {
+    if (!el) return;
+    el.style.height = "auto";
+    el.style.height = `${el.scrollHeight}px`;
+  };
+  useEffect(() => fit(textRef.current), [textDraft]);
+  useEffect(() => fit(emailRef.current), [emailDraft]);
+
+  // Per-button copy confirmation (briefly swaps to a check + "Copied"). The copy
+  // ACTION is unchanged (onCopy still writes the clipboard + records the mark).
+  const [copiedField, setCopiedField] = useState<"text" | "email" | null>(null);
+  const copy = (which: "text" | "email", text: string) => {
+    onCopy?.(text);
+    setCopiedField(which);
+    setTimeout(() => setCopiedField((c) => (c === which ? null : c)), 1400);
+  };
 
   return (
     <div
@@ -2745,7 +2763,7 @@ function PreparedFollowUpPane({
           {onDismiss && (
             <button
               type="button"
-              className="lib-btn lib-btn-quiet"
+              className="lib-prepared-dismiss"
               onClick={onDismiss}
               data-testid="lib-prepared-dismiss"
             >
@@ -2758,11 +2776,11 @@ function PreparedFollowUpPane({
           <p className="lib-prepared-note" data-testid="lib-prepared-error">
             {pane.error ?? "Could not prepare a follow-up just now."}
           </p>
-          <div className="lib-actions">
+          <div className="lib-prepared-footer">
             {pane.canRetry && onRetry && (
               <button
                 type="button"
-                className="lib-btn lib-btn-quiet"
+                className="lib-prepared-dismiss"
                 onClick={onRetry}
                 disabled={busy}
                 data-testid="lib-prepared-retry"
@@ -2773,7 +2791,7 @@ function PreparedFollowUpPane({
             {onDismiss && (
               <button
                 type="button"
-                className="lib-btn lib-btn-quiet"
+                className="lib-prepared-dismiss"
                 onClick={onDismiss}
                 data-testid="lib-prepared-dismiss"
               >
@@ -2784,78 +2802,103 @@ function PreparedFollowUpPane({
         </div>
       ) : (
         <div className="lib-prepared-draft">
+          <div className="lib-prepared-head">
+            <span className="lib-prepared-dot" aria-hidden="true" />
+            <div className="lib-prepared-head-text">
+              <p className="lib-prepared-title">Follow-up prepared</p>
+              <p className="lib-prepared-sub">
+                Review, tweak, and copy. Nothing sends on its own.
+              </p>
+            </div>
+          </div>
+
           {pane.askField === "seller_name" && (
             <p className="lib-prepared-ask" data-testid="lib-prepared-ask">
               Tip: add the seller&apos;s name in the text below to personalize it.
             </p>
           )}
 
-          {pane.bullets && pane.bullets.length > 0 && (
-            <ul className="lib-prepared-bullets" data-testid="lib-prepared-bullets">
-              {pane.bullets.map((b, i) => (
-                <li key={i}>{b.label}</li>
-              ))}
-            </ul>
-          )}
-
-          {pane.pageUrl && (
-            <p className="lib-prepared-link" data-testid="lib-prepared-link">
-              {pane.pageUrl}
-            </p>
-          )}
-
-          <label className="lib-prepared-field">
-            <span className="lib-prepared-label">Text message</span>
+          <div className="lib-prepared-section">
+            <div className="lib-prepared-section-head">
+              <span className="lib-prepared-section-label">Text message</span>
+              <span className="lib-prepared-edit-hint">
+                <Pencil size={11} aria-hidden="true" /> editable
+              </span>
+            </div>
             <textarea
+              ref={textRef}
               className="lib-prepared-textarea"
               value={textDraft}
               onChange={(e) => setTextDraft(e.target.value)}
-              rows={4}
+              rows={1}
               data-testid="lib-prepared-text"
             />
             {onCopy && (
               <button
                 type="button"
-                className="lib-btn lib-btn-quiet"
-                onClick={() => onCopy(textDraft)}
+                className="lib-prepared-copy"
+                onClick={() => copy("text", textDraft)}
                 data-testid="lib-prepared-copy-text"
               >
-                {copied ? "Copied" : "Copy text"}
+                {copiedField === "text" ? (
+                  <>
+                    <Check size={13} aria-hidden="true" /> Copied
+                  </>
+                ) : (
+                  "Copy text"
+                )}
               </button>
             )}
-          </label>
+          </div>
 
-          <label className="lib-prepared-field">
-            <span className="lib-prepared-label">Email</span>
+          <div className="lib-prepared-section">
+            <div className="lib-prepared-section-head">
+              <span className="lib-prepared-section-label">Email</span>
+              <span className="lib-prepared-edit-hint">
+                <Pencil size={11} aria-hidden="true" /> editable
+              </span>
+            </div>
             <textarea
+              ref={emailRef}
               className="lib-prepared-textarea"
               value={emailDraft}
               onChange={(e) => setEmailDraft(e.target.value)}
-              rows={6}
+              rows={1}
               data-testid="lib-prepared-email"
             />
             {onCopy && (
               <button
                 type="button"
-                className="lib-btn lib-btn-quiet"
-                onClick={() => onCopy(emailDraft)}
+                className="lib-prepared-copy"
+                onClick={() => copy("email", emailDraft)}
                 data-testid="lib-prepared-copy-email"
               >
-                {copied ? "Copied" : "Copy email"}
+                {copiedField === "email" ? (
+                  <>
+                    <Check size={13} aria-hidden="true" /> Copied
+                  </>
+                ) : (
+                  "Copy email"
+                )}
               </button>
             )}
-          </label>
+          </div>
 
-          {onDismiss && (
-            <button
-              type="button"
-              className="lib-btn lib-btn-quiet"
-              onClick={onDismiss}
-              data-testid="lib-prepared-dismiss"
-            >
-              Dismiss
-            </button>
-          )}
+          <div className="lib-prepared-footer">
+            {onDismiss && (
+              <button
+                type="button"
+                className="lib-prepared-dismiss"
+                onClick={onDismiss}
+                data-testid="lib-prepared-dismiss"
+              >
+                Dismiss
+              </button>
+            )}
+            <span className="lib-prepared-foot-hint">
+              Stays put until the page changes.
+            </span>
+          </div>
         </div>
       )}
     </div>
