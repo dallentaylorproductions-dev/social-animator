@@ -143,7 +143,11 @@ export async function GET(req: Request): Promise<NextResponse> {
     (payload.agent?.name || payload.agentBranding?.name || "").trim() || "Your agent";
   const propertyLabel =
     (payload.propertyAddress || payload.property?.address || "").trim() || "your home";
-  const appointmentAt = payload.appointmentAt?.trim() || undefined;
+  // v0.6 §2 appointment-tense guard: only an upcoming appointment is passed (same
+  // future-check as the real route), so a past date is never referenced.
+  const apptRaw = payload.appointmentAt?.trim() || undefined;
+  const appointmentAt =
+    apptRaw && Date.parse(apptRaw) > Date.now() ? apptRaw : undefined;
   const sellerName = payload.preparedFor?.trim() ?? undefined;
 
   // The single capped generation (no persistence, no cap consumed). NO page data.

@@ -264,7 +264,13 @@ export async function POST(req: Request): Promise<NextResponse> {
     (payload.agent?.name || payload.agentBranding?.name || "").trim() || "Your agent";
   const propertyLabel =
     (payload.propertyAddress || payload.property?.address || "").trim() || "your home";
-  const appointmentAt = payload.appointmentAt?.trim() || undefined;
+  // v0.6 §2 appointment-tense guard: only pass the appointment when it is actually
+  // upcoming. The page stores a timezone-less local wall-clock, so this compares
+  // against the server clock (good enough for the "upcoming" framing). A past
+  // appointment is dropped, so the recap never references a date that has passed.
+  const apptRaw = payload.appointmentAt?.trim() || undefined;
+  const appointmentAt =
+    apptRaw && Date.parse(apptRaw) > Date.now() ? apptRaw : undefined;
   const sellerName = sellerNameOverride ?? payload.preparedFor?.trim() ?? undefined;
 
   // One capped generation call.
