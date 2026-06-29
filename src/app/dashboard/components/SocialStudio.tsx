@@ -230,7 +230,7 @@ export function SocialStudioTile({ skills }: { skills: CallableSkill[] }) {
           <span className="tile-cta flagship-cta">Open studio →</span>
         </div>
         <p className="tile-blurb flagship-blurb">
-          {skills.length} animated social templates: Q&amp;A, Listing Card,
+          {skills.length}{' '}animated social templates: Q&amp;A, Listing Card,
           Carousel, Before/After, Stat, Market Update, and more, all in one
           studio.
         </p>
