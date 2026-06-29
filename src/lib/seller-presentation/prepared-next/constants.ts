@@ -20,8 +20,14 @@ export const MIN_BULLET_CHARS = 20;
 /** Max bullets restated in the draft (first 3 qualifying candidates, in priority order). */
 export const MAX_BULLETS = 3;
 
-/** One text variant + one email/recap variant, no rambling. */
-export const MAX_GEN_OUTPUT_TOKENS = 650;
+/**
+ * One text variant + one email/recap variant, no rambling. Headroom against
+ * truncation: v0.2 raised 650 → 1024 after the page link moved out of the model
+ * output (appended by code, like FALLBACK_CTA), so two concise variants fit with
+ * room to spare. This is headroom, not license to ramble — the prompt holds the
+ * brevity bar; the truncation gate stays the backstop.
+ */
+export const MAX_GEN_OUTPUT_TOKENS = 1024;
 
 /** AbortController ceiling for the single generation call. Route maxDuration stays 60. */
 export const GEN_TIMEOUT_MS = 20_000;

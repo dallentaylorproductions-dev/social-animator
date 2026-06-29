@@ -23,6 +23,7 @@ import { extractBulletCandidates } from "@/lib/seller-presentation/prepared-next
 import { resolveConfidence } from "@/lib/seller-presentation/prepared-next/confidence";
 import { generateFollowUpDraft } from "@/lib/seller-presentation/prepared-next/generate";
 import { validatePreparedOutput } from "@/lib/seller-presentation/prepared-next/validate";
+import { composePreparedDraft } from "@/lib/seller-presentation/prepared-next/compose";
 
 export const runtime = "nodejs";
 export const maxDuration = 60;
@@ -142,7 +143,6 @@ export async function GET(req: Request): Promise<NextResponse> {
   // The single capped generation (no persistence, no cap consumed).
   const gen = await generateFollowUpDraft({
     bullets,
-    pageUrl,
     sellerName: payload.preparedFor?.trim() ?? undefined,
     voice: {
       agentName,
@@ -185,10 +185,9 @@ export async function GET(req: Request): Promise<NextResponse> {
     tokenCapHit: gen.tokenCapHit,
   });
 
-  const textExcerpt = gen.draft.textVariant.slice(0, 200);
-  const emailExcerpt = gen.draft.emailVariant.slice(0, 200);
-
   if (!verdict.ok) {
+    // On a gate rejection, show the RAW model output (~200 chars) so the walk
+    // sees where it tripped (e.g. a truncated tail).
     return noStore(
       {
         ...base,
@@ -196,16 +195,26 @@ export async function GET(req: Request): Promise<NextResponse> {
         failed: true,
         reason: GATE_TO_REASON[verdict.reason],
         gate: verdict.reason,
-        textExcerpt,
-        emailExcerpt,
+        textExcerpt: gen.draft.textVariant.slice(0, 200),
+        emailExcerpt: gen.draft.emailVariant.slice(0, 200),
       },
       200,
     );
   }
 
-  // Passed generate + validate. Report the drafted text (dark/preview only).
+  // Passed generate + validate. Show the FINAL composed variants (model text +
+  // the code-appended page link + CTA) in FULL so the walk can confirm complete
+  // sentences AND that the link + CTA are present (they ride at the end). The
+  // drafts are short by design; this is the agent's own draft on a dark build.
+  const composed = composePreparedDraft(gen.draft, pageUrl);
   return noStore(
-    { ...base, generated: true, failed: false, textExcerpt, emailExcerpt },
+    {
+      ...base,
+      generated: true,
+      failed: false,
+      textExcerpt: composed.textVariant,
+      emailExcerpt: composed.emailVariant,
+    },
     200,
   );
 }

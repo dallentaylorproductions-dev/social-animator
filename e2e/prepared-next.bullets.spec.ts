@@ -4,7 +4,11 @@ import {
   type BulletSection,
 } from "../src/lib/seller-presentation/prepared-next/bullets";
 import { resolveConfidence } from "../src/lib/seller-presentation/prepared-next/confidence";
-import { MIN_BULLET_CHARS } from "../src/lib/seller-presentation/prepared-next/constants";
+import { composePreparedDraft } from "../src/lib/seller-presentation/prepared-next/compose";
+import {
+  MIN_BULLET_CHARS,
+  FALLBACK_CTA,
+} from "../src/lib/seller-presentation/prepared-next/constants";
 import type { PublicPayload } from "../src/tools/seller-presentation/output/public-payload";
 
 /**
@@ -153,6 +157,30 @@ test.describe("extractBulletCandidates - State-A invitation coverage (v0.1)", ()
       "marketing",
       "comps",
     ]);
+  });
+});
+
+test.describe("composePreparedDraft - link + CTA appended by code (v0.2)", () => {
+  const url = "https://studio.example.com/h/f3r6vy96";
+  const draft = {
+    textVariant: "Hi there. Quick note about your page.",
+    emailVariant: "Hello. A short body for the email.",
+  };
+
+  test("appends the page link AND the CTA to both variants, after the model text", () => {
+    const out = composePreparedDraft(draft, url);
+    for (const v of [out.textVariant, out.emailVariant]) {
+      expect(v).toContain(url);
+      expect(v.endsWith(FALLBACK_CTA)).toBe(true);
+    }
+    expect(out.textVariant.startsWith(draft.textVariant)).toBe(true);
+    expect(out.emailVariant.startsWith(draft.emailVariant)).toBe(true);
+  });
+
+  test("a blank link yields just the CTA (byte-identical to the pre-link append)", () => {
+    const out = composePreparedDraft(draft, "");
+    expect(out.textVariant).toBe(`${draft.textVariant}\n\n${FALLBACK_CTA}`);
+    expect(out.emailVariant).toBe(`${draft.emailVariant}\n\n${FALLBACK_CTA}`);
   });
 });
 

@@ -40,10 +40,12 @@ export interface GenerateVoice {
 
 export interface GenerateInput {
   bullets: BulletCandidate[];
-  pageUrl: string;
   voice: GenerateVoice;
   /** Present only when known (enrichment); NEVER invented. */
   sellerName?: string;
+  // NOTE: the page link is NOT passed to the model — it is appended by code
+  // (composePreparedDraft) after the validator, like FALLBACK_CTA. The model is
+  // told not to write any URL, so it spends no budget on the link (v0.2 fix).
 }
 
 export type GenerateResult =
@@ -65,7 +67,8 @@ const SYSTEM_PROMPT = [
   "Honesty: restate only the points you are given. Do not add qualifiers, opinions, market claims, statistics, or any detail that is not in the provided sections. Restate, do not embellish.",
   "Never invent a seller name or any personal detail. If no seller name is provided, open without a name (for example: Hi there).",
   "Keep the text message to a few sentences. Keep the email to a short greeting, two or three sentences, and a sign off with the agent name.",
-  "Do not write a call-to-action closing line; one is added separately.",
+  "Keep both variants brief and do not repeat yourself.",
+  "Do not write a closing call-to-action line, and do not write any link, URL, or web address. A page link and a closing line are added automatically after your text, so leave them out entirely.",
   'Return ONLY a JSON object of the form {"textVariant": "...", "emailVariant": "..."} with no markdown and no commentary.',
 ].join("\n");
 
@@ -83,14 +86,13 @@ function buildUserPrompt(input: GenerateInput): string {
   } else {
     lines.push("No agent voice is defined. Use a neutral, warm, professional Studio voice.");
   }
-  lines.push(`Page link to include: ${input.pageUrl}`);
   lines.push("");
   lines.push("Points to restate (do not add any others):");
   input.bullets.forEach((b, i) => {
     lines.push(`${i + 1}. ${b.label}: ${b.text}`);
   });
   lines.push("");
-  lines.push("Write the text message and the email that restate the points above and include the page link.");
+  lines.push("Write the text message and the email that restate the points above. Do not write any link or URL; a page link and closing line are appended automatically.");
   return lines.join("\n");
 }
 

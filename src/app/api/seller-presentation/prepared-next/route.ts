@@ -6,10 +6,10 @@ import { clampPublicPayload } from "@/tools/seller-presentation/output/public-pa
 import type { PublicPayload } from "@/tools/seller-presentation/output/public-payload";
 import { isPreparedNextEnabled } from "@/lib/seller-presentation/prepared-next/flag";
 import {
-  FALLBACK_CTA,
   MAX_GENERATIONS_PER_WORK_ORDER,
   PER_ACCOUNT_DAILY_GEN_CEILING,
 } from "@/lib/seller-presentation/prepared-next/constants";
+import { composePreparedDraft } from "@/lib/seller-presentation/prepared-next/compose";
 import { extractBulletCandidates } from "@/lib/seller-presentation/prepared-next/bullets";
 import { resolveConfidence } from "@/lib/seller-presentation/prepared-next/confidence";
 import { generateFollowUpDraft } from "@/lib/seller-presentation/prepared-next/generate";
@@ -270,7 +270,6 @@ export async function POST(req: Request): Promise<NextResponse> {
   wo = { ...wo, generationCount: wo.generationCount + 1 };
   const gen = await generateFollowUpDraft({
     bullets,
-    pageUrl,
     sellerName: sellerNameOverride ?? payload.preparedFor?.trim() ?? undefined,
     voice: {
       agentName,
@@ -352,11 +351,9 @@ export async function POST(req: Request): Promise<NextResponse> {
     );
   }
 
-  // Append the code-constant CTA (exempt from the validator, never model-made).
-  const draftOutput = {
-    textVariant: `${gen.draft.textVariant}\n\n${FALLBACK_CTA}`,
-    emailVariant: `${gen.draft.emailVariant}\n\n${FALLBACK_CTA}`,
-  };
+  // Append the code-constant page link + CTA (both exempt from the validator,
+  // never model-made — the model is told to write no URL, v0.2 truncation fix).
+  const draftOutput = composePreparedDraft(gen.draft, pageUrl);
   const prepared: FollowUpRecapWorkOrder = {
     ...wo,
     status: "prepared",
