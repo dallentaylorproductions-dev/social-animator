@@ -12,10 +12,16 @@ import {
 import { composePreparedDraft } from "@/lib/seller-presentation/prepared-next/compose";
 import { resolveConfidence } from "@/lib/seller-presentation/prepared-next/confidence";
 import { generateFollowUpDraft } from "@/lib/seller-presentation/prepared-next/generate";
-import { loadAgentVoice } from "@/lib/seller-presentation/prepared-next/voice-source";
+import {
+  buildAgentVoice,
+  loadBrandVoiceRecord,
+  voiceSignature,
+} from "@/lib/seller-presentation/prepared-next/voice-source";
 import { validatePreparedOutput } from "@/lib/seller-presentation/prepared-next/validate";
 import { viewedSignalMoment } from "@/lib/seller-presentation/prepared-next/moment";
+import { publicPageUrl } from "@/lib/public-url";
 import {
+  composePreparedVersion,
   ensureEligibleWorkOrder,
   newEligibleWorkOrder,
   getWorkOrder,
@@ -136,7 +142,16 @@ export async function POST(req: Request): Promise<NextResponse> {
   if (!record || record.ownerEmail.toLowerCase() !== accountId) {
     return noStore({ ok: false, error: "Page not found or not owned by this agent" }, 404);
   }
-  const version = record.updatedAt ?? "initial";
+
+  // v1.2 (Q2): voice is part of the freshness identity, so a Settings voice change
+  // supersedes an already-prepared recap (a republish still does too), while an
+  // unrelated brand edit does NOT churn it. Load the brand ONCE here and reuse it
+  // for generation below — best-effort, so a KV miss falls to the neutral voice.
+  const brand = await loadBrandVoiceRecord(accountId);
+  const version = composePreparedVersion({
+    handoutUpdatedAt: record.updatedAt,
+    voiceSignature: voiceSignature(brand),
+  });
 
   // Load or (resiliently) ensure the Work Order. ensureEligible supersedes on a
   // content-version change, so a stale prior WO never blocks a fresh prepare.
@@ -223,8 +238,11 @@ export async function POST(req: Request): Promise<NextResponse> {
     );
   }
 
-  const origin = new URL(req.url).origin;
-  const pageUrl = `${origin}/h/${slug}`;
+  // v1.2 (Q3): the seller-facing link is the CANONICAL production URL, never the
+  // request origin — so a prepare triggered from a preview / branch deploy can't
+  // leak a *.vercel.app URL into the seller's message. Same builder as the
+  // cockpit "Copy link" / "View live page".
+  const pageUrl = publicPageUrl(slug);
 
   // Cached prepared draft (same version): a re-render / re-click does NOT
   // regenerate. Only an explicit "retry" forces a new generation.
@@ -292,7 +310,7 @@ export async function POST(req: Request): Promise<NextResponse> {
   // NOT page data), so a voice set in Settings takes effect on the next prepare
   // for every page with no republish, and an invitation page no longer falls to
   // neutral just because its frozen payload lacks the State-A voice snapshot.
-  const voice = await loadAgentVoice(accountId, agentName);
+  const voice = buildAgentVoice(brand, agentName);
 
   // One capped generation call.
   wo = { ...wo, generationCount: wo.generationCount + 1 };
@@ -329,10 +347,11 @@ export async function POST(req: Request): Promise<NextResponse> {
     pageUrl,
     slug,
     // v0.8: the agent's own voice cues are allowed (the model may channel their
-    // tone); they are not market/data leaks. v1.1: sourced from the live Profile.
+    // tone); they are not market/data leaks. v1.2: sourced from the live Profile
+    // (tagline + signature + the visible CTA reassurance line).
     voice.tagline ?? "",
     voice.signatureLine ?? "",
-    voice.guarantee ?? "",
+    voice.ctaReassurance ?? "",
   ]);
   const verdict = validatePreparedOutput({
     textVariant: gen.draft.textVariant,

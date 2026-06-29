@@ -1,5 +1,6 @@
 import { test, expect } from "@playwright/test";
 import {
+  composePreparedVersion,
   ensureEligibleWorkOrder,
   saveWorkOrder,
   newEligibleWorkOrder,
@@ -193,5 +194,76 @@ test.describe("generation budget invariants (work-order surface)", () => {
 
   test("the cap is two (one initial + one manual retry)", () => {
     expect(MAX_GENERATIONS_PER_WORK_ORDER).toBe(2);
+  });
+});
+
+test.describe("composePreparedVersion (v1.2 Q2) - voice is part of freshness", () => {
+  test("same handout version + same voice signature => same version (no churn)", () => {
+    const a = composePreparedVersion({ handoutUpdatedAt: "2026-06-01", voiceSignature: "abc" });
+    const b = composePreparedVersion({ handoutUpdatedAt: "2026-06-01", voiceSignature: "abc" });
+    expect(a).toBe(b);
+  });
+
+  test("a VOICE change (new signature) => a NEW version (busts a prepared recap)", () => {
+    const before = composePreparedVersion({ handoutUpdatedAt: "2026-06-01", voiceSignature: "abc" });
+    const after = composePreparedVersion({ handoutUpdatedAt: "2026-06-01", voiceSignature: "xyz" });
+    expect(after).not.toBe(before);
+  });
+
+  test("a HANDOUT change (republish) => a NEW version, voice held constant", () => {
+    const before = composePreparedVersion({ handoutUpdatedAt: "2026-06-01", voiceSignature: "abc" });
+    const after = composePreparedVersion({ handoutUpdatedAt: "2026-06-02", voiceSignature: "abc" });
+    expect(after).not.toBe(before);
+  });
+
+  test("a null handout updatedAt folds to the 'initial' content version", () => {
+    expect(composePreparedVersion({ handoutUpdatedAt: null, voiceSignature: "abc" })).toBe(
+      composePreparedVersion({ handoutUpdatedAt: "initial", voiceSignature: "abc" }),
+    );
+  });
+
+  test("a prepared WO is SUPERSEDED when the voice signature changes (regenerates)", async () => {
+    const slug = "voice001";
+    const v1 = composePreparedVersion({ handoutUpdatedAt: "h1", voiceSignature: "sigA" });
+    // A page was prepared under voice sigA (one generation spent, draft cached).
+    await seedWorkOrder(slug, v1, {
+      status: "prepared",
+      generationCount: 1,
+      draftOutput: { textVariant: "old voice", emailVariant: "old voice" },
+    });
+    // The agent changed a voice field → new signature → new composite version.
+    const v2 = composePreparedVersion({ handoutUpdatedAt: "h1", voiceSignature: "sigB" });
+    const res = await ensureEligibleWorkOrder({ moment: moment(slug, v2), accountId: ACCOUNT, version: v2 });
+    // Superseded to a fresh eligible so the next prepare regenerates with the new voice.
+    expect(res.status).toBe("eligible");
+    expect(res.version).toBe(v2);
+    expect(res.generationCount).toBe(0);
+    expect(res.draftOutput).toBeNull();
+    expect(__keyCount()).toBe(1);
+  });
+
+  test("an UNRELATED brand edit (same voice signature) does NOT supersede a prepared WO", async () => {
+    const slug = "voice002";
+    const v1 = composePreparedVersion({ handoutUpdatedAt: "h1", voiceSignature: "sigA" });
+    await seedWorkOrder(slug, v1, {
+      status: "prepared",
+      generationCount: 1,
+      draftOutput: { textVariant: "keep me", emailVariant: "keep me" },
+    });
+    // A color edit etc. leaves tagline/signature/reassurance untouched → same sig → same version.
+    const again = await ensureEligibleWorkOrder({ moment: moment(slug, v1), accountId: ACCOUNT, version: v1 });
+    expect(again.status).toBe("prepared");
+    expect(again.generationCount).toBe(1);
+    expect(again.draftOutput).toEqual({ textVariant: "keep me", emailVariant: "keep me" });
+    expect(__keyCount()).toBe(1);
+  });
+
+  test("a dismissed WO stays dismissed even when the voice signature changes (anti-nag holds)", async () => {
+    const slug = "voice003";
+    const v1 = composePreparedVersion({ handoutUpdatedAt: "h1", voiceSignature: "sigA" });
+    await seedWorkOrder(slug, v1, { status: "dismissed", approvalAction: "dismiss" });
+    const v2 = composePreparedVersion({ handoutUpdatedAt: "h1", voiceSignature: "sigB" });
+    const res = await ensureEligibleWorkOrder({ moment: moment(slug, v2), accountId: ACCOUNT, version: v2 });
+    expect(res.status).toBe("dismissed");
   });
 });

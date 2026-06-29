@@ -37,6 +37,7 @@ import {
   type SellerPresentationDraft,
 } from "@/tools/seller-presentation/engine/types";
 import { DEFAULT_BRAND_THEME_ID, loadBrandSettings } from "@/lib/brand";
+import { publicBaseUrl } from "@/lib/public-url";
 import { brandToPublishInputs } from "@/tools/seller-presentation/components/preview/preview-payload";
 import {
   applyManualOrder,
@@ -799,7 +800,10 @@ export function PagesLibrary({
 
   async function copyLink(card: PageCard) {
     if (!card.publicUrl) return;
-    const url = `${window.location.origin}${card.publicUrl}`;
+    // Canonical prod link, never the current (possibly preview) origin — so the
+    // seller always receives a studio.simplyeditpro.com URL. Same base as the
+    // recap link + View live page.
+    const url = `${publicBaseUrl()}${card.publicUrl}`;
     try {
       await navigator.clipboard.writeText(url);
       setCopiedKey(card.key);
@@ -814,7 +818,13 @@ export function PagesLibrary({
 
   function viewLive(card: PageCard) {
     if (!card.publicUrl) return;
-    window.open(card.publicUrl, "_blank", "noopener,noreferrer");
+    // Open the canonical prod URL (not the current origin) so View live page,
+    // Copy link, and the recap link all resolve to the same studio domain.
+    window.open(
+      `${publicBaseUrl()}${card.publicUrl}`,
+      "_blank",
+      "noopener,noreferrer",
+    );
   }
 
   // ── single-card primitives (return success; no reload — caller reloads) ──
@@ -2932,7 +2942,7 @@ function PreparedFollowUpPane({
               </button>
             )}
             <span className="lib-prepared-foot-hint">
-              Stays put until the page changes.
+              Stays put until the page or your saved voice changes.
             </span>
           </div>
         </div>

@@ -74,6 +74,24 @@ export function preparedKey(slug: string): string {
 }
 
 /**
+ * The Work Order freshness `version`: the handout content version PLUS the agent's
+ * voice signature. A change to EITHER supersedes an already-prepared recap — a
+ * republish (handout `updatedAt`) OR a Settings voice edit (the voice signature
+ * from voice-source). An unrelated brand edit (e.g. a color) leaves the voice
+ * signature, and so this version, unchanged, so prepared recaps are not churned.
+ *
+ * Composing here (not inline) keeps the cache-key shape in one place, next to the
+ * supersede logic that compares it, and unit-testable without KV.
+ */
+export function composePreparedVersion(opts: {
+  handoutUpdatedAt: string | null | undefined;
+  voiceSignature: string;
+}): string {
+  const handout = opts.handoutUpdatedAt ?? "initial";
+  return `${handout}#voice=${opts.voiceSignature}`;
+}
+
+/**
  * The idempotency identity: `accountId:slug:follow_up_recap:viewed_signal:<version>`.
  * `slug` is globally unique, so this is unique per content version; computing it
  * twice yields the same string, so the same view produces exactly one Work Order.
