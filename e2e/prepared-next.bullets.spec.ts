@@ -118,7 +118,7 @@ test.describe("extractBulletCandidates - State-A invitation coverage (v0.1)", ()
     const out = extractBulletCandidates(p);
     expect(out.length).toBeGreaterThanOrEqual(2);
     expect(out.map((c) => c.section)).toEqual<BulletSection[]>(["marketing", "agent_plan"]);
-    expect(resolveConfidence(p, out).confidence).toBe("partial");
+    expect(resolveConfidence(p).confidence).toBe("partial");
   });
 
   test("D - exposure content only (no comps/valuation/brand) reaches partial", () => {
@@ -130,18 +130,18 @@ test.describe("extractBulletCandidates - State-A invitation coverage (v0.1)", ()
     });
     const out = extractBulletCandidates(p);
     expect(out.length).toBeGreaterThanOrEqual(2);
-    expect(resolveConfidence(p, out).confidence).toBe("partial");
+    expect(resolveConfidence(p).confidence).toBe("partial");
   });
 
-  test("template-only payload stays weak (boilerplate is not a bullet)", () => {
+  test("template-only payload yields no bullet candidates (boilerplate is not a bullet)", () => {
     const p = payload({
       ...hard,
       welcomeLine: "At our meeting we will walk through the whole plan together.",
       valuationMessage: "I like to understand the market first before we talk price.",
     });
-    const out = extractBulletCandidates(p);
-    expect(out).toEqual([]);
-    expect(resolveConfidence(p, out).confidence).toBe("weak");
+    // The boilerplate guard still drops these (extractBulletCandidates is unchanged
+    // in v0.5; it is just no longer consulted by the gate).
+    expect(extractBulletCandidates(p)).toEqual([]);
   });
 
   test("priority order holds when State-A and State-B fields coexist (first 3)", () => {
@@ -184,70 +184,40 @@ test.describe("composePreparedDraft - link + CTA appended by code (v0.2)", () =>
   });
 });
 
-test.describe("resolveConfidence", () => {
+test.describe("resolveConfidence - v0.5 minimal-claims gate (no bullet dependency)", () => {
   const hard = { agentName: "Dana Rae", propertyAddress: "12 Oak St" };
 
-  test("weak when fewer than 2 candidates", () => {
-    const p = payload({ ...hard, value: longEnough });
-    const r = resolveConfidence(p, extractBulletCandidates(p));
+  test("weak when the page subject is missing", () => {
+    const r = resolveConfidence(payload({ agentName: "Dana Rae" }));
     expect(r.confidence).toBe("weak");
     expect(r.askField).toBeNull();
   });
 
-  test("weak when a hard_required (agent identity) is missing", () => {
-    const p = payload({
-      propertyAddress: "12 Oak St",
-      value: longEnough,
-      marketing: longEnough,
-      comps: longEnough,
-    });
-    const r = resolveConfidence(p, extractBulletCandidates(p));
+  test("weak when agent identity is missing", () => {
+    const r = resolveConfidence(payload({ propertyAddress: "12 Oak St" }));
     expect(r.confidence).toBe("weak");
   });
 
-  test("partial with exactly 2 candidates", () => {
-    const p = payload({ ...hard, value: longEnough, marketing: longEnough });
-    const r = resolveConfidence(p, extractBulletCandidates(p));
-    expect(r.confidence).toBe("partial");
-  });
-
-  test("partial + ask seller_name when name missing (3 candidates)", () => {
-    const p = payload({
-      ...hard,
-      value: longEnough,
-      marketing: longEnough,
-      comps: longEnough,
-      appointmentAt: "2026-07-01T17:00",
-    });
-    const r = resolveConfidence(p, extractBulletCandidates(p));
+  test("partial + ask seller_name when the seller name is unknown (no page data needed)", () => {
+    const r = resolveConfidence(payload({ ...hard }));
     expect(r.confidence).toBe("partial");
     expect(r.askField).toBe("seller_name");
   });
 
-  test("partial + ask appointment_timing when name present but appointment missing", () => {
-    const p = payload({
-      ...hard,
-      preparedFor: "The Kims",
-      value: longEnough,
-      marketing: longEnough,
-      comps: longEnough,
-    });
-    const r = resolveConfidence(p, extractBulletCandidates(p));
-    expect(r.confidence).toBe("partial");
-    expect(r.askField).toBe("appointment_timing");
+  test("a thin page with zero bullet candidates is still partial (was weak pre-v0.5)", () => {
+    const p = payload({ ...hard }); // no value/marketing/comps/agent_plan content
+    expect(extractBulletCandidates(p)).toEqual([]);
+    expect(resolveConfidence(p).confidence).toBe("partial");
   });
 
-  test("enough when 3 candidates + both askable enrichments present", () => {
-    const p = payload({
-      ...hard,
-      preparedFor: "The Kims",
-      appointmentAt: "2026-07-01T17:00",
-      value: longEnough,
-      marketing: longEnough,
-      comps: longEnough,
-    });
-    const r = resolveConfidence(p, extractBulletCandidates(p));
+  test("enough when the seller name is known", () => {
+    const r = resolveConfidence(payload({ ...hard, preparedFor: "The Kims" }));
     expect(r.confidence).toBe("enough");
     expect(r.askField).toBeNull();
+  });
+
+  test("an agent-supplied seller name upgrades partial to enough", () => {
+    const p = payload({ ...hard });
+    expect(resolveConfidence(p, { sellerName: "The Kims" }).confidence).toBe("enough");
   });
 });

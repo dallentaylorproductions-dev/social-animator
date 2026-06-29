@@ -172,12 +172,15 @@ export async function POST(req: Request): Promise<NextResponse> {
     return noStore({ ok: false, code: "failed-final", status: "failed_final" }, 200);
   }
 
-  // Confidence (rule-derived) — needed for both the weak short-circuit and display.
+  // Confidence (rule-derived) — v0.5 minimal-claims recap: decided from the
+  // payload alone (no bullet candidates). The page is preparable whenever it has
+  // a property subject + agent identity.
   const payload = clampPublicPayload(record.data);
+  const conf = resolveConfidence(payload, { sellerName: sellerNameOverride });
+  // TEMP (remove before flag flip): walk verification. `bullets` no longer gates
+  // or feeds generation (the recap claims nothing from page data); it is computed
+  // here ONLY to keep the diagnostic sections/count visible during the walk.
   const bullets = extractBulletCandidates(payload);
-  const conf = resolveConfidence(payload, bullets, { sellerName: sellerNameOverride });
-  // TEMP (remove before flag flip): PREPARED_NEXT walk verification — confirms
-  // which sections fired on a given slug during the preview device walk.
   console.log("PREPARED_NEXT walk:", {
     slug,
     confidence: conf.confidence,
@@ -254,31 +257,22 @@ export async function POST(req: Request): Promise<NextResponse> {
     // KV unavailable — skip the soft ceiling (other bounds still apply).
   }
 
-  // Voice from the public payload (already public, honest material). Thin profile
-  // → neutral Studio voice, no fake personalization.
+  // v0.5 minimal-claims recap: generation gets ONLY the safe, factual fields —
+  // no page data, no bullets — so there is nothing to overstate. `agentName` is
+  // kept solely for the denylist allow-list below.
   const agentName =
     (payload.agent?.name || payload.agentBranding?.name || "").trim() || "Your agent";
-  const tagline = payload.agentTagline?.trim();
-  const signatureLine = payload.signatureLine?.trim();
-  const guarantee =
-    payload.whyUs && typeof payload.whyUs.guarantee === "string"
-      ? payload.whyUs.guarantee.trim()
-      : undefined;
-  const neutral = !tagline && !signatureLine && !guarantee && !payload.whyUs;
+  const propertyLabel =
+    (payload.propertyAddress || payload.property?.address || "").trim() || "your home";
+  const appointmentAt = payload.appointmentAt?.trim() || undefined;
+  const sellerName = sellerNameOverride ?? payload.preparedFor?.trim() ?? undefined;
 
   // One capped generation call.
   wo = { ...wo, generationCount: wo.generationCount + 1 };
   const gen = await generateFollowUpDraft({
-    bullets,
-    sellerName: sellerNameOverride ?? payload.preparedFor?.trim() ?? undefined,
-    voice: {
-      agentName,
-      brokerage: payload.agent?.brokerage?.trim() || undefined,
-      tagline,
-      signatureLine,
-      guarantee,
-      neutral,
-    },
+    sellerName,
+    propertyLabel,
+    appointmentAt,
   });
 
   const failTo = (): "failed" | "failed_final" =>
@@ -308,13 +302,15 @@ export async function POST(req: Request): Promise<NextResponse> {
     );
   }
 
-  // Output validator (the gate). Build the dynamic denylist from payload values
-  // outside the clip; allow the link + agent/seller identity + the bullet texts.
-  const clippedText = bullets.map((b) => `${b.label} ${b.text}`).join("\n");
-  const denyValues = buildDenyValues(payload, clippedText, [
+  // Output validator (the gate). The model received ONLY the safe fields, so the
+  // "clip" is those fields; the denylist is every OTHER payload string value
+  // (comps, views, valuation, etc.) the model never saw and must not emit.
+  const safeInput = [sellerName ?? "", propertyLabel, appointmentAt ?? ""]
+    .filter(Boolean)
+    .join(" ");
+  const denyValues = buildDenyValues(payload, safeInput, [
     agentName,
     payload.agent?.brokerage ?? "",
-    sellerNameOverride ?? payload.preparedFor ?? "",
     pageUrl,
     slug,
   ]);

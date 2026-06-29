@@ -12,11 +12,13 @@
  *   - `AbortController` with `GEN_TIMEOUT_MS` (route maxDuration stays 60)
  *   - model: the existing Haiku 4.5 integration (`COMP_IMPORT_MODEL`)
  *
- * Honesty (input clip = the primary defense): the model is handed ONLY the <=3
- * clipped public sections + the agent's public voice/identity. It RESTATES each
- * passed section in the agent's voice. It may not add qualifiers, opinions, or
- * any claim absent from the source. Calm house voice, no em dashes. Thin-profile
- * floor: a neutral Studio voice with no fake personalization.
+ * Honesty (v0.5 minimal-claims recap): the model is handed almost nothing to
+ * overstate. NO page data — no bullets, no marketing/exposure, no comps, no
+ * views, no valuation, no payload sections — reaches generation. The ONLY inputs
+ * are the safe, factual `{ sellerName?, propertyLabel, appointmentAt? }`. The
+ * recap is a warm re-open that references the page the agent PREPARED and offers
+ * to talk; it makes no market/data claims and never implies the seller was seen
+ * viewing the page. The model cannot overstate data it is never given.
  */
 
 import {
@@ -25,27 +27,18 @@ import {
   MissingAnthropicKeyError,
 } from "@/lib/ai/anthropic-client";
 import { GEN_TIMEOUT_MS, MAX_GEN_OUTPUT_TOKENS } from "./constants";
-import type { BulletCandidate } from "./bullets";
 import type { PreparedDraft } from "./work-order";
 
-export interface GenerateVoice {
-  agentName: string;
-  brokerage?: string;
-  tagline?: string;
-  signatureLine?: string;
-  guarantee?: string;
-  /** True when the profile has no defined voice → draft in the neutral Studio voice. */
-  neutral: boolean;
-}
-
 export interface GenerateInput {
-  bullets: BulletCandidate[];
-  voice: GenerateVoice;
-  /** Present only when known (enrichment); NEVER invented. */
+  /** The seller's real name, if known. NEVER invented; absent → warm, no name. */
   sellerName?: string;
-  // NOTE: the page link is NOT passed to the model — it is appended by code
-  // (composePreparedDraft) after the validator, like FALLBACK_CTA. The model is
-  // told not to write any URL, so it spends no budget on the link (v0.2 fix).
+  /** The property / page subject (address). The one concrete reference allowed. */
+  propertyLabel: string;
+  /** The upcoming appointment, if present on the page. Optional reference only. */
+  appointmentAt?: string;
+  // NOTE: the page link + closing CTA are NOT passed to the model — they are
+  // appended by code (composePreparedDraft) after the validator. The model is
+  // told to write no URL and no closing line, so it spends no budget on them.
 }
 
 export type GenerateResult =
@@ -69,45 +62,32 @@ export type GenerateResult =
     };
 
 const SYSTEM_PROMPT = [
-  "You draft a short follow-up text message and a short follow-up email for a real estate agent to review before sending.",
-  "Voice: calm, clear, professional, brief. No hype. No pressure. No exclamation points.",
+  "You write a brief, warm follow-up text message and a brief follow-up email for a real estate agent to send to a seller they prepared a page for.",
+  "Voice: calm, warm, clear, one to one, brief. No hype, no pressure, no exclamation points.",
   "Hard rule: never use an em dash. Use periods or commas.",
-  "Honesty: restate only the points you are given. Do not add qualifiers, opinions, market claims, statistics, or any detail that is not in the provided sections. Restate, do not embellish.",
-  "Never invent a seller name or any personal detail. If no seller name is provided, open without a name (for example: Hi there).",
-  "Restate metrics exactly, with their real units. A number keeps the meaning it has on the page. A view is a view, never a buyer, lead, offer, or shopper. Never convert one metric into another. If you are not certain what a number measures, restate it with the page's own label or leave the number out.",
-  "Do not inflate quantity. Match singular and plural to the source. If the page shows one listing or one example, do not imply several. One is one.",
-  "Do not characterize the market or the comparable sales. Do not add evaluative words such as strong, solid, hot, great, impressive, clear, or motivated. State comparable sales as a count. For any market trend, quote only the page's own stated figure, for example 'up about 3% this year', or say nothing. Do not invent a trend, momentum, or sentiment.",
-  "Do not add scope or topics the page does not raise, such as timeline, motivation, negotiation, or strategy. Stay on what the page actually shows.",
-  "Restate, do not embellish: every clause must trace to a specific value on the page. If a clause does not, cut it. When in doubt, say less.",
-  "Text message: 2 to 3 sentences, about 40 to 60 words total. One warm opener, the single most relevant point, and stop.",
-  "Email: 3 to 5 sentences, about 90 to 130 words. A short greeting, one or two points, and a light close. No subject line, no headers, no bullet lists, no signature block.",
-  "Do not enumerate. Never list more than one example address or listing. Summarize comparable sales as a count, for example 'a few recent nearby sales' or 'four recent closings nearby', not a list of addresses. Refer to exposure by the page's own metric, for example 'a recent listing with thousands of views', never converting views into buyers and never implying more listings than the page shows.",
-  "Brevity must not become invention: restate only what the points contain, just more concisely.",
+  "Reference the page the agent PREPARED for the seller's property, and offer to walk them through it. You may mention the upcoming appointment only if one is provided below.",
+  "Make NO claims about market data, views, comparable sales, pricing, buyer activity, or trends. Do not mention numbers of any kind.",
+  "Never state or imply that you saw, noticed, or know the seller viewed or opened the page. No surveillance tone.",
+  "Never invent a seller name or any detail. If no seller name is provided, address the seller warmly without a name (for example: Hi there) and do not fake any personal detail.",
+  "Text message: 1 to 2 sentences, about 25 to 45 words.",
+  "Email: 2 to 3 sentences, about 50 to 80 words. A short greeting, the warm note, and a light close. No subject line, no headers, no bullet lists, no signature block.",
   "Do not write a closing call-to-action line, and do not write any link, URL, or web address. A page link and a closing line are added automatically after your text, so leave them out entirely.",
   'Return ONLY a JSON object of the form {"textVariant": "...", "emailVariant": "..."} with no markdown and no commentary.',
 ].join("\n");
 
 function buildUserPrompt(input: GenerateInput): string {
-  const { voice } = input;
   const lines: string[] = [];
-  lines.push(`Agent: ${voice.agentName}${voice.brokerage ? `, ${voice.brokerage}` : ""}`);
-  if (input.sellerName) lines.push(`Seller first name: ${input.sellerName}`);
-  if (!voice.neutral) {
-    const v: string[] = [];
-    if (voice.tagline) v.push(voice.tagline);
-    if (voice.signatureLine) v.push(voice.signatureLine);
-    if (voice.guarantee) v.push(voice.guarantee);
-    if (v.length) lines.push(`Agent voice cues: ${v.join(" / ")}`);
+  if (input.sellerName) {
+    lines.push(`Seller name: ${input.sellerName}`);
   } else {
-    lines.push("No agent voice is defined. Use a neutral, warm, professional Studio voice.");
+    lines.push("No seller name is known. Address the seller warmly without a name; do not invent one.");
+  }
+  lines.push(`Property the agent prepared a page for: ${input.propertyLabel}`);
+  if (input.appointmentAt) {
+    lines.push(`Upcoming appointment (you may reference it lightly, do not invent a day of week): ${input.appointmentAt}`);
   }
   lines.push("");
-  lines.push("Points to restate (do not add any others):");
-  input.bullets.forEach((b, i) => {
-    lines.push(`${i + 1}. ${b.label}: ${b.text}`);
-  });
-  lines.push("");
-  lines.push("Write the text message and the email that restate the points above. Do not write any link or URL; a page link and closing line are appended automatically.");
+  lines.push("Write the warm text message and the warm email per the rules. Reference the prepared page for the property and offer to talk. Make no data claims and write no link or URL; a page link and closing line are appended automatically.");
   return lines.join("\n");
 }
 

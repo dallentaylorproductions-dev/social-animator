@@ -12,7 +12,7 @@
  * payload (there is no CTA field); this is always appended.
  */
 export const FALLBACK_CTA =
-  "Happy to walk you through any of the numbers whenever you would like.";
+  "Happy to walk you through any of it whenever you would like.";
 
 /** A payload section must exceed this trimmed length to count as a bullet candidate. */
 export const MIN_BULLET_CHARS = 20;

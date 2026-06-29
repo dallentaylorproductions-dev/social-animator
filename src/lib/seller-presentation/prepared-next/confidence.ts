@@ -1,39 +1,34 @@
 /**
  * PREPARED_NEXT — confidence buckets (rule-derived, NOT model-rated).
  *
- * The Follow-Up Recap Asset Contract:
- *   - hard_required: seller page link · agent identity · property/page subject ·
- *     public payload content.
- *   - enrichment (missing one does NOT block): seller name · seller motivation ·
- *     appointment timing · richer profile voice · viewed timestamp.
- *   - CTA is enrichment with the code-constant fallback (always appended, never blocks).
+ * v0.5 minimal-claims recap: the recap no longer re-pitches page data, so it no
+ * longer depends on bullet candidates. A warm re-open is preparable whenever the
+ * page has a property subject (always true for a viewed published page), so the
+ * bucket is decided by the safe, factual fields only:
  *
- * Buckets:
- *   - enough  → ALL hard_required present AND >=3 bullet candidates → prepare.
- *   - partial → ALL hard_required present, but an ASKABLE enrichment is missing OR
- *     only 2 candidates → prepare AND optionally ask the single `ask_field`.
- *   - weak    → ANY hard_required missing OR <2 candidates → do NOT draft (zero spend).
+ *   - hard_required: seller page link · agent identity · property/page subject.
+ *   - weak    → a hard_required is missing → do NOT draft (effectively never, for
+ *     a real published page).
+ *   - partial → preparable, but the seller name is unknown → optionally ask the
+ *     single `ask_field` ("seller_name"). Still drafts (warm, no name).
+ *   - enough  → preparable and the seller name is known.
  *
- * Why "askable enrichment" (seller name, appointment timing) gates the bucket,
- * not the full enrichment list: those are the only two with an `ask_field`, and
- * the ask is HARD-CAPPED at one (priority: seller name → appointment timing).
- * Seller motivation has no public source and can never be asked, profile voice
- * has the neutral-voice floor, and the viewed timestamp always rides the Moment —
- * so none of those would ever change behavior, and folding them into the bucket
- * would make `enough` unreachable. The downgrade set is exactly the askable pair.
+ * The thin-profile neutral-voice floor + no-fake-personalization are preserved by
+ * design: the recap always uses the calm neutral house voice and never invents a
+ * name (enforced in the generation prompt). `extractBulletCandidates` is no longer
+ * consulted here.
  */
 
 import type { PublicPayload } from "@/tools/seller-presentation/output/public-payload";
-import type { BulletCandidate } from "./bullets";
 
 export type Confidence = "enough" | "partial" | "weak";
 
-/** The single follow-up question to optionally ask, by fixed priority. */
-export type AskField = "seller_name" | "appointment_timing";
+/** The single follow-up question to optionally ask (v0.5: seller name only). */
+export type AskField = "seller_name";
 
 export interface ConfidenceResult {
   confidence: Confidence;
-  /** Present ONLY on `partial`, and at most one (the first missing askable field). */
+  /** Present ONLY on `partial`: the seller name is unknown and may be asked. */
   askField: AskField | null;
   availableContext: string[];
   missingContext: string[];
@@ -44,7 +39,7 @@ function present(value: unknown): boolean {
 }
 
 /**
- * Decide the bucket from the public payload + the extracted candidates. PURE so
+ * Decide the bucket from the public payload alone (no bullet candidates). PURE so
  * the route and the unit tests share one verdict.
  *
  * `sellerName` defaults to the payload's `preparedFor`; the route may pass an
@@ -52,27 +47,22 @@ function present(value: unknown): boolean {
  */
 export function resolveConfidence(
   payload: PublicPayload,
-  candidates: BulletCandidate[],
   opts: { sellerName?: string } = {},
 ): ConfidenceResult {
-  const candidateCount = candidates.length;
-
-  // hard_required.
-  const hasPageContent = candidates.length > 0 || Boolean(payload);
-  const hasAgentIdentity = present(payload.agent?.name) || present(payload.agentBranding?.name);
+  // hard_required (the page link is always derivable from the slug at the call
+  // site, so it is structurally present whenever we have a payload).
+  const hasAgentIdentity =
+    present(payload.agent?.name) || present(payload.agentBranding?.name);
   const hasSubject =
     present(payload.propertyAddress) || present(payload.property?.address);
-  // The page link is always derivable from the slug at the call site, so it is
-  // structurally present whenever we have a payload to prepare from.
   const hardRequired: Array<[string, boolean]> = [
     ["page link", true],
     ["agent identity", hasAgentIdentity],
     ["page subject", hasSubject],
-    ["page content", hasPageContent],
   ];
   const missingHard = hardRequired.filter(([, ok]) => !ok).map(([k]) => k);
 
-  // enrichment.
+  // The one safe optional field that drives the lone ask_field.
   const sellerName = present(opts.sellerName)
     ? opts.sellerName!.trim()
     : present(payload.preparedFor)
@@ -80,39 +70,24 @@ export function resolveConfidence(
       : "";
   const hasSellerName = present(sellerName);
   const hasAppointment = present(payload.appointmentAt);
-  const hasProfileVoice =
-    present(payload.agentTagline) ||
-    present(payload.signatureLine) ||
-    Boolean(payload.whyUs);
 
   const availableContext: string[] = [];
   const missingContext: string[] = [...missingHard];
   if (hasSellerName) availableContext.push("seller name");
   else missingContext.push("seller name");
   if (hasAppointment) availableContext.push("appointment timing");
-  else missingContext.push("appointment timing");
-  if (hasProfileVoice) availableContext.push("profile voice");
-  else missingContext.push("profile voice");
-  // Seller motivation is never in the public payload — always an honest gap.
-  missingContext.push("seller motivation");
 
-  // weak: any hard_required missing OR fewer than 2 candidates → no draft, no spend.
-  if (missingHard.length > 0 || candidateCount < 2) {
+  // weak: a hard_required is missing → no draft, no spend. (Effectively never for
+  // a real published page, which always has an agent + a property subject.)
+  if (missingHard.length > 0) {
     return { confidence: "weak", askField: null, availableContext, missingContext };
   }
 
-  // The ONE askable enrichment, by fixed priority (cap of one).
-  const askField: AskField | null = !hasSellerName
-    ? "seller_name"
-    : !hasAppointment
-      ? "appointment_timing"
-      : null;
-
-  // enough: a full, well-grounded page — >=3 candidates AND both askable fields present.
-  if (candidateCount >= 3 && askField === null) {
-    return { confidence: "enough", askField: null, availableContext, missingContext };
+  // partial: preparable, but ask for the seller name when it is unknown.
+  if (!hasSellerName) {
+    return { confidence: "partial", askField: "seller_name", availableContext, missingContext };
   }
 
-  // partial: draftable, optionally ask one question.
-  return { confidence: "partial", askField, availableContext, missingContext };
+  // enough: preparable and the seller name is known.
+  return { confidence: "enough", askField: null, availableContext, missingContext };
 }

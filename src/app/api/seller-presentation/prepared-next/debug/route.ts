@@ -101,8 +101,10 @@ export async function GET(req: Request): Promise<NextResponse> {
   }
 
   const payload = clampPublicPayload(record.data);
+  const conf = resolveConfidence(payload);
+  // bullets are no longer in the recap path (v0.5); computed here ONLY for the
+  // informational sections/count fields in this TEMP diagnostic response.
   const bullets = extractBulletCandidates(payload);
-  const conf = resolveConfidence(payload, bullets);
 
   // Stable response shape — failure-detail keys default null.
   const base = {
@@ -134,31 +136,21 @@ export async function GET(req: Request): Promise<NextResponse> {
     return noStore({ ...base, reason: "weak" }, 200);
   }
 
-  // Voice + page link, identical to the real route.
+  // Safe fields + page link, identical to the real route (v0.5 minimal-claims).
   const origin = new URL(req.url).origin;
   const pageUrl = `${origin}/h/${slug}`;
   const agentName =
     (payload.agent?.name || payload.agentBranding?.name || "").trim() || "Your agent";
-  const tagline = payload.agentTagline?.trim();
-  const signatureLine = payload.signatureLine?.trim();
-  const guarantee =
-    payload.whyUs && typeof payload.whyUs.guarantee === "string"
-      ? payload.whyUs.guarantee.trim()
-      : undefined;
-  const neutral = !tagline && !signatureLine && !guarantee && !payload.whyUs;
+  const propertyLabel =
+    (payload.propertyAddress || payload.property?.address || "").trim() || "your home";
+  const appointmentAt = payload.appointmentAt?.trim() || undefined;
+  const sellerName = payload.preparedFor?.trim() ?? undefined;
 
-  // The single capped generation (no persistence, no cap consumed).
+  // The single capped generation (no persistence, no cap consumed). NO page data.
   const gen = await generateFollowUpDraft({
-    bullets,
-    sellerName: payload.preparedFor?.trim() ?? undefined,
-    voice: {
-      agentName,
-      brokerage: payload.agent?.brokerage?.trim() || undefined,
-      tagline,
-      signatureLine,
-      guarantee,
-      neutral,
-    },
+    sellerName,
+    propertyLabel,
+    appointmentAt,
   });
 
   if (!gen.ok) {
@@ -176,12 +168,15 @@ export async function GET(req: Request): Promise<NextResponse> {
     );
   }
 
-  // The output validator (same denylist construction as the real route).
-  const clippedText = bullets.map((b) => `${b.label} ${b.text}`).join("\n");
-  const denyValues = buildDenyValues(payload, clippedText, [
+  // The output validator (same denylist construction as the real route): the
+  // model saw only the safe fields, so the clip is those; everything else in the
+  // payload is denied verbatim.
+  const safeInput = [sellerName ?? "", propertyLabel, appointmentAt ?? ""]
+    .filter(Boolean)
+    .join(" ");
+  const denyValues = buildDenyValues(payload, safeInput, [
     agentName,
     payload.agent?.brokerage ?? "",
-    payload.preparedFor ?? "",
     pageUrl,
     slug,
   ]);
