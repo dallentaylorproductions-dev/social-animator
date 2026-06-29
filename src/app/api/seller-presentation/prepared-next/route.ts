@@ -13,6 +13,7 @@ import { composePreparedDraft } from "@/lib/seller-presentation/prepared-next/co
 import { extractBulletCandidates } from "@/lib/seller-presentation/prepared-next/bullets";
 import { resolveConfidence } from "@/lib/seller-presentation/prepared-next/confidence";
 import { generateFollowUpDraft } from "@/lib/seller-presentation/prepared-next/generate";
+import { loadAgentVoice } from "@/lib/seller-presentation/prepared-next/voice-source";
 import { validatePreparedOutput } from "@/lib/seller-presentation/prepared-next/validate";
 import { viewedSignalMoment } from "@/lib/seller-presentation/prepared-next/moment";
 import {
@@ -275,22 +276,11 @@ export async function POST(req: Request): Promise<NextResponse> {
     apptRaw && Date.parse(apptRaw) > Date.now() ? apptRaw : undefined;
   const sellerName = sellerNameOverride ?? payload.preparedFor?.trim() ?? undefined;
 
-  // v0.8: re-add the agent's Studio Profile VOICE (tone cues only — NOT page
-  // data). Neutral when no cue exists, so the model uses the neutral floor.
-  const tagline = payload.agentTagline?.trim() || undefined;
-  const signatureLine = payload.signatureLine?.trim() || undefined;
-  const guarantee =
-    payload.whyUs && typeof payload.whyUs.guarantee === "string"
-      ? payload.whyUs.guarantee.trim() || undefined
-      : undefined;
-  const voice = {
-    agentName,
-    brokerage: payload.agent?.brokerage?.trim() || undefined,
-    tagline,
-    signatureLine,
-    guarantee,
-    neutral: !tagline && !signatureLine && !guarantee,
-  };
+  // v1.1: source the agent's VOICE from the LIVE brand Profile (tone cues only —
+  // NOT page data), so a voice set in Settings takes effect on the next prepare
+  // for every page with no republish, and an invitation page no longer falls to
+  // neutral just because its frozen payload lacks the State-A voice snapshot.
+  const voice = await loadAgentVoice(accountId, agentName);
 
   // One capped generation call.
   wo = { ...wo, generationCount: wo.generationCount + 1 };
@@ -336,14 +326,16 @@ export async function POST(req: Request): Promise<NextResponse> {
     .join(" ");
   const denyValues = buildDenyValues(payload, safeInput, [
     agentName,
+    voice.agentName,
     payload.agent?.brokerage ?? "",
+    voice.brokerage ?? "",
     pageUrl,
     slug,
     // v0.8: the agent's own voice cues are allowed (the model may channel their
-    // tone); they are not market/data leaks.
-    tagline ?? "",
-    signatureLine ?? "",
-    guarantee ?? "",
+    // tone); they are not market/data leaks. v1.1: sourced from the live Profile.
+    voice.tagline ?? "",
+    voice.signatureLine ?? "",
+    voice.guarantee ?? "",
   ]);
   const verdict = validatePreparedOutput({
     textVariant: gen.draft.textVariant,

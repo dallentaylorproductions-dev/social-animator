@@ -25,6 +25,7 @@ import { generateFollowUpDraft } from "@/lib/seller-presentation/prepared-next/g
 import { validatePreparedOutput } from "@/lib/seller-presentation/prepared-next/validate";
 import { composePreparedDraft } from "@/lib/seller-presentation/prepared-next/compose";
 import { deleteWorkOrder } from "@/lib/seller-presentation/prepared-next/work-order";
+import { loadAgentVoice } from "@/lib/seller-presentation/prepared-next/voice-source";
 
 export const runtime = "nodejs";
 export const maxDuration = 60;
@@ -162,21 +163,9 @@ export async function GET(req: Request): Promise<NextResponse> {
     apptRaw && Date.parse(apptRaw) > Date.now() ? apptRaw : undefined;
   const sellerName = payload.preparedFor?.trim() ?? undefined;
 
-  // v0.8: Studio Profile VOICE (tone cues only, NOT page data) — same as the real route.
-  const tagline = payload.agentTagline?.trim() || undefined;
-  const signatureLine = payload.signatureLine?.trim() || undefined;
-  const guarantee =
-    payload.whyUs && typeof payload.whyUs.guarantee === "string"
-      ? payload.whyUs.guarantee.trim() || undefined
-      : undefined;
-  const voice = {
-    agentName,
-    brokerage: payload.agent?.brokerage?.trim() || undefined,
-    tagline,
-    signatureLine,
-    guarantee,
-    neutral: !tagline && !signatureLine && !guarantee,
-  };
+  // v1.1: VOICE from the LIVE brand Profile (tone cues only, NOT page data) — same
+  // as the real route, so the echo reflects what the real prepare would use.
+  const voice = await loadAgentVoice(accountId, agentName);
 
   // The single capped generation (no persistence, no cap consumed). NO page data.
   const gen = await generateFollowUpDraft({
@@ -210,13 +199,15 @@ export async function GET(req: Request): Promise<NextResponse> {
     .join(" ");
   const denyValues = buildDenyValues(payload, safeInput, [
     agentName,
+    voice.agentName,
     payload.agent?.brokerage ?? "",
+    voice.brokerage ?? "",
     pageUrl,
     slug,
-    // v0.8: the agent's own voice cues are allowed (not market/data leaks).
-    tagline ?? "",
-    signatureLine ?? "",
-    guarantee ?? "",
+    // v1.1: the agent's own live voice cues are allowed (not market/data leaks).
+    voice.tagline ?? "",
+    voice.signatureLine ?? "",
+    voice.guarantee ?? "",
   ]);
   const verdict = validatePreparedOutput({
     textVariant: gen.draft.textVariant,
