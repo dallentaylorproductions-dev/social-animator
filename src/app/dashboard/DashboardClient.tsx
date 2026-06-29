@@ -178,9 +178,10 @@ export function DashboardClient({
 }: {
   agentProfile: AgentProfile;
   /**
-   * DASHBOARD_HOME_V2 (Pass 1) — server-resolved. When false (default),
-   * the render below is byte-identical to the v1.47 Lane A dashboard.
-   * When true, the four-tier registry-driven home renders instead.
+   * DASHBOARD_HOME_V2 — server-resolved. When false (default), the render
+   * below is byte-identical to the v1.47 Lane A dashboard. When true, the
+   * launch operating home renders instead (Today → Seller Presentation
+   * hero → Social Studio secondary).
    */
   dashboardV2?: boolean;
   /**
@@ -298,10 +299,11 @@ export function DashboardClient({
     );
   }
 
-  // DASHBOARD_HOME_V2 (Pass 1) — the four-tier registry-driven operating
-  // home. Mounted only when the server-resolved flag is on; the V1 render
-  // below is left byte-identical for the flag-off path. Hooks above run
-  // unconditionally (Rules of Hooks); only the rendered tree branches.
+  // DASHBOARD_HOME_V2 — the launch operating home (Today → Seller
+  // Presentation hero → Social Studio secondary). Mounted only when the
+  // server-resolved flag is on; the V1 render below is left byte-identical
+  // for the flag-off path. Hooks above run unconditionally (Rules of
+  // Hooks); only the rendered tree branches.
   if (dashboardV2) {
     return (
       <DashboardHomeV2

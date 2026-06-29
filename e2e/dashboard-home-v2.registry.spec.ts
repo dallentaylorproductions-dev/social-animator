@@ -3,21 +3,24 @@ import {
   DASHBOARD_TOOLS,
   flagshipTool,
   socialTool,
-  quickOutputTools,
-  comingNextTools,
+  hiddenTools,
   toolsByAvailability,
 } from '../src/app/dashboard/tool-registry';
 import { deriveTodayState } from '../src/app/dashboard/today-state';
 import type { OwnerPagesActivity } from '../src/app/dashboard/use-owner-pages-activity';
 
 /**
- * DASHBOARD_HOME_V2 (Pass 1) — registry + Today-state source contract.
+ * DASHBOARD_HOME_V2 (launch model) — registry + Today-state source contract.
  *
  * Pure-Node spec (no browser): the dashboard is registry-DRIVEN, so the
  * registry → availability-mode mapping IS the durable contract. The
  * e2e harness can't flip the server env flag mid-suite, so flag-on render
  * is verified on preview (Cowork); CI proves the data the render binds to.
  * Mirrors the Pages Library DARK passes' pure + source-contract approach.
+ *
+ * Launch model: the home surfaces exactly TWO tools (Seller Presentation
+ * flagship + Social Studio); every other built tool is `hidden` — no card,
+ * no "Coming soon" tile, no graveyard.
  */
 
 test.describe('dashboard tool registry', () => {
@@ -30,21 +33,6 @@ test.describe('dashboard tool registry', () => {
     expect(toolsByAvailability('active-flagship')).toHaveLength(1);
   });
 
-  test('Quick Outputs are the built tools, reframed by job, all active', () => {
-    const ids = quickOutputTools().map((t) => t.id);
-    expect(ids).toEqual([
-      'listing-presentation',
-      'listing-flyer',
-      'open-house-promo',
-    ]);
-    for (const tool of quickOutputTools()) {
-      expect(tool.availability).toBe('active-quick');
-      // Active, not a weak flagship: it has a real route + a job CTA label.
-      expect(tool.primaryHref.startsWith('/')).toBe(true);
-      expect(tool.primaryActionLabel.length).toBeGreaterThan(0);
-    }
-  });
-
   test('Social Studio is its own active-social tool', () => {
     const social = socialTool();
     expect(social?.id).toBe('social-studio');
@@ -52,27 +40,37 @@ test.describe('dashboard tool registry', () => {
     expect(social?.primaryHref).toBe('/social-animator');
   });
 
-  test('Coming next is quiet and never a greyed flagship card', () => {
-    const ids = comingNextTools().map((t) => t.id);
+  test('the home surfaces exactly Seller Presentation + Social Studio', () => {
+    const surfaced = DASHBOARD_TOOLS.filter(
+      (t) => t.availability !== 'hidden',
+    ).map((t) => t.id);
+    // No Quick Outputs tier, no Coming-soon tiles — only the two launch cards.
+    expect(surfaced.sort()).toEqual(['seller-presentation', 'social-studio']);
+  });
+
+  test('every other built tool is hidden (a data flip away from returning)', () => {
+    const ids = hiddenTools().map((t) => t.id);
+    expect(ids).toContain('listing-presentation');
+    expect(ids).toContain('listing-flyer');
+    expect(ids).toContain('open-house-promo');
     expect(ids).toContain('seller-intelligence-report');
     expect(ids).toContain('open-house-prep');
-    for (const tool of comingNextTools()) {
-      expect(tool.availability).toBe('coming-next');
-      // No clickable CTA; carries a quiet status label instead.
-      expect(tool.primaryActionLabel).toBe('');
-      expect(tool.statusLabel).toBeTruthy();
+    for (const tool of hiddenTools()) {
+      expect(tool.availability).toBe('hidden');
+      // Keeps its record (route + job CTA) for the later surface-it flip.
+      expect(tool.primaryHref.startsWith('/')).toBe(true);
+      expect(tool.primaryActionLabel.length).toBeGreaterThan(0);
     }
   });
 
-  test('coming-next / internal-beta tools never leak into the active modes', () => {
-    const active = new Set([
+  test('hidden tools never leak into the surfaced modes', () => {
+    const surfaced = new Set([
       ...toolsByAvailability('active-flagship'),
-      ...toolsByAvailability('active-quick'),
       ...toolsByAvailability('active-social'),
     ]);
     for (const tool of DASHBOARD_TOOLS) {
-      if (tool.availability === 'coming-next' || tool.availability === 'internal-beta') {
-        expect(active.has(tool)).toBe(false);
+      if (tool.availability === 'hidden') {
+        expect(surfaced.has(tool)).toBe(false);
       }
     }
   });

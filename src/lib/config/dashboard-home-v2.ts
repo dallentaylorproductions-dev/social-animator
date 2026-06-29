@@ -5,9 +5,10 @@
  *
  * When OFF, /dashboard renders byte-identical to the v1.47 Lane A shell
  * (welcome → hero "Up next" → three stage grids → flagship → footer).
- * When ON, the dashboard renders the four-tier registry-driven home:
- * Today card → Seller Presentation flagship (live activity) → Quick
- * Outputs row → Social Studio "Stay visible" → quiet "Coming next".
+ * When ON, the dashboard renders the launch operating home — three things,
+ * in this order, and nothing else: Today card → Seller Presentation hero
+ * flagship (live activity) → Social Studio secondary section. No Quick
+ * Outputs tier, no "Coming soon" tiles.
  *
  * Read SERVER-SIDE in src/app/dashboard/page.tsx (mirroring how the
  * seller-presentation page reads SELLER_PAGES_LIBRARY_ENABLED et al.) and
