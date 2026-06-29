@@ -162,8 +162,10 @@ export async function POST(req: Request): Promise<NextResponse> {
   }
 
   // ---- prepare / retry ----
-  // A page the agent already dismissed for THIS version stays dismissed (no
-  // re-nag) until the page materially changes (a new version supersedes above).
+  // A dismissed page stays dismissed: ensureEligibleWorkOrder preserves dismiss
+  // across version changes (the one terminal state a republish does not reopen),
+  // so a dismissed agent is never re-nagged. Every OTHER terminal status (failed /
+  // failed_final) was already reset to `eligible` above when the version changed.
   if (wo.status === "dismissed") {
     return noStore({ ok: true, status: "dismissed" }, 200);
   }

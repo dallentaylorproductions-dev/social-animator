@@ -130,9 +130,13 @@ export async function saveWorkOrder(
  *
  *   - same version already stored → return it untouched (idempotent: one WO,
  *     one eventual generation, even for ms-apart duplicate view events).
- *   - a DIFFERENT version stored (the page changed) → supersede with a fresh
- *     eligible WO for the new version (a new identity; dismissal does not carry
- *     across versions, which is the "page materially changed → prepare again" rule).
+ *   - a DIFFERENT version stored AND the existing WO was DISMISSED → keep it
+ *     dismissed (v0.9: an explicit dismiss is the one terminal state a republish
+ *     does NOT reopen — a dismissed agent is never re-nagged).
+ *   - a DIFFERENT version stored, any OTHER status (eligible / prepared / failed
+ *     / failed_final) → supersede with a fresh `eligible` WO (fresh
+ *     generationCount) for the new version, so a materially changed page always
+ *     earns one fresh attempt regardless of how the prior attempt ended.
  *   - nothing stored → create via SET NX; if a concurrent create won the race,
  *     re-read and return that one.
  *
@@ -148,6 +152,9 @@ export async function ensureEligibleWorkOrder(opts: {
   const existing = await getWorkOrder(slug);
   if (existing && existing.version === opts.version) return existing;
 
+  // v0.9: dismiss survives a version change; every other status resets.
+  if (existing && existing.status === "dismissed") return existing;
+
   const fresh = newEligibleWorkOrder(opts);
 
   if (!existing) {
@@ -159,7 +166,16 @@ export async function ensureEligibleWorkOrder(opts: {
     return fresh;
   }
 
-  // Existing WO is for an older content version → supersede.
+  // Existing non-dismissed WO is for an older content version → supersede.
   await kv.set(preparedKey(slug), fresh);
   return fresh;
+}
+
+/**
+ * TEMP (remove before flag flip): delete a page's Work Order so the device walk
+ * can exercise a clean first attempt. Owner-scope is enforced by the caller (the
+ * TEMP debug route checks ownership before calling this).
+ */
+export async function deleteWorkOrder(slug: string): Promise<void> {
+  await kv.del(preparedKey(slug));
 }

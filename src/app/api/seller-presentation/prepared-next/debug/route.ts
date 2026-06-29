@@ -24,6 +24,7 @@ import { resolveConfidence } from "@/lib/seller-presentation/prepared-next/confi
 import { generateFollowUpDraft } from "@/lib/seller-presentation/prepared-next/generate";
 import { validatePreparedOutput } from "@/lib/seller-presentation/prepared-next/validate";
 import { composePreparedDraft } from "@/lib/seller-presentation/prepared-next/compose";
+import { deleteWorkOrder } from "@/lib/seller-presentation/prepared-next/work-order";
 
 export const runtime = "nodejs";
 export const maxDuration = 60;
@@ -98,6 +99,13 @@ export async function GET(req: Request): Promise<NextResponse> {
   const record = await getHandoutRecord(slug);
   if (!record || record.ownerEmail.toLowerCase() !== accountId) {
     return noStore({ ok: false, error: "Page not found or not owned by this agent" }, 404);
+  }
+
+  // TEMP (remove before flag flip): ?reset=1 clears this owner's prepared:<slug>
+  // Work Order so the device walk can exercise a clean first attempt.
+  if (new URL(req.url).searchParams.get("reset") === "1") {
+    await deleteWorkOrder(slug);
+    return noStore({ ok: true, reset: true }, 200);
   }
 
   const payload = clampPublicPayload(record.data);
