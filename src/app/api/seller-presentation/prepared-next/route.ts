@@ -10,7 +10,6 @@ import {
   PER_ACCOUNT_DAILY_GEN_CEILING,
 } from "@/lib/seller-presentation/prepared-next/constants";
 import { composePreparedDraft } from "@/lib/seller-presentation/prepared-next/compose";
-import { extractBulletCandidates } from "@/lib/seller-presentation/prepared-next/bullets";
 import { resolveConfidence } from "@/lib/seller-presentation/prepared-next/confidence";
 import { generateFollowUpDraft } from "@/lib/seller-presentation/prepared-next/generate";
 import { loadAgentVoice } from "@/lib/seller-presentation/prepared-next/voice-source";
@@ -180,16 +179,6 @@ export async function POST(req: Request): Promise<NextResponse> {
   // a property subject + agent identity.
   const payload = clampPublicPayload(record.data);
   const conf = resolveConfidence(payload, { sellerName: sellerNameOverride });
-  // TEMP (remove before flag flip): walk verification. `bullets` no longer gates
-  // or feeds generation (the recap claims nothing from page data); it is computed
-  // here ONLY to keep the diagnostic sections/count visible during the walk.
-  const bullets = extractBulletCandidates(payload);
-  console.log("PREPARED_NEXT walk:", {
-    slug,
-    confidence: conf.confidence,
-    sections: bullets.map((b) => b.section),
-    count: bullets.length,
-  });
   wo = {
     ...wo,
     confidence: conf.confidence,
@@ -224,7 +213,6 @@ export async function POST(req: Request): Promise<NextResponse> {
         confidence: conf.confidence,
         askField: conf.askField,
         draft: wo.draftOutput,
-        bullets,
         pageUrl,
       },
       200,
@@ -296,21 +284,6 @@ export async function POST(req: Request): Promise<NextResponse> {
 
   if (!gen.ok) {
     const status = failTo();
-    // TEMP (remove before flag flip): WHY generation failed — gen_exception
-    // (caught SDK error, with its name + first ~200 chars of the message) vs
-    // parse (model returned unparseable / wrong-shape JSON).
-    console.log("PREPARED_NEXT walk fail:", {
-      slug,
-      stage: "generate",
-      reason: gen.reason === "malformed" ? "parse" : "gen_exception",
-      genReason: gen.reason,
-      ...(gen.reason !== "malformed"
-        ? {
-            errorName: gen.errorName,
-            errorMessage: (gen.errorMessage ?? "").slice(0, 200),
-          }
-        : {}),
-    });
     await saveWorkOrder(slug, { ...wo, status });
     return noStore(
       { ok: false, code: "generation-failed", status, reason: gen.reason },
@@ -345,24 +318,6 @@ export async function POST(req: Request): Promise<NextResponse> {
   });
   if (!verdict.ok) {
     const status = failTo();
-    // TEMP (remove before flag flip): WHY the validator rejected — the gate name
-    // plus a ~200-char excerpt of the rejected draft (the agent's OWN draft, on a
-    // dark/preview build, so fine to log). em-dash gate normalized to em_dash.
-    const gateToReason = {
-      denylist: "denylist",
-      "em-dash": "em_dash",
-      truncated: "truncated",
-      empty: "empty",
-    } as const;
-    console.log("PREPARED_NEXT walk fail:", {
-      slug,
-      stage: "validate",
-      reason: gateToReason[verdict.reason],
-      gate: verdict.reason,
-      detail: verdict.detail,
-      textExcerpt: gen.draft.textVariant.slice(0, 200),
-      emailExcerpt: gen.draft.emailVariant.slice(0, 200),
-    });
     await saveWorkOrder(slug, { ...wo, status });
     return noStore(
       { ok: false, code: "validation-failed", status, reason: verdict.reason },
@@ -387,7 +342,6 @@ export async function POST(req: Request): Promise<NextResponse> {
       confidence: conf.confidence,
       askField: conf.askField,
       draft: draftOutput,
-      bullets,
       pageUrl,
     },
     200,

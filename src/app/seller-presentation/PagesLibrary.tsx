@@ -1008,7 +1008,6 @@ export function PagesLibrary({
           status: body.status,
           reason: body.reason,
           draft: body.draft,
-          bullets: body.bullets,
           pageUrl: body.pageUrl,
           askField: body.askField ?? null,
           canRetry: false,
@@ -1510,7 +1509,7 @@ export function PagesLibrary({
                   <span
                     className="lib-followup-count"
                     data-testid="lib-followup-count"
-                    title="Pages a seller engaged with recently. A quiet suggestion to reach out — nothing is sent for you."
+                    title="Pages a seller engaged with recently. A quiet suggestion to reach out. Nothing is sent for you."
                   >
                     {followUpCount} worth a follow-up
                   </span>
@@ -1947,7 +1946,6 @@ interface PreparedPaneState {
   status?: string;
   reason?: string;
   draft?: { textVariant: string; emailVariant: string };
-  bullets?: { section: string; label: string; text: string }[];
   pageUrl?: string;
   askField?: "seller_name" | "appointment_timing" | null;
   canRetry?: boolean;
@@ -1961,7 +1959,6 @@ interface PreparedApiResponse {
   status?: string;
   reason?: string;
   draft?: { textVariant: string; emailVariant: string };
-  bullets?: { section: string; label: string; text: string }[];
   pageUrl?: string;
   askField?: "seller_name" | "appointment_timing" | null;
 }

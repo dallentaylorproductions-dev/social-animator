@@ -81,6 +81,16 @@ jobs:
         # this; CI Linux does.
         run: npx playwright install --with-deps chromium webkit
 
+      # Pure-unit lane (prepared-next safety modules: validate / voice-source /
+      # work-order). Runs in Playwright's Node worker with in-memory fakes wired via
+      # tsconfig.unit.json (@vercel/kv + the brand store), so there is NO webServer,
+      # no :3000, and no browser launch — the real-KV throw can never reach CI. The
+      # specs live in ./tests-unit, OUTSIDE ./e2e, so the default lane below is
+      # untouched (it still picks up 0 of them). Fail-first: a safety-gate regression
+      # fails CI here in ~2s, before the full browser suite spins up.
+      - name: Run prepared-next unit lane
+        run: npx playwright test --config=playwright.unit.config.ts
+
       - name: Run Playwright tests
         run: npx playwright test
 

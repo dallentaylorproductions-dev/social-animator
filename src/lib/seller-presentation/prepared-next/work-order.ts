@@ -170,12 +170,3 @@ export async function ensureEligibleWorkOrder(opts: {
   await kv.set(preparedKey(slug), fresh);
   return fresh;
 }
-
-/**
- * TEMP (remove before flag flip): delete a page's Work Order so the device walk
- * can exercise a clean first attempt. Owner-scope is enforced by the caller (the
- * TEMP debug route checks ownership before calling this).
- */
-export async function deleteWorkOrder(slug: string): Promise<void> {
-  await kv.del(preparedKey(slug));
-}

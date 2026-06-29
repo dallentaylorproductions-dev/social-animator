@@ -64,19 +64,10 @@ export type GenerateResult =
       ok: true;
       draft: PreparedDraft;
       tokenCapHit: boolean;
-      // TEMP (remove before flag flip): raw usage for the debug endpoint so the
-      // walk can verify length directly. The route never branches on these.
-      outputTokens?: number;
-      stopReason?: string;
     }
   | {
       ok: false;
       reason: "missing-key" | "timeout" | "malformed" | "error";
-      // TEMP (remove before flag flip): surface the caught exception so the
-      // prepare route's PREPARED_NEXT walk log can record WHY a gen_exception
-      // failed. Diagnostic only — the route never branches on these fields.
-      errorName?: string;
-      errorMessage?: string;
     };
 
 const SYSTEM_PROMPT = [
@@ -166,13 +157,7 @@ export async function generateFollowUpDraft(
     client = getAnthropicClient();
   } catch (err) {
     if (err instanceof MissingAnthropicKeyError) return { ok: false, reason: "missing-key" };
-    // TEMP (remove before flag flip): carry the exception detail for the walk log.
-    return {
-      ok: false,
-      reason: "error",
-      errorName: err instanceof Error ? err.name : "Unknown",
-      errorMessage: err instanceof Error ? err.message : String(err),
-    };
+    return { ok: false, reason: "error" };
   }
 
   const controller = new AbortController();
@@ -195,21 +180,12 @@ export async function generateFollowUpDraft(
       ok: true,
       draft,
       tokenCapHit: result.stop_reason === "max_tokens",
-      // TEMP (remove before flag flip): raw usage for the debug endpoint.
-      outputTokens: result.usage?.output_tokens,
-      stopReason: result.stop_reason ?? undefined,
     };
   } catch (err) {
-    // TEMP (remove before flag flip): carry the exception detail for the walk log.
     if (err instanceof Error && err.name === "AbortError") {
-      return { ok: false, reason: "timeout", errorName: err.name, errorMessage: err.message };
+      return { ok: false, reason: "timeout" };
     }
-    return {
-      ok: false,
-      reason: "error",
-      errorName: err instanceof Error ? err.name : "Unknown",
-      errorMessage: err instanceof Error ? err.message : String(err),
-    };
+    return { ok: false, reason: "error" };
   } finally {
     clearTimeout(timer);
   }

@@ -7,8 +7,7 @@
  * variant AFTER the output validator has run — both are trusted code constants,
  * exempt from the denylist / em-dash scan exactly as the CTA always was.
  *
- * PURE. Shared by the prepare route and the TEMP debug endpoint so the composed
- * shape can never drift between them.
+ * PURE, so the composed shape stays consistent wherever the prepare route calls it.
  */
 
 import { FALLBACK_CTA } from "./constants";
