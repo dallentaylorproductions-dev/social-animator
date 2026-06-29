@@ -41,7 +41,8 @@ export interface GenerateVoice {
   brokerage?: string;
   tagline?: string;
   signatureLine?: string;
-  guarantee?: string;
+  /** The agent's visible "CTA reassurance line" (Settings). Tone cue, not a fact. */
+  ctaReassurance?: string;
   neutral: boolean;
 }
 
@@ -97,7 +98,7 @@ function buildUserPrompt(input: GenerateInput): string {
     if (voice.agentName) {
       lines.push(`Agent: ${voice.agentName}${voice.brokerage ? `, ${voice.brokerage}` : ""}`);
     }
-    const cues = [voice.tagline, voice.signatureLine, voice.guarantee].filter(Boolean);
+    const cues = [voice.tagline, voice.signatureLine, voice.ctaReassurance].filter(Boolean);
     if (cues.length) {
       lines.push(
         `Agent voice cues (match their tone and word choice ONLY; never restate these as claims or facts): ${cues.join(" / ")}`,
