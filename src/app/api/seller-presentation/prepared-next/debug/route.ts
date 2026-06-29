@@ -137,6 +137,10 @@ export async function GET(req: Request): Promise<NextResponse> {
     // On a PASS: the FULL composed variants (model text + appended link + CTA).
     textVariant: null as string | null,
     emailVariant: null as string | null,
+    // TEMP (v1.0): the resolved GenerateVoice the route built before calling the
+    // model (incl. the `neutral` flag), so the walk can see whether the agent's
+    // voice cues actually reached generation. Null when generation was not run.
+    voice: null as Record<string, unknown> | null,
   };
 
   // weak → the real route never generates (zero spend). Report and stop.
@@ -186,6 +190,7 @@ export async function GET(req: Request): Promise<NextResponse> {
     return noStore(
       {
         ...base,
+        voice, // TEMP (v1.0): the resolved voice passed to generation.
         failed: true,
         reason: gen.reason === "malformed" ? "parse" : "gen_exception",
         genReason: gen.reason,
@@ -221,9 +226,11 @@ export async function GET(req: Request): Promise<NextResponse> {
   });
 
   // Usage is available whenever generation succeeded (validator pass OR fail).
+  // `voice` (TEMP v1.0) is the resolved voice that was passed to generation.
   const usage = {
     outputTokens: gen.outputTokens ?? null,
     stopReason: gen.stopReason ?? null,
+    voice,
   };
 
   if (!verdict.ok) {
