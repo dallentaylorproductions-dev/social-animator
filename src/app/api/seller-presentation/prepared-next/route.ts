@@ -273,12 +273,30 @@ export async function POST(req: Request): Promise<NextResponse> {
     apptRaw && Date.parse(apptRaw) > Date.now() ? apptRaw : undefined;
   const sellerName = sellerNameOverride ?? payload.preparedFor?.trim() ?? undefined;
 
+  // v0.8: re-add the agent's Studio Profile VOICE (tone cues only — NOT page
+  // data). Neutral when no cue exists, so the model uses the neutral floor.
+  const tagline = payload.agentTagline?.trim() || undefined;
+  const signatureLine = payload.signatureLine?.trim() || undefined;
+  const guarantee =
+    payload.whyUs && typeof payload.whyUs.guarantee === "string"
+      ? payload.whyUs.guarantee.trim() || undefined
+      : undefined;
+  const voice = {
+    agentName,
+    brokerage: payload.agent?.brokerage?.trim() || undefined,
+    tagline,
+    signatureLine,
+    guarantee,
+    neutral: !tagline && !signatureLine && !guarantee,
+  };
+
   // One capped generation call.
   wo = { ...wo, generationCount: wo.generationCount + 1 };
   const gen = await generateFollowUpDraft({
     sellerName,
     propertyLabel,
     appointmentAt,
+    voice,
   });
 
   const failTo = (): "failed" | "failed_final" =>
@@ -319,6 +337,11 @@ export async function POST(req: Request): Promise<NextResponse> {
     payload.agent?.brokerage ?? "",
     pageUrl,
     slug,
+    // v0.8: the agent's own voice cues are allowed (the model may channel their
+    // tone); they are not market/data leaks.
+    tagline ?? "",
+    signatureLine ?? "",
+    guarantee ?? "",
   ]);
   const verdict = validatePreparedOutput({
     textVariant: gen.draft.textVariant,

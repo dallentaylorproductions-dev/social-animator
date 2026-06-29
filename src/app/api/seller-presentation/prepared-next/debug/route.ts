@@ -150,11 +150,28 @@ export async function GET(req: Request): Promise<NextResponse> {
     apptRaw && Date.parse(apptRaw) > Date.now() ? apptRaw : undefined;
   const sellerName = payload.preparedFor?.trim() ?? undefined;
 
+  // v0.8: Studio Profile VOICE (tone cues only, NOT page data) — same as the real route.
+  const tagline = payload.agentTagline?.trim() || undefined;
+  const signatureLine = payload.signatureLine?.trim() || undefined;
+  const guarantee =
+    payload.whyUs && typeof payload.whyUs.guarantee === "string"
+      ? payload.whyUs.guarantee.trim() || undefined
+      : undefined;
+  const voice = {
+    agentName,
+    brokerage: payload.agent?.brokerage?.trim() || undefined,
+    tagline,
+    signatureLine,
+    guarantee,
+    neutral: !tagline && !signatureLine && !guarantee,
+  };
+
   // The single capped generation (no persistence, no cap consumed). NO page data.
   const gen = await generateFollowUpDraft({
     sellerName,
     propertyLabel,
     appointmentAt,
+    voice,
   });
 
   if (!gen.ok) {
@@ -183,6 +200,10 @@ export async function GET(req: Request): Promise<NextResponse> {
     payload.agent?.brokerage ?? "",
     pageUrl,
     slug,
+    // v0.8: the agent's own voice cues are allowed (not market/data leaks).
+    tagline ?? "",
+    signatureLine ?? "",
+    guarantee ?? "",
   ]);
   const verdict = validatePreparedOutput({
     textVariant: gen.draft.textVariant,

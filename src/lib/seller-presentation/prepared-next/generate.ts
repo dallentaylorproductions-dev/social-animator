@@ -12,13 +12,16 @@
  *   - `AbortController` with `GEN_TIMEOUT_MS` (route maxDuration stays 60)
  *   - model: the existing Haiku 4.5 integration (`COMP_IMPORT_MODEL`)
  *
- * Honesty (v0.5 minimal-claims recap): the model is handed almost nothing to
+ * Honesty (v0.5 minimal-claims recap): the model is handed almost no FACTS to
  * overstate. NO page data — no bullets, no marketing/exposure, no comps, no
- * views, no valuation, no payload sections — reaches generation. The ONLY inputs
- * are the safe, factual `{ sellerName?, propertyLabel, appointmentAt? }`. The
- * recap is a warm re-open that references the page the agent PREPARED and offers
- * to talk; it makes no market/data claims and never implies the seller was seen
- * viewing the page. The model cannot overstate data it is never given.
+ * views, no valuation, no payload sections — reaches generation. The only factual
+ * inputs are the safe `{ sellerName?, propertyLabel, appointmentAt? }`.
+ *
+ * v0.8: the agent's Studio Profile `voice` is re-added so the recap sounds like
+ * the agent. Voice is TONE and word choice, not facts: it never adds, changes, or
+ * embellishes a fact, and the honesty / no-claims rules OVERRIDE voice on any
+ * conflict. Absent voice falls to the neutral Studio floor (warm, no fake
+ * personalization). The model still cannot overstate data it is never given.
  */
 
 import {
@@ -29,6 +32,19 @@ import {
 import { GEN_TIMEOUT_MS, MAX_GEN_OUTPUT_TOKENS } from "./constants";
 import type { PreparedDraft } from "./work-order";
 
+/**
+ * The agent's Studio Profile voice — TONE cues only (no facts). `neutral` is true
+ * when no usable cue exists, so the model uses the neutral Studio floor.
+ */
+export interface GenerateVoice {
+  agentName: string;
+  brokerage?: string;
+  tagline?: string;
+  signatureLine?: string;
+  guarantee?: string;
+  neutral: boolean;
+}
+
 export interface GenerateInput {
   /** The seller's real name, if known. NEVER invented; absent → warm, no name. */
   sellerName?: string;
@@ -36,6 +52,8 @@ export interface GenerateInput {
   propertyLabel: string;
   /** The upcoming appointment, if present on the page. Optional reference only. */
   appointmentAt?: string;
+  /** Studio Profile voice (tone only). Absent → the neutral Studio floor. */
+  voice?: GenerateVoice;
   // NOTE: the page link + closing CTA are NOT passed to the model — they are
   // appended by code (composePreparedDraft) after the validator. The model is
   // told to write no URL and no closing line, so it spends no budget on them.
@@ -73,6 +91,8 @@ const SYSTEM_PROMPT = [
   "If the email runs a little longer than the text, the extra content must be faithful only, for example that the private overview was prepared ahead of the upcoming appointment when one is provided. Never add an invented claim, a characterization, or filler. If there is nothing faithful to add, keep the email as short as the text.",
   "Never state or imply that you saw, noticed, or know the seller viewed or opened the overview. No surveillance tone.",
   "Never invent a seller name or any detail. If no seller name is provided, address the seller warmly without a name (for example: Hi there) and do not fake any personal detail.",
+  "Voice: when voice cues are provided below, write in the agent's voice and match their warmth, tone, and word choice. Voice shapes warmth and word choice ONLY. It must never add, change, or embellish a fact, and never introduce hype, superlatives, or claims, even if the agent's described voice is energetic or salesy. All of the honesty and no-claims rules above take priority over voice on any conflict.",
+  "If no voice cues are provided, write in a neutral, warm, professional, brief Studio voice. Either way, never invent a name or any personal detail.",
   "Text message: 1 to 2 sentences, about 25 to 45 words.",
   "Email: 2 to 3 sentences, about 50 to 80 words. A short greeting and the warm note. No subject line, no headers, no bullet lists, no signature block, and no closing line of your own.",
   "Do not write a closing call-to-action line, and do not write any link, URL, or web address. A link and a closing line are added automatically after your text, so leave them out entirely.",
@@ -81,6 +101,20 @@ const SYSTEM_PROMPT = [
 
 function buildUserPrompt(input: GenerateInput): string {
   const lines: string[] = [];
+  const voice = input.voice;
+  if (voice && !voice.neutral) {
+    if (voice.agentName) {
+      lines.push(`Agent: ${voice.agentName}${voice.brokerage ? `, ${voice.brokerage}` : ""}`);
+    }
+    const cues = [voice.tagline, voice.signatureLine, voice.guarantee].filter(Boolean);
+    if (cues.length) {
+      lines.push(
+        `Agent voice cues (match their tone and word choice ONLY; never restate these as claims or facts): ${cues.join(" / ")}`,
+      );
+    }
+  } else {
+    lines.push("No agent voice is defined. Write in a neutral, warm, professional Studio voice.");
+  }
   if (input.sellerName) {
     lines.push(`Seller name: ${input.sellerName}`);
   } else {
