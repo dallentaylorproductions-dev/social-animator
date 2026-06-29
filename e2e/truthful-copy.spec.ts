@@ -18,7 +18,18 @@ import { defaultWhyUs } from '../src/lib/whyus';
 const SCAN_DIRS = [
   path.resolve(__dirname, '../src/app/settings'),
   path.resolve(__dirname, '../src/tools/seller-presentation/components'),
+  // The launch dashboard surfaces its own user-facing copy (the Social Studio
+  // blurb, tile labels). It slipped past this gate before, so it is scanned now.
+  path.resolve(__dirname, '../src/app/dashboard/components'),
 ];
+
+// The dashboard is registry-DRIVEN: card titles / blurbs / CTA labels live as
+// strings in tool-registry.ts (a .ts file, so the .tsx dir walkers miss it).
+// Scan it explicitly so registry copy meets the honesty + no-em-dash standard.
+const DASHBOARD_REGISTRY_FILE = path.resolve(
+  __dirname,
+  '../src/app/dashboard/tool-registry.ts',
+);
 
 // Case-insensitive substrings that must never appear in user-facing copy.
 const FORBIDDEN = [
@@ -46,10 +57,11 @@ function collectTsx(dir: string): string[] {
 
 test.describe('truthful-copy gate', () => {
   test('user-facing settings + seller-presentation TSX carry no over-claiming copy', () => {
-    const files = SCAN_DIRS.flatMap(collectTsx);
+    const files = [...SCAN_DIRS.flatMap(collectTsx), DASHBOARD_REGISTRY_FILE];
     // Sanity: the scan actually found the surfaces we care about.
     expect(files.length).toBeGreaterThan(0);
     expect(files.some((f) => f.endsWith('WhyUsSection.tsx'))).toBe(true);
+    expect(files.some((f) => f.endsWith('SocialStudio.tsx'))).toBe(true);
 
     const violations: string[] = [];
     for (const file of files) {
@@ -224,6 +236,10 @@ const STATIC_COPY_DIRS = [
   path.resolve(__dirname, '../src/tools/seller-presentation/components'),
   path.resolve(__dirname, '../src/tools/seller-presentation/output'),
   path.resolve(__dirname, '../src/app/settings'),
+  // Dashboard components + the registry strings the cards bind to. Scoped to
+  // the surfaces this gate covers; the wider dashboard logic dir is excluded so
+  // this stays a copy gate, not a structural one.
+  path.resolve(__dirname, '../src/app/dashboard/components'),
 ];
 
 function collectSource(dir: string): string[] {
@@ -275,8 +291,14 @@ function findClauseBreakDashes(text: string): string[] {
 
 test.describe('static copy em-dash gate', () => {
   test('no clause-break em-dash in published template + wizard copy', () => {
-    const files = STATIC_COPY_DIRS.flatMap(collectSource);
+    const files = [
+      ...STATIC_COPY_DIRS.flatMap(collectSource),
+      DASHBOARD_REGISTRY_FILE,
+    ];
     expect(files.length).toBeGreaterThan(0);
+    // Sanity: the dashboard surfaces that slipped past before are in scope now.
+    expect(files.some((f) => f.endsWith('SocialStudio.tsx'))).toBe(true);
+    expect(files.some((f) => f.endsWith('tool-registry.ts'))).toBe(true);
 
     const violations: string[] = [];
     for (const file of files) {
@@ -302,5 +324,18 @@ test.describe('static copy em-dash gate', () => {
     expect(findClauseBreakDashes('$720,000 – $780,000')).toEqual([]);
     expect(findClauseBreakDashes('return "—";')).toEqual([]);
     expect(findClauseBreakDashes('// a comment — with a dash')).toEqual([]);
+
+    // Regression proof for the v2.1 walk fix: the OLD Social Studio blurb (two
+    // clause-break em-dashes) is caught, and the shipped replacement is clean.
+    expect(
+      findClauseBreakDashes(
+        '10 animated social templates — Q&A, Market Update and more — all in one studio.',
+      ).length,
+    ).toBeGreaterThan(0);
+    expect(
+      findClauseBreakDashes(
+        '10 animated social templates: Q&A, Market Update, and more, all in one studio.',
+      ),
+    ).toEqual([]);
   });
 });

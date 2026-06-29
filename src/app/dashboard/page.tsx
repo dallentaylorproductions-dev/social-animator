@@ -1,6 +1,7 @@
 import Link from "next/link";
 import { auth, signOut } from "@/lib/auth";
 import { loadAgentProfile } from "@/lib/entitlements/load-agent-profile";
+import { getOwnedBrandSettings } from "@/lib/brand-settings-store";
 import { isDashboardHomeV2Enabled } from "@/lib/config/dashboard-home-v2";
 import {
   isDashboardTodaySeamEnabled,
@@ -35,6 +36,33 @@ import "./sep-studio.css";
  * `data-stagedots`) carry static defaults; the TweaksPanel UI from the
  * reference is deliberately not ported (theme picker = A7f.3).
  */
+/**
+ * The greeting first name, resolved SERVER-SIDE from the owner-scoped brand
+ * record so it is correct on the first paint.
+ *
+ * The greeting previously read the name only from per-device localStorage
+ * inside a client effect. On a device/session whose cache was empty (or had
+ * just been wiped by the account-isolation reconcile that runs before children
+ * hydrate), that read returned nothing, so the card fell back to "Agent" on
+ * first load and only showed the real name after a later visit repopulated the
+ * cache. Reading the owner-scoped KV brand record here makes the real name
+ * available on the first render and consistent across navigation.
+ *
+ * Returns "" when server brand persistence is off or no record exists, so the
+ * client effect's localStorage value still wins as a fallback (and a genuinely
+ * nameless agent stays "Agent"). KV read failures degrade to "" — never throw.
+ */
+async function resolveGreetingFirstName(email: string): Promise<string> {
+  if (!email || process.env.SERVER_BRAND_SETTINGS_ENABLED !== "true") return "";
+  try {
+    const record = await getOwnedBrandSettings(email);
+    const full = record?.settings.agentName?.trim() ?? "";
+    return full ? full.split(/\s+/)[0] : "";
+  } catch {
+    return "";
+  }
+}
+
 export default async function DashboardPage({
   searchParams,
 }: {
@@ -49,9 +77,13 @@ export default async function DashboardPage({
   // resolver maps the override into AgentProfile.internalTestOverride,
   // which DashboardClient consumes via resolveEntitlements → resolveSkill.
   const sp = await searchParams;
-  const agentProfile = await loadAgentProfile(email || null, {
-    testTier: sp.testTier,
-  });
+  // Resolve the entitlement profile and the greeting name concurrently — both
+  // are owner-scoped KV reads, so running them together keeps the dashboard
+  // server render bounded to a single round-trip's latency.
+  const [agentProfile, serverFirstName] = await Promise.all([
+    loadAgentProfile(email || null, { testTier: sp.testTier }),
+    resolveGreetingFirstName(email),
+  ]);
 
   // DASHBOARD_HOME_V2 (Pass 1) — read server-side, threaded as a prop so
   // the flag can differ between preview and prod without a NEXT_PUBLIC
@@ -147,6 +179,7 @@ export default async function DashboardPage({
           onboardingFirstRun={onboardingFirstRun}
           studioProfileSetup={studioProfileSetup}
           agentProfile={agentProfile}
+          serverFirstName={serverFirstName}
           dashboardV2={dashboardHomeV2}
           todaySeam={dashboardTodaySeam}
           todaySeamPreview={todaySeamPreview}

@@ -118,14 +118,29 @@ export function DashboardHomeV2({
         </section>
       )}
 
-      {/* SECONDARY — STAY VISIBLE (Social Studio, calmer daily-use anchor) */}
-      <section className="stage" id="stage-visibility" data-testid="sep-stage-visibility">
-        <StageHeader
-          index={2}
-          label="Stay visible"
-          hint="Cadence content. One studio, ten formats."
-          stage="visibility"
-        />
+      {/* SECONDARY — STAY VISIBLE (Social Studio, calmer daily-use anchor).
+          Deliberately NOT a numbered StageHeader: Stay-visible is not step 2
+          of winning a listing, so it reads as a quieter secondary subhead
+          beneath the hero, not a co-equal "Stage 02". The Seller Presentation
+          hero above stays the single numbered primary stage. */}
+      <section
+        className="stage stage-secondary"
+        id="stage-visibility"
+        data-testid="sep-stage-visibility"
+      >
+        <header
+          className="stage-head stage-head-secondary"
+          data-stage="visibility"
+          data-testid="sep-stage-head-visibility"
+        >
+          <div className="stage-text">
+            <div className="stage-label">Stay visible</div>
+            <div className="stage-hint">
+              Cadence content. One studio, ten formats.
+            </div>
+          </div>
+          <div className="stage-rule" />
+        </header>
         <SocialStudioTile skills={visibilitySkills} />
       </section>
 
