@@ -347,10 +347,9 @@ export async function POST(req: Request): Promise<NextResponse> {
     pageUrl,
     slug,
     // v0.8: the agent's own voice cues are allowed (the model may channel their
-    // tone); they are not market/data leaks. v1.2: sourced from the live Profile
-    // (tagline + signature + the visible CTA reassurance line).
+    // tone); they are not market/data leaks. v1.3: sourced from the live Profile
+    // (tagline + the visible CTA reassurance line).
     voice.tagline ?? "",
-    voice.signatureLine ?? "",
     voice.ctaReassurance ?? "",
   ]);
   const verdict = validatePreparedOutput({

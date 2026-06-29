@@ -16,7 +16,7 @@ import {
 } from "./_fakes/brand-settings-store";
 
 /**
- * PREPARED_NEXT v1.2 - regression lock for `voice-source.ts`, the neutral floor.
+ * PREPARED_NEXT v1.3 - regression lock for `voice-source.ts`, the neutral floor.
  *
  * `loadAgentVoice` reads the agent's LIVE brand Profile and must be BEST-EFFORT:
  * an empty / missing / failing read can never fail a prepare, it falls to the
@@ -24,10 +24,11 @@ import {
  * (tsconfig.unit.json) whose `__`-helpers we import from the SAME specifier so we
  * drive the exact record voice-source consumes.
  *
- * v1.2 HONEST INPUTS: the voice is shaped by the fields the agent can SEE and SET
- * - Tagline (`agentTagline`), signature line (`signatureLine`), and the visible
- * CTA reassurance line (`agentCtaReassurance`). The hidden `whyUs.guarantee` is no
- * longer consulted. `neutral` is true ONLY when all three visible cues are empty.
+ * v1.3 HONEST INPUTS: the voice is shaped by the fields EVERY agent can SEE and
+ * SET - Tagline (`agentTagline`) and the visible CTA reassurance line
+ * (`agentCtaReassurance`). It does NOT read the hidden `whyUs.guarantee`, and it
+ * no longer reads `signatureLine` (whose only setter is SELLER_STATE_A-gated).
+ * `neutral` is true ONLY when both visible cues are empty.
  */
 
 const EMAIL = "agent@example.com";
@@ -39,7 +40,7 @@ function record(settings: Record<string, unknown>) {
   return { ownerEmail: EMAIL, updatedAt: "2026-06-01T00:00:00.000Z", settings };
 }
 
-test("empty profile (no tagline / signature / reassurance) -> neutral floor", async () => {
+test("empty profile (no tagline / reassurance) -> neutral floor", async () => {
   __setBrandFixture(record({ agentName: "Dana Rae", brokerage: "Cedar Realty" }));
   const voice = await loadAgentVoice(EMAIL, "Fallback Name");
   expect(voice.neutral).toBe(true);
@@ -47,16 +48,14 @@ test("empty profile (no tagline / signature / reassurance) -> neutral floor", as
   expect(voice.agentName).toBe("Dana Rae");
   expect(voice.brokerage).toBe("Cedar Realty");
   expect(voice.tagline).toBeUndefined();
-  expect(voice.signatureLine).toBeUndefined();
   expect(voice.ctaReassurance).toBeUndefined();
 });
 
-test("full voice (tagline + signature + reassurance) -> not neutral, fields carried through", async () => {
+test("full voice (tagline + reassurance) -> not neutral, fields carried through", async () => {
   __setBrandFixture(
     record({
       agentName: "Dana Rae",
       agentTagline: "Calm, steady guidance from list to close.",
-      signatureLine: "Always in your corner.",
       agentCtaReassurance: "No pressure. Reach out whenever you are ready.",
     }),
   );
@@ -64,7 +63,6 @@ test("full voice (tagline + signature + reassurance) -> not neutral, fields carr
   expect(voice.neutral).toBe(false);
   expect(voice.agentName).toBe("Dana Rae");
   expect(voice.tagline).toBe("Calm, steady guidance from list to close.");
-  expect(voice.signatureLine).toBe("Always in your corner.");
   expect(voice.ctaReassurance).toBe("No pressure. Reach out whenever you are ready.");
 });
 
@@ -77,16 +75,25 @@ test("the visible CTA reassurance line alone -> not neutral (the agent set a voi
   expect(voice.ctaReassurance).toBe("No pressure, whenever the time is right.");
 });
 
-test("the hidden whyUs.guarantee is NO LONGER a voice cue -> still neutral", async () => {
-  // v1.2: the guarantee is not a field the agent sets as voice, so it must not
-  // silently color the recap. With only guarantee set, the voice stays neutral.
+test("the hidden whyUs.guarantee is NOT a voice cue -> still neutral", async () => {
+  // The guarantee is not a field the agent sets as voice, so it must not silently
+  // color the recap. With only guarantee set, the voice stays neutral.
   __setBrandFixture(
     record({ whyUs: { guarantee: "Cancel anytime, no questions." } }),
   );
   const voice = await loadAgentVoice(EMAIL, "Fallback Name");
   expect(voice.neutral).toBe(true);
   expect(voice.tagline).toBeUndefined();
-  expect(voice.signatureLine).toBeUndefined();
+  expect(voice.ctaReassurance).toBeUndefined();
+});
+
+test("signatureLine is NO LONGER a voice cue -> still neutral (State-A-gated setter)", async () => {
+  // v1.3: signatureLine's only setter is in the SELLER_STATE_A-gated block, so it
+  // must not double as a recap voice cue. Set ONLY signatureLine -> still neutral.
+  __setBrandFixture(record({ signatureLine: "Always in your corner." }));
+  const voice = await loadAgentVoice(EMAIL, "Fallback Name");
+  expect(voice.neutral).toBe(true);
+  expect(voice.tagline).toBeUndefined();
   expect(voice.ctaReassurance).toBeUndefined();
 });
 
@@ -95,12 +102,12 @@ test("partial voice (only tagline set) -> not neutral", async () => {
   const voice = await loadAgentVoice(EMAIL, "Fallback Name");
   expect(voice.neutral).toBe(false);
   expect(voice.tagline).toBe("Local expertise, honest advice.");
-  expect(voice.signatureLine).toBeUndefined();
+  expect(voice.ctaReassurance).toBeUndefined();
 });
 
 test("whitespace-only cues do NOT count as voice -> neutral floor", async () => {
   __setBrandFixture(
-    record({ agentTagline: "   ", signatureLine: "\n\t", agentCtaReassurance: "" }),
+    record({ agentTagline: "   ", agentCtaReassurance: "\n\t" }),
   );
   const voice = await loadAgentVoice(EMAIL, "Fallback Name");
   expect(voice.neutral).toBe(true);
@@ -128,15 +135,14 @@ test("no brand name AND no fallback -> the 'Your agent' floor name", async () =>
 });
 
 /**
- * voiceSignature — the cache-key half of the SAME one-place field set. A change to
- * any VOICE field changes the signature (busts an already-prepared recap); a
- * change to a NON-voice field (name, brokerage, color, the old guarantee) does
- * not. Pure, so no KV is needed.
+ * voiceSignature - the cache-key half of the SAME one-place field set. A change to
+ * a VOICE field (tagline / ctaReassurance) changes the signature (busts an
+ * already-prepared recap); a change to a NON-voice field (name, brokerage, color,
+ * the guarantee, signatureLine) does not. Pure, so no KV is needed.
  */
 test.describe("voiceSignature", () => {
   const base = {
     agentTagline: "Steady from list to close.",
-    signatureLine: "In your corner.",
     agentCtaReassurance: "No pressure.",
   } as unknown as BrandSettings;
 
@@ -151,21 +157,24 @@ test.describe("voiceSignature", () => {
     expect(sig({})).not.toBe(sig({ agentTagline: "A different tagline." }));
   });
 
-  test("changes when the signature line changes", () => {
-    expect(sig({})).not.toBe(sig({ signatureLine: "Different signature." }));
-  });
-
   test("changes when the CTA reassurance line changes", () => {
     expect(sig({})).not.toBe(
       sig({ agentCtaReassurance: "Different reassurance." }),
     );
   });
 
-  test("does NOT change on an unrelated brand edit (name / brokerage / guarantee / color)", () => {
+  test("does NOT change when only signatureLine changes (no longer a voice input)", () => {
+    expect(sig({ signatureLine: "A signature line." } as Partial<BrandSettings>)).toBe(
+      sig({}),
+    );
+  });
+
+  test("does NOT change on an unrelated brand edit (name / brokerage / guarantee / signature / color)", () => {
     const unrelated = {
       agentName: "Someone Else",
       brokerage: "Other Brokerage",
-      whyUs: { guarantee: "Some guarantee that no longer feeds voice." },
+      signatureLine: "In your corner.",
+      whyUs: { guarantee: "Some guarantee that does not feed voice." },
       brandPrimaryColor: "#ff0000",
     } as unknown as Partial<BrandSettings>;
     expect(sig(unrelated)).toBe(sig({}));
@@ -175,17 +184,13 @@ test.describe("voiceSignature", () => {
     expect(voiceSignature(undefined)).toBe(voiceSignature({} as BrandSettings));
   });
 
-  test("voiceFields reads exactly the three visible fields, trimmed", () => {
+  test("voiceFields reads exactly the two visible fields, trimmed (no signatureLine)", () => {
     const f = voiceFields({
       agentTagline: "  Tag  ",
-      signatureLine: "Sig",
       agentCtaReassurance: "  ",
+      signatureLine: "ignored",
       whyUs: { guarantee: "ignored" },
     } as unknown as BrandSettings);
-    expect(f).toEqual({
-      tagline: "Tag",
-      signatureLine: "Sig",
-      ctaReassurance: undefined,
-    });
+    expect(f).toEqual({ tagline: "Tag", ctaReassurance: undefined });
   });
 });
