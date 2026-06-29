@@ -11,7 +11,7 @@ import {
 } from "react";
 import { createPortal } from "react-dom";
 import { Reorder, useDragControls, useReducedMotion } from "framer-motion";
-import { ChevronDown, GripVertical, House } from "lucide-react";
+import { Check, ChevronDown, GripVertical, House, Pencil } from "lucide-react";
 import {
   cacheInstance,
   createInstance,
@@ -185,6 +185,7 @@ export function PagesLibrary({
   cardExpandEnabled = false,
   libraryV3Enabled = false,
   manageListEnabled = false,
+  preparedNextEnabled = false,
 }: {
   ownerEmail: string | null;
   /**
@@ -245,6 +246,15 @@ export function PagesLibrary({
    * of libraryV3Enabled; owner-scoped, nothing seller-facing.
    */
   manageListEnabled?: boolean;
+  /**
+   * PREPARED_NEXT (Anticipation v0) — when true, a "Worth a follow-up" card gains
+   * a "Prepare follow-up" action that drafts a short text + email (model-written,
+   * review-first) and opens it INLINE in the card's existing expand region. The
+   * agent reviews / edits / copies / dismisses; nothing ever sends. Default false
+   * ⇒ byte-identical to today's passive nudge (no button, no pane, no network
+   * call). Owner-scoped; nothing seller-facing.
+   */
+  preparedNextEnabled?: boolean;
 }) {
   // SP-KEYSTONE — the server's draft instances for this agent (the DRAFT slice
   // when the flag is on). null = not loaded / the fetch failed ⇒ fall back to
@@ -263,6 +273,14 @@ export function PagesLibrary({
   const [busyKey, setBusyKey] = useState<string | null>(null);
   const [actionError, setActionError] = useState<string | null>(null);
   const [copiedKey, setCopiedKey] = useState<string | null>(null);
+
+  // PREPARED_NEXT (Anticipation v0) — per-card review-pane state, keyed by
+  // card.key. Inert unless `preparedNextEnabled`; a card with no entry renders
+  // exactly as today (no pane). The pane content is cached here after a prepare
+  // so a re-render never re-generates.
+  const [preparedState, setPreparedState] = useState<
+    Record<string, PreparedPaneState>
+  >({});
 
   // v2 — organization + management state.
   const [tab, setTab] = useState<LibraryTab>("active");
@@ -940,6 +958,119 @@ export function PagesLibrary({
     }
   }
 
+  // PREPARED_NEXT (Anticipation v0) — the ONE explicit "Prepare follow-up" click.
+  // Generates a model-drafted text + email (review-first; nothing sends) and
+  // opens it inline in the card. `action` is "prepare" (default) or the single
+  // manual "retry" after a failure. Server enforces the two-generation cap, the
+  // confidence buckets (a weak page returns no draft, zero spend), the validator,
+  // and the per-account daily ceiling — the client just renders what comes back.
+  async function prepareFollowUp(
+    card: PageCard,
+    action: "prepare" | "retry" | "prepare_again" = "prepare",
+  ) {
+    if (!card.slug) return;
+    const key = card.key;
+    setPreparedState((s) => ({
+      ...s,
+      [key]: { ...(s[key] ?? {}), open: true, loading: true, error: null },
+    }));
+    try {
+      const res = await fetch("/api/seller-presentation/prepared-next", {
+        method: "POST",
+        headers: { "Content-Type": "application/json" },
+        body: JSON.stringify({ slug: card.slug, action }),
+      });
+      const body = (await res.json().catch(() => ({}))) as PreparedApiResponse;
+      if (!res.ok || !body.ok) {
+        const failedFinal = body.status === "failed_final";
+        setPreparedState((s) => ({
+          ...s,
+          [key]: {
+            open: true,
+            loading: false,
+            error:
+              body.error ??
+              (body.code === "daily-cap-hit"
+                ? "You have reached today's prepared follow-up limit. Try again tomorrow."
+                : "Could not prepare a follow-up just now."),
+            status: body.status,
+            canRetry: body.status === "failed" && !failedFinal,
+          },
+        }));
+        return;
+      }
+      setPreparedState((s) => ({
+        ...s,
+        [key]: {
+          open: true,
+          loading: false,
+          error: null,
+          status: body.status,
+          reason: body.reason,
+          draft: body.draft,
+          pageUrl: body.pageUrl,
+          askField: body.askField ?? null,
+          canRetry: false,
+        },
+      }));
+    } catch {
+      setPreparedState((s) => ({
+        ...s,
+        [key]: {
+          ...(s[key] ?? {}),
+          open: true,
+          loading: false,
+          error: "Could not reach the server. Please try again.",
+          canRetry: true,
+        },
+      }));
+    }
+  }
+
+  // Quiet "Dismiss" — closes the inline pane and records the advisory dismiss on
+  // the Work Order (never prepares again for this version). Best-effort: the pane
+  // closes regardless so the agent is never stuck.
+  async function dismissPrepared(card: PageCard) {
+    const key = card.key;
+    setPreparedState((s) => {
+      const next = { ...s };
+      delete next[key];
+      return next;
+    });
+    if (!card.slug) return;
+    try {
+      await fetch("/api/seller-presentation/prepared-next", {
+        method: "POST",
+        headers: { "Content-Type": "application/json" },
+        body: JSON.stringify({ slug: card.slug, action: "dismiss" }),
+      });
+    } catch {
+      // Advisory only — a failed dismiss mark never blocks the agent.
+    }
+  }
+
+  // Copy one variant to the clipboard and record the "copied" mark (advisory; no
+  // send). Mirrors the copyLink affordance's transient "Copied" feedback.
+  async function copyPreparedVariant(card: PageCard, text: string) {
+    try {
+      await navigator.clipboard.writeText(text);
+      setCopiedKey(card.key);
+      setTimeout(() => setCopiedKey((k) => (k === card.key ? null : k)), 1800);
+    } catch {
+      setActionError("Could not copy to the clipboard.");
+    }
+    if (!card.slug) return;
+    try {
+      await fetch("/api/seller-presentation/prepared-next", {
+        method: "POST",
+        headers: { "Content-Type": "application/json" },
+        body: JSON.stringify({ slug: card.slug, action: "copy" }),
+      });
+    } catch {
+      // Advisory mark only.
+    }
+  }
+
   function requestDelete(card: PageCard) {
     setConfirm({
       title: "Delete this page?",
@@ -1143,6 +1274,15 @@ export function PagesLibrary({
       onDuplicate: () => duplicate(card),
       onDelete: () => requestDelete(card),
       onMarkFollowedUp: () => markFollowedUp(card),
+      // PREPARED_NEXT (Anticipation v0) — Cards view only (PageRowView ignores
+      // these, like libraryV3/expandable). Flag-off ⇒ no button, no pane.
+      preparedNext: preparedNextEnabled,
+      preparedPane: preparedState[card.key] ?? null,
+      onPrepare: () => prepareFollowUp(card, "prepare"),
+      onPrepareRetry: () => prepareFollowUp(card, "retry"),
+      onPrepareAgain: () => prepareFollowUp(card, "prepare_again"),
+      onDismissPrepared: () => dismissPrepared(card),
+      onCopyPrepared: (text: string) => copyPreparedVariant(card, text),
     };
   }
 
@@ -1370,7 +1510,7 @@ export function PagesLibrary({
                   <span
                     className="lib-followup-count"
                     data-testid="lib-followup-count"
-                    title="Pages a seller engaged with recently. A quiet suggestion to reach out — nothing is sent for you."
+                    title="Pages a seller engaged with recently. A quiet suggestion to reach out. Nothing is sent for you."
                   >
                     {followUpCount} worth a follow-up
                   </span>
@@ -1782,6 +1922,47 @@ interface PageItemProps {
   onDelete: () => void;
   /** Phase 3 — clear this page from the advisory follow-up nudge set. */
   onMarkFollowedUp: () => void;
+  /**
+   * PREPARED_NEXT (Anticipation v0) — Cards view only. When `preparedNext` is
+   * true AND the card is worth a follow-up, the card shows a "Prepare follow-up"
+   * action and (once prepared) an inline review pane. `preparedPane` is this
+   * card's pane state (null = no pane). PageRowView ignores all of these.
+   */
+  preparedNext?: boolean;
+  preparedPane?: PreparedPaneState | null;
+  onPrepare?: () => void;
+  onPrepareRetry?: () => void;
+  onPrepareAgain?: () => void;
+  onDismissPrepared?: () => void;
+  onCopyPrepared?: (text: string) => void;
+}
+
+/**
+ * PREPARED_NEXT — the inline review-pane state for one card (client-only).
+ * Cached after a prepare so a re-render never re-generates.
+ */
+interface PreparedPaneState {
+  open?: boolean;
+  loading?: boolean;
+  error?: string | null;
+  status?: string;
+  reason?: string;
+  draft?: { textVariant: string; emailVariant: string };
+  pageUrl?: string;
+  askField?: "seller_name" | "appointment_timing" | null;
+  canRetry?: boolean;
+}
+
+/** The shape the prepare route returns (the fields the pane reads). */
+interface PreparedApiResponse {
+  ok?: boolean;
+  code?: string;
+  error?: string;
+  status?: string;
+  reason?: string;
+  draft?: { textVariant: string; emailVariant: string };
+  pageUrl?: string;
+  askField?: "seller_name" | "appointment_timing" | null;
 }
 
 /**
@@ -2008,6 +2189,13 @@ function PageCardView({
   onDuplicate,
   onDelete,
   onMarkFollowedUp,
+  preparedNext = false,
+  preparedPane = null,
+  onPrepare,
+  onPrepareRetry,
+  onPrepareAgain,
+  onDismissPrepared,
+  onCopyPrepared,
 }: PageItemProps) {
   const isArchived = card.status === "archived";
   const isLive = card.status === "live" || card.status === "live-edits-pending";
@@ -2344,6 +2532,22 @@ function PageCardView({
                   </button>
                 )}
 
+                {preparedNext && card.worthFollowUp && (
+                  <button
+                    type="button"
+                    className="lib-btn lib-btn-quiet"
+                    onClick={onPrepare}
+                    disabled={busy || preparedPane?.loading}
+                    data-testid="lib-action-prepare"
+                  >
+                    {preparedPane?.loading
+                      ? "Preparing…"
+                      : preparedPane?.status === "prepared"
+                        ? "Follow-up prepared"
+                        : "Prepare follow-up"}
+                  </button>
+                )}
+
                 {overflowActions.length > 0 && (
                   <RowMenu
                     card={card}
@@ -2420,6 +2624,22 @@ function PageCardView({
                 </button>
               )}
 
+              {preparedNext && card.worthFollowUp && (
+                <button
+                  type="button"
+                  className="lib-btn lib-btn-quiet"
+                  onClick={onPrepare}
+                  disabled={busy || preparedPane?.loading}
+                  data-testid="lib-action-prepare"
+                >
+                  {preparedPane?.loading
+                    ? "Preparing…"
+                    : preparedPane?.status === "prepared"
+                      ? "Follow-up prepared"
+                      : "Prepare follow-up"}
+                </button>
+              )}
+
               {!isArchived && (
                 <button
                   type="button"
@@ -2458,8 +2678,266 @@ function PageCardView({
             </div>
           )
         )}
+
+        {preparedNext && preparedPane?.open && (
+          <PreparedFollowUpPane
+            pane={preparedPane}
+            busy={busy}
+            onRetry={onPrepareRetry}
+            onPrepareAgain={onPrepareAgain}
+            onDismiss={onDismissPrepared}
+            onCopy={onCopyPrepared}
+          />
+        )}
       </div>
     </article>
+  );
+}
+
+/**
+ * PREPARED_NEXT (Anticipation v0) — the inline review pane. Renders inside the
+ * card body (reusing the expand region) once the agent clicks "Prepare follow-
+ * up": a model-drafted text + email the agent reviews, edits inline, copies, or
+ * dismisses. NOTHING ever sends (there is no send button). A weak page shows a
+ * calm note instead of a draft; a failed generation shows one manual Retry (or,
+ * when terminal, no retry); a dismissed follow-up shows a calm note and a single
+ * "Prepare again" (the §8.1 manual re-prepare). All copy here is em-dash-free.
+ */
+function PreparedFollowUpPane({
+  pane,
+  busy,
+  onRetry,
+  onPrepareAgain,
+  onDismiss,
+  onCopy,
+}: {
+  pane: PreparedPaneState;
+  busy: boolean;
+  onRetry?: () => void;
+  onPrepareAgain?: () => void;
+  onDismiss?: () => void;
+  onCopy?: (text: string) => void;
+}) {
+  // Editable drafts (the "Edit" affordance is inline editing). Re-seeded whenever
+  // a fresh prepared draft arrives (initial prepare or a retry).
+  const [textDraft, setTextDraft] = useState("");
+  const [emailDraft, setEmailDraft] = useState("");
+  const seedText = pane.draft?.textVariant;
+  const seedEmail = pane.draft?.emailVariant;
+  useEffect(() => {
+    if (typeof seedText === "string") setTextDraft(seedText);
+    if (typeof seedEmail === "string") setEmailDraft(seedEmail);
+  }, [seedText, seedEmail]);
+
+  // Auto-height: each field grows to fit its full message (no inner scrollbar)
+  // and re-fits as the agent edits. Presentation only.
+  const textRef = useRef<HTMLTextAreaElement>(null);
+  const emailRef = useRef<HTMLTextAreaElement>(null);
+  const fit = (el: HTMLTextAreaElement | null) => {
+    if (!el) return;
+    el.style.height = "auto";
+    el.style.height = `${el.scrollHeight}px`;
+  };
+  useEffect(() => fit(textRef.current), [textDraft]);
+  useEffect(() => fit(emailRef.current), [emailDraft]);
+
+  // Per-button copy confirmation (briefly swaps to a check + "Copied"). The copy
+  // ACTION is unchanged (onCopy still writes the clipboard + records the mark).
+  const [copiedField, setCopiedField] = useState<"text" | "email" | null>(null);
+  const copy = (which: "text" | "email", text: string) => {
+    onCopy?.(text);
+    setCopiedField(which);
+    setTimeout(() => setCopiedField((c) => (c === which ? null : c)), 1400);
+  };
+
+  return (
+    <div
+      className="lib-prepared"
+      data-no-longpress="true"
+      data-testid="lib-prepared-pane"
+    >
+      {pane.loading ? (
+        <p className="lib-prepared-note">Preparing your follow-up.</p>
+      ) : pane.status === "weak" ? (
+        <div className="lib-prepared-weak">
+          <p className="lib-prepared-note" data-testid="lib-prepared-weak">
+            There is not enough on this page yet to prepare a useful draft. The
+            follow-up nudge stays as it is.
+          </p>
+          {onDismiss && (
+            <button
+              type="button"
+              className="lib-prepared-dismiss"
+              onClick={onDismiss}
+              data-testid="lib-prepared-dismiss"
+            >
+              Close
+            </button>
+          )}
+        </div>
+      ) : pane.status === "dismissed" ? (
+        // Honest, calm copy — NOT the generic error. A dismissed follow-up offers
+        // the §8.1 manual escape ("Prepare again"), the ONLY path that reopens a
+        // dismiss; the neutral wrapper avoids the amber error tint.
+        <div className="lib-prepared-weak">
+          <p className="lib-prepared-note" data-testid="lib-prepared-dismissed">
+            You dismissed this follow-up.
+          </p>
+          <div className="lib-prepared-footer">
+            {onPrepareAgain && (
+              <button
+                type="button"
+                className="lib-prepared-dismiss"
+                onClick={onPrepareAgain}
+                disabled={busy}
+                data-testid="lib-prepared-prepare-again"
+              >
+                Prepare again
+              </button>
+            )}
+            {onDismiss && (
+              <button
+                type="button"
+                className="lib-prepared-dismiss"
+                onClick={onDismiss}
+                data-testid="lib-prepared-close"
+              >
+                Close
+              </button>
+            )}
+          </div>
+        </div>
+      ) : pane.error || !pane.draft ? (
+        <div className="lib-prepared-error">
+          <p className="lib-prepared-note" data-testid="lib-prepared-error">
+            {pane.error ?? "Could not prepare a follow-up just now."}
+          </p>
+          <div className="lib-prepared-footer">
+            {pane.canRetry && onRetry && (
+              <button
+                type="button"
+                className="lib-prepared-dismiss"
+                onClick={onRetry}
+                disabled={busy}
+                data-testid="lib-prepared-retry"
+              >
+                Try again
+              </button>
+            )}
+            {onDismiss && (
+              <button
+                type="button"
+                className="lib-prepared-dismiss"
+                onClick={onDismiss}
+                data-testid="lib-prepared-dismiss"
+              >
+                Close
+              </button>
+            )}
+          </div>
+        </div>
+      ) : (
+        <div className="lib-prepared-draft">
+          <div className="lib-prepared-head">
+            <span className="lib-prepared-dot" aria-hidden="true" />
+            <div className="lib-prepared-head-text">
+              <p className="lib-prepared-title">Follow-up prepared</p>
+              <p className="lib-prepared-sub">
+                Review, tweak, and copy. Nothing sends on its own.
+              </p>
+            </div>
+          </div>
+
+          {pane.askField === "seller_name" && (
+            <p className="lib-prepared-ask" data-testid="lib-prepared-ask">
+              Tip: add the seller&apos;s name in the text below to personalize it.
+            </p>
+          )}
+
+          <div className="lib-prepared-section">
+            <div className="lib-prepared-section-head">
+              <span className="lib-prepared-section-label">Text message</span>
+              <span className="lib-prepared-edit-hint">
+                <Pencil size={11} aria-hidden="true" /> editable
+              </span>
+            </div>
+            <textarea
+              ref={textRef}
+              className="lib-prepared-textarea"
+              value={textDraft}
+              onChange={(e) => setTextDraft(e.target.value)}
+              rows={1}
+              data-testid="lib-prepared-text"
+            />
+            {onCopy && (
+              <button
+                type="button"
+                className="lib-prepared-copy"
+                onClick={() => copy("text", textDraft)}
+                data-testid="lib-prepared-copy-text"
+              >
+                {copiedField === "text" ? (
+                  <>
+                    <Check size={13} aria-hidden="true" /> Copied
+                  </>
+                ) : (
+                  "Copy text"
+                )}
+              </button>
+            )}
+          </div>
+
+          <div className="lib-prepared-section">
+            <div className="lib-prepared-section-head">
+              <span className="lib-prepared-section-label">Email</span>
+              <span className="lib-prepared-edit-hint">
+                <Pencil size={11} aria-hidden="true" /> editable
+              </span>
+            </div>
+            <textarea
+              ref={emailRef}
+              className="lib-prepared-textarea"
+              value={emailDraft}
+              onChange={(e) => setEmailDraft(e.target.value)}
+              rows={1}
+              data-testid="lib-prepared-email"
+            />
+            {onCopy && (
+              <button
+                type="button"
+                className="lib-prepared-copy"
+                onClick={() => copy("email", emailDraft)}
+                data-testid="lib-prepared-copy-email"
+              >
+                {copiedField === "email" ? (
+                  <>
+                    <Check size={13} aria-hidden="true" /> Copied
+                  </>
+                ) : (
+                  "Copy email"
+                )}
+              </button>
+            )}
+          </div>
+
+          <div className="lib-prepared-footer">
+            {onDismiss && (
+              <button
+                type="button"
+                className="lib-prepared-dismiss"
+                onClick={onDismiss}
+                data-testid="lib-prepared-dismiss"
+              >
+                Dismiss
+              </button>
+            )}
+            <span className="lib-prepared-foot-hint">
+              Stays put until the page changes.
+            </span>
+          </div>
+        </div>
+      )}
+    </div>
   );
 }
 

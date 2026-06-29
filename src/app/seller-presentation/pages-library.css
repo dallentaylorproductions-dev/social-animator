@@ -1267,3 +1267,152 @@
      have room, while staying clearly photo-forward. */
   .sep-library .lib-row-thumb { width: 96px; height: 72px; }
 }
+
+/* ===========================================================================
+   PREPARED_NEXT — the inline "Follow-up prepared" review pane (v1.2 polish).
+   Renders inside the card body (reusing the expand region) only under the flag.
+   Dark-native + calm: blended fields (no white boxes), auto-height messages (no
+   inner scroll), one link (inside the message), per-button copy confirmation.
+   Reuses the cockpit tokens (--accent mint, --surface, --border, --fg*).
+   =========================================================================== */
+.sep-library .lib-prepared {
+  margin-top: 12px;
+  padding-top: 14px;
+  border-top: 1px solid var(--border);
+  display: flex;
+  flex-direction: column;
+  gap: 14px;
+}
+
+/* Header: mint status dot + title + one quiet reassurance line. */
+.sep-library .lib-prepared-head {
+  display: flex;
+  align-items: flex-start;
+  gap: 9px;
+}
+.sep-library .lib-prepared-dot {
+  margin-top: 6px;
+  width: 7px;
+  height: 7px;
+  border-radius: 50%;
+  background: var(--accent);
+  box-shadow: 0 0 7px color-mix(in oklch, var(--accent) 60%, transparent);
+  flex: none;
+}
+.sep-library .lib-prepared-head-text {
+  display: flex;
+  flex-direction: column;
+  gap: 2px;
+}
+.sep-library .lib-prepared-title {
+  margin: 0;
+  font-size: 15px;
+  font-weight: 500;
+  color: var(--fg);
+}
+.sep-library .lib-prepared-sub {
+  margin: 0;
+  font-size: 13px;
+  line-height: 1.45;
+  color: var(--fg-mute);
+}
+
+.sep-library .lib-prepared-note {
+  margin: 0;
+  font-size: 13px;
+  line-height: 1.5;
+  color: var(--fg-mute);
+}
+.sep-library .lib-prepared-ask {
+  margin: 0;
+  font-size: 12.5px;
+  color: var(--fg-dim);
+}
+
+/* A labeled message section (Text message / Email). */
+.sep-library .lib-prepared-section {
+  display: flex;
+  flex-direction: column;
+  gap: 7px;
+}
+.sep-library .lib-prepared-section-head {
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+  gap: 10px;
+}
+.sep-library .lib-prepared-section-label {
+  font-size: 12.5px;
+  font-weight: 500;
+  color: var(--fg-mute);
+}
+.sep-library .lib-prepared-edit-hint {
+  display: inline-flex;
+  align-items: center;
+  gap: 4px;
+  font-size: 12px;
+  color: var(--fg-dim);
+}
+
+/* The message field — blended with the dark theme; auto-height (no scrollbar). */
+.sep-library .lib-prepared-textarea {
+  width: 100%;
+  box-sizing: border-box;
+  resize: none;
+  overflow: hidden;
+  display: block;
+  font: inherit;
+  font-size: 13.5px;
+  line-height: 1.6;
+  padding: 12px 14px;
+  border: 0.5px solid var(--border-hi);
+  border-radius: var(--radius-sm);
+  background: var(--surface);
+  color: var(--fg);
+}
+.sep-library .lib-prepared-textarea:focus {
+  outline: none;
+  border-color: color-mix(in oklch, var(--accent) 45%, var(--border-hi));
+  background: var(--surface-hi);
+}
+
+/* Copy button: quiet, dark; turns mint on the brief "Copied" confirmation. */
+.sep-library .lib-prepared-copy {
+  align-self: flex-start;
+  display: inline-flex;
+  align-items: center;
+  gap: 5px;
+  font-size: 12.5px;
+  padding: 6px 12px;
+  border-radius: var(--radius-sm);
+  border: 0.5px solid var(--border-hi);
+  background: var(--surface-hi);
+  color: var(--fg);
+}
+.sep-library .lib-prepared-copy:hover {
+  border-color: color-mix(in oklch, var(--accent) 40%, var(--border-hi));
+  color: var(--accent);
+}
+
+/* Footer: quiet Dismiss (left) + a muted hint (right). */
+.sep-library .lib-prepared-footer {
+  display: flex;
+  align-items: center;
+  gap: 10px;
+  flex-wrap: wrap;
+}
+.sep-library .lib-prepared-dismiss {
+  font-size: 12.5px;
+  color: var(--fg-mute);
+  padding: 4px 2px;
+}
+.sep-library .lib-prepared-dismiss:hover {
+  color: var(--fg);
+}
+.sep-library .lib-prepared-foot-hint {
+  font-size: 12px;
+  color: var(--fg-dim);
+}
+.sep-library .lib-prepared-error .lib-prepared-note {
+  color: color-mix(in oklch, var(--st-draft) 70%, var(--fg-mute));
+}

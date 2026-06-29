@@ -103,6 +103,14 @@ export default async function SellerPresentationPage({
   // flag. Independent of PAGES_LIBRARY_V3; only the library uses it.
   const manageListEnabled = process.env.PAGES_MANAGE_LIST === "true";
 
+  // PREPARED_NEXT (Anticipation v0) — upgrade the "Worth a follow-up" card's
+  // passive nudge into a model-drafted, review-first follow-up the agent prepares
+  // on an explicit click. OFF by default; ships DARK so the inline review pane can
+  // be verified on preview before any flip. Read server-side and threaded down as
+  // a prop (mirroring manageListEnabled) so the client needs no separate public
+  // flag. Flag-off is byte-identical to today's passive nudge.
+  const preparedNextEnabled = process.env.PREPARED_NEXT === "true";
+
   const sp = await searchParams;
   const idParam = sp?.id;
   const hasId =
@@ -129,6 +137,7 @@ export default async function SellerPresentationPage({
       cardExpandEnabled={cardExpandEnabled}
       libraryV3Enabled={libraryV3Enabled}
       manageListEnabled={manageListEnabled}
+      preparedNextEnabled={preparedNextEnabled}
     />
   );
 }

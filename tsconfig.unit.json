@@ -1,0 +1,18 @@
+{
+  "//": "Pure-unit lane tsconfig (playwright.unit.config.ts). Redirects the two external deps of the prepared-next safety modules to in-memory fakes so work-order.ts / voice-source.ts run with no KV and no network. Mirrors the base '@/*' mapping; the two non-wildcard entries take precedence over it. NOT used by the default playwright.config.ts.",
+  "compilerOptions": {
+    "baseUrl": ".",
+    "module": "CommonJS",
+    "moduleResolution": "node",
+    "target": "ES2020",
+    "esModuleInterop": true,
+    "skipLibCheck": true,
+    "jsx": "preserve",
+    "paths": {
+      "@vercel/kv": ["./tests-unit/_fakes/vercel-kv"],
+      "@/lib/brand-settings-store": ["./tests-unit/_fakes/brand-settings-store"],
+      "@/*": ["./src/*"]
+    }
+  },
+  "include": ["tests-unit/**/*.ts", "src/**/*.ts"]
+}
