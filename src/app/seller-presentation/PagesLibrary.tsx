@@ -966,7 +966,7 @@ export function PagesLibrary({
   // and the per-account daily ceiling — the client just renders what comes back.
   async function prepareFollowUp(
     card: PageCard,
-    action: "prepare" | "retry" = "prepare",
+    action: "prepare" | "retry" | "prepare_again" = "prepare",
   ) {
     if (!card.slug) return;
     const key = card.key;
@@ -1280,6 +1280,7 @@ export function PagesLibrary({
       preparedPane: preparedState[card.key] ?? null,
       onPrepare: () => prepareFollowUp(card, "prepare"),
       onPrepareRetry: () => prepareFollowUp(card, "retry"),
+      onPrepareAgain: () => prepareFollowUp(card, "prepare_again"),
       onDismissPrepared: () => dismissPrepared(card),
       onCopyPrepared: (text: string) => copyPreparedVariant(card, text),
     };
@@ -1931,6 +1932,7 @@ interface PageItemProps {
   preparedPane?: PreparedPaneState | null;
   onPrepare?: () => void;
   onPrepareRetry?: () => void;
+  onPrepareAgain?: () => void;
   onDismissPrepared?: () => void;
   onCopyPrepared?: (text: string) => void;
 }
@@ -2191,6 +2193,7 @@ function PageCardView({
   preparedPane = null,
   onPrepare,
   onPrepareRetry,
+  onPrepareAgain,
   onDismissPrepared,
   onCopyPrepared,
 }: PageItemProps) {
@@ -2681,6 +2684,7 @@ function PageCardView({
             pane={preparedPane}
             busy={busy}
             onRetry={onPrepareRetry}
+            onPrepareAgain={onPrepareAgain}
             onDismiss={onDismissPrepared}
             onCopy={onCopyPrepared}
           />
@@ -2696,18 +2700,21 @@ function PageCardView({
  * up": a model-drafted text + email the agent reviews, edits inline, copies, or
  * dismisses. NOTHING ever sends (there is no send button). A weak page shows a
  * calm note instead of a draft; a failed generation shows one manual Retry (or,
- * when terminal, no retry). All copy here is em-dash-free by rule.
+ * when terminal, no retry); a dismissed follow-up shows a calm note and a single
+ * "Prepare again" (the §8.1 manual re-prepare). All copy here is em-dash-free.
  */
 function PreparedFollowUpPane({
   pane,
   busy,
   onRetry,
+  onPrepareAgain,
   onDismiss,
   onCopy,
 }: {
   pane: PreparedPaneState;
   busy: boolean;
   onRetry?: () => void;
+  onPrepareAgain?: () => void;
   onDismiss?: () => void;
   onCopy?: (text: string) => void;
 }) {
@@ -2767,6 +2774,38 @@ function PreparedFollowUpPane({
               Close
             </button>
           )}
+        </div>
+      ) : pane.status === "dismissed" ? (
+        // Honest, calm copy — NOT the generic error. A dismissed follow-up offers
+        // the §8.1 manual escape ("Prepare again"), the ONLY path that reopens a
+        // dismiss; the neutral wrapper avoids the amber error tint.
+        <div className="lib-prepared-weak">
+          <p className="lib-prepared-note" data-testid="lib-prepared-dismissed">
+            You dismissed this follow-up.
+          </p>
+          <div className="lib-prepared-footer">
+            {onPrepareAgain && (
+              <button
+                type="button"
+                className="lib-prepared-dismiss"
+                onClick={onPrepareAgain}
+                disabled={busy}
+                data-testid="lib-prepared-prepare-again"
+              >
+                Prepare again
+              </button>
+            )}
+            {onDismiss && (
+              <button
+                type="button"
+                className="lib-prepared-dismiss"
+                onClick={onDismiss}
+                data-testid="lib-prepared-close"
+              >
+                Close
+              </button>
+            )}
+          </div>
         </div>
       ) : pane.error || !pane.draft ? (
         <div className="lib-prepared-error">

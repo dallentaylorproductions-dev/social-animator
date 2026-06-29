@@ -17,6 +17,7 @@ import { validatePreparedOutput } from "@/lib/seller-presentation/prepared-next/
 import { viewedSignalMoment } from "@/lib/seller-presentation/prepared-next/moment";
 import {
   ensureEligibleWorkOrder,
+  newEligibleWorkOrder,
   getWorkOrder,
   saveWorkOrder,
   type FollowUpRecapWorkOrder,
@@ -39,6 +40,9 @@ import {
  *     else generate + validate + cache the prepared draft (idempotent: a re-click
  *     on an already-prepared page returns the cached draft, no regenerate).
  *   - "retry"   → the ONE manual retry after a failure (two-generation cap).
+ *   - "prepare_again" → the §8.1 manual escape from a dismissed page: resets the
+ *     dismissed WO to a fresh eligible (current version) and generates. The ONLY
+ *     path that reopens a dismiss; auto paths (view / republish) never do (v0.9).
  *   - "copy" / "dismiss" → quiet state marks (no model spend).
  */
 export const runtime = "nodejs";
@@ -118,7 +122,8 @@ export async function POST(req: Request): Promise<NextResponse> {
   const action =
     body.action === "retry" ||
     body.action === "copy" ||
-    body.action === "dismiss"
+    body.action === "dismiss" ||
+    body.action === "prepare_again"
       ? body.action
       : "prepare";
   const sellerNameOverride =
@@ -161,13 +166,32 @@ export async function POST(req: Request): Promise<NextResponse> {
     return noStore({ ok: true, status: "copied" }, 200);
   }
 
-  // ---- prepare / retry ----
+  // ---- prepare / retry / prepare_again ----
   // A dismissed page stays dismissed: ensureEligibleWorkOrder preserves dismiss
   // across version changes (the one terminal state a republish does not reopen),
   // so a dismissed agent is never re-nagged. Every OTHER terminal status (failed /
   // failed_final) was already reset to `eligible` above when the version changed.
   if (wo.status === "dismissed") {
-    return noStore({ ok: true, status: "dismissed" }, 200);
+    // v1.6: ONLY an explicit "Prepare again" reopens a dismissed Work Order (the
+    // §8.1 manual-regenerate escape). A plain prepare / retry click, and every AUTO
+    // path (a new seller view, a republish / new version), leaves it dismissed, so
+    // the v0.9 anti-nag guarantee holds: a dismissed agent is never re-nagged.
+    if (action !== "prepare_again") {
+      return noStore({ ok: true, status: "dismissed" }, 200);
+    }
+    // Reset to a FRESH eligible for the CURRENT version (fresh generationCount) and
+    // fall through to the normal capped generation (one initial + one manual retry,
+    // the per-account daily ceiling, and the validator are all unchanged).
+    wo = newEligibleWorkOrder({
+      moment: viewedSignalMoment({
+        slug,
+        ownerEmail: accountId,
+        handoutUpdatedAt: version,
+        timestamp: new Date().toISOString(),
+      }),
+      accountId,
+      version,
+    });
   }
   // Terminal failure: no retry button, no further action.
   if (wo.status === "failed_final") {

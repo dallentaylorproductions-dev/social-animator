@@ -141,6 +141,41 @@ test.describe("ensureEligibleWorkOrder - version reset (every non-dismissed term
   }
 });
 
+test.describe("manual re-prepare (v1.6) - the explicit escape from dismiss", () => {
+  test("the route's reset replaces a dismissed WO with a fresh eligible (gen 0, no draft) for the current version", async () => {
+    const slug = "reprep01";
+    // A dismissed WO is on file (e.g. preserved across a republish at v2).
+    await seedWorkOrder(slug, "v2", {
+      status: "dismissed",
+      approvalAction: "dismiss",
+      generationCount: MAX_GENERATIONS_PER_WORK_ORDER,
+      draftOutput: { textVariant: "old", emailVariant: "old" },
+    });
+    // The "prepare_again" route step: a fresh eligible for the CURRENT version,
+    // which then falls through to generate. This is the ONLY path that clears a
+    // dismiss; the auto path (next test) must not.
+    const reset = newEligibleWorkOrder({ moment: moment(slug, "v2"), accountId: ACCOUNT, version: "v2" });
+    await saveWorkOrder(slug, reset);
+    const stored = __readKv(preparedKey(slug)) as FollowUpRecapWorkOrder;
+    expect(stored.status).toBe("eligible");
+    expect(stored.generationCount).toBe(0);
+    expect(stored.draftOutput).toBeNull();
+    expect(stored.approvalAction).toBeNull();
+    expect(stored.version).toBe("v2");
+  });
+
+  test("the AUTO path (ensureEligibleWorkOrder) still does NOT reset a dismissed WO (v0.9 anti-nag preserved)", async () => {
+    const slug = "reprep02";
+    await seedWorkOrder(slug, "v1", { status: "dismissed", approvalAction: "dismiss" });
+    // A new view / republish flows through ensureEligibleWorkOrder, which must
+    // leave the dismiss intact — only the explicit manual reset (above) clears it.
+    const res = await ensureEligibleWorkOrder({ moment: moment(slug, "v2"), accountId: ACCOUNT, version: "v2" });
+    expect(res.status).toBe("dismissed");
+    const stored = __readKv(preparedKey(slug)) as FollowUpRecapWorkOrder;
+    expect(stored.status).toBe("dismissed");
+  });
+});
+
 test.describe("generation budget invariants (work-order surface)", () => {
   // NOTE: the run-time cap CHECK (generationCount >= MAX -> failed_final, no third
   // generation) is enforced in the prepare ROUTE, not in work-order.ts, and is
