@@ -62,7 +62,26 @@ test.describe("buyer-tour page — layout + controls", () => {
     );
   });
 
-  test("a valid bundled home photo shows the image (not the placeholder)", async ({
+  test("SSR HTML carries no home/headshot <img> — the hydration-race broken glyph is impossible", async ({
+    request,
+  }) => {
+    // Photos + headshot are mounted CLIENT-SIDE only, so a failing/loading <img> is
+    // never in the server-rendered HTML — there is no pre-hydration window for a
+    // broken glyph. This is the root-cause fix, asserted timing-independently.
+    const res = await request.get("/buyer-tour-preview?fixture=full");
+    expect(res.ok()).toBeTruthy();
+    const html = await res.text();
+    // NOTE: the URLs appear in the serialized RSC props payload — that's fine; only a
+    // rendered <img> TAG can show a broken glyph pre-hydration. Assert no <img src=...>
+    // for the photos/headshot is server-rendered (the attribute form, not the JSON).
+    expect(html).not.toContain('src="/buyer-tour-samples/__missing__.jpg"');
+    expect(html).not.toContain('src="/buyer-tour-samples/home-1.svg"');
+    expect(html).not.toMatch(/<img[^>]+src="\/buyer-tour-samples\//);
+    // The placeholder + the page itself ARE server-rendered.
+    expect(html).toContain("btb-home-3-placeholder");
+  });
+
+  test("a valid bundled home photo is revealed after it loads (placeholder gone)", async ({
     page,
   }) => {
     await page.goto(FULL); // home 1 uses a bundled same-origin SVG
@@ -79,19 +98,25 @@ test.describe("buyer-tour page — layout + controls", () => {
     await expect(page.getByTestId("btb-home-3-photo")).toHaveCount(0);
   });
 
-  test("a FAILED home photo load is REPLACED by the placeholder (onError swap)", async ({
+  test("a REAL failing home photo (404) shows the placeholder; the photo is never revealed", async ({
     page,
   }) => {
     await page.goto(FULL);
-    // home 1's bundled SVG loads, so the <img> is reliably mounted — simulate a load
-    // failure on it and assert the component REPLACES it with the placeholder (the
-    // img is unmounted, never left behind a broken glyph). This is the exact path a
-    // real browser takes on the deployed preview for a 404 / unreachable photo URL.
-    const img = page.getByTestId("btb-home-1-photo");
-    await expect(img).toBeVisible();
-    await img.evaluate((el) => el.dispatchEvent(new Event("error")));
-    await expect(page.getByTestId("btb-home-1-placeholder")).toBeVisible();
-    await expect(page.getByTestId("btb-home-1-photo")).toHaveCount(0);
+    // Home 2 points at a missing same-origin asset (real 404, not a synthetic event).
+    // The placeholder is the BASE state, shown immediately and never replaced.
+    await expect(page.getByTestId("btb-home-2-placeholder")).toBeVisible();
+    // If the client-mounted <img> is still present, it must remain transparent
+    // (never revealed) — so no broken glyph is ever visible — and it is removed on
+    // error. Either outcome satisfies "no broken image".
+    const photo = page.getByTestId("btb-home-2-photo");
+    if (await photo.count()) {
+      const opacity = await photo.evaluate(
+        (el) => getComputedStyle(el).opacity,
+      );
+      expect(opacity).toBe("0");
+    }
+    // No leaked alt text anywhere on the page.
+    expect(await page.locator('img[alt]:not([alt=""])').count()).toBe(0);
   });
 
   test("an absent agent headshot renders a monogram", async ({ page }) => {
@@ -99,16 +124,12 @@ test.describe("buyer-tour page — layout + controls", () => {
     await expect(page.getByTestId("btb-agent-avatar")).toHaveText("AR");
   });
 
-  test("a FAILED agent headshot load swaps to the monogram", async ({ page }) => {
+  test("a REAL failing agent headshot (404) shows the monogram", async ({
+    page,
+  }) => {
     await page.goto(FULL); // FULL agent headshot points at a missing same-origin asset
-    const avatar = page.getByTestId("btb-agent-avatar");
-    // Force the error path only if it's still the <img> (race-proof), then assert
-    // the monogram swap.
-    await avatar
-      .evaluate((el) => {
-        if (el.tagName === "IMG") el.dispatchEvent(new Event("error"));
-      })
-      .catch(() => {});
+    // The monogram is the BASE state and is shown immediately; a failing headshot
+    // never reveals, so it stays the monogram "JA" (Jordan Avery).
     await expect(page.getByTestId("btb-agent-avatar")).toHaveText("JA");
   });
 });

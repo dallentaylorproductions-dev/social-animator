@@ -153,46 +153,69 @@ function Eyebrow({ children }: { children: React.ReactNode }) {
   );
 }
 
-/** Home photo with a branded placeholder fallback (absent OR onError). */
-function HomePhoto({
-  home,
-  accent,
-}: {
-  home: PublicHome;
-  accent: string;
-}) {
-  const [failed, setFailed] = useState(false);
+/**
+ * Image load state machine that DEFEATS the SSR hydration race.
+ *
+ * The page is server-rendered. If an <img> is in the SSR HTML, the browser begins
+ * loading it BEFORE React hydrates and attaches `onError`; a failure that lands in
+ * that window is never caught and the broken glyph sticks. So we:
+ *   1. Never SSR the <img> — it is mounted CLIENT-SIDE ONLY (after `mounted`), so the
+ *      onLoad/onError handlers are attached the instant the element (and its request)
+ *      exists. No pre-hydration window.
+ *   2. Default to the placeholder/monogram; reveal the photo ONLY on `loaded`.
+ *   3. Defensively reconcile against the ref after mount: a cached image may already
+ *      be `complete` (→ loaded), and an already-errored image reports
+ *      `complete && naturalWidth === 0` (→ failed). Catches anything the events miss.
+ *
+ * Returns whether to render the <img> at all, plus the resolved status.
+ */
+function useRevealOnLoad(hasUrl: boolean) {
+  // `isClient` is false on the server + first hydration snapshot, true on the client
+  // thereafter — the lint-clean "is-hydrated" pattern (no set-state-in-effect). The
+  // <img> is rendered only when isClient, so it never appears in the SSR HTML.
+  const isClient = useSyncExternalStore(
+    () => () => {},
+    () => true,
+    () => false,
+  );
+  const [status, setStatus] = useState<"pending" | "loaded" | "failed">(
+    "pending",
+  );
+  const ref = useRef<HTMLImageElement | null>(null);
+
+  // Defensive reconcile against the SSR/cache race: an already-cached image is
+  // `complete` (→ loaded); an already-errored image is `complete && naturalWidth 0`
+  // (→ failed). Catches anything the onLoad/onError events miss.
+  useEffect(() => {
+    if (!isClient) return;
+    const img = ref.current;
+    if (img && img.complete) {
+      setStatus(img.naturalWidth > 0 ? "loaded" : "failed");
+    }
+  }, [isClient]);
+
+  return {
+    ref,
+    // The <img> lives only client-side and only until a failure is known.
+    renderImg: hasUrl && isClient && status !== "failed",
+    loaded: status === "loaded",
+    onLoad: () => setStatus("loaded"),
+    onError: () => setStatus("failed"),
+  };
+}
+
+/** Home photo — placeholder by default; the photo is revealed only after it loads. */
+function HomePhoto({ home, accent }: { home: PublicHome; accent: string }) {
   const { street, rest } = splitAddress(home.address);
-  const showPhoto = !!home.photoUrl && !failed;
+  const { ref, renderImg, loaded, onLoad, onError } = useRevealOnLoad(
+    !!home.photoUrl,
+  );
 
   return (
     <div className="relative flex h-[150px] items-end overflow-hidden">
-      {showPhoto ? (
-        <>
-          {/* eslint-disable-next-line @next/next/no-img-element */}
-          <img
-            src={home.photoUrl}
-            alt={`Home ${home.stop}: ${home.address}`}
-            onError={() => setFailed(true)}
-            className="absolute inset-0 h-full w-full object-cover"
-            data-testid={`btb-home-${home.stop}-photo`}
-          />
-          <div
-            className="relative w-full px-4 pb-3 pt-7"
-            style={{
-              background:
-                "linear-gradient(180deg, rgba(22,33,31,0), rgba(22,33,31,.82))",
-            }}
-          >
-            <div className="text-[15.5px] font-bold leading-tight text-white">
-              {street}
-            </div>
-            {rest && <div className="mt-0.5 text-xs text-[#E7E0D5]">{rest}</div>}
-          </div>
-        </>
-      ) : (
-        // Branded placeholder — neutral sand canvas + a single accent house glyph
-        // (the tour thread). Never a broken-image glyph.
+      {/* Branded placeholder base — visible in every state except a loaded photo.
+          Never a broken-image glyph. */}
+      {!loaded && (
         <div
           className="absolute inset-0 flex items-center justify-center"
           style={{ background: "linear-gradient(135deg,#F2ECDE,#E7DECB)" }}
@@ -222,9 +245,44 @@ function HomePhoto({
         </div>
       )}
 
+      {/* Photo — client-mounted only, transparent until loaded (so a still-loading
+          or failed image shows nothing over the placeholder), removed on failure. */}
+      {renderImg && (
+        <>
+          {/* eslint-disable-next-line @next/next/no-img-element */}
+          <img
+            ref={ref}
+            src={home.photoUrl}
+            alt=""
+            onLoad={onLoad}
+            onError={onError}
+            className={`absolute inset-0 h-full w-full object-cover transition-opacity ${
+              loaded ? "opacity-100" : "opacity-0"
+            }`}
+            data-testid={`btb-home-${home.stop}-photo`}
+          />
+          {loaded && (
+            <div
+              className="absolute bottom-0 w-full px-4 pb-3 pt-7"
+              style={{
+                background:
+                  "linear-gradient(180deg, rgba(22,33,31,0), rgba(22,33,31,.82))",
+              }}
+            >
+              <div className="text-[15.5px] font-bold leading-tight text-white">
+                {street}
+              </div>
+              {rest && (
+                <div className="mt-0.5 text-xs text-[#E7E0D5]">{rest}</div>
+              )}
+            </div>
+          )}
+        </>
+      )}
+
       {/* Stop badge — paper chip with accent number (per mock). */}
       <div
-        className="absolute left-2.5 top-2.5 flex h-[30px] w-[30px] items-center justify-center rounded-[9px] bg-white text-[15px] font-bold shadow-[0_1px_2px_rgba(22,33,31,.06),0_6px_20px_rgba(22,33,31,.06)]"
+        className="absolute left-2.5 top-2.5 z-10 flex h-[30px] w-[30px] items-center justify-center rounded-[9px] bg-white text-[15px] font-bold shadow-[0_1px_2px_rgba(22,33,31,.06),0_6px_20px_rgba(22,33,31,.06)]"
         style={{ color: accent }}
         data-testid={`btb-home-${home.stop}-badge`}
       >
@@ -234,32 +292,46 @@ function HomePhoto({
   );
 }
 
-/** Agent avatar — headshot, falling back to a monogram (absent OR onError). */
+/**
+ * Agent avatar — monogram by default; the headshot is revealed only after it loads
+ * (same SSR-race-proof pattern as HomePhoto). A missing/failed headshot never leaves
+ * a broken glyph: the monogram is the base and the <img> is client-mounted, kept
+ * transparent until loaded, and removed on failure.
+ */
 function AgentAvatar({ agent }: { agent: PublicAgent }) {
-  const [failed, setFailed] = useState(false);
   const mono = initials(agent.name) || "•";
-  if (agent.photoUrl && !failed) {
-    return (
-      // eslint-disable-next-line @next/next/no-img-element
-      <img
-        src={agent.photoUrl}
-        alt={agent.name ?? "Your agent"}
-        onError={() => setFailed(true)}
-        className="h-14 w-14 flex-none rounded-[14px] object-cover"
-        data-testid="btb-agent-avatar"
-      />
-    );
-  }
+  const { ref, renderImg, loaded, onLoad, onError } = useRevealOnLoad(
+    !!agent.photoUrl,
+  );
   return (
     <div
-      className="flex h-14 w-14 flex-none items-center justify-center rounded-[14px] border border-white/10 text-[20px] font-semibold text-[#9FE3D6]"
-      style={{
-        fontFamily: SERIF,
-        background: "linear-gradient(135deg,#2A3D39,#1A2A27)",
-      }}
+      className="relative h-14 w-14 flex-none overflow-hidden rounded-[14px]"
       data-testid="btb-agent-avatar"
     >
-      {mono}
+      {!loaded && (
+        <div
+          className="absolute inset-0 flex items-center justify-center border border-white/10 text-[20px] font-semibold text-[#9FE3D6]"
+          style={{
+            fontFamily: SERIF,
+            background: "linear-gradient(135deg,#2A3D39,#1A2A27)",
+          }}
+        >
+          {mono}
+        </div>
+      )}
+      {renderImg && (
+        // eslint-disable-next-line @next/next/no-img-element
+        <img
+          ref={ref}
+          src={agent.photoUrl}
+          alt=""
+          onLoad={onLoad}
+          onError={onError}
+          className={`absolute inset-0 h-14 w-14 object-cover transition-opacity ${
+            loaded ? "opacity-100" : "opacity-0"
+          }`}
+        />
+      )}
     </div>
   );
 }
