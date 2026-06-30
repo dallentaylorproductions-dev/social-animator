@@ -209,6 +209,29 @@ test.describe("buyer-tour public-payload allow-list", () => {
     ).toBeUndefined();
   });
 
+  test("photo URL allow-list: http(s) + same-origin root-relative pass; js/data/protocol-relative drop", () => {
+    const mk = (photoUrl: string) =>
+      clampBuyerTourPublicPayload({
+        buyerName: "x",
+        tourDate: "y",
+        priorities: [],
+        buyerPriorities: [],
+        homes: [
+          { address: "1 A St", whyOnList: "w", watchFor: "", proximity: [], photoUrl },
+        ],
+      }).homes[0].photoUrl;
+
+    // Allowed: absolute http(s) + same-origin root-relative (bundled assets).
+    expect(mk("https://cdn.example.com/a.jpg")).toBe("https://cdn.example.com/a.jpg");
+    expect(mk("/buyer-tour-samples/home-1.svg")).toBe("/buyer-tour-samples/home-1.svg");
+    // Dropped: the dangerous + cross-origin forms.
+    expect(mk("javascript:alert(1)")).toBeUndefined();
+    expect(mk("data:image/png;base64,AAAA")).toBeUndefined();
+    expect(mk("//evil.com/a.jpg")).toBeUndefined(); // protocol-relative = cross-origin
+    expect(mk("ftp://x/a.jpg")).toBeUndefined();
+    expect(mk("not a url")).toBeUndefined();
+  });
+
   test("empty / absent input clamps to a safe minimal payload", () => {
     const payload = clampBuyerTourPublicPayload(null);
     expect(payload.templateVersion).toBe(1);

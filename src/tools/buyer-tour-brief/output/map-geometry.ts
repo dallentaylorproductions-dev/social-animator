@@ -120,13 +120,17 @@ export function projectTourMap(input: ProjectInput): {
     return { x, y };
   };
 
+  // The on-map anchor tag is shown ONLY when the anchor is near the tour area.
+  // "Near" = within one tour-span of the home bounds on each axis (fraction in
+  // [-1, 2]). A FAR anchor (a base/airport/downtown many miles off) is OMITTED so
+  // it can't distort or mislead the tour view — commute still shows as drive-time
+  // chips. With a single (or zero-span) tour there's no scale to judge by, so omit.
   let anchor: MapPoint | undefined;
-  if (anchorValid) {
-    if (single) {
-      // No span to scale against — drop the anchor toward a bottom corner so it
-      // still reads as "off in that direction" rather than sitting on the home.
-      anchor = { x: padding, y: height - padding };
-    } else {
+  if (anchorValid && !single) {
+    const fx = spanLng === 0 ? 0.5 : (anchorValid.lng - minLng) / spanLng;
+    const fy = spanLat === 0 ? 0.5 : (anchorValid.lat - minLat) / spanLat;
+    const near = fx >= -1 && fx <= 2 && fy >= -1 && fy <= 2;
+    if (near) {
       const raw = project(anchorValid);
       anchor = {
         x: clamp(raw.x, padding, width - padding),

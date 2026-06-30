@@ -309,9 +309,12 @@ export function BuyerTourPage({ payload }: { payload: BuyerTourPublicPayload }) 
     [reduced],
   );
 
-  const hasMap = payload.homes.some(
+  // Map shows when at least ONE home geocoded (one pin, no route). Zero geocoded →
+  // the calm "Map unavailable" fallback (tour order + cards still render below).
+  const geocodedCount = payload.homes.filter(
     (h) => h.lat !== undefined && h.lng !== undefined,
-  );
+  ).length;
+  const hasMap = geocodedCount >= 1;
 
   // The commute layer only makes sense with an anchor set — hide it cleanly
   // otherwise (never imply a default destination). Every other layer passes through.
@@ -543,6 +546,17 @@ export function BuyerTourPage({ payload }: { payload: BuyerTourPublicPayload }) 
                   recommendations, or judgments about any school or area.
                 </div>
               </div>
+            </div>
+          </section>
+        )}
+
+        {/* ---------- map-unavailable fallback (no home geocoded) ---------- */}
+        {!hasMap && (
+          <section className="px-6 pt-6" data-testid="btb-map-unavailable">
+            <div className="rounded-[14px] border border-[#EAE3D8] bg-[#F7F3EA] px-4 py-5 text-center">
+              <p className="text-[13px] text-[#7C8A86]">
+                Map unavailable, tour order shown below.
+              </p>
             </div>
           </section>
         )}

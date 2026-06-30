@@ -135,10 +135,19 @@ function projLng(v: unknown): number | undefined {
   return v >= -180 && v <= 180 ? v : undefined;
 }
 
+/**
+ * Accept a hosted absolute http(s) URL OR a same-origin ROOT-RELATIVE path
+ * ("/path", e.g. a bundled /public asset). Everything else drops — crucially
+ * `javascript:` / `data:` (no inline payloads into an <img> or link) and
+ * protocol-relative `//host` (that is cross-origin, not same-origin). This is an
+ * allow-list EXTENSION for same-origin assets, not a loosening of the boundary.
+ */
 function projHostedUrl(v: unknown): string | undefined {
   const s = projOptStr(v, 2048);
   if (!s) return undefined;
-  return /^https?:\/\//i.test(s) ? s : undefined;
+  if (/^https?:\/\//i.test(s)) return s;
+  if (/^\/(?!\/)/.test(s)) return s; // root-relative, but not protocol-relative "//"
+  return undefined;
 }
 
 /** Only a valid #rgb / #rrggbb hex survives — defends the accent slot against an

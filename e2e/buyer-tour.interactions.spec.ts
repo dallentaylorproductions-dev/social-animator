@@ -62,6 +62,14 @@ test.describe("buyer-tour page — layout + controls", () => {
     );
   });
 
+  test("a valid bundled home photo shows the image (not the placeholder)", async ({
+    page,
+  }) => {
+    await page.goto(FULL); // home 1 uses a bundled same-origin SVG
+    await expect(page.getByTestId("btb-home-1-photo")).toBeVisible();
+    await expect(page.getByTestId("btb-home-1-placeholder")).toHaveCount(0);
+  });
+
   test("an absent home photo renders the branded placeholder (no broken image)", async ({
     page,
   }) => {
@@ -71,17 +79,19 @@ test.describe("buyer-tour page — layout + controls", () => {
     await expect(page.getByTestId("btb-home-3-photo")).toHaveCount(0);
   });
 
-  test("a home photo that FAILS to load falls back to the branded placeholder", async ({
+  test("a FAILED home photo load is REPLACED by the placeholder (onError swap)", async ({
     page,
   }) => {
     await page.goto(FULL);
-    // Home 2 has a non-loadable URL. Drive the failure deterministically (a bad URL
-    // just hangs in CI rather than firing `error`), then assert the swap.
-    const img = page.getByTestId("btb-home-2-photo");
-    await expect(img).toBeAttached();
+    // home 1's bundled SVG loads, so the <img> is reliably mounted — simulate a load
+    // failure on it and assert the component REPLACES it with the placeholder (the
+    // img is unmounted, never left behind a broken glyph). This is the exact path a
+    // real browser takes on the deployed preview for a 404 / unreachable photo URL.
+    const img = page.getByTestId("btb-home-1-photo");
+    await expect(img).toBeVisible();
     await img.evaluate((el) => el.dispatchEvent(new Event("error")));
-    await expect(page.getByTestId("btb-home-2-placeholder")).toBeVisible();
-    await expect(page.getByTestId("btb-home-2-photo")).toHaveCount(0);
+    await expect(page.getByTestId("btb-home-1-placeholder")).toBeVisible();
+    await expect(page.getByTestId("btb-home-1-photo")).toHaveCount(0);
   });
 
   test("an absent agent headshot renders a monogram", async ({ page }) => {
@@ -89,12 +99,16 @@ test.describe("buyer-tour page — layout + controls", () => {
     await expect(page.getByTestId("btb-agent-avatar")).toHaveText("AR");
   });
 
-  test("a failed agent headshot load falls back to a monogram", async ({
-    page,
-  }) => {
-    await page.goto(FULL); // FULL agent is Jordan Avery → monogram "JA"
+  test("a FAILED agent headshot load swaps to the monogram", async ({ page }) => {
+    await page.goto(FULL); // FULL agent headshot points at a missing same-origin asset
     const avatar = page.getByTestId("btb-agent-avatar");
-    await avatar.evaluate((el) => el.dispatchEvent(new Event("error")));
+    // Force the error path only if it's still the <img> (race-proof), then assert
+    // the monogram swap.
+    await avatar
+      .evaluate((el) => {
+        if (el.tagName === "IMG") el.dispatchEvent(new Event("error"));
+      })
+      .catch(() => {});
     await expect(page.getByTestId("btb-agent-avatar")).toHaveText("JA");
   });
 });
@@ -193,6 +207,82 @@ test.describe("buyer-tour page — national usability (non-WA sample)", () => {
   test("a photoless agent renders a monogram (ML)", async ({ page }) => {
     await page.goto(MN);
     await expect(page.getByTestId("btb-agent-avatar")).toHaveText("ML");
+  });
+});
+
+test.describe("buyer-tour — national QA + map legitimacy", () => {
+  for (const fx of ["mn", "tx", "rural"]) {
+    test(`${fx}: no WA/JBLM copy; projected ordered pins; buyer-priority Planned-around`, async ({
+      page,
+    }) => {
+      await page.goto(`/buyer-tour-preview?fixture=${fx}`);
+      const body = page.getByTestId("buyer-tour-page");
+      await expect(body).toBeVisible();
+      await expect(body).not.toContainText("JBLM");
+      await expect(body).not.toContainText("Tacoma");
+      await expect(body).not.toContainText("South Sound");
+      // Pins are projected from coords (each fixture has 3 geocoded homes) and the
+      // route is an ordered polyline.
+      await expect(page.getByTestId("btb-map-pin-1")).toBeAttached();
+      await expect(page.getByTestId("btb-map-pin-3")).toBeAttached();
+      await expect(page.getByTestId("btb-map-route")).toHaveCount(1);
+      // Planned-around is the buyer's custom priorities, not the layer set.
+      await expect(page.getByTestId("btb-planned-around")).toBeVisible();
+      await expect(page.getByTestId("btb-planned-around")).not.toContainText(
+        "School locations",
+      );
+    });
+  }
+
+  test("FAR commute anchor (Dallas Love Field) is omitted from the map; chips remain", async ({
+    page,
+  }) => {
+    await page.goto("/buyer-tour-preview?fixture=tx");
+    await expect(page.getByTestId("btb-map-anchor")).toHaveCount(0);
+    await expect(page.getByTestId("btb-chip-1-commute")).toContainText(
+      "Dallas Love Field",
+    );
+  });
+
+  test("NEAR commute anchor (Downtown Minneapolis) shows the on-map tag", async ({
+    page,
+  }) => {
+    await page.goto("/buyer-tour-preview?fixture=mn");
+    await expect(page.getByTestId("btb-map-anchor")).toContainText("Downtown");
+  });
+
+  test("layer toggle ties map ↔ chips in a non-WA market (tx)", async ({
+    page,
+  }) => {
+    await page.goto("/buyer-tour-preview?fixture=tx");
+    const chip = page.getByTestId("btb-chip-1-schools");
+    await expect(chip).toHaveAttribute("data-active", "true");
+    await expect(page.getByTestId("btb-map-marker-1-schools")).toHaveCount(1);
+    await page.getByTestId("btb-legend-schools").click();
+    await expect(chip).toHaveAttribute("data-active", "false");
+    await expect(page.getByTestId("btb-map-marker-1-schools")).toHaveCount(0);
+  });
+
+  test("geocode-fail fixture shows the calm Map-unavailable fallback (no broken map)", async ({
+    page,
+  }) => {
+    await page.goto("/buyer-tour-preview?fixture=nomap");
+    await expect(page.getByTestId("btb-map-unavailable")).toContainText(
+      "Map unavailable",
+    );
+    await expect(page.getByTestId("btb-map")).toHaveCount(0);
+    // Tour order + home cards still render.
+    await expect(page.getByTestId("btb-order-1")).toBeVisible();
+    await expect(page.getByTestId("btb-home-1")).toBeVisible();
+  });
+
+  test("single-geocoded fixture shows one pin and hides the route line", async ({
+    page,
+  }) => {
+    await page.goto("/buyer-tour-preview?fixture=onepin");
+    await expect(page.getByTestId("btb-map-pin-1")).toBeAttached();
+    await expect(page.getByTestId("btb-map-pin-2")).toHaveCount(0);
+    await expect(page.getByTestId("btb-map-route")).toHaveCount(0);
   });
 });
 
