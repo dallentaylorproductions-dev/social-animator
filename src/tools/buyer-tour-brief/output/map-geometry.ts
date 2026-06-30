@@ -56,8 +56,14 @@ function isPoint(p: LatLng | null | undefined): p is LatLng {
 /**
  * Project home + anchor coordinates into the viewBox. Homes without coordinates
  * project to `null` (the caller skips drawing that pin on the map but still shows
- * the card). The bounding box spans every valid point (homes + anchor) so the
- * whole tour fits with padding.
+ * the card).
+ *
+ * The bounding box is computed from the HOMES ONLY, so the tour spreads to fill the
+ * canvas. The commute anchor is usually far outside that box (a base / workplace
+ * miles away); including it would squash every home into one corner (the v0 bug).
+ * Instead the anchor is projected with the same transform and then CLAMPED to the
+ * padded canvas edge, so it reads as a direction marker ("JBLM is that way") without
+ * distorting the home spread — matching the mock, where the anchor is a small edge tag.
  */
 export function projectTourMap(input: ProjectInput): {
   width: number;
@@ -69,19 +75,19 @@ export function projectTourMap(input: ProjectInput): {
   const height = input.height ?? DEFAULT_HEIGHT;
   const padding = input.padding ?? DEFAULT_PADDING;
 
-  const valid: LatLng[] = [];
-  for (const h of input.homes) if (isPoint(h)) valid.push(h);
+  const homePoints: LatLng[] = [];
+  for (const h of input.homes) if (isPoint(h)) homePoints.push(h);
   const anchorValid = isPoint(input.anchor) ? input.anchor : undefined;
-  if (anchorValid) valid.push(anchorValid);
 
   const cx = (padding + (width - padding)) / 2;
   const cy = (padding + (height - padding)) / 2;
 
-  if (valid.length === 0) {
+  if (homePoints.length === 0) {
     return {
       width,
       height,
       homes: input.homes.map(() => null),
+      // With no home box to scale against we can't meaningfully place the anchor.
       anchor: undefined,
     };
   }
@@ -90,7 +96,7 @@ export function projectTourMap(input: ProjectInput): {
   let maxLat = -Infinity;
   let minLng = Infinity;
   let maxLng = -Infinity;
-  for (const p of valid) {
+  for (const p of homePoints) {
     if (p.lat < minLat) minLat = p.lat;
     if (p.lat > maxLat) maxLat = p.lat;
     if (p.lng < minLng) minLng = p.lng;
@@ -99,9 +105,13 @@ export function projectTourMap(input: ProjectInput): {
 
   const spanLat = maxLat - minLat;
   const spanLng = maxLng - minLng;
+  // Single distinct home (or all-identical) → put it dead centre, not a corner.
+  const single = spanLat === 0 && spanLng === 0;
+
+  const clamp = (v: number, lo: number, hi: number) =>
+    Math.max(lo, Math.min(hi, v));
 
   const project = (p: LatLng): MapPoint => {
-    // All-identical (or single) on an axis → centre that axis (avoid /0).
     const fx = spanLng === 0 ? 0.5 : (p.lng - minLng) / spanLng;
     const fy = spanLat === 0 ? 0.5 : (p.lat - minLat) / spanLat;
     const x = padding + fx * (width - 2 * padding);
@@ -110,8 +120,20 @@ export function projectTourMap(input: ProjectInput): {
     return { x, y };
   };
 
-  // Single distinct point → put it dead centre rather than at a corner.
-  const single = spanLat === 0 && spanLng === 0;
+  let anchor: MapPoint | undefined;
+  if (anchorValid) {
+    if (single) {
+      // No span to scale against — drop the anchor toward a bottom corner so it
+      // still reads as "off in that direction" rather than sitting on the home.
+      anchor = { x: padding, y: height - padding };
+    } else {
+      const raw = project(anchorValid);
+      anchor = {
+        x: clamp(raw.x, padding, width - padding),
+        y: clamp(raw.y, padding, height - padding),
+      };
+    }
+  }
 
   return {
     width,
@@ -119,11 +141,7 @@ export function projectTourMap(input: ProjectInput): {
     homes: input.homes.map((h) =>
       isPoint(h) ? (single ? { x: cx, y: cy } : project(h)) : null,
     ),
-    anchor: anchorValid
-      ? single
-        ? { x: cx, y: cy }
-        : project(anchorValid)
-      : undefined,
+    anchor,
   };
 }
 

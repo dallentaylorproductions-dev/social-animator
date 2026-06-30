@@ -101,6 +101,29 @@ test.describe("buyer-tour Fair Housing gate", () => {
     expect(lower).toContain("all buyers are welcome and served equally");
   });
 
+  test("shipped fixtures model no familial-status language", () => {
+    // The agent's free text isn't banned by construction, but the SAMPLE we ship
+    // must not MODEL familial-status phrasing. Scan the fixture file specifically.
+    const FAMILIAL_STATUS = [
+      "with the kids",
+      "for the kids",
+      "your kids",
+      "the children",
+      "for families",
+      "young family",
+      "growing family",
+      "perfect for kids",
+      "good for raising",
+      "great for raising",
+    ];
+    const file = path.resolve(SCAN_ROOT, "output/__fixtures__/sample-payload.ts");
+    const lower = stripComments(readFileSync(file, "utf8")).toLowerCase();
+    const hits = FAMILIAL_STATUS.filter((p) => lower.includes(p));
+    expect(hits, `Familial-status copy in fixtures: ${hits.join(", ")}`).toEqual(
+      [],
+    );
+  });
+
   test("detector self-test: a seeded banned phrase is caught", () => {
     const seeded = "These are the best schools in a safe neighborhood.".toLowerCase();
     const hits = FAIR_HOUSING_BANNED.filter((p) => seeded.includes(p));

@@ -67,7 +67,7 @@ export const FULL_PAYLOAD: BuyerTourPublicPayload = {
       lng: -122.4585,
       whyOnList:
         "Biggest yard on the list and the price leaves room for the bathroom update we talked about.",
-      watchFor: "One bath only. Picture mornings with the kids.",
+      watchFor: "One bath only. Picture how the morning routine would flow.",
       proximity: [
         { category: "schools", label: "Lincoln High School", value: "0.4 mi" },
         { category: "commute", label: "JBLM main gate", value: "18 min drive" },

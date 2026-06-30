@@ -1,39 +1,51 @@
 "use client";
 
 /**
- * Buyer Tour Brief — the buyer-facing page (BUYER_TOUR_BRIEF).
+ * Buyer Tour Brief — the buyer-facing page (BUYER_TOUR_BRIEF, v0.1 cream re-skin).
  *
- * The buyer-side twin of the Seller Presentation. The hero is the AGENT'S THINKING
- * (why each home is on the list, what to notice), not the map; the map is an
- * experience hero, not a data dependency. Renders ONLY from the clamped public
- * payload (the privacy boundary) — never the raw draft.
+ * The buyer-side twin of the Seller Presentation, in the SAME light/cream serif
+ * premium family as the seller consumer page. Ported from the approved mock: top
+ * bar, serif hero, Tour Snapshot, static "planned around" card, the Buyer Day Map +
+ * wrapping checkbox legend, ordered home cards (stop badge, "why" accent bar, "watch
+ * for", factual proximity chips), the after-tour comparison preview, the agent close,
+ * and the Fair-Housing footer. Renders ONLY from the clamped public payload.
  *
- * Acceptance criteria wired here:
- *   1. No horizontal overflow — content is a single max-w column; chips + legend wrap.
- *   2. "Planned around you" is a static, fully-visible card (no scroll-to-reveal).
- *   3. Layer legend = real buttons (aria-pressed), wrap, ≥44px tap targets, a
- *      first-use hint, clear active/inactive states.
- *   4. Toggling a layer updates BOTH the map markers AND the matching card chips
- *      (the chip glow ties layer → card → buyer priority).
- *   5. Tapping a map pin scrolls to + briefly highlights the matching home.
- *   6. prefers-reduced-motion → glow/flash become a static highlight (no animation);
- *      map markers appear without scale/transition (motion-safe gating).
- *   7. School layer is factual proximity only, labelled "School locations".
+ * Color discipline (the two-color rule, preserved): the agent brand `accent` rides
+ * the TOUR THREAD only (brand mark, map pins + route, order-strip step numbers, the
+ * "why" accent bar, the primary CTA), run through `pickContrastText` for legibility.
+ * The fixed semantic palette owns the MAP LOGIC (markers + legend + chips). Everything
+ * else stays the mock's cream / neutral palette.
+ *
+ * Image fallbacks (no broken-image glyphs): a home photo that is absent OR fails to
+ * load renders the branded placeholder; an absent/failed agent headshot renders a
+ * monogram. Motion respects prefers-reduced-motion (static highlight, no flash).
  */
 
-import { useCallback, useEffect, useRef, useState, useSyncExternalStore } from "react";
-import type { ProximityCategory } from "../engine/types";
-import type { BuyerTourPublicPayload, PublicHome } from "./public-payload";
 import {
-  AFTER_TOUR_TEASER,
-  FOOTER_DISCLAIMER,
-  HEADINGS,
-  LAYER_HINTS,
-  LAYER_LABELS,
-  LEGEND_HINT,
-} from "./copy";
+  useCallback,
+  useEffect,
+  useRef,
+  useState,
+  useSyncExternalStore,
+} from "react";
+import type { ProximityCategory } from "../engine/types";
+import type {
+  BuyerTourPublicPayload,
+  PublicAgent,
+  PublicHome,
+} from "./public-payload";
+import { AFTER_TOUR_TEASER, FOOTER_DISCLAIMER, LAYER_HINTS, LAYER_LABELS } from "./copy";
 import { DEFAULT_TOUR_ACCENT, LAYER_COLOR, StylizedMap } from "./StylizedMap";
 import { pickContrastText } from "@/tools/listing-flyer/engine/contrast";
+
+/**
+ * The mock's system serif stack (Iowan / Palatino / Georgia). Deliberately a SYSTEM
+ * stack, not a web font: it adds zero network/build dependency (no Google Fonts
+ * fetch) and matches the mock 1:1. The seller flagship's Newsreader could be wired
+ * later for exact cross-surface type if desired — flagged in the handoff.
+ */
+const SERIF =
+  '"Iowan Old Style", "Palatino Linotype", Palatino, Georgia, "Times New Roman", serif';
 
 const REDUCED_MOTION_QUERY = "(prefers-reduced-motion: reduce)";
 
@@ -44,8 +56,7 @@ function subscribeReducedMotion(onChange: () => void): () => void {
   return () => mq.removeEventListener?.("change", onChange);
 }
 
-/** SSR-safe prefers-reduced-motion read via the external-store subscription
- *  pattern (no set-state-in-effect). Server snapshot is false. */
+/** SSR-safe prefers-reduced-motion read via external-store subscription. */
 function useReducedMotion(): boolean {
   return useSyncExternalStore(
     subscribeReducedMotion,
@@ -57,41 +68,154 @@ function useReducedMotion(): boolean {
   );
 }
 
-function formatPrice(price?: number): string | null {
-  if (price === undefined) return null;
-  return `$${price.toLocaleString("en-US")}`;
+function initials(name?: string): string {
+  if (!name) return "";
+  const parts = name.trim().split(/\s+/).filter(Boolean);
+  if (parts.length === 0) return "";
+  const first = parts[0][0] ?? "";
+  const last = parts.length > 1 ? parts[parts.length - 1][0] : "";
+  return (first + last).toUpperCase();
 }
 
-function specLine(home: PublicHome): string | null {
-  const parts: string[] = [];
-  if (home.beds !== undefined) parts.push(`${home.beds} bd`);
-  if (home.baths !== undefined) parts.push(`${home.baths} ba`);
-  if (home.sqft !== undefined) parts.push(`${home.sqft.toLocaleString("en-US")} sqft`);
-  return parts.length > 0 ? parts.join(" · ") : null;
+function formatPrice(price?: number): string | null {
+  return price === undefined ? null : `$${price.toLocaleString("en-US")}`;
+}
+
+function splitAddress(address: string): { street: string; rest: string } {
+  const i = address.indexOf(",");
+  if (i === -1) return { street: address, rest: "" };
+  return {
+    street: address.slice(0, i).trim(),
+    rest: address.slice(i + 1).trim(),
+  };
+}
+
+/** Eyebrow — thin uppercase letter-spaced label. Neutral (accent discipline). */
+function Eyebrow({ children }: { children: React.ReactNode }) {
+  return (
+    <div className="text-[11px] font-bold uppercase tracking-[0.16em] text-[#7C8A86]">
+      {children}
+    </div>
+  );
+}
+
+/** Home photo with a branded placeholder fallback (absent OR onError). */
+function HomePhoto({
+  home,
+  accent,
+}: {
+  home: PublicHome;
+  accent: string;
+}) {
+  const [failed, setFailed] = useState(false);
+  const { street, rest } = splitAddress(home.address);
+  const showPhoto = !!home.photoUrl && !failed;
+
+  return (
+    <div className="relative flex h-[150px] items-end overflow-hidden">
+      {showPhoto ? (
+        <>
+          {/* eslint-disable-next-line @next/next/no-img-element */}
+          <img
+            src={home.photoUrl}
+            alt={`Home ${home.stop}: ${home.address}`}
+            onError={() => setFailed(true)}
+            className="absolute inset-0 h-full w-full object-cover"
+            data-testid={`btb-home-${home.stop}-photo`}
+          />
+          <div
+            className="relative w-full px-4 pb-3 pt-7"
+            style={{
+              background:
+                "linear-gradient(180deg, rgba(22,33,31,0), rgba(22,33,31,.82))",
+            }}
+          >
+            <div className="text-[15.5px] font-bold leading-tight text-white">
+              {street}
+            </div>
+            {rest && <div className="mt-0.5 text-xs text-[#E7E0D5]">{rest}</div>}
+          </div>
+        </>
+      ) : (
+        // Branded placeholder — neutral sand canvas + a single accent house glyph
+        // (the tour thread). Never a broken-image glyph.
+        <div
+          className="absolute inset-0 flex items-center justify-center"
+          style={{ background: "linear-gradient(135deg,#F2ECDE,#E7DECB)" }}
+          data-testid={`btb-home-${home.stop}-placeholder`}
+        >
+          <svg
+            width="42"
+            height="42"
+            viewBox="0 0 24 24"
+            fill="none"
+            stroke={accent}
+            strokeWidth="1.5"
+            strokeLinecap="round"
+            strokeLinejoin="round"
+            opacity="0.9"
+            aria-hidden="true"
+          >
+            <path d="M3 10.5 12 3l9 7.5" />
+            <path d="M5 9.5V21h14V9.5" />
+          </svg>
+          <div className="absolute bottom-0 w-full px-4 pb-3 pt-7">
+            <div className="text-[15.5px] font-bold leading-tight text-[#16211F]">
+              {street}
+            </div>
+            {rest && <div className="mt-0.5 text-xs text-[#42514E]">{rest}</div>}
+          </div>
+        </div>
+      )}
+
+      {/* Stop badge — paper chip with accent number (per mock). */}
+      <div
+        className="absolute left-2.5 top-2.5 flex h-[30px] w-[30px] items-center justify-center rounded-[9px] bg-white text-[15px] font-bold shadow-[0_1px_2px_rgba(22,33,31,.06),0_6px_20px_rgba(22,33,31,.06)]"
+        style={{ color: accent }}
+        data-testid={`btb-home-${home.stop}-badge`}
+      >
+        {home.stop}
+      </div>
+    </div>
+  );
+}
+
+/** Agent avatar — headshot, falling back to a monogram (absent OR onError). */
+function AgentAvatar({ agent }: { agent: PublicAgent }) {
+  const [failed, setFailed] = useState(false);
+  const mono = initials(agent.name) || "•";
+  if (agent.photoUrl && !failed) {
+    return (
+      // eslint-disable-next-line @next/next/no-img-element
+      <img
+        src={agent.photoUrl}
+        alt={agent.name ?? "Your agent"}
+        onError={() => setFailed(true)}
+        className="h-14 w-14 flex-none rounded-[14px] object-cover"
+        data-testid="btb-agent-avatar"
+      />
+    );
+  }
+  return (
+    <div
+      className="flex h-14 w-14 flex-none items-center justify-center rounded-[14px] border border-white/10 text-[20px] font-semibold text-[#9FE3D6]"
+      style={{
+        fontFamily: SERIF,
+        background: "linear-gradient(135deg,#2A3D39,#1A2A27)",
+      }}
+      data-testid="btb-agent-avatar"
+    >
+      {mono}
+    </div>
+  );
 }
 
 export function BuyerTourPage({ payload }: { payload: BuyerTourPublicPayload }) {
   const reduced = useReducedMotion();
 
-  // The agent brand accent owns the TOUR THREAD only (pins/route handled in the
-  // map; CTA + step numbers + the "why" accent bar handled below). Legibility never
-  // rides on it: text drawn ON the accent uses a contrast-picked color, so a very
-  // light or very dark agent accent still reads. Absent → the default tour accent.
   const accent = payload.brandAccent ?? DEFAULT_TOUR_ACCENT;
   const onAccent = pickContrastText(accent);
 
-  // The single primary CTA (the next action) also belongs to the brand accent.
-  // Prefer a text thread to the agent, then scheduling, then email.
-  const agentFirst = payload.agent.name?.trim().split(/\s+/)[0] ?? "your agent";
-  const primaryCta = payload.agent.phone
-    ? { label: `Text ${agentFirst}`, href: `sms:${payload.agent.phone}` }
-    : payload.agent.schedulingUrl
-      ? { label: "Plan the day", href: payload.agent.schedulingUrl }
-      : payload.agent.email
-        ? { label: `Email ${agentFirst}`, href: `mailto:${payload.agent.email}` }
-        : null;
-
-  // Active layers default to the agent-enabled priority set.
   const [activeLayers, setActiveLayers] = useState<Set<ProximityCategory>>(
     () => new Set(payload.priorities),
   );
@@ -126,8 +250,6 @@ export function BuyerTourPage({ payload }: { payload: BuyerTourPublicPayload }) 
       }
       setHighlightedStop(stop);
       if (clearTimer.current) clearTimeout(clearTimer.current);
-      // Clear after a beat. With reduced motion the highlight is a STATIC ring
-      // (no flash animation) while it is applied — see the card className below.
       clearTimer.current = setTimeout(() => setHighlightedStop(null), 2200);
     },
     [reduced],
@@ -138,130 +260,321 @@ export function BuyerTourPage({ payload }: { payload: BuyerTourPublicPayload }) 
   );
 
   const greeting = payload.buyerName
-    ? `${payload.buyerName}, here's the tour I planned around you`
-    : "Here's the tour I planned around you";
+    ? `Hi ${payload.buyerName}, here's the day I planned for you.`
+    : "Here's the day I planned for you.";
+
+  const agentFirst = payload.agent.name?.trim().split(/\s+/)[0] ?? "your agent";
+  const primaryCta = payload.agent.phone
+    ? { label: `Text ${agentFirst} about the tour`, href: `sms:${payload.agent.phone}` }
+    : payload.agent.schedulingUrl
+      ? { label: "Plan the day", href: payload.agent.schedulingUrl }
+      : payload.agent.email
+        ? { label: `Email ${agentFirst}`, href: `mailto:${payload.agent.email}` }
+        : null;
+
+  const brandName = payload.agent.brokerage || payload.agent.name || "Your agent";
+  const brandMark = initials(payload.agent.brokerage || payload.agent.name) || "•";
 
   return (
     <main
-      className="min-h-screen bg-neutral-950 text-neutral-100 overflow-x-hidden"
+      className="min-h-screen bg-[#ECE6DB] text-[#16211F] [overflow-x:hidden]"
       data-testid="buyer-tour-page"
     >
-      <div className="mx-auto w-full max-w-xl px-4 py-8 sm:py-12">
-        {/* ---- Hero / "planned around you" (static, fully visible) ---- */}
-        <header className="mb-8">
-          <p className="text-[11px] uppercase tracking-[0.18em] text-neutral-500">
-            {HEADINGS.plannedAround}
-          </p>
-          <h1 className="mt-2 text-2xl font-semibold leading-snug text-neutral-50 sm:text-3xl">
+      <div className="mx-auto w-full max-w-[480px] bg-[#FBF8F3]">
+        {/* ---------- top bar ---------- */}
+        <div className="flex items-center justify-between border-b border-[#EAE3D8] bg-white px-6 py-4">
+          <div className="flex items-center gap-2.5">
+            <div
+              className="flex h-[34px] w-[34px] flex-none items-center justify-center rounded-[9px] text-base font-bold"
+              style={{ background: accent, color: onAccent, fontFamily: SERIF }}
+            >
+              {brandMark}
+            </div>
+            <div className="min-w-0">
+              <div className="truncate text-sm font-bold leading-tight">
+                {brandName}
+              </div>
+              {payload.agent.name && (
+                <div className="text-[11px] text-[#7C8A86]">
+                  Prepared for you by {payload.agent.name}
+                </div>
+              )}
+            </div>
+          </div>
+          {payload.tourDate && (
+            <div className="text-right text-[10.5px] leading-snug text-[#7C8A86]">
+              {payload.tourDate}
+            </div>
+          )}
+        </div>
+
+        {/* ---------- hero ---------- */}
+        <div
+          className="border-b border-[#EAE3D8] px-6 pb-6 pt-7"
+          style={{
+            background:
+              "radial-gradient(130% 90% at 100% 0%, #EFF6F4 0%, rgba(239,246,244,0) 62%), #FFFFFF",
+          }}
+        >
+          <Eyebrow>Your tour, planned around you</Eyebrow>
+          <h1
+            className="mt-3 text-[28px] font-semibold leading-[1.14] tracking-[-0.01em]"
+            style={{ fontFamily: SERIF }}
+          >
             {greeting}
           </h1>
-          <dl className="mt-4 flex flex-wrap gap-x-6 gap-y-2 text-sm text-neutral-300">
-            {payload.tourDate && (
-              <div>
-                <dt className="text-[11px] uppercase tracking-wide text-neutral-500">
-                  {HEADINGS.theDay}
-                </dt>
-                <dd className="font-medium" data-testid="btb-tour-date">
-                  {payload.tourDate}
-                </dd>
-              </div>
-            )}
-            {payload.meetingPoint && (
-              <div>
-                <dt className="text-[11px] uppercase tracking-wide text-neutral-500">
-                  Meeting point
-                </dt>
-                <dd className="font-medium" data-testid="btb-meeting-point">
-                  {payload.meetingPoint}
-                </dd>
-              </div>
-            )}
-          </dl>
-        </header>
+          <p className="mt-3 text-[15px] text-[#42514E]">
+            {payload.homes.length} {payload.homes.length === 1 ? "home" : "homes"},
+            in the order I think they&rsquo;ll feel best to see. I chose each one
+            around what you told me matters most.
+          </p>
+        </div>
 
-        {/* The agent's note — the agent's voice, rendered verbatim. */}
-        {payload.agentNote && (
-          <section
-            className="mb-8 rounded-2xl border border-neutral-800 bg-neutral-900/60 p-5"
-            data-testid="btb-agent-note"
-          >
-            <p className="whitespace-pre-line text-[15px] leading-relaxed text-neutral-200">
-              {payload.agentNote}
-            </p>
-          </section>
-        )}
-
-        {/* ---- Map + layer legend ---- */}
-        {hasMap && (
-          <section className="mb-10" data-testid="btb-map-section">
-            <h2 className="mb-3 text-sm font-semibold uppercase tracking-[0.14em] text-neutral-400">
-              {HEADINGS.mapTitle}
-            </h2>
-            <StylizedMap
-              homes={payload.homes}
-              anchor={payload.commuteAnchor}
-              activeLayers={activeLayers}
-              highlightedStop={highlightedStop}
-              onPinTap={onPinTap}
-              accent={accent}
-            />
-
-            {payload.priorities.length > 0 && (
-              <div className="mt-4" data-testid="btb-legend">
-                <p className="mb-2 text-xs text-neutral-500">{LEGEND_HINT}</p>
-                <div className="flex flex-wrap gap-2">
-                  {payload.priorities.map((cat) => {
-                    const on = activeLayers.has(cat);
-                    const col = LAYER_COLOR[cat];
-                    return (
-                      <button
-                        key={cat}
-                        type="button"
-                        role="switch"
-                        aria-checked={on}
-                        aria-label={`${LAYER_LABELS[cat]} — ${LAYER_HINTS[cat]}`}
-                        title={LAYER_HINTS[cat]}
-                        onClick={() => toggleLayer(cat)}
-                        data-testid={`btb-legend-${cat}`}
-                        data-active={on ? "true" : "false"}
-                        // The layer control's active state uses the LAYER'S category
-                        // color (the semantic legend), never the agent brand accent.
-                        style={
-                          on
-                            ? { borderColor: col, backgroundColor: `${col}26` }
-                            : undefined
-                        }
-                        className={`inline-flex min-h-[44px] items-center gap-2 rounded-full border px-4 py-2 text-sm motion-safe:transition-colors ${
-                          on
-                            ? "text-neutral-100"
-                            : "border-neutral-700 bg-neutral-900 text-neutral-400"
-                        }`}
-                      >
-                        <span
-                          aria-hidden="true"
-                          className="inline-block h-2.5 w-2.5 rounded-full"
-                          style={{ backgroundColor: on ? col : "#525252" }}
-                        />
-                        {LAYER_LABELS[cat]}
-                      </button>
-                    );
-                  })}
+        {/* ---------- tour snapshot ---------- */}
+        <div className="px-6 pt-5">
+          <div className="overflow-hidden rounded-[14px] border border-[#EAE3D8] bg-white shadow-[0_1px_2px_rgba(22,33,31,.04),0_6px_20px_rgba(22,33,31,.06)]">
+            <div className="grid grid-cols-2">
+              <div className="border-b border-r border-[#F0EBE1] px-4 py-3">
+                <div className="text-[10.5px] font-bold uppercase tracking-[0.12em] text-[#7C8A86]">
+                  Date
+                </div>
+                <div
+                  className="mt-0.5 text-[15px] font-semibold"
+                  style={{ fontFamily: SERIF }}
+                  data-testid="btb-tour-date"
+                >
+                  {payload.tourDate || "To be set"}
                 </div>
               </div>
+              <div className="border-b border-[#F0EBE1] px-4 py-3">
+                <div className="text-[10.5px] font-bold uppercase tracking-[0.12em] text-[#7C8A86]">
+                  Homes
+                </div>
+                <div
+                  className="mt-0.5 text-[15px] font-semibold"
+                  style={{ fontFamily: SERIF }}
+                >
+                  {payload.homes.length}{" "}
+                  {payload.homes.length === 1 ? "stop" : "stops"}
+                </div>
+              </div>
+            </div>
+            {payload.meetingPoint && (
+              <div
+                className="px-4 py-2.5 text-[12.5px] text-[#42514E]"
+                data-testid="btb-meeting-point"
+              >
+                Meeting point&nbsp;&nbsp;·&nbsp;&nbsp;
+                <b className="font-semibold text-[#16211F]">
+                  {payload.meetingPoint}
+                </b>
+              </div>
             )}
+          </div>
+        </div>
+
+        {/* ---------- planned around (static, fully visible) ---------- */}
+        {payload.priorities.length > 0 && (
+          <div className="px-6 pt-3">
+            <div className="flex flex-wrap items-center gap-x-3 gap-y-2.5 rounded-[14px] border border-[#EAE3D8] bg-[#F7F3EA] px-4 py-3.5">
+              <span className="text-[10.5px] font-bold uppercase tracking-[0.1em] text-[#C2703D]">
+                Planned around
+              </span>
+              <div className="flex flex-wrap gap-2">
+                {payload.priorities.map((cat) => (
+                  <span
+                    key={cat}
+                    className="rounded-full border border-[#EAE3D8] bg-white px-3 py-1.5 text-[12.5px] font-semibold text-[#42514E]"
+                  >
+                    {LAYER_LABELS[cat]}
+                  </span>
+                ))}
+              </div>
+            </div>
+          </div>
+        )}
+
+        {/* ---------- buyer day map ---------- */}
+        {hasMap && (
+          <section className="pt-6" data-testid="btb-map-section">
+            <div className="mb-3.5 px-6">
+              <Eyebrow>The route</Eyebrow>
+              <h2
+                className="mt-1.5 text-[20px] font-semibold"
+                style={{ fontFamily: SERIF }}
+              >
+                Your Buyer Day Map
+              </h2>
+              <p className="mt-1 text-[13px] text-[#7C8A86]">
+                The {payload.homes.length} stops in order. Turn a layer on to see
+                what&rsquo;s nearby.
+              </p>
+            </div>
+            <div className="px-4">
+              <div className="overflow-hidden rounded-[18px] border border-[#EAE3D8] bg-white shadow-[0_1px_2px_rgba(22,33,31,.04),0_6px_20px_rgba(22,33,31,.06)]">
+                <StylizedMap
+                  homes={payload.homes}
+                  anchor={payload.commuteAnchor}
+                  activeLayers={activeLayers}
+                  highlightedStop={highlightedStop}
+                  onPinTap={onPinTap}
+                  accent={accent}
+                />
+
+                {payload.priorities.length > 0 && (
+                  <div data-testid="btb-legend">
+                    <div className="border-t border-[#EAE3D8] bg-[#F7F3EA] px-[18px] pt-3 text-[10.5px] font-bold uppercase tracking-[0.12em] text-[#7C8A86]">
+                      Map layers
+                    </div>
+                    <div className="flex flex-wrap gap-2 bg-[#F7F3EA] px-3.5 pb-3.5 pt-2.5">
+                      {payload.priorities.map((cat) => {
+                        const on = activeLayers.has(cat);
+                        const col = LAYER_COLOR[cat];
+                        return (
+                          <button
+                            key={cat}
+                            type="button"
+                            role="switch"
+                            aria-checked={on}
+                            aria-label={`${LAYER_LABELS[cat]} — ${LAYER_HINTS[cat]}`}
+                            title={LAYER_HINTS[cat]}
+                            onClick={() => toggleLayer(cat)}
+                            data-testid={`btb-legend-${cat}`}
+                            data-active={on ? "true" : "false"}
+                            className="inline-flex min-h-[44px] items-center gap-2.5 rounded-[11px] border bg-white px-3.5 text-[12.5px] font-semibold motion-safe:transition-colors"
+                            style={{
+                              borderColor: on ? "#D5DCD7" : "#EAE3D8",
+                              color: on ? "#16211F" : "#7C8A86",
+                            }}
+                          >
+                            {/* Checkbox affordance — the LAYER'S category color fills
+                                it when on (the semantic legend; never the brand accent). */}
+                            <span
+                              aria-hidden="true"
+                              className="flex h-[17px] w-[17px] flex-none items-center justify-center rounded-[5px] border-[1.5px]"
+                              style={{
+                                backgroundColor: on ? col : "#fff",
+                                borderColor: on ? col : "#CBD2CD",
+                              }}
+                            >
+                              {on && (
+                                <svg
+                                  width="9"
+                                  height="9"
+                                  viewBox="0 0 12 12"
+                                  fill="none"
+                                >
+                                  <path
+                                    d="M2 6.5 5 9.5 10 3"
+                                    stroke="#fff"
+                                    strokeWidth="2"
+                                    strokeLinecap="round"
+                                    strokeLinejoin="round"
+                                  />
+                                </svg>
+                              )}
+                            </span>
+                            {LAYER_LABELS[cat]}
+                          </button>
+                        );
+                      })}
+                    </div>
+                  </div>
+                )}
+
+                <div className="border-t border-[#EAE3D8] bg-white px-[18px] py-3 text-[11px] leading-relaxed text-[#7C8A86]">
+                  School locations and places show nearby points and approximate
+                  distances for orientation only. They are not ratings,
+                  recommendations, or judgments about any school or area.
+                </div>
+              </div>
+            </div>
           </section>
         )}
 
-        {/* ---- The homes, in order ---- */}
-        <section data-testid="btb-homes">
-          <h2 className="mb-4 text-sm font-semibold uppercase tracking-[0.14em] text-neutral-400">
-            {HEADINGS.theHomes}
-          </h2>
-          <ol className="space-y-6">
+        {/* ---------- tour order ---------- */}
+        {payload.homes.length > 0 && (
+          <section className="pt-6">
+            <div className="mb-3.5 px-6">
+              <Eyebrow>The order</Eyebrow>
+              <h2
+                className="mt-1.5 text-[20px] font-semibold"
+                style={{ fontFamily: SERIF }}
+              >
+                How the day flows
+              </h2>
+            </div>
+            <div className="flex items-stretch px-6">
+              {payload.homes.map((home, i) => {
+                const { street } = splitAddress(home.address);
+                return (
+                  <div
+                    key={home.stop}
+                    className="relative flex-1 text-center"
+                  >
+                    {i > 0 && (
+                      <span
+                        aria-hidden="true"
+                        className="absolute left-[-50%] top-[15px] z-0 h-0.5 w-full"
+                        style={{
+                          background: `repeating-linear-gradient(90deg, ${accent} 0 4px, transparent 4px 9px)`,
+                        }}
+                      />
+                    )}
+                    <div
+                      className="relative z-[2] mx-auto flex h-[30px] w-[30px] items-center justify-center rounded-full text-sm font-bold"
+                      style={{ background: accent, color: onAccent }}
+                      data-testid={`btb-order-${home.stop}`}
+                    >
+                      {home.stop}
+                    </div>
+                    <div className="mt-1.5 truncate px-1 text-[11px] leading-tight text-[#7C8A86]">
+                      {street}
+                    </div>
+                  </div>
+                );
+              })}
+            </div>
+          </section>
+        )}
+
+        {/* ---------- home cards ---------- */}
+        <section className="pt-6" data-testid="btb-homes">
+          <div className="mb-3.5 px-6">
+            <Eyebrow>The homes</Eyebrow>
+            <h2
+              className="mt-1.5 text-[20px] font-semibold"
+              style={{ fontFamily: SERIF }}
+            >
+              Each stop, and why it&rsquo;s on the list
+            </h2>
+          </div>
+          <ol className="px-4">
             {payload.homes.map((home) => {
               const highlighted = highlightedStop === home.stop;
               const price = formatPrice(home.price);
-              const specs = specLine(home);
+              const specs: React.ReactNode[] = [];
+              if (home.beds !== undefined)
+                specs.push(
+                  <span key="bd">
+                    <b className="font-semibold text-[#16211F]">{home.beds}</b> bd
+                  </span>,
+                );
+              if (home.baths !== undefined)
+                specs.push(
+                  <span key="ba">
+                    <b className="font-semibold text-[#16211F]">{home.baths}</b> ba
+                  </span>,
+                );
+              if (home.sqft !== undefined)
+                specs.push(
+                  <span key="sf">
+                    <b className="font-semibold text-[#16211F]">
+                      {home.sqft.toLocaleString("en-US")}
+                    </b>{" "}
+                    sqft
+                  </span>,
+                );
               return (
                 <li
                   key={home.stop}
@@ -270,77 +583,48 @@ export function BuyerTourPage({ payload }: { payload: BuyerTourPublicPayload }) 
                   }}
                   data-testid={`btb-home-${home.stop}`}
                   data-highlighted={highlighted ? "true" : "false"}
-                  className={`scroll-mt-6 overflow-hidden rounded-2xl border bg-neutral-900/60 motion-safe:transition-[border-color,box-shadow] ${
+                  className="mb-4 scroll-mt-6 overflow-hidden rounded-[18px] border bg-white motion-safe:transition-[border-color,box-shadow]"
+                  style={
                     highlighted
-                      ? "border-teal-400 shadow-[0_0_0_2px_rgba(45,212,191,0.5)]"
-                      : "border-neutral-800"
-                  }`}
+                      ? { borderColor: accent, boxShadow: `0 0 0 2px ${accent}80` }
+                      : { borderColor: "#EAE3D8" }
+                  }
                 >
-                  {home.photoUrl ? (
-                    // eslint-disable-next-line @next/next/no-img-element
-                    <img
-                      src={home.photoUrl}
-                      alt={`Home ${home.stop}: ${home.address}`}
-                      className="aspect-[4/3] w-full object-cover"
-                      data-testid={`btb-home-${home.stop}-photo`}
-                    />
-                  ) : (
-                    // Clean branded placeholder — the card looks complete with no
-                    // photo work. Neutral canvas + a single accent house glyph (the
-                    // tour thread), never a brand-color flood.
-                    <div
-                      className="flex aspect-[4/3] w-full items-center justify-center bg-gradient-to-br from-neutral-800 to-neutral-900"
-                      data-testid={`btb-home-${home.stop}-placeholder`}
-                      aria-hidden="true"
-                    >
-                      <svg
-                        width="40"
-                        height="40"
-                        viewBox="0 0 24 24"
-                        fill="none"
-                        stroke={accent}
-                        strokeWidth="1.5"
-                        strokeLinecap="round"
-                        strokeLinejoin="round"
-                        opacity="0.85"
-                      >
-                        <path d="M3 10.5 12 3l9 7.5" />
-                        <path d="M5 9.5V21h14V9.5" />
-                      </svg>
-                    </div>
-                  )}
-                  <div className="p-5">
-                    <div className="flex items-start gap-3">
-                      <span
-                        className="mt-0.5 flex h-7 w-7 flex-none items-center justify-center rounded-full text-sm font-bold"
-                        style={{ backgroundColor: accent, color: onAccent }}
-                        data-testid={`btb-home-${home.stop}-badge`}
-                      >
-                        {home.stop}
-                      </span>
-                      <div className="min-w-0">
-                        <p className="break-words font-medium text-neutral-100">
-                          {home.address}
-                        </p>
-                        {(price || specs) && (
-                          <p className="mt-0.5 text-sm text-neutral-400">
-                            {[price, specs].filter(Boolean).join("  ·  ")}
-                          </p>
-                        )}
-                      </div>
+                  <HomePhoto home={home} accent={accent} />
+                  <div className="px-4 pb-4 pt-3.5">
+                    <div className="flex flex-wrap items-baseline gap-x-3.5 gap-y-1">
+                      {price && (
+                        <div
+                          className="text-[21px] font-semibold"
+                          style={{ fontFamily: SERIF }}
+                        >
+                          {price}
+                        </div>
+                      )}
+                      {specs.length > 0 && (
+                        <div className="text-[13px] text-[#42514E]">
+                          {specs.reduce<React.ReactNode[]>((acc, el, idx) => {
+                            if (idx > 0) acc.push(<span key={`s${idx}`}> · </span>);
+                            acc.push(el);
+                            return acc;
+                          }, [])}
+                        </div>
+                      )}
                     </div>
 
                     {home.whyOnList && (
-                      // The "why it's on the list" accent bar is part of the tour
-                      // thread → agent brand accent.
-                      <div
-                        className="mt-4 border-l-2 pl-3"
-                        style={{ borderColor: accent }}
-                      >
-                        <p className="text-[11px] uppercase tracking-wide text-neutral-400">
-                          {HEADINGS.whyOnList}
-                        </p>
-                        <p className="mt-1 whitespace-pre-line text-[15px] leading-relaxed text-neutral-100">
+                      <div className="mt-3.5">
+                        <div
+                          className="mb-1.5 flex items-center gap-2 text-[10.5px] font-bold uppercase tracking-[0.1em]"
+                          style={{ color: accent }}
+                        >
+                          <span
+                            className="h-0.5 w-[13px] rounded-sm"
+                            style={{ background: accent }}
+                          />
+                          Why it&rsquo;s on the list
+                        </div>
+                        <p className="m-0 whitespace-pre-line text-sm text-[#42514E]">
                           {home.whyOnList}
                         </p>
                       </div>
@@ -348,17 +632,21 @@ export function BuyerTourPage({ payload }: { payload: BuyerTourPublicPayload }) 
 
                     {home.watchFor && (
                       <div className="mt-3">
-                        <p className="text-[11px] uppercase tracking-wide text-neutral-500">
-                          {HEADINGS.watchFor}
-                        </p>
-                        <p className="mt-1 whitespace-pre-line text-[15px] leading-relaxed text-neutral-300">
+                        <div className="mb-1.5 flex items-center gap-2 text-[10.5px] font-bold uppercase tracking-[0.1em] text-[#C2703D]">
+                          <span className="h-0.5 w-[13px] rounded-sm bg-[#C2703D]" />
+                          Watch for
+                        </div>
+                        <p className="m-0 whitespace-pre-line text-sm text-[#42514E]">
                           {home.watchFor}
                         </p>
                       </div>
                     )}
 
                     {home.proximity.length > 0 && (
-                      <ul className="mt-4 flex flex-wrap gap-2" data-testid={`btb-home-${home.stop}-chips`}>
+                      <ul
+                        className="mt-3.5 flex flex-wrap gap-1.5 border-t border-[#F0EBE1] pt-3.5"
+                        data-testid={`btb-home-${home.stop}-chips`}
+                      >
                         {home.proximity.map((chip, idx) => {
                           const on = activeLayers.has(chip.category);
                           const col = LAYER_COLOR[chip.category];
@@ -367,34 +655,30 @@ export function BuyerTourPage({ payload }: { payload: BuyerTourPublicPayload }) 
                               key={`${chip.category}-${idx}`}
                               data-testid={`btb-chip-${home.stop}-${chip.category}`}
                               data-active={on ? "true" : "false"}
-                              // Chips are MAP-LOGIC facts → the active glow uses the
-                              // category color (the legend), never the brand accent.
+                              className="inline-flex max-w-full items-center gap-1.5 rounded-[8px] border px-2.5 py-1.5 text-[11.5px] font-medium motion-safe:transition-all"
                               style={
                                 on
                                   ? {
                                       borderColor: col,
                                       backgroundColor: `${col}1f`,
+                                      color: "#16211F",
                                       boxShadow: `0 0 0 1px ${col}59`,
                                     }
-                                  : undefined
+                                  : {
+                                      borderColor: "#EAE3D8",
+                                      backgroundColor: "#F7F3EA",
+                                      color: "#7C8A86",
+                                    }
                               }
-                              className={`inline-flex max-w-full items-center gap-1.5 rounded-full border px-3 py-1 text-xs motion-safe:transition-all ${
-                                on
-                                  ? "text-neutral-50"
-                                  : "border-neutral-800 bg-neutral-900 text-neutral-500 opacity-70"
-                              }`}
                             >
                               <span
                                 aria-hidden="true"
-                                className="inline-block h-2 w-2 flex-none rounded-full"
-                                style={{ backgroundColor: on ? col : "#525252" }}
+                                className="h-2 w-2 flex-none rounded-full"
+                                style={{ backgroundColor: on ? col : "#C9CEC8" }}
                               />
                               <span className="truncate">
-                                <span className="text-neutral-300">
-                                  {LAYER_LABELS[chip.category]}:
-                                </span>{" "}
+                                <b className="font-bold">{chip.value}</b>{" "}
                                 {chip.label}
-                                {chip.value ? ` · ${chip.value}` : ""}
                               </span>
                             </li>
                           );
@@ -408,94 +692,125 @@ export function BuyerTourPage({ payload }: { payload: BuyerTourPublicPayload }) 
           </ol>
         </section>
 
-        {/* ---- After-tour teaser (copy only in v0) ---- */}
-        <section
-          className="mt-10 rounded-2xl border border-dashed border-neutral-800 bg-neutral-900/40 p-5"
-          data-testid="btb-after-tour"
-        >
-          <p className="text-[11px] uppercase tracking-[0.18em] text-neutral-500">
-            {HEADINGS.afterTour}
-          </p>
-          <p className="mt-2 text-sm leading-relaxed text-neutral-300">
-            {AFTER_TOUR_TEASER}
-          </p>
-        </section>
-
-        {/* ---- Agent contact ---- */}
-        {(payload.agent.name || payload.agent.phone || payload.agent.email) && (
-          <section className="mt-10" data-testid="btb-agent">
-            <h2 className="mb-3 text-sm font-semibold uppercase tracking-[0.14em] text-neutral-400">
-              {HEADINGS.contact}
-            </h2>
-            <div className="flex items-center gap-4 rounded-2xl border border-neutral-800 bg-neutral-900/60 p-5">
-              {payload.agent.photoUrl && (
-                // eslint-disable-next-line @next/next/no-img-element
-                <img
-                  src={payload.agent.photoUrl}
-                  alt={payload.agent.name ?? "Your agent"}
-                  className="h-14 w-14 flex-none rounded-full object-cover"
-                />
-              )}
-              <div className="min-w-0">
-                {payload.agent.name && (
-                  <p className="font-medium text-neutral-100">
-                    {payload.agent.name}
-                  </p>
-                )}
-                {payload.agent.brokerage && (
-                  <p className="text-sm text-neutral-400">
-                    {payload.agent.brokerage}
-                  </p>
-                )}
-                {primaryCta && (
-                  <a
-                    href={primaryCta.href}
-                    className="mt-3 inline-flex items-center justify-center rounded-full px-5 py-2 text-sm font-semibold"
-                    style={{ backgroundColor: accent, color: onAccent }}
-                    data-testid="btb-primary-cta"
-                  >
-                    {primaryCta.label}
-                  </a>
-                )}
-                <div className="mt-2 flex flex-wrap gap-x-4 gap-y-1 text-sm text-neutral-400">
-                  {payload.agent.schedulingUrl && (
-                    <a
-                      href={payload.agent.schedulingUrl}
-                      target="_blank"
-                      rel="noopener noreferrer"
-                      className="hover:text-neutral-200"
-                    >
-                      Plan the day
-                    </a>
-                  )}
-                  {payload.agent.phone && (
-                    <a href={`tel:${payload.agent.phone}`} className="hover:text-neutral-200">
-                      {payload.agent.phone}
-                    </a>
-                  )}
-                  {payload.agent.email && (
-                    <a
-                      href={`mailto:${payload.agent.email}`}
-                      className="break-all hover:text-neutral-200"
-                    >
-                      {payload.agent.email}
-                    </a>
-                  )}
-                </div>
+        {/* ---------- after tour ---------- */}
+        <section className="px-6 pt-2" data-testid="btb-after-tour">
+          <div className="rounded-[16px] border border-[#EAE3D8] bg-[#F2ECDE] p-[18px]">
+            <div className="flex items-start gap-3.5">
+              <div className="flex h-[38px] w-[38px] flex-none items-center justify-center rounded-[11px] bg-white shadow-[0_1px_2px_rgba(22,33,31,.06)]">
+                <svg
+                  width="20"
+                  height="20"
+                  viewBox="0 0 24 24"
+                  fill="none"
+                  stroke={accent}
+                  strokeWidth="2"
+                >
+                  <path d="M9 11l3 3L22 4" />
+                  <path d="M21 12v7a2 2 0 01-2 2H5a2 2 0 01-2-2V5a2 2 0 012-2h11" />
+                </svg>
+              </div>
+              <div>
+                <h3
+                  className="m-0 text-base font-semibold"
+                  style={{ fontFamily: SERIF }}
+                >
+                  After we tour
+                </h3>
+                <p className="mt-1.5 text-[13px] text-[#42514E]">
+                  {AFTER_TOUR_TEASER}
+                </p>
               </div>
             </div>
-          </section>
-        )}
+            <div className="mt-3.5 flex items-stretch gap-2.5" aria-hidden="true">
+              <div className="flex-1 rounded-[10px] border border-[#EAE3D8] bg-white p-2.5 opacity-85">
+                <div className="text-[9.5px] font-semibold uppercase tracking-[0.04em] text-[#7C8A86]">
+                  Stop 1
+                </div>
+                <div className="mb-1.5 mt-1 h-[7px] w-[70%] rounded bg-[#D7E2DD]" />
+                <div className="h-[7px] w-[45%] rounded bg-[#EAE3D8]" />
+              </div>
+              <div className="flex items-center text-[10px] font-bold text-[#7C8A86]">
+                vs
+              </div>
+              <div className="flex-1 rounded-[10px] border border-[#EAE3D8] bg-white p-2.5 opacity-85">
+                <div className="text-[9.5px] font-semibold uppercase tracking-[0.04em] text-[#7C8A86]">
+                  Stop {Math.min(3, payload.homes.length) || 1}
+                </div>
+                <div className="mb-1.5 mt-1 h-[7px] w-[70%] rounded bg-[#D7E2DD]" />
+                <div className="h-[7px] w-[45%] rounded bg-[#EAE3D8]" />
+              </div>
+            </div>
+          </div>
+        </section>
 
-        {/* ---- Required Fair Housing footer disclaimer ---- */}
-        <footer className="mt-10 border-t border-neutral-900 pt-6">
+        {/* ---------- agent close (dark accent panel) ---------- */}
+        <div className="px-4 pt-6" data-testid="btb-agent">
+          <div
+            className="rounded-[20px] px-5 py-6 text-[#EAF1EE]"
+            style={{ background: "linear-gradient(160deg,#16211F,#0F1A18)" }}
+          >
+            <div className="flex items-center gap-3.5">
+              <AgentAvatar agent={payload.agent} />
+              <div className="min-w-0">
+                {payload.agent.name && (
+                  <div className="text-base font-bold text-white">
+                    {payload.agent.name}
+                  </div>
+                )}
+                {payload.agent.brokerage && (
+                  <div className="mt-0.5 text-[12.5px] text-[#9FB6B0]">
+                    {payload.agent.brokerage}
+                  </div>
+                )}
+              </div>
+            </div>
+            <p
+              className="mt-4 text-sm leading-[1.55] text-[#C8D6D2]"
+              data-testid="btb-agent-note"
+            >
+              {payload.agentNote ||
+                "Text me anytime before the day if you want to add a home, drop one, or shift the start time. This is your day, so let's shape it around you."}
+            </p>
+            {primaryCta && (
+              <a
+                href={primaryCta.href}
+                className="mt-[18px] block rounded-[12px] py-3.5 text-center text-[14.5px] font-bold no-underline"
+                style={{ background: accent, color: onAccent }}
+                data-testid="btb-primary-cta"
+              >
+                {primaryCta.label}
+              </a>
+            )}
+            {payload.agent.phone && (
+              <div className="mt-3 text-center text-[12.5px] text-[#8FA8A2]">
+                or call{" "}
+                <a
+                  href={`tel:${payload.agent.phone}`}
+                  className="font-semibold text-[#BFE7DD] no-underline"
+                >
+                  {payload.agent.phone}
+                </a>
+              </div>
+            )}
+            <div className="mt-3.5 text-center text-xs leading-relaxed text-[#8FA8A2]">
+              No rush and no pressure. We&rsquo;ll go at your pace.
+            </div>
+          </div>
+        </div>
+
+        {/* ---------- footer ---------- */}
+        <div className="px-6 py-6 text-center">
           <p
-            className="text-[11px] leading-relaxed text-neutral-500"
+            className="mb-3 text-[10.5px] leading-[1.6] text-[#7C8A86]"
             data-testid="btb-disclaimer"
           >
             {FOOTER_DISCLAIMER}
           </p>
-        </footer>
+          <div className="text-[11px] font-semibold tracking-[0.04em] text-[#7C8A86]">
+            Prepared with{" "}
+            <b style={{ color: accent }}>Simply Edit Pro Studio</b>
+          </div>
+        </div>
       </div>
     </main>
   );

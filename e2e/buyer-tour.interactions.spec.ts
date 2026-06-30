@@ -11,6 +11,7 @@ import { test, expect } from "@playwright/test";
  */
 
 const FULL = "/buyer-tour-preview?fixture=full";
+const MINIMAL = "/buyer-tour-preview?fixture=minimal";
 const PHONE = { width: 390, height: 844 };
 
 test.describe("buyer-tour page — layout + controls", () => {
@@ -61,12 +62,40 @@ test.describe("buyer-tour page — layout + controls", () => {
     );
   });
 
-  test("a home with no photo shows the clean branded placeholder", async ({
+  test("an absent home photo renders the branded placeholder (no broken image)", async ({
     page,
   }) => {
-    await page.goto(FULL); // home 3 in the full fixture has no photoUrl
+    await page.goto(FULL);
+    // Home 3 has no photoUrl at all → placeholder, never a broken <img>.
     await expect(page.getByTestId("btb-home-3-placeholder")).toBeVisible();
-    await expect(page.getByTestId("btb-home-1-photo")).toBeVisible();
+    await expect(page.getByTestId("btb-home-3-photo")).toHaveCount(0);
+  });
+
+  test("a home photo that FAILS to load falls back to the branded placeholder", async ({
+    page,
+  }) => {
+    await page.goto(FULL);
+    const img = page.getByTestId("btb-home-1-photo");
+    await expect(img).toBeAttached();
+    // Drive the load failure deterministically (a real bad URL just hangs in CI
+    // rather than firing `error`), then assert the onError fallback swapped in.
+    await img.evaluate((el) => el.dispatchEvent(new Event("error")));
+    await expect(page.getByTestId("btb-home-1-placeholder")).toBeVisible();
+    await expect(page.getByTestId("btb-home-1-photo")).toHaveCount(0);
+  });
+
+  test("an absent agent headshot renders a monogram", async ({ page }) => {
+    await page.goto(MINIMAL); // minimal fixture agent has no photoUrl
+    await expect(page.getByTestId("btb-agent-avatar")).toHaveText("AR");
+  });
+
+  test("a failed agent headshot load falls back to a monogram", async ({
+    page,
+  }) => {
+    await page.goto(FULL);
+    const avatar = page.getByTestId("btb-agent-avatar");
+    await avatar.evaluate((el) => el.dispatchEvent(new Event("error")));
+    await expect(page.getByTestId("btb-agent-avatar")).toHaveText("AR");
   });
 });
 
@@ -108,11 +137,11 @@ test.describe("buyer-tour page — brand color distribution", () => {
       "stroke",
       "#7c3aed",
     );
-    // Tour-order step badge is painted with the brand accent (rgb(124,58,237)).
-    const badgeBg = await page
-      .getByTestId("btb-home-1-badge")
+    // Tour-order step number is painted with the brand accent (rgb(124,58,237)).
+    const orderBg = await page
+      .getByTestId("btb-order-1")
       .evaluate((el) => getComputedStyle(el).backgroundColor);
-    expect(badgeBg).toBe("rgb(124, 58, 237)");
+    expect(orderBg).toBe("rgb(124, 58, 237)");
 
     // The primary CTA is the brand accent too.
     const ctaBg = await page

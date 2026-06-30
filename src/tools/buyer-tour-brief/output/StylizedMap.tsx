@@ -1,46 +1,44 @@
 "use client";
 
 /**
- * Buyer Tour Brief — the branded stylized map (BUYER_TOUR_BRIEF, decision #1).
+ * Buyer Tour Brief — the branded stylized map (BUYER_TOUR_BRIEF, v0.1 re-skin).
  *
- * A designed SVG canvas — NOT live Google tiles, NO pan/zoom. Numbered home pins
- * on a route line, plus the single commute-anchor pin, projected from geocoded
- * coordinates (see map-geometry.ts). Layer markers are FACTUAL annotations on each
- * home pin: when a layer is active, a small dot appears on the pins of the homes
- * that carry that proximity chip — it reflects which homes have that factual layer,
- * never a fabricated third-party location. Honest by construction + Fair-Housing-clean.
+ * A designed light "Buyer Day Map" canvas (per the approved mock) — NOT live Google
+ * tiles, NO pan/zoom. A soft sage land base with decorative water / parks / roads,
+ * numbered home pins on a dashed route, the commute anchor as an edge tag, and
+ * per-pin factual layer markers. Projected from geocoded coordinates (map-geometry).
  *
- * Interactions wired by the parent (BuyerTourPage):
- *   • Tapping a pin calls `onPinTap(stop)` → parent scrolls to + highlights the card.
- *   • Active layers drive which annotation dots show.
+ * Color rule (preserved through the re-skin):
+ *   • TOUR THREAD = the agent brand `accent`: the route line + the numbered pins.
+ *   • MAP LOGIC = the FIXED semantic palette (`LAYER_COLOR`): the layer markers (+
+ *     the legend + chips in BuyerTourPage). Never tinted by the brand accent.
  *
- * Motion: layer markers + the active-pin ring use `motion-safe:` transitions, so a
- * `prefers-reduced-motion` viewer gets them statically (no scale/transition) per
- * acceptance criterion 6.
+ * Layer markers are FACTUAL annotations on each home pin (the home carries that
+ * proximity chip), never a fabricated third-party location. Honest + Fair-Housing
+ * clean. Motion uses `motion-safe:` so reduced-motion viewers get them statically.
  */
 
 import type { ProximityCategory } from "../engine/types";
 import type { PublicHome, PublicCommuteAnchor } from "./public-payload";
 import { LAYER_LABELS } from "./copy";
 import { projectTourMap, routePolyline } from "./map-geometry";
+import { pickContrastText } from "@/tools/listing-flyer/engine/contrast";
 
 /**
- * FIXED semantic map-logic palette (the legend). These own the MAP LOGIC — the
- * functional markers AND their layer-control checkboxes — and are NEVER tinted
- * with the agent brand color: tinting them would break the legend and risk a
- * collision with the tour-thread accent. The agent brand accent owns the tour
- * thread (pins / route / CTA / step numbers / why-bar) instead.
+ * FIXED semantic map-logic palette (the legend). Owns the markers + legend + chips;
+ * NEVER tinted with the brand accent (tinting would break the legend / collide with
+ * the tour thread). Matches the mock's marker colors.
  */
 export const LAYER_COLOR: Record<ProximityCategory, string> = {
   schools: "#3b82f6", // blue
-  commute: "#c2622d", // terra
-  parks: "#22c55e", // green
-  coffee: "#92400e", // brown
-  grocery: "#15803d", // green (deeper, so it stays distinct from parks)
+  commute: "#c2703d", // terra
+  parks: "#4e7d33", // green
+  coffee: "#9a6b3f", // brown
+  grocery: "#3e7d5a", // green (deeper, distinct from parks)
 };
 
 /** Default tour-thread accent when the agent has no brandAccent set. */
-export const DEFAULT_TOUR_ACCENT = "#2dd4bf";
+export const DEFAULT_TOUR_ACCENT = "#0e7c73";
 
 interface StylizedMapProps {
   homes: PublicHome[];
@@ -52,8 +50,8 @@ interface StylizedMapProps {
   accent: string;
 }
 
-const WIDTH = 320;
-const HEIGHT = 240;
+const WIDTH = 400;
+const HEIGHT = 360;
 
 export function StylizedMap({
   homes,
@@ -63,6 +61,7 @@ export function StylizedMap({
   onPinTap,
   accent,
 }: StylizedMapProps) {
+  const onAccent = pickContrastText(accent);
   const projected = projectTourMap({
     homes: homes.map((h) =>
       h.lat !== undefined && h.lng !== undefined
@@ -75,81 +74,97 @@ export function StylizedMap({
         : null,
     width: WIDTH,
     height: HEIGHT,
+    padding: 40,
   });
 
   const polyline = routePolyline(projected.homes);
 
   return (
     <div
-      className="relative w-full overflow-hidden rounded-2xl border border-neutral-800 bg-gradient-to-br from-neutral-900 to-neutral-950"
+      className="relative w-full overflow-hidden"
+      style={{ aspectRatio: "1 / 0.9", background: "#EAF0E8" }}
       data-testid="btb-map"
     >
       <svg
         viewBox={`0 0 ${WIDTH} ${HEIGHT}`}
-        className="block h-auto w-full"
+        className="absolute inset-0 block h-full w-full"
         role="img"
         aria-label="Stylized map of your tour route"
       >
-        {/* Subtle on-brand grid wash — purely decorative. */}
         <defs>
-          <pattern
-            id="btb-grid"
-            width="32"
-            height="32"
-            patternUnits="userSpaceOnUse"
-          >
-            <path
-              d="M32 0H0V32"
-              fill="none"
-              stroke="#262626"
-              strokeWidth="0.5"
+          <filter id="btb-pin-shadow" x="-50%" y="-50%" width="200%" height="200%">
+            <feDropShadow
+              dx="0"
+              dy="1.5"
+              stdDeviation="2"
+              floodColor="#16211F"
+              floodOpacity="0.28"
             />
-          </pattern>
+          </filter>
         </defs>
-        <rect width={WIDTH} height={HEIGHT} fill="url(#btb-grid)" />
 
-        {/* Route line through the ordered home pins. */}
+        {/* Decorative geographic base — water, parks, roads. Not brand, not data. */}
+        <rect x="0" y="0" width={WIDTH} height={HEIGHT} fill="#EAF0E8" />
+        <path
+          d="M0,250 Q70,232 110,252 T200,268 Q160,300 0,300 Z"
+          fill="#D3E3EA"
+        />
+        <ellipse cx="305" cy="78" rx="52" ry="34" fill="#D9E7CC" />
+        <ellipse cx="70" cy="138" rx="40" ry="30" fill="#D9E7CC" />
+        <g stroke="#FFFFFF" strokeWidth="8" fill="none" strokeLinecap="round">
+          <path d="M-10,190 H410" />
+          <path d="M150,-10 V370" />
+          <path d="M40,36 Q205,110 382,62" />
+          <path d="M28,278 Q205,232 392,280" />
+        </g>
+
+        {/* Route line through the ordered home pins — TOUR THREAD = accent. */}
         {polyline && (
           <polyline
             points={polyline}
             fill="none"
             stroke={accent}
-            strokeWidth="2"
-            strokeDasharray="5 4"
+            strokeWidth="3"
+            strokeDasharray="0.5 7"
             strokeLinecap="round"
-            opacity="0.7"
+            opacity="0.85"
             data-testid="btb-map-route"
           />
         )}
 
-        {/* Commute anchor pin (diamond). */}
+        {/* Commute anchor — terra (fixed) edge tag, clamped into view by geometry. */}
         {projected.anchor && (
           <g
             transform={`translate(${projected.anchor.x}, ${projected.anchor.y})`}
             data-testid="btb-map-anchor"
           >
             <rect
-              x="-7"
-              y="-7"
-              width="14"
-              height="14"
-              rx="2"
-              transform="rotate(45)"
-              fill="#0a0a0a"
-              stroke={accent}
-              strokeWidth="2"
+              x="-29"
+              y="-12"
+              width="58"
+              height="24"
+              rx="7"
+              fill={LAYER_COLOR.commute}
             />
-            <title>{anchor?.label ?? "Commute anchor"}</title>
+            <text
+              textAnchor="middle"
+              dominantBaseline="central"
+              fontSize="9"
+              fontWeight="700"
+              letterSpacing="0.04em"
+              fill="#ffffff"
+            >
+              {(anchor?.label ?? "Anchor").slice(0, 8)}
+            </text>
           </g>
         )}
 
-        {/* Home pins + their active-layer annotation dots. */}
+        {/* Home pins + their active-layer annotation markers. */}
         {projected.homes.map((pt, i) => {
           if (!pt) return null;
           const home = homes[i];
           const stop = home.stop;
           const isActive = highlightedStop === stop;
-          // Which active layers does THIS home carry a chip for?
           const homeLayers = Array.from(
             new Set(home.proximity.map((c) => c.category)),
           ).filter((c) => activeLayers.has(c));
@@ -159,28 +174,26 @@ export function StylizedMap({
               transform={`translate(${pt.x}, ${pt.y})`}
               data-testid={`btb-map-pin-${stop}`}
             >
-              {/* Active-pin halo (motion-safe transition; static for reduced motion). */}
               {isActive && (
                 <circle
-                  r="18"
+                  r="24"
                   fill={accent}
-                  opacity="0.18"
+                  opacity="0.16"
                   data-testid={`btb-map-pin-${stop}-halo`}
                 />
               )}
-              {/* Layer annotation dots, arranged around the pin. */}
               {homeLayers.map((cat, j) => {
-                const angle = (-90 + j * 42) * (Math.PI / 180);
-                const r = 15;
+                const angle = (-90 + j * 40) * (Math.PI / 180);
+                const r = 22;
                 return (
                   <circle
                     key={cat}
                     cx={Math.cos(angle) * r}
                     cy={Math.sin(angle) * r}
-                    r="3.5"
+                    r="4.5"
                     fill={LAYER_COLOR[cat]}
-                    stroke="#0a0a0a"
-                    strokeWidth="1"
+                    stroke="#ffffff"
+                    strokeWidth="1.5"
                     className="motion-safe:transition-opacity"
                     data-testid={`btb-map-marker-${stop}-${cat}`}
                   >
@@ -188,21 +201,20 @@ export function StylizedMap({
                   </circle>
                 );
               })}
-              {/* The numbered, tappable home pin. ≥44px hit area via the overlay
-                  <rect> in foreignObject below; the visible circle is smaller. */}
               <circle
-                r="11"
-                fill={isActive ? accent : "#171717"}
-                stroke={accent}
-                strokeWidth="2"
+                r="16"
+                fill={accent}
+                stroke="#ffffff"
+                strokeWidth="3"
+                filter="url(#btb-pin-shadow)"
                 className="motion-safe:transition-colors"
               />
               <text
                 textAnchor="middle"
                 dominantBaseline="central"
-                fontSize="11"
+                fontSize="13"
                 fontWeight="700"
-                fill={isActive ? "#0a0a0a" : accent}
+                fill={onAccent}
               >
                 {stop}
               </text>
@@ -211,14 +223,10 @@ export function StylizedMap({
         })}
       </svg>
 
-      {/* Real, ≥44px tappable hit targets layered over each pin (criterion 3 +
-          criterion 5). Kept as HTML buttons (not SVG <rect>) so they are honest
-          interactive controls with an accessible name. */}
+      {/* Real, ≥44px tappable hit targets over each pin (criterion 3 + 5). */}
       {projected.homes.map((pt, i) => {
         if (!pt) return null;
         const stop = homes[i].stop;
-        const leftPct = (pt.x / WIDTH) * 100;
-        const topPct = (pt.y / HEIGHT) * 100;
         return (
           <button
             key={stop}
@@ -228,8 +236,8 @@ export function StylizedMap({
             data-testid={`btb-map-pinbtn-${stop}`}
             className="absolute -translate-x-1/2 -translate-y-1/2 rounded-full"
             style={{
-              left: `${leftPct}%`,
-              top: `${topPct}%`,
+              left: `${(pt.x / WIDTH) * 100}%`,
+              top: `${(pt.y / HEIGHT) * 100}%`,
               width: 44,
               height: 44,
             }}
