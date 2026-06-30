@@ -33,3 +33,15 @@ export function publicBaseUrl(): string {
 export function publicPageUrl(slug: string): string {
   return `${publicBaseUrl()}/h/${slug}`;
 }
+
+/**
+ * The canonical public URL for a published Buyer Tour Brief: `<base>/tour/<slug>`.
+ *
+ * Same discipline as `publicPageUrl`: built from the pinned production base, never
+ * the request origin, so a tour link copied / sent while the agent is on a preview
+ * deploy can never leak a `*.vercel.app` URL into a buyer's message. Reused across
+ * the publish route response, "Copy link", and "View live page".
+ */
+export function tourPageUrl(slug: string): string {
+  return `${publicBaseUrl()}/tour/${slug}`;
+}
