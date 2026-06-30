@@ -62,7 +62,7 @@ function isPoint(p: LatLng | null | undefined): p is LatLng {
  * canvas. The commute anchor is usually far outside that box (a base / workplace
  * miles away); including it would squash every home into one corner (the v0 bug).
  * Instead the anchor is projected with the same transform and then CLAMPED to the
- * padded canvas edge, so it reads as a direction marker ("JBLM is that way") without
+ * padded canvas edge, so it reads as a direction marker ("the anchor is that way") without
  * distorting the home spread — matching the mock, where the anchor is a small edge tag.
  */
 export function projectTourMap(input: ProjectInput): {

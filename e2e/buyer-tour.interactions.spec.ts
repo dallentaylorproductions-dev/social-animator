@@ -75,27 +75,27 @@ test.describe("buyer-tour page — layout + controls", () => {
     page,
   }) => {
     await page.goto(FULL);
-    const img = page.getByTestId("btb-home-1-photo");
+    // Home 2 has a non-loadable URL. Drive the failure deterministically (a bad URL
+    // just hangs in CI rather than firing `error`), then assert the swap.
+    const img = page.getByTestId("btb-home-2-photo");
     await expect(img).toBeAttached();
-    // Drive the load failure deterministically (a real bad URL just hangs in CI
-    // rather than firing `error`), then assert the onError fallback swapped in.
     await img.evaluate((el) => el.dispatchEvent(new Event("error")));
-    await expect(page.getByTestId("btb-home-1-placeholder")).toBeVisible();
-    await expect(page.getByTestId("btb-home-1-photo")).toHaveCount(0);
+    await expect(page.getByTestId("btb-home-2-placeholder")).toBeVisible();
+    await expect(page.getByTestId("btb-home-2-photo")).toHaveCount(0);
   });
 
   test("an absent agent headshot renders a monogram", async ({ page }) => {
-    await page.goto(MINIMAL); // minimal fixture agent has no photoUrl
+    await page.goto(MINIMAL); // minimal fixture agent (Alex Rivera) has no photoUrl
     await expect(page.getByTestId("btb-agent-avatar")).toHaveText("AR");
   });
 
   test("a failed agent headshot load falls back to a monogram", async ({
     page,
   }) => {
-    await page.goto(FULL);
+    await page.goto(FULL); // FULL agent is Jordan Avery → monogram "JA"
     const avatar = page.getByTestId("btb-agent-avatar");
     await avatar.evaluate((el) => el.dispatchEvent(new Event("error")));
-    await expect(page.getByTestId("btb-agent-avatar")).toHaveText("AR");
+    await expect(page.getByTestId("btb-agent-avatar")).toHaveText("JA");
   });
 });
 
@@ -105,24 +105,94 @@ test.describe("buyer-tour page — layer toggle ties map ↔ chips", () => {
   }) => {
     await page.goto(FULL);
 
-    // Home 1 carries a coffee chip; it starts active (priority enabled).
-    const coffeeChip = page.getByTestId("btb-chip-1-coffee");
-    await expect(coffeeChip).toHaveAttribute("data-active", "true");
+    // Home 1 carries a parks chip; it starts active (priority enabled).
+    const parksChip = page.getByTestId("btb-chip-1-parks");
+    await expect(parksChip).toHaveAttribute("data-active", "true");
     // Its map marker is present while active.
-    await expect(page.getByTestId("btb-map-marker-1-coffee")).toHaveCount(1);
+    await expect(page.getByTestId("btb-map-marker-1-parks")).toHaveCount(1);
 
-    // Toggle the coffee layer OFF.
-    await page.getByTestId("btb-legend-coffee").click();
+    // Toggle the parks layer OFF.
+    await page.getByTestId("btb-legend-parks").click();
 
     // Chip dims (inactive) AND the map marker disappears.
-    await expect(coffeeChip).toHaveAttribute("data-active", "false");
-    await expect(page.getByTestId("btb-map-marker-1-coffee")).toHaveCount(0);
+    await expect(parksChip).toHaveAttribute("data-active", "false");
+    await expect(page.getByTestId("btb-map-marker-1-parks")).toHaveCount(0);
 
     // A different active layer's chip is unaffected.
     await expect(page.getByTestId("btb-chip-1-commute")).toHaveAttribute(
       "data-active",
       "true",
     );
+  });
+});
+
+test.describe("buyer-tour page — v0.2 polish", () => {
+  test("Planned around shows the buyer's CUSTOM priorities, not map-layer labels", async ({
+    page,
+  }) => {
+    await page.goto(FULL);
+    const planned = page.getByTestId("btb-planned-around");
+    await expect(planned).toContainText("Home office");
+    await expect(planned).toContainText("Short commute");
+    // It must NOT be the fixed map-layer set.
+    await expect(planned).not.toContainText("School locations");
+  });
+
+  test("Tour Snapshot renders the full 2x2 (Date / Start / Homes / Length)", async ({
+    page,
+  }) => {
+    await page.goto(FULL);
+    const body = page.getByTestId("buyer-tour-page");
+    await expect(body).toContainText("Start");
+    await expect(body).toContainText("9:30 AM");
+    await expect(body).toContainText("Length");
+    await expect(page.getByTestId("btb-tour-date")).toContainText("Saturday");
+  });
+
+  test("'stops' copy has a space (no 4stops trap)", async ({ page }) => {
+    await page.goto(FULL);
+    await expect(page.getByTestId("btb-map-section")).toContainText(
+      "The 4 stops in order",
+    );
+  });
+
+  test("home cards show at most 3 proximity chips", async ({ page }) => {
+    await page.goto(FULL);
+    const chipCount = await page
+      .getByTestId("btb-home-1-chips")
+      .locator("li")
+      .count();
+    expect(chipCount).toBeLessThanOrEqual(3);
+  });
+
+  test("the map commute tag uses a short dynamic anchor label (no clip)", async ({
+    page,
+  }) => {
+    await page.goto(FULL); // anchor label "JBLM main gate" → short form "JBLM"
+    await expect(page.getByTestId("btb-map-anchor")).toContainText("JBLM");
+  });
+});
+
+test.describe("buyer-tour page — national usability (non-WA sample)", () => {
+  const MN = "/buyer-tour-preview?fixture=mn";
+
+  test("commute label is dynamic from the tour's anchor; no JBLM leaks in", async ({
+    page,
+  }) => {
+    await page.goto(MN);
+    // Map tag reads the MN anchor, not a hardcoded place.
+    await expect(page.getByTestId("btb-map-anchor")).toContainText("Downtown");
+    // The commute chip reads "<time> to Downtown Minneapolis".
+    await expect(page.getByTestId("btb-chip-1-commute")).toContainText(
+      "to Downtown Minneapolis",
+    );
+    // No South Sound assumption anywhere on the page.
+    await expect(page.getByTestId("buyer-tour-page")).not.toContainText("JBLM");
+  });
+
+  test("a photoless agent renders a monogram (ML)", async ({ page }) => {
+    await page.goto(MN);
+    await expect(page.getByTestId("btb-agent-avatar")).toHaveText("ML");
   });
 });
 

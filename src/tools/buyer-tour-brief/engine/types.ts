@@ -56,7 +56,7 @@ export interface LatLng {
  */
 export interface ProximityChip {
   category: ProximityCategory;
-  /** Factual place name or anchor label, e.g. "Lincoln Elementary", "JBLM gate". */
+  /** Factual place name or anchor label, e.g. "Lincoln Elementary", "the gate". */
   label: string;
   /** Factual measure, e.g. "0.4 mi" or "12 min drive". */
   value: string;
@@ -65,7 +65,7 @@ export interface ProximityChip {
 }
 
 /**
- * The single per-tour commute anchor (e.g. a workplace, "JBLM gate"). Every home
+ * The single per-tour commute anchor (e.g. a workplace, a base gate). Every home
  * shows drive time to this one address. The raw `address` is agent-private; only
  * the `label` (+ lat/lng for the map anchor pin) is buyer-facing.
  */
@@ -114,10 +114,21 @@ export interface BuyerTourDraft {
   buyerName: string;
   /** Free-text or ISO date string, e.g. "Saturday, July 12" or "2026-07-12". */
   tourDate: string;
+  /** Agent-set start time string, e.g. "9:30 AM" (Tour Snapshot). */
+  startTime?: string;
+  /** Agent-set length string, e.g. "About 2.5 hrs"; absent → estimated from homes. */
+  length?: string;
   meetingPoint?: string;
   commuteAnchor?: CommuteAnchor;
-  /** The factual layer set the agent enabled for this tour. */
+  /** The factual layer set the agent enabled for this tour (drives the map toggles). */
   priorities: ProximityCategory[];
+  /**
+   * The agent's CUSTOM buyer-priority chips for the "Planned around you" section —
+   * what the BUYER cares about, in the agent's words (e.g. "Short commute", "Home
+   * office", "Parks & coffee"). DISTINCT from `priorities` (the factual map layers).
+   * Free text, never bound to the fixed map-layer set, never region-specific.
+   */
+  buyerPriorities: string[];
   /** Agent-authored note to the buyer (agent voice). */
   agentNote?: string;
   /** 3–6 ordered homes. */
@@ -128,8 +139,12 @@ export const EMPTY_BUYER_TOUR_DRAFT: BuyerTourDraft = {
   buyerName: "",
   tourDate: "",
   priorities: [],
+  buyerPriorities: [],
   homes: [],
 };
+
+/** Cap on custom buyer-priority chips (keeps the Planned-around row legible). */
+export const MAX_BUYER_PRIORITIES = 8;
 
 /* --------------------------------------------------------------------------
  * Defensive clamp helpers. Pure + unit-testable. The publish route runs the
@@ -278,12 +293,26 @@ export function clampBuyerTourDraft(
   const homes = Array.isArray(r.homes)
     ? r.homes.slice(0, MAX_HOMES).map((h, i) => clampHome(h, i))
     : [];
+  const buyerPriorities: string[] = [];
+  if (Array.isArray(r.buyerPriorities)) {
+    for (const p of r.buyerPriorities) {
+      const s = clampString(p, 60);
+      if (s && buyerPriorities.length < MAX_BUYER_PRIORITIES) {
+        buyerPriorities.push(s);
+      }
+    }
+  }
   const draft: BuyerTourDraft = {
     buyerName: clampString(r.buyerName, 120),
     tourDate: clampString(r.tourDate, 120),
     priorities,
+    buyerPriorities,
     homes,
   };
+  const startTime = clampOptionalString(r.startTime, 40);
+  if (startTime) draft.startTime = startTime;
+  const length = clampOptionalString(r.length, 40);
+  if (length) draft.length = length;
   const meetingPoint = clampOptionalString(r.meetingPoint, 280);
   if (meetingPoint) draft.meetingPoint = meetingPoint;
   const agentNote = clampOptionalString(r.agentNote, 800);

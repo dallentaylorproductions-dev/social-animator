@@ -124,6 +124,33 @@ test.describe("buyer-tour Fair Housing gate", () => {
     );
   });
 
+  test("no hardcoded region (JBLM / Tacoma / South Sound) in product code", () => {
+    // National usability: region-specific words may live ONLY in __fixtures__
+    // (sample data). Product code must stay generic — every commute label comes
+    // from the tour's commuteAnchor.label at runtime.
+    const REGION_WORDS = [/\bjblm\b/i, /\btacoma\b/i, /south sound/i];
+    const productTrees = [
+      SCAN_ROOT,
+      path.resolve(__dirname, "../src/lib/buyer-tour-brief"),
+    ];
+    const offenders: string[] = [];
+    for (const file of productTrees.flatMap(collectSource)) {
+      if (file.includes("__fixtures__")) continue; // sample data is exempt
+      // Strip comments — a doc example is not a region ASSUMPTION in the logic
+      // (consistent with the banned-copy scan above).
+      const src = stripComments(readFileSync(file, "utf8"));
+      for (const re of REGION_WORDS) {
+        if (re.test(src)) {
+          offenders.push(`${path.relative(process.cwd(), file)} → ${re}`);
+        }
+      }
+    }
+    expect(
+      offenders,
+      `Hardcoded region in product code:\n${offenders.join("\n")}`,
+    ).toEqual([]);
+  });
+
   test("detector self-test: a seeded banned phrase is caught", () => {
     const seeded = "These are the best schools in a safe neighborhood.".toLowerCase();
     const hits = FAIR_HOUSING_BANNED.filter((p) => seeded.includes(p));

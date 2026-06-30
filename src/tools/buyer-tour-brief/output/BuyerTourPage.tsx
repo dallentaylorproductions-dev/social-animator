@@ -90,6 +90,60 @@ function splitAddress(address: string): { street: string; rest: string } {
   };
 }
 
+/** Short AREA label for the order strip — the locality (token after the first
+ *  comma), else the street. Generic by construction: derived from the address, no
+ *  hardcoded regions. */
+function areaLabel(address: string): string {
+  const parts = address
+    .split(",")
+    .map((s) => s.trim())
+    .filter(Boolean);
+  return parts.length >= 2 ? parts[1] : parts[0] ?? "";
+}
+
+/** Estimate tour length from the stop count when the agent didn't set one.
+ *  ~0.6 hr/stop, rounded to the nearest half hour. */
+function estimateLength(stops: number): string {
+  if (stops <= 0) return "";
+  const hrs = Math.max(0.5, Math.round(stops * 0.6 * 2) / 2);
+  const label = Number.isInteger(hrs) ? `${hrs}` : `${hrs}`;
+  return `About ${label} ${hrs === 1 ? "hr" : "hrs"}`;
+}
+
+/** One Tour Snapshot cell (the mock's 2x2 grid). */
+function SnapCell({
+  k,
+  v,
+  testid,
+  rightBorder,
+  bottomBorder,
+}: {
+  k: string;
+  v: string;
+  testid?: string;
+  rightBorder?: boolean;
+  bottomBorder?: boolean;
+}) {
+  return (
+    <div
+      className={`px-4 py-3 ${rightBorder ? "border-r border-[#F0EBE1]" : ""} ${
+        bottomBorder ? "border-b border-[#F0EBE1]" : ""
+      }`}
+    >
+      <div className="text-[10.5px] font-bold uppercase tracking-[0.12em] text-[#7C8A86]">
+        {k}
+      </div>
+      <div
+        className="mt-0.5 text-[15px] font-semibold"
+        style={{ fontFamily: SERIF }}
+        data-testid={testid}
+      >
+        {v}
+      </div>
+    </div>
+  );
+}
+
 /** Eyebrow — thin uppercase letter-spaced label. Neutral (accent discipline). */
 function Eyebrow({ children }: { children: React.ReactNode }) {
   return (
@@ -259,6 +313,12 @@ export function BuyerTourPage({ payload }: { payload: BuyerTourPublicPayload }) 
     (h) => h.lat !== undefined && h.lng !== undefined,
   );
 
+  // The commute layer only makes sense with an anchor set — hide it cleanly
+  // otherwise (never imply a default destination). Every other layer passes through.
+  const legendCats = payload.priorities.filter(
+    (c) => c !== "commute" || !!payload.commuteAnchor,
+  );
+
   const greeting = payload.buyerName
     ? `Hi ${payload.buyerName}, here's the day I planned for you.`
     : "Here's the day I planned for you.";
@@ -334,30 +394,23 @@ export function BuyerTourPage({ payload }: { payload: BuyerTourPublicPayload }) 
         <div className="px-6 pt-5">
           <div className="overflow-hidden rounded-[14px] border border-[#EAE3D8] bg-white shadow-[0_1px_2px_rgba(22,33,31,.04),0_6px_20px_rgba(22,33,31,.06)]">
             <div className="grid grid-cols-2">
-              <div className="border-b border-r border-[#F0EBE1] px-4 py-3">
-                <div className="text-[10.5px] font-bold uppercase tracking-[0.12em] text-[#7C8A86]">
-                  Date
-                </div>
-                <div
-                  className="mt-0.5 text-[15px] font-semibold"
-                  style={{ fontFamily: SERIF }}
-                  data-testid="btb-tour-date"
-                >
-                  {payload.tourDate || "To be set"}
-                </div>
-              </div>
-              <div className="border-b border-[#F0EBE1] px-4 py-3">
-                <div className="text-[10.5px] font-bold uppercase tracking-[0.12em] text-[#7C8A86]">
-                  Homes
-                </div>
-                <div
-                  className="mt-0.5 text-[15px] font-semibold"
-                  style={{ fontFamily: SERIF }}
-                >
-                  {payload.homes.length}{" "}
-                  {payload.homes.length === 1 ? "stop" : "stops"}
-                </div>
-              </div>
+              <SnapCell
+                k="Date"
+                v={payload.tourDate || "To be set"}
+                testid="btb-tour-date"
+                rightBorder
+                bottomBorder
+              />
+              <SnapCell k="Start" v={payload.startTime || "To be set"} bottomBorder />
+              <SnapCell
+                k="Homes"
+                v={`${payload.homes.length} ${payload.homes.length === 1 ? "stop" : "stops"}`}
+                rightBorder
+              />
+              <SnapCell
+                k="Length"
+                v={payload.length || estimateLength(payload.homes.length)}
+              />
             </div>
             {payload.meetingPoint && (
               <div
@@ -373,20 +426,20 @@ export function BuyerTourPage({ payload }: { payload: BuyerTourPublicPayload }) 
           </div>
         </div>
 
-        {/* ---------- planned around (static, fully visible) ---------- */}
-        {payload.priorities.length > 0 && (
-          <div className="px-6 pt-3">
+        {/* ---------- planned around = BUYER priorities (custom, not map layers) ---------- */}
+        {payload.buyerPriorities.length > 0 && (
+          <div className="px-6 pt-3" data-testid="btb-planned-around">
             <div className="flex flex-wrap items-center gap-x-3 gap-y-2.5 rounded-[14px] border border-[#EAE3D8] bg-[#F7F3EA] px-4 py-3.5">
               <span className="text-[10.5px] font-bold uppercase tracking-[0.1em] text-[#C2703D]">
                 Planned around
               </span>
               <div className="flex flex-wrap gap-2">
-                {payload.priorities.map((cat) => (
+                {payload.buyerPriorities.map((p, i) => (
                   <span
-                    key={cat}
+                    key={`${p}-${i}`}
                     className="rounded-full border border-[#EAE3D8] bg-white px-3 py-1.5 text-[12.5px] font-semibold text-[#42514E]"
                   >
-                    {LAYER_LABELS[cat]}
+                    {p}
                   </span>
                 ))}
               </div>
@@ -406,8 +459,10 @@ export function BuyerTourPage({ payload }: { payload: BuyerTourPublicPayload }) 
                 Your Buyer Day Map
               </h2>
               <p className="mt-1 text-[13px] text-[#7C8A86]">
-                The {payload.homes.length} stops in order. Turn a layer on to see
-                what&rsquo;s nearby.
+                {`The ${payload.homes.length} ${
+                  payload.homes.length === 1 ? "stop" : "stops"
+                } in order.`}{" "}
+                Turn a layer on to see what&rsquo;s nearby.
               </p>
             </div>
             <div className="px-4">
@@ -421,13 +476,13 @@ export function BuyerTourPage({ payload }: { payload: BuyerTourPublicPayload }) 
                   accent={accent}
                 />
 
-                {payload.priorities.length > 0 && (
+                {legendCats.length > 0 && (
                   <div data-testid="btb-legend">
                     <div className="border-t border-[#EAE3D8] bg-[#F7F3EA] px-[18px] pt-3 text-[10.5px] font-bold uppercase tracking-[0.12em] text-[#7C8A86]">
                       Map layers
                     </div>
                     <div className="flex flex-wrap gap-2 bg-[#F7F3EA] px-3.5 pb-3.5 pt-2.5">
-                      {payload.priorities.map((cat) => {
+                      {legendCats.map((cat) => {
                         const on = activeLayers.has(cat);
                         const col = LAYER_COLOR[cat];
                         return (
@@ -505,35 +560,30 @@ export function BuyerTourPage({ payload }: { payload: BuyerTourPublicPayload }) 
               </h2>
             </div>
             <div className="flex items-stretch px-6">
-              {payload.homes.map((home, i) => {
-                const { street } = splitAddress(home.address);
-                return (
+              {payload.homes.map((home, i) => (
+                <div key={home.stop} className="relative flex-1 text-center">
+                  {i > 0 && (
+                    <span
+                      aria-hidden="true"
+                      className="absolute left-[-50%] top-[15px] z-0 h-0.5 w-full"
+                      style={{
+                        background: `repeating-linear-gradient(90deg, ${accent} 0 4px, transparent 4px 9px)`,
+                      }}
+                    />
+                  )}
                   <div
-                    key={home.stop}
-                    className="relative flex-1 text-center"
+                    className="relative z-[2] mx-auto flex h-[30px] w-[30px] items-center justify-center rounded-full text-sm font-bold"
+                    style={{ background: accent, color: onAccent }}
+                    data-testid={`btb-order-${home.stop}`}
                   >
-                    {i > 0 && (
-                      <span
-                        aria-hidden="true"
-                        className="absolute left-[-50%] top-[15px] z-0 h-0.5 w-full"
-                        style={{
-                          background: `repeating-linear-gradient(90deg, ${accent} 0 4px, transparent 4px 9px)`,
-                        }}
-                      />
-                    )}
-                    <div
-                      className="relative z-[2] mx-auto flex h-[30px] w-[30px] items-center justify-center rounded-full text-sm font-bold"
-                      style={{ background: accent, color: onAccent }}
-                      data-testid={`btb-order-${home.stop}`}
-                    >
-                      {home.stop}
-                    </div>
-                    <div className="mt-1.5 truncate px-1 text-[11px] leading-tight text-[#7C8A86]">
-                      {street}
-                    </div>
+                    {home.stop}
                   </div>
-                );
-              })}
+                  {/* Short AREA label only — full street addresses live on the cards. */}
+                  <div className="mx-auto mt-1.5 line-clamp-2 px-1 text-[11px] leading-tight text-[#7C8A86]">
+                    {areaLabel(home.address)}
+                  </div>
+                </div>
+              ))}
             </div>
           </section>
         )}
@@ -615,16 +665,16 @@ export function BuyerTourPage({ payload }: { payload: BuyerTourPublicPayload }) 
                     {home.whyOnList && (
                       <div className="mt-3.5">
                         <div
-                          className="mb-1.5 flex items-center gap-2 text-[10.5px] font-bold uppercase tracking-[0.1em]"
+                          className="mb-1.5 flex items-center gap-2 text-[12px] font-semibold"
                           style={{ color: accent }}
                         >
                           <span
                             className="h-0.5 w-[13px] rounded-sm"
                             style={{ background: accent }}
                           />
-                          Why it&rsquo;s on the list
+                          Why I included it
                         </div>
-                        <p className="m-0 whitespace-pre-line text-sm text-[#42514E]">
+                        <p className="m-0 whitespace-pre-line text-sm leading-relaxed text-[#42514E]">
                           {home.whyOnList}
                         </p>
                       </div>
@@ -632,11 +682,11 @@ export function BuyerTourPage({ payload }: { payload: BuyerTourPublicPayload }) 
 
                     {home.watchFor && (
                       <div className="mt-3">
-                        <div className="mb-1.5 flex items-center gap-2 text-[10.5px] font-bold uppercase tracking-[0.1em] text-[#C2703D]">
+                        <div className="mb-1.5 flex items-center gap-2 text-[12px] font-semibold text-[#C2703D]">
                           <span className="h-0.5 w-[13px] rounded-sm bg-[#C2703D]" />
-                          Watch for
+                          What to watch for
                         </div>
-                        <p className="m-0 whitespace-pre-line text-sm text-[#42514E]">
+                        <p className="m-0 whitespace-pre-line text-sm leading-relaxed text-[#42514E]">
                           {home.watchFor}
                         </p>
                       </div>
@@ -650,19 +700,24 @@ export function BuyerTourPage({ payload }: { payload: BuyerTourPublicPayload }) 
                         {home.proximity.map((chip, idx) => {
                           const on = activeLayers.has(chip.category);
                           const col = LAYER_COLOR[chip.category];
+                          // Render-only tidy: a commute value like "12 min drive"
+                          // reads better as "12 min to <anchor>".
+                          const value =
+                            chip.category === "commute"
+                              ? chip.value.replace(/\s*drive$/i, "")
+                              : chip.value;
                           return (
                             <li
                               key={`${chip.category}-${idx}`}
                               data-testid={`btb-chip-${home.stop}-${chip.category}`}
                               data-active={on ? "true" : "false"}
-                              className="inline-flex max-w-full items-center gap-1.5 rounded-[8px] border px-2.5 py-1.5 text-[11.5px] font-medium motion-safe:transition-all"
+                              className="inline-flex min-h-[26px] max-w-full items-center gap-1.5 rounded-[8px] border px-2.5 py-1 text-[11.5px] font-medium motion-safe:transition-colors"
                               style={
                                 on
                                   ? {
-                                      borderColor: col,
-                                      backgroundColor: `${col}1f`,
+                                      borderColor: `${col}59`,
+                                      backgroundColor: `${col}14`,
                                       color: "#16211F",
-                                      boxShadow: `0 0 0 1px ${col}59`,
                                     }
                                   : {
                                       borderColor: "#EAE3D8",
@@ -677,8 +732,8 @@ export function BuyerTourPage({ payload }: { payload: BuyerTourPublicPayload }) 
                                 style={{ backgroundColor: on ? col : "#C9CEC8" }}
                               />
                               <span className="truncate">
-                                <b className="font-bold">{chip.value}</b>{" "}
-                                {chip.label}
+                                <b className="font-semibold">{value}</b>
+                                {chip.label ? ` to ${chip.label}` : ""}
                               </span>
                             </li>
                           );

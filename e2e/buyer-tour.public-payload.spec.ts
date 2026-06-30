@@ -32,9 +32,12 @@ function maxedDraft(): BuyerTourDraft {
   return {
     buyerName: "Jordan",
     tourDate: "Saturday",
+    startTime: "9:30 AM",
+    length: "About 2.5 hrs",
     meetingPoint: "Cafe",
     agentNote: "My note to you.",
     priorities: ["schools", "commute", "parks", "coffee", "grocery"],
+    buyerPriorities: ["Short commute", "Home office"],
     // The commute anchor's raw ADDRESS is agent-private and must never publish.
     commuteAnchor: {
       label: "JBLM gate",
@@ -157,6 +160,28 @@ test.describe("buyer-tour public-payload allow-list", () => {
     expect(
       (payload.commuteAnchor as unknown as Record<string, unknown>).address,
     ).toBeUndefined();
+  });
+
+  test("v0.2 fields (buyerPriorities / startTime / length) project field-by-field", () => {
+    const draft = maxedDraft();
+    const payload = toBuyerTourPublicPayload(draft, { name: "Alex" });
+    expect(payload.buyerPriorities).toEqual(["Short commute", "Home office"]);
+    expect(payload.startTime).toBe("9:30 AM");
+    expect(payload.length).toBe("About 2.5 hrs");
+
+    // Read-time clamp keeps clean values and drops garbage entries.
+    const clamped = clampBuyerTourPublicPayload({
+      buyerName: "x",
+      tourDate: "y",
+      priorities: [],
+      homes: [],
+      buyerPriorities: ["Backyard", "", 42, "Walkable coffee"],
+      startTime: "10:00 AM",
+      length: "",
+    });
+    expect(clamped.buyerPriorities).toEqual(["Backyard", "Walkable coffee"]);
+    expect(clamped.startTime).toBe("10:00 AM");
+    expect(clamped.length).toBeUndefined();
   });
 
   test("brandAccent: a valid hex projects; an invalid / rogue value drops", () => {

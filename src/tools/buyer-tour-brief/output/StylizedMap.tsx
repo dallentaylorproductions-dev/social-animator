@@ -40,6 +40,20 @@ export const LAYER_COLOR: Record<ProximityCategory, string> = {
 /** Default tour-thread accent when the agent has no brandAccent set. */
 export const DEFAULT_TOUR_ACCENT = "#0e7c73";
 
+/**
+ * A short, dynamic display form of the agent's commute-anchor label for the map
+ * tag — fixes the clip without hardcoding any place. Whole label if short, else
+ * the first clean token (a multi-word destination collapses to its first word),
+ * else a neutral "Commute". The label is always the tour's own anchor.
+ */
+export function shortAnchorLabel(label: string | undefined): string {
+  const l = (label ?? "").trim();
+  if (!l) return "Commute";
+  if (l.length <= 12) return l;
+  const first = l.split(/\s+/)[0];
+  return first.length <= 12 ? first : first.slice(0, 12);
+}
+
 interface StylizedMapProps {
   homes: PublicHome[];
   anchor?: PublicCommuteAnchor;
@@ -132,32 +146,38 @@ export function StylizedMap({
           />
         )}
 
-        {/* Commute anchor — terra (fixed) edge tag, clamped into view by geometry. */}
-        {projected.anchor && (
-          <g
-            transform={`translate(${projected.anchor.x}, ${projected.anchor.y})`}
-            data-testid="btb-map-anchor"
-          >
-            <rect
-              x="-29"
-              y="-12"
-              width="58"
-              height="24"
-              rx="7"
-              fill={LAYER_COLOR.commute}
-            />
-            <text
-              textAnchor="middle"
-              dominantBaseline="central"
-              fontSize="9"
-              fontWeight="700"
-              letterSpacing="0.04em"
-              fill="#ffffff"
-            >
-              {(anchor?.label ?? "Anchor").slice(0, 8)}
-            </text>
-          </g>
-        )}
+        {/* Commute anchor — terra (fixed) edge tag, clamped into view by geometry.
+            Label is dynamic + width-fit so it never clips. */}
+        {projected.anchor &&
+          (() => {
+            const tag = shortAnchorLabel(anchor?.label);
+            const w = Math.max(48, tag.length * 6.5 + 18);
+            return (
+              <g
+                transform={`translate(${projected.anchor.x}, ${projected.anchor.y})`}
+                data-testid="btb-map-anchor"
+              >
+                <rect
+                  x={-w / 2}
+                  y="-12"
+                  width={w}
+                  height="24"
+                  rx="7"
+                  fill={LAYER_COLOR.commute}
+                />
+                <text
+                  textAnchor="middle"
+                  dominantBaseline="central"
+                  fontSize="10"
+                  fontWeight="700"
+                  letterSpacing="0.02em"
+                  fill="#ffffff"
+                >
+                  {tag}
+                </text>
+              </g>
+            );
+          })()}
 
         {/* Home pins + their active-layer annotation markers. */}
         {projected.homes.map((pt, i) => {

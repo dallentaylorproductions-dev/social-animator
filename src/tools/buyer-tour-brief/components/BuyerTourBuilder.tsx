@@ -319,6 +319,30 @@ export function BuyerTourBuilder() {
               />
             </div>
             <div>
+              <label className={labelCls} htmlFor="btb-start">
+                Start time (optional)
+              </label>
+              <input
+                id="btb-start"
+                className={field}
+                placeholder="9:30 AM"
+                value={draft.startTime ?? ""}
+                onChange={(e) => patch({ startTime: e.target.value })}
+              />
+            </div>
+            <div>
+              <label className={labelCls} htmlFor="btb-length">
+                Length (optional)
+              </label>
+              <input
+                id="btb-length"
+                className={field}
+                placeholder="About 2.5 hrs (auto if blank)"
+                value={draft.length ?? ""}
+                onChange={(e) => patch({ length: e.target.value })}
+              />
+            </div>
+            <div>
               <label className={labelCls} htmlFor="btb-meet">
                 Meeting point (optional)
               </label>
@@ -329,6 +353,29 @@ export function BuyerTourBuilder() {
                 onChange={(e) => patch({ meetingPoint: e.target.value })}
               />
             </div>
+          </div>
+          <div>
+            <label className={labelCls} htmlFor="btb-buyer-priorities">
+              Planned around (what your buyer cares about)
+            </label>
+            <input
+              id="btb-buyer-priorities"
+              className={field}
+              placeholder="Short commute, Home office, Parks & coffee"
+              value={draft.buyerPriorities.join(", ")}
+              onChange={(e) =>
+                patch({
+                  buyerPriorities: e.target.value
+                    .split(",")
+                    .map((s) => s.trim())
+                    .filter(Boolean),
+                })
+              }
+            />
+            <p className="mt-1 text-[11px] text-neutral-500">
+              Comma separated. These are the buyer&apos;s priorities, separate from
+              the factual map layers below.
+            </p>
           </div>
           <div>
             <label className={labelCls} htmlFor="btb-note">
@@ -356,7 +403,7 @@ export function BuyerTourBuilder() {
               <input
                 id="btb-anchor-label"
                 className={field}
-                placeholder="JBLM main gate"
+                placeholder="Work, gate, campus, airport…"
                 value={anchorLabel}
                 onChange={(e) => setAnchorLabel(e.target.value)}
               />
@@ -368,7 +415,7 @@ export function BuyerTourBuilder() {
               <input
                 id="btb-anchor-addr"
                 className={field}
-                placeholder="Liberty Gate Rd, JBLM, WA"
+                placeholder="Street, City, ST"
                 value={anchorAddress}
                 onChange={(e) => setAnchorAddress(e.target.value)}
               />

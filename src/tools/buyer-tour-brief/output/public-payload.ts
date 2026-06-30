@@ -73,14 +73,22 @@ export interface PublicCommuteAnchor {
   lng?: number;
 }
 
+/** Max proximity chips shown per home card (the narrative stays dominant). */
+export const MAX_PUBLIC_CHIPS = 3;
+
 export interface BuyerTourPublicPayload {
   templateVersion: 1;
   buyerName: string;
   tourDate: string;
+  /** Tour Snapshot: start time + length (length may be estimated by the renderer). */
+  startTime?: string;
+  length?: string;
   meetingPoint?: string;
   agentNote?: string;
-  /** Enabled factual layers, deduped + in canonical order. */
+  /** Enabled factual layers, deduped + in canonical order (the map toggles). */
   priorities: ProximityCategory[];
+  /** The agent's CUSTOM buyer-priority chips (Planned around). Distinct from layers. */
+  buyerPriorities: string[];
   commuteAnchor?: PublicCommuteAnchor;
   homes: PublicHome[];
   agent: PublicAgent;
@@ -157,6 +165,17 @@ function projPriorities(raw: unknown): ProximityCategory[] {
   return CANON.filter((c) => present.has(c));
 }
 
+/** Project the custom buyer-priority chips: clean non-empty strings, capped. */
+function projBuyerPriorities(raw: unknown): string[] {
+  if (!Array.isArray(raw)) return [];
+  const out: string[] = [];
+  for (const v of raw) {
+    const s = projStr(v, 60);
+    if (s && out.length < 8) out.push(s);
+  }
+  return out;
+}
+
 function projChip(raw: unknown): PublicProximityChip | null {
   if (!raw || typeof raw !== "object") return null;
   const r = raw as Record<string, unknown>;
@@ -206,7 +225,7 @@ function projHome(raw: unknown, stop: number): PublicHome {
       ? r.proximity
           .map((c) => projChip(c))
           .filter((c): c is PublicProximityChip => c !== null)
-          .slice(0, 8)
+          .slice(0, MAX_PUBLIC_CHIPS)
       : [],
   };
   const photoUrl = projHostedUrl(r.photoUrl);
@@ -263,9 +282,14 @@ export function toBuyerTourPublicPayload(
     buyerName: projStr(draft.buyerName, 120),
     tourDate: projStr(draft.tourDate, 120),
     priorities: projPriorities(draft.priorities),
+    buyerPriorities: projBuyerPriorities(draft.buyerPriorities),
     homes,
     agent: projAgent(agent),
   };
+  const startTime = projOptStr(draft.startTime, 40);
+  if (startTime) payload.startTime = startTime;
+  const length = projOptStr(draft.length, 40);
+  if (length) payload.length = length;
   const meetingPoint = projOptStr(draft.meetingPoint, 280);
   if (meetingPoint) payload.meetingPoint = meetingPoint;
   const agentNote = projOptStr(draft.agentNote, 800);
@@ -299,9 +323,14 @@ export function clampBuyerTourPublicPayload(
     buyerName: projStr(r.buyerName, 120),
     tourDate: projStr(r.tourDate, 120),
     priorities: projPriorities(r.priorities),
+    buyerPriorities: projBuyerPriorities(r.buyerPriorities),
     homes,
     agent: projAgent(r.agent as BuyerTourAgent | undefined),
   };
+  const startTime = projOptStr(r.startTime, 40);
+  if (startTime) payload.startTime = startTime;
+  const length = projOptStr(r.length, 40);
+  if (length) payload.length = length;
   const meetingPoint = projOptStr(r.meetingPoint, 280);
   if (meetingPoint) payload.meetingPoint = meetingPoint;
   const agentNote = projOptStr(r.agentNote, 800);
