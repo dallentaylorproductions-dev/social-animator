@@ -61,7 +61,20 @@ const field =
 const labelCls =
   "block text-[10px] uppercase tracking-[0.15em] text-neutral-500 mb-1.5";
 
-export function BuyerTourBuilder() {
+export interface BuyerTourBuilderProps {
+  /**
+   * Whether the GreatSchools "School context" toggle is offered (GREATSCHOOLS_ENABLED,
+   * resolved SERVER-SIDE in the /buyer-tour route and passed down). Default false so the
+   * toggle stays dark when the flag is off; the client never reads the server-only flag
+   * itself. This only decides whether the AUTHORING control renders; the live school
+   * fetch happens at render on /tour/[slug], never here.
+   */
+  schoolLayerAvailable?: boolean;
+}
+
+export function BuyerTourBuilder({
+  schoolLayerAvailable = false,
+}: BuyerTourBuilderProps = {}) {
   const [draft, setDraft] = useState<BuyerTourDraft>(() => ({
     ...EMPTY_BUYER_TOUR_DRAFT,
     // Priority defaults pre-checked (often zero clicks); agent can toggle.
@@ -459,6 +472,57 @@ export function BuyerTourBuilder() {
             )}
           </div>
         </section>
+
+        {/* ---- School context (GREATSCHOOLS_ENABLED, dark when off) ---- */}
+        {schoolLayerAvailable && (
+          <section
+            className="mt-6 space-y-3 rounded-2xl border border-neutral-800 bg-neutral-900/40 p-5"
+            data-testid="btb-school-context"
+          >
+            <h2 className="text-sm font-semibold uppercase tracking-wide text-neutral-400">
+              School context
+            </h2>
+            <div className="flex items-start justify-between gap-4">
+              <div className="flex-1">
+                <label
+                  htmlFor="btb-school-layer"
+                  className="block text-sm font-medium text-neutral-100"
+                >
+                  Show nearby school-ratings
+                </label>
+                <p className="mt-1 text-[11px] leading-relaxed text-neutral-500">
+                  Adds a GreatSchools school-ratings section to this tour, the
+                  nearest school for each home, shown the same way for every home.
+                  Sourced from GreatSchools, not your or Studio&apos;s opinion.
+                </p>
+                <p className="mt-1 text-[11px] text-neutral-600">
+                  The section appears once the tour is published.
+                </p>
+              </div>
+              <button
+                id="btb-school-layer"
+                type="button"
+                role="switch"
+                aria-checked={draft.schoolLayer === true}
+                onClick={() => patch({ schoolLayer: !draft.schoolLayer })}
+                data-testid="btb-school-layer-toggle"
+                className={`relative mt-0.5 inline-flex h-6 w-11 shrink-0 items-center rounded-full border transition-colors ${
+                  draft.schoolLayer === true
+                    ? "border-teal-400/70 bg-teal-400/30"
+                    : "border-neutral-700 bg-neutral-800"
+                }`}
+              >
+                <span
+                  className={`inline-block h-4 w-4 rounded-full bg-neutral-100 transition-transform ${
+                    draft.schoolLayer === true
+                      ? "translate-x-5"
+                      : "translate-x-1"
+                  }`}
+                />
+              </button>
+            </div>
+          </section>
+        )}
 
         {/* ---- Homes ---- */}
         <section className="mt-6 space-y-5">
