@@ -22,6 +22,7 @@
  */
 
 import {
+  type ReactNode,
   useCallback,
   useEffect,
   useRef,
@@ -336,7 +337,19 @@ function AgentAvatar({ agent }: { agent: PublicAgent }) {
   );
 }
 
-export function BuyerTourPage({ payload }: { payload: BuyerTourPublicPayload }) {
+export function BuyerTourPage({
+  payload,
+  schoolSection,
+}: {
+  payload: BuyerTourPublicPayload;
+  /**
+   * The GreatSchools "School context" section, prerendered SERVER-SIDE by the
+   * `/tour/[slug]` page from a live render-time fetch and injected here as a node so
+   * GreatSchools data never enters this client component's props/bundle. Absent
+   * (flag/toggle off, or unavailable) → nothing renders here (byte-identical).
+   */
+  schoolSection?: ReactNode;
+}) {
   const reduced = useReducedMotion();
 
   const accent = payload.brandAccent ?? DEFAULT_TOUR_ACCENT;
@@ -832,6 +845,9 @@ export function BuyerTourPage({ payload }: { payload: BuyerTourPublicPayload }) 
             })}
           </ol>
         </section>
+
+        {/* ---------- school context (GreatSchools, server-rendered; null when off) ---------- */}
+        {schoolSection}
 
         {/* ---------- after tour ---------- */}
         <section className="px-6 pt-2" data-testid="btb-after-tour">
