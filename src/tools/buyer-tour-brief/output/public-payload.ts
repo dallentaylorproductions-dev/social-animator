@@ -101,6 +101,14 @@ export interface BuyerTourPublicPayload {
    * value drops to undefined (the page never renders an arbitrary string into CSS).
    */
   brandAccent?: string;
+  /**
+   * Whether the agent turned on the GreatSchools "School context" layer for this
+   * tour. A PLAIN BOOLEAN — the only new stored field the school section adds. NO
+   * GreatSchools data is ever carried in this payload (ToS 3.2.2 / 3.2.8): when this
+   * is true (and GREATSCHOOLS_ENABLED), the public page live-fetches school data at
+   * render time from each home's coordinates and never persists it. Absent → off.
+   */
+  schoolLayer?: boolean;
 }
 
 /* --------------------------------------------------------------------------
@@ -118,6 +126,12 @@ function projStr(v: unknown, maxLen = 400): string {
 function projOptStr(v: unknown, maxLen = 400): string | undefined {
   const s = projStr(v, maxLen);
   return s.length > 0 ? s : undefined;
+}
+
+/** Only a real boolean survives — a truthy string / number is NOT coerced, so a
+ *  tampered `schoolLayer: "true"` in KV drops to undefined (off), never on. */
+function projBool(v: unknown): boolean | undefined {
+  return v === true ? true : v === false ? false : undefined;
 }
 
 function projNonNegInt(v: unknown): number | undefined {
@@ -307,6 +321,8 @@ export function toBuyerTourPublicPayload(
   if (commuteAnchor) payload.commuteAnchor = commuteAnchor;
   const accent = projHex(brandAccent);
   if (accent) payload.brandAccent = accent;
+  const schoolLayer = projBool(draft.schoolLayer);
+  if (schoolLayer !== undefined) payload.schoolLayer = schoolLayer;
   return payload;
 }
 
@@ -348,5 +364,7 @@ export function clampBuyerTourPublicPayload(
   if (commuteAnchor) payload.commuteAnchor = commuteAnchor;
   const accent = projHex(r.brandAccent);
   if (accent) payload.brandAccent = accent;
+  const schoolLayer = projBool(r.schoolLayer);
+  if (schoolLayer !== undefined) payload.schoolLayer = schoolLayer;
   return payload;
 }

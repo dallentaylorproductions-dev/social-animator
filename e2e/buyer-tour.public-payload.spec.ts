@@ -209,6 +209,71 @@ test.describe("buyer-tour public-payload allow-list", () => {
     ).toBeUndefined();
   });
 
+  test("schoolLayer: a real boolean projects; a tampered non-boolean drops (never coerced on)", () => {
+    const draft = maxedDraft();
+    // Draft toggle on → boolean true projects.
+    draft.schoolLayer = true;
+    expect(toBuyerTourPublicPayload(draft, {}).schoolLayer).toBe(true);
+    // Explicit false projects as false.
+    draft.schoolLayer = false;
+    expect(toBuyerTourPublicPayload(draft, {}).schoolLayer).toBe(false);
+    // Absent → undefined (off).
+    delete draft.schoolLayer;
+    expect(toBuyerTourPublicPayload(draft, {}).schoolLayer).toBeUndefined();
+    // A tampered truthy NON-boolean in KV must NOT become `true` (no coercion).
+    expect(
+      clampBuyerTourPublicPayload({
+        buyerName: "x",
+        tourDate: "y",
+        priorities: [],
+        homes: [],
+        schoolLayer: "true",
+      }).schoolLayer,
+    ).toBeUndefined();
+    expect(
+      clampBuyerTourPublicPayload({
+        buyerName: "x",
+        tourDate: "y",
+        priorities: [],
+        homes: [],
+        schoolLayer: 1,
+      }).schoolLayer,
+    ).toBeUndefined();
+  });
+
+  test("NO GreatSchools data can enter the payload — the ToS 3.2.2 no-store boundary", () => {
+    // Even if GreatSchools-shaped fields are smuggled onto the draft/home/top-level,
+    // the field-by-field projection never carries them (no-persistence, made code).
+    const GS = "GREATSCHOOLS_SENTINEL_MUST_NOT_STORE";
+    const clamped = clampBuyerTourPublicPayload({
+      buyerName: "x",
+      tourDate: "y",
+      priorities: [],
+      homes: [
+        {
+          address: "1 A St",
+          whyOnList: "w",
+          watchFor: "",
+          proximity: [],
+          // GreatSchools fields glued onto a home (e.g. a hand-edited KV record).
+          ratingBand: GS,
+          schools: [{ name: GS, ratingBand: "Above average", profileUrl: GS }],
+          gsProfileUrl: GS,
+        },
+      ],
+      // …and at the top level.
+      greatSchools: [{ name: GS }],
+      schoolData: GS,
+    });
+    const serialized = JSON.stringify(clamped);
+    expect(serialized).not.toContain(GS);
+    for (const key of ["ratingBand", "schools", "greatSchools", "schoolData", "gsProfileUrl"]) {
+      expect(serialized).not.toContain(`"${key}":`);
+    }
+    // The one allowed new field is the plain boolean toggle only.
+    expect(Object.keys(clamped.homes[0]).sort()).not.toContain("ratingBand");
+  });
+
   test("photo URL allow-list: http(s) + same-origin root-relative pass; js/data/protocol-relative drop", () => {
     const mk = (photoUrl: string) =>
       clampBuyerTourPublicPayload({

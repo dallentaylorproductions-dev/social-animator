@@ -131,6 +131,14 @@ export interface BuyerTourDraft {
   buyerPriorities: string[];
   /** Agent-authored note to the buyer (agent voice). */
   agentNote?: string;
+  /**
+   * Whether the agent turned on the GreatSchools "School context" layer for this
+   * tour (GREATSCHOOLS_ENABLED). The ONLY new stored field the school section adds —
+   * a plain boolean. GreatSchools data itself is NEVER stored (ToS 3.2.2 / 3.2.8);
+   * it is live-fetched at render from each home's already-stored coordinates when
+   * this is on. Absent/false → no school section.
+   */
+  schoolLayer?: boolean;
   /** 3–6 ordered homes. */
   homes: Home[];
 }
