@@ -38,6 +38,10 @@ import type {
 import { AFTER_TOUR_TEASER, FOOTER_DISCLAIMER, LAYER_HINTS, LAYER_LABELS } from "./copy";
 import { DEFAULT_TOUR_ACCENT, LAYER_COLOR, StylizedMap } from "./StylizedMap";
 import { pickContrastText } from "@/tools/listing-flyer/engine/contrast";
+import { stopLetter } from "./buyer-tour-v1";
+import { QuickReadComparison } from "./QuickReadComparison";
+import { NearbyExpander } from "./NearbyExpander";
+import { PinSummaryCard } from "./PinSummaryCard";
 
 /**
  * The mock's system serif stack (Iowan / Palatino / Georgia). Deliberately a SYSTEM
@@ -206,7 +210,16 @@ function useRevealOnLoad(hasUrl: boolean) {
 }
 
 /** Home photo — placeholder by default; the photo is revealed only after it loads. */
-function HomePhoto({ home, accent }: { home: PublicHome; accent: string }) {
+function HomePhoto({
+  home,
+  accent,
+  label,
+}: {
+  home: PublicHome;
+  accent: string;
+  /** The identity label shown on the badge — a number (v0) or a letter (v1). */
+  label: string | number;
+}) {
   const { street, rest } = splitAddress(home.address);
   const { ref, renderImg, loaded, onLoad, onError } = useRevealOnLoad(
     !!home.photoUrl,
@@ -287,7 +300,7 @@ function HomePhoto({ home, accent }: { home: PublicHome; accent: string }) {
         style={{ color: accent }}
         data-testid={`btb-home-${home.stop}-badge`}
       >
-        {home.stop}
+        {label}
       </div>
     </div>
   );
@@ -340,6 +353,7 @@ function AgentAvatar({ agent }: { agent: PublicAgent }) {
 export function BuyerTourPage({
   payload,
   schoolSection,
+  v1 = false,
 }: {
   payload: BuyerTourPublicPayload;
   /**
@@ -349,8 +363,20 @@ export function BuyerTourPage({
    * (flag/toggle off, or unavailable) → nothing renders here (byte-identical).
    */
   schoolSection?: ReactNode;
+  /**
+   * BUYER_TOUR_BRIEF_V1 — the "context hub" upgrade. `false` (default) renders the live
+   * v0 arrangement BYTE-IDENTICAL. `true` renders the mock-2h context hub: Quick Read +
+   * comparison spine, A/B/C identity, the pin summary card, and per-home expanders.
+   */
+  v1?: boolean;
 }) {
   const reduced = useReducedMotion();
+
+  /** Home identity label: v0 numbers (1/2/3), v1 letters (A/B/C). */
+  const stopLabel = useCallback(
+    (stop: number): string => (v1 ? stopLetter(stop) : String(stop)),
+    [v1],
+  );
 
   const accent = payload.brandAccent ?? DEFAULT_TOUR_ACCENT;
   const onAccent = pickContrastText(accent);
@@ -359,6 +385,8 @@ export function BuyerTourPage({
     () => new Set(payload.priorities),
   );
   const [highlightedStop, setHighlightedStop] = useState<number | null>(null);
+  /** V1 only: which home's pin summary card is open over the map (null = none). */
+  const [activePin, setActivePin] = useState<number | null>(null);
 
   const cardRefs = useRef<Map<number, HTMLElement | null>>(new Map());
   const clearTimer = useRef<ReturnType<typeof setTimeout> | null>(null);
@@ -378,7 +406,8 @@ export function BuyerTourPage({
     });
   }, []);
 
-  const onPinTap = useCallback(
+  /** Scroll to a home card + briefly highlight it (the explicit, user-driven jump). */
+  const jumpToStop = useCallback(
     (stop: number) => {
       const el = cardRefs.current.get(stop);
       if (el) {
@@ -392,6 +421,17 @@ export function BuyerTourPage({
       clearTimer.current = setTimeout(() => setHighlightedStop(null), 2200);
     },
     [reduced],
+  );
+
+  // Pin tap. v0: jump straight to the card (existing behavior). v1: open the pin summary
+  // card over the map and do NOT scroll — the buyer chooses "View home" to jump. This is
+  // the "controls act on the map only, never hijack scroll" rule (mock 2h).
+  const onPinTap = useCallback(
+    (stop: number) => {
+      if (v1) setActivePin(stop);
+      else jumpToStop(stop);
+    },
+    [v1, jumpToStop],
   );
 
   // Map shows when at least ONE home geocoded (one pin, no route). Zero geocoded →
@@ -555,14 +595,35 @@ export function BuyerTourPage({
             </div>
             <div className="px-4">
               <div className="overflow-hidden rounded-[18px] border border-[#EAE3D8] bg-white shadow-[0_1px_2px_rgba(22,33,31,.04),0_6px_20px_rgba(22,33,31,.06)]">
-                <StylizedMap
-                  homes={payload.homes}
-                  anchor={payload.commuteAnchor}
-                  activeLayers={activeLayers}
-                  highlightedStop={highlightedStop}
-                  onPinTap={onPinTap}
-                  accent={accent}
-                />
+                <div className="relative">
+                  <StylizedMap
+                    homes={payload.homes}
+                    anchor={payload.commuteAnchor}
+                    activeLayers={activeLayers}
+                    highlightedStop={highlightedStop}
+                    onPinTap={onPinTap}
+                    accent={accent}
+                    v1={v1}
+                  />
+                  {v1 &&
+                    activePin !== null &&
+                    (() => {
+                      const home = payload.homes.find((h) => h.stop === activePin);
+                      if (!home) return null;
+                      return (
+                        <PinSummaryCard
+                          home={home}
+                          letter={stopLetter(activePin)}
+                          accent={accent}
+                          onJump={() => {
+                            setActivePin(null);
+                            jumpToStop(activePin);
+                          }}
+                          onClose={() => setActivePin(null)}
+                        />
+                      );
+                    })()}
+                </div>
 
                 {legendCats.length > 0 && (
                   <div data-testid="btb-legend">
@@ -646,6 +707,9 @@ export function BuyerTourPage({
           </section>
         )}
 
+        {/* ---------- V1: Quick Read + comparison spine (the emotional peak) ---------- */}
+        {v1 && <QuickReadComparison payload={payload} accent={accent} />}
+
         {/* ---------- tour order ---------- */}
         {payload.homes.length > 0 && (
           <section className="pt-6">
@@ -657,6 +721,11 @@ export function BuyerTourPage({
               >
                 How the day flows
               </h2>
+              {v1 && (
+                <p className="mt-1 text-[12.5px] text-[#7C8A86]" data-testid="btb-order-cue">
+                  A, B, C are how we&rsquo;ll drive the day &mdash; the order, not a ranking.
+                </p>
+              )}
             </div>
             <div className="flex items-stretch px-6">
               {payload.homes.map((home, i) => (
@@ -675,7 +744,7 @@ export function BuyerTourPage({
                     style={{ background: accent, color: onAccent }}
                     data-testid={`btb-order-${home.stop}`}
                   >
-                    {home.stop}
+                    {stopLabel(home.stop)}
                   </div>
                   {/* Short AREA label only — full street addresses live on the cards. */}
                   <div className="mx-auto mt-1.5 line-clamp-2 px-1 text-[11px] leading-tight text-[#7C8A86]">
@@ -739,7 +808,7 @@ export function BuyerTourPage({
                       : { borderColor: "#EAE3D8" }
                   }
                 >
-                  <HomePhoto home={home} accent={accent} />
+                  <HomePhoto home={home} accent={accent} label={stopLabel(home.stop)} />
                   <div className="px-4 pb-4 pt-3.5">
                     <div className="flex flex-wrap items-baseline gap-x-3.5 gap-y-1">
                       {price && (
@@ -839,6 +908,14 @@ export function BuyerTourPage({
                         })}
                       </ul>
                     )}
+
+                    {/* V1: the obvious "see everything near this home" expander. */}
+                    {v1 && (
+                      <NearbyExpander
+                        letter={stopLetter(home.stop)}
+                        chips={home.proximityAll ?? home.proximity}
+                      />
+                    )}
                   </div>
                 </li>
               );
@@ -874,14 +951,16 @@ export function BuyerTourPage({
                   After we tour
                 </h3>
                 <p className="mt-1.5 text-[13px] text-[#42514E]">
-                  {AFTER_TOUR_TEASER}
+                  {v1
+                    ? "After we walk these, I'll rank the ones you loved side by side so the decision feels clear. No rush and no pressure — the full comparison comes after the day."
+                    : AFTER_TOUR_TEASER}
                 </p>
               </div>
             </div>
             <div className="mt-3.5 flex items-stretch gap-2.5" aria-hidden="true">
               <div className="flex-1 rounded-[10px] border border-[#EAE3D8] bg-white p-2.5 opacity-85">
                 <div className="text-[9.5px] font-semibold uppercase tracking-[0.04em] text-[#7C8A86]">
-                  Stop 1
+                  {v1 ? `Home ${stopLabel(1)}` : "Stop 1"}
                 </div>
                 <div className="mb-1.5 mt-1 h-[7px] w-[70%] rounded bg-[#D7E2DD]" />
                 <div className="h-[7px] w-[45%] rounded bg-[#EAE3D8]" />
@@ -891,7 +970,9 @@ export function BuyerTourPage({
               </div>
               <div className="flex-1 rounded-[10px] border border-[#EAE3D8] bg-white p-2.5 opacity-85">
                 <div className="text-[9.5px] font-semibold uppercase tracking-[0.04em] text-[#7C8A86]">
-                  Stop {Math.min(3, payload.homes.length) || 1}
+                  {v1
+                    ? `Home ${stopLabel(Math.min(3, payload.homes.length) || 1)}`
+                    : `Stop ${Math.min(3, payload.homes.length) || 1}`}
                 </div>
                 <div className="mb-1.5 mt-1 h-[7px] w-[70%] rounded bg-[#D7E2DD]" />
                 <div className="h-[7px] w-[45%] rounded bg-[#EAE3D8]" />

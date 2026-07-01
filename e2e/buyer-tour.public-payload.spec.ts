@@ -274,6 +274,62 @@ test.describe("buyer-tour public-payload allow-list", () => {
     expect(Object.keys(clamped.homes[0]).sort()).not.toContain("ratingBand");
   });
 
+  test("proximityAll (V1): derives one chip per category, canonical order, projected field-by-field", () => {
+    const draft = maxedDraft();
+    // A home with several categories incl. a duplicate — proximityAll dedupes to one/cat.
+    draft.homes = [
+      {
+        id: "h1",
+        address: "1 A St",
+        whyOnList: "w",
+        watchFor: "",
+        proximity: [
+          { category: "commute", label: "Gate", value: "18 min" },
+          { category: "schools", label: "Elm", value: "0.3 mi" },
+          { category: "parks", label: "Pk", value: "0.4 mi" },
+          { category: "coffee", label: "Cafe", value: "0.5 mi" },
+          { category: "grocery", label: "Mart", value: "0.6 mi" },
+          { category: "schools", label: "Second School", value: "0.9 mi" }, // dup category
+        ],
+      },
+    ] as unknown as BuyerTourDraft["homes"];
+    const payload = toBuyerTourPublicPayload(draft, { name: "Alex" });
+    const all = payload.homes[0].proximityAll;
+    expect(all).toBeDefined();
+    // one per category, canonical order (schools, commute, parks, coffee, grocery)
+    expect(all?.map((c) => c.category)).toEqual([
+      "schools",
+      "commute",
+      "parks",
+      "coffee",
+      "grocery",
+    ]);
+    // the FIRST schools chip wins the dedupe
+    expect(all?.find((c) => c.category === "schools")?.label).toBe("Elm");
+    // inline `proximity` stays capped at MAX_PUBLIC_CHIPS
+    expect(payload.homes[0].proximity.length).toBeLessThanOrEqual(3);
+
+    // Read-time clamp round-trips proximityAll (prefers it over the capped inline set).
+    const clamped = clampBuyerTourPublicPayload(payload as unknown);
+    expect(clamped.homes[0].proximityAll?.map((c) => c.category)).toEqual([
+      "schools",
+      "commute",
+      "parks",
+      "coffee",
+      "grocery",
+    ]);
+  });
+
+  test("proximityAll: a home with nothing to add leaves the field absent (graceful)", () => {
+    const clamped = clampBuyerTourPublicPayload({
+      buyerName: "x",
+      tourDate: "y",
+      priorities: [],
+      homes: [{ address: "1 A St", whyOnList: "w", watchFor: "", proximity: [] }],
+    });
+    expect(clamped.homes[0].proximityAll).toBeUndefined();
+  });
+
   test("photo URL allow-list: http(s) + same-origin root-relative pass; js/data/protocol-relative drop", () => {
     const mk = (photoUrl: string) =>
       clampBuyerTourPublicPayload({

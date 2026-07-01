@@ -53,7 +53,15 @@ export interface PublicHome {
   lng?: number;
   whyOnList: string;
   watchFor: string;
+  /** The capped, buyer-facing chips shown inline on the card (narrative stays dominant). */
   proximity: PublicProximityChip[];
+  /**
+   * OPTIONAL fuller nearby set — one factual chip per category, canonical order — used
+   * ONLY by the V1 context hub (comparison card + per-home "see everything" expander).
+   * Absent on pages published before V1 (they degrade to `proximity`). Never new agent
+   * input: derived from the same draft proximity. The v0 render ignores this field.
+   */
+  proximityAll?: PublicProximityChip[];
 }
 
 /** The agent identity surfaced to the buyer. */
@@ -234,6 +242,32 @@ function projAgent(agent: BuyerTourAgent | PublicAgent | undefined): PublicAgent
   return out;
 }
 
+/**
+ * The fuller nearby set for V1: every valid chip, deduped to ONE per category, in the
+ * canonical layer order. Field-by-field via `projChip` (no spread). Returns undefined
+ * when there is nothing beyond the capped inline set, so the field stays absent (and
+ * v0 / the clamp treat it as "not present" → graceful degrade to `proximity`).
+ */
+function projProximityAll(raw: unknown): PublicProximityChip[] | undefined {
+  if (!Array.isArray(raw)) return undefined;
+  const CANON: ProximityCategory[] = [
+    "schools",
+    "commute",
+    "parks",
+    "coffee",
+    "grocery",
+  ];
+  const byCat = new Map<ProximityCategory, PublicProximityChip>();
+  for (const c of raw) {
+    const chip = projChip(c);
+    if (chip && !byCat.has(chip.category)) byCat.set(chip.category, chip);
+  }
+  const out = CANON.filter((c) => byCat.has(c)).map(
+    (c) => byCat.get(c) as PublicProximityChip,
+  );
+  return out.length > 0 ? out : undefined;
+}
+
 function projHome(raw: unknown, stop: number): PublicHome {
   const r = (raw && typeof raw === "object" ? raw : {}) as Record<
     string,
@@ -251,6 +285,11 @@ function projHome(raw: unknown, stop: number): PublicHome {
           .slice(0, MAX_PUBLIC_CHIPS)
       : [],
   };
+  // Publish: the draft home carries the FULL proximity in `r.proximity` (the cap is
+  // applied above for the inline set). Clamp: the stored fuller set is in `r.proximityAll`
+  // and `r.proximity` is already capped — so prefer `proximityAll` when re-clamping.
+  const proximityAll = projProximityAll(r.proximityAll ?? r.proximity);
+  if (proximityAll) home.proximityAll = proximityAll;
   const photoUrl = projHostedUrl(r.photoUrl);
   if (photoUrl) home.photoUrl = photoUrl;
   const price = projNonNegInt(r.price);

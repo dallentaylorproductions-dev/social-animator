@@ -18,10 +18,12 @@
  * clean. Motion uses `motion-safe:` so reduced-motion viewers get them statically.
  */
 
+import { useState } from "react";
 import type { ProximityCategory } from "../engine/types";
 import type { PublicHome, PublicCommuteAnchor } from "./public-payload";
 import { LAYER_LABELS } from "./copy";
 import { projectTourMap, routePolyline } from "./map-geometry";
+import { stopLetter } from "./buyer-tour-v1";
 import { pickContrastText } from "@/tools/listing-flyer/engine/contrast";
 
 /**
@@ -62,6 +64,11 @@ interface StylizedMapProps {
   onPinTap: (stop: number) => void;
   /** The agent brand accent — owns the pins + route line (the tour thread). */
   accent: string;
+  /**
+   * BUYER_TOUR_BRIEF_V1 — when true, pins show A/B/C identity and layer markers become
+   * tap-to-name (mobile, no hover). Default false renders the v0 map BYTE-IDENTICAL.
+   */
+  v1?: boolean;
 }
 
 const WIDTH = 400;
@@ -74,8 +81,13 @@ export function StylizedMap({
   highlightedStop,
   onPinTap,
   accent,
+  v1 = false,
 }: StylizedMapProps) {
   const onAccent = pickContrastText(accent);
+  // V1 only: the name label shown when a layer marker is tapped (mobile-friendly).
+  const [marker, setMarker] = useState<{ x: number; y: number; text: string } | null>(
+    null,
+  );
   const projected = projectTourMap({
     homes: homes.map((h) =>
       h.lat !== undefined && h.lng !== undefined
@@ -98,6 +110,7 @@ export function StylizedMap({
       className="relative w-full overflow-hidden"
       style={{ aspectRatio: "1 / 0.9", background: "#EAF0E8" }}
       data-testid="btb-map"
+      onClick={v1 ? () => setMarker(null) : undefined}
     >
       <svg
         viewBox={`0 0 ${WIDTH} ${HEIGHT}`}
@@ -205,11 +218,45 @@ export function StylizedMap({
               {homeLayers.map((cat, j) => {
                 const angle = (-90 + j * 40) * (Math.PI / 180);
                 const r = 22;
+                const cx = Math.cos(angle) * r;
+                const cy = Math.sin(angle) * r;
+                if (v1) {
+                  // Tap-to-name: name the marker from the home's own proximity chip
+                  // (a real place, Fair-Housing clean), falling back to the layer label.
+                  const chip = home.proximity.find((c) => c.category === cat);
+                  const name =
+                    chip?.label && chip.label.trim().length > 0
+                      ? chip.label
+                      : LAYER_LABELS[cat];
+                  return (
+                    <g
+                      key={cat}
+                      className="cursor-pointer"
+                      onClick={(e) => {
+                        e.stopPropagation();
+                        setMarker({ x: pt.x + cx, y: pt.y + cy, text: name });
+                      }}
+                      data-testid={`btb-map-marker-${stop}-${cat}`}
+                    >
+                      {/* ≥ tappable hit area over the small dot */}
+                      <circle cx={cx} cy={cy} r="11" fill="transparent" />
+                      <circle
+                        cx={cx}
+                        cy={cy}
+                        r="4.5"
+                        fill={LAYER_COLOR[cat]}
+                        stroke="#ffffff"
+                        strokeWidth="1.5"
+                      />
+                      <title>{name}</title>
+                    </g>
+                  );
+                }
                 return (
                   <circle
                     key={cat}
-                    cx={Math.cos(angle) * r}
-                    cy={Math.sin(angle) * r}
+                    cx={cx}
+                    cy={cy}
                     r="4.5"
                     fill={LAYER_COLOR[cat]}
                     stroke="#ffffff"
@@ -236,7 +283,7 @@ export function StylizedMap({
                 fontWeight="700"
                 fill={onAccent}
               >
-                {stop}
+                {v1 ? stopLetter(stop) : stop}
               </text>
             </g>
           );
@@ -251,8 +298,14 @@ export function StylizedMap({
           <button
             key={stop}
             type="button"
-            onClick={() => onPinTap(stop)}
-            aria-label={`Jump to home ${stop}`}
+            onClick={(e) => {
+              if (v1) {
+                e.stopPropagation();
+                setMarker(null);
+              }
+              onPinTap(stop);
+            }}
+            aria-label={v1 ? `Home ${stopLetter(stop)}` : `Jump to home ${stop}`}
             data-testid={`btb-map-pinbtn-${stop}`}
             className="absolute -translate-x-1/2 -translate-y-1/2 rounded-full"
             style={{
@@ -264,6 +317,20 @@ export function StylizedMap({
           />
         );
       })}
+
+      {/* V1: the tapped marker's name (mobile tap-to-name; no hover dependence). */}
+      {v1 && marker && (
+        <div
+          className="pointer-events-none absolute z-20 -translate-x-1/2 -translate-y-[140%] whitespace-nowrap rounded-md bg-[#16211F] px-2 py-1 text-[11px] font-semibold text-white shadow-[0_2px_8px_rgba(22,33,31,.3)]"
+          style={{
+            left: `${(marker.x / WIDTH) * 100}%`,
+            top: `${(marker.y / HEIGHT) * 100}%`,
+          }}
+          data-testid="btb-map-marker-label"
+        >
+          {marker.text}
+        </div>
+      )}
     </div>
   );
 }

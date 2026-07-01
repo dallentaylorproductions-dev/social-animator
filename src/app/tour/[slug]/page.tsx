@@ -3,6 +3,7 @@ import type { ReactNode } from "react";
 import { notFound } from "next/navigation";
 import { fetchHandout } from "@/lib/share-urls";
 import { isBuyerTourBriefEnabled } from "@/lib/config/buyer-tour-brief";
+import { isBuyerTourBriefV1Enabled } from "@/lib/config/buyer-tour-brief-v1";
 import { isGreatSchoolsEnabled } from "@/lib/config/greatschools";
 import {
   hasGreatSchoolsKey,
@@ -109,5 +110,11 @@ export default async function TourPage({ params }: PageProps) {
 
   const payload = clampBuyerTourPublicPayload(record.data);
   const schoolSection = await resolveSchoolSection(payload);
-  return <BuyerTourPage payload={payload} schoolSection={schoolSection} />;
+  return (
+    <BuyerTourPage
+      payload={payload}
+      schoolSection={schoolSection}
+      v1={isBuyerTourBriefV1Enabled()}
+    />
+  );
 }
