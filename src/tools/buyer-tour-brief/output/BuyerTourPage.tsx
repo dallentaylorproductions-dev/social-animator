@@ -723,7 +723,7 @@ export function BuyerTourPage({
               </h2>
               {v1 && (
                 <p className="mt-1 text-[12.5px] text-[#7C8A86]" data-testid="btb-order-cue">
-                  A, B, C are how we&rsquo;ll drive the day &mdash; the order, not a ranking.
+                  A, B, C are how we&rsquo;ll drive the day. It&rsquo;s the order, not a ranking.
                 </p>
               )}
             </div>
@@ -952,7 +952,7 @@ export function BuyerTourPage({
                 </h3>
                 <p className="mt-1.5 text-[13px] text-[#42514E]">
                   {v1
-                    ? "After we walk these, I'll rank the ones you loved side by side so the decision feels clear. No rush and no pressure — the full comparison comes after the day."
+                    ? "After we walk these, I'll rank the ones you loved side by side so the decision feels clear. No rush and no pressure. The full comparison comes after the day."
                     : AFTER_TOUR_TEASER}
                 </p>
               </div>

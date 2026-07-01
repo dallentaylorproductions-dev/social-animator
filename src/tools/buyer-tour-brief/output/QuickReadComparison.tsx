@@ -126,7 +126,7 @@ export function QuickReadComparison({
         ))}
 
         <div className="bg-[#F7F3EA] px-[18px] py-3 text-[11px] text-[#7C8A86]" data-testid="btb-cmp-note">
-          Factual proximity and size, ranked per priority — never an overall best. Your
+          Factual proximity and size, ranked per priority, never an overall best. Your
           agent confirms each; Studio never rates a school or neighborhood.
         </div>
       </div>
