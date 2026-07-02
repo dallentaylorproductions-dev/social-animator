@@ -62,22 +62,23 @@ const PLACES_TYPE: Record<Exclude<ProximityCategory, "commute">, string> = {
   grocery: "supermarket",
 };
 
-/** Google Place `types` that positively identify a real school. `school` is the
- *  umbrella (covers K-12); the others are the specific real-school types. A
- *  preschool/daycare counts as a real school per the v0 product decision. */
+/** The SPECIFIC Google Place types that positively identify a real school. The
+ *  generic `school` type is deliberately NOT here: Google tags scuba / driving /
+ *  dance / music / yoga "schools" with the bare `school` type, so accepting it lets
+ *  them through (the live walk hit "Scuba Center"). Real K-12 schools reliably carry
+ *  `primary_school` / `secondary_school`; a preschool/daycare counts as a real
+ *  school per the v0 product decision. */
 const SCHOOL_TYPES = new Set([
-  "school",
   "primary_school",
   "secondary_school",
   "preschool",
 ]);
 
-/** Types that mark a place as NOT a school even when Google also tags it `school`
- *  — the yoga / scuba / gym "schools" and tutoring/spa storefronts that made the
- *  layer pick "0.1 mi to Thai Yoga Bodywork". Any of these present → rejected.
- *  NOTE: `place_of_worship` is deliberately NOT here — a parochial/religious K-12
- *  school legitimately carries it, and a bare meditation/zen center is already
- *  excluded by carrying no school type at all. */
+/** Types that mark a place as NOT a school. Now a secondary guard — the specific
+ *  positive types above already exclude the generic-`school`-only businesses — but
+ *  kept so a place mis-tagged with both a specific school type and one of these is
+ *  still rejected. NOTE: `place_of_worship` is deliberately NOT here — a parochial/
+ *  religious K-12 school legitimately carries it. */
 const NON_SCHOOL_TYPES = new Set([
   "gym",
   "health",
@@ -88,11 +89,13 @@ const NON_SCHOOL_TYPES = new Set([
 
 /**
  * Does a Places result's `types` array identify an ACTUAL school (not a loosely
- * school-tagged non-school like a yoga studio or a scuba center)? Pure.
+ * school-tagged non-school like a scuba center or a driving school)? Pure.
  *
- * A result qualifies iff it carries at least one real school type AND carries no
- * disqualifying non-school type. A place with only `point_of_interest` /
- * `establishment` (no school type) never qualifies.
+ * A result qualifies iff it carries a SPECIFIC real-school type
+ * (`primary_school` / `secondary_school` / `preschool`) AND no disqualifying
+ * non-school type. The generic `school` type alone is NOT sufficient, because
+ * Google tags scuba / driving / dance / music schools with it. Prefer showing
+ * empty over a wrong result.
  */
 export function isQualifyingSchool(types: unknown): boolean {
   if (!Array.isArray(types)) return false;
@@ -298,10 +301,11 @@ export async function nearestPlaceChip(
 ): Promise<DerivedChip | null> {
   const store: MapsKv = deps.kvImpl ?? kv;
   const doFetch = deps.fetchImpl ?? fetch;
-  // `schools` moved to v2 when the qualification filter landed, so a chip cached
-  // under the old loose logic (e.g. a yoga studio) can never be served again. The
-  // other four layers are unchanged, so they keep their v1 cache.
-  const version = category === "schools" ? "v2" : "v1";
+  // `schools` bumped to v3 when the qualifier tightened to require a specific
+  // school type, so a chip cached under earlier looser logic (a yoga studio at v1,
+  // a scuba center at v2) can never be served again. The other four layers are
+  // unchanged, so they keep their v1 cache.
+  const version = category === "schools" ? "v3" : "v1";
   const cacheKey = `btb:place:${version}:${category}:${home.lat.toFixed(4)},${home.lng.toFixed(4)}`;
   try {
     const cached = await store.get<DerivedChip>(cacheKey);

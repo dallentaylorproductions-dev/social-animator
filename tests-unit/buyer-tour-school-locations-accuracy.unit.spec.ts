@@ -81,21 +81,26 @@ const MIXED_RESPONSE = {
 
 /* ---- isQualifyingSchool: the type filter ---------------------------------- */
 
-test("a real school qualifies (real school type, no disqualifier)", () => {
+test("a real school qualifies only via a SPECIFIC school type", () => {
+  // Real K-12 schools reliably carry primary_school / secondary_school.
   expect(
     isQualifyingSchool(["primary_school", "school", "point_of_interest"]),
   ).toBe(true);
   expect(isQualifyingSchool(["secondary_school", "school"])).toBe(true);
-  // A school Google only tags with the umbrella `school` still qualifies.
-  expect(isQualifyingSchool(["school", "point_of_interest", "establishment"])).toBe(
-    true,
-  );
   // A preschool / daycare is a real school per the v0 decision.
-  expect(isQualifyingSchool(["preschool", "school"])).toBe(true);
+  expect(isQualifyingSchool(["preschool", "point_of_interest"])).toBe(true);
 });
 
-test("a yoga/scuba/gym 'school' is excluded by its non-school types", () => {
-  // Carries `school` but also spa/health → not a school.
+test("the GENERIC `school` type alone is NOT sufficient (scuba/driving schools)", () => {
+  // Google tags scuba / driving / dance / music "schools" with the bare `school`
+  // type and nothing more specific. These must NOT qualify.
+  expect(
+    isQualifyingSchool(["school", "point_of_interest", "establishment"]),
+  ).toBe(false);
+});
+
+test("a yoga/scuba/gym 'school' does not qualify", () => {
+  // Carries generic `school` but also spa/health, and no specific school type.
   expect(
     isQualifyingSchool(["school", "health", "spa", "point_of_interest"]),
   ).toBe(false);
@@ -153,9 +158,42 @@ test("returns null on ZERO_RESULTS / non-OK / malformed", () => {
   expect(
     parseNearestSchool({
       status: "OK",
-      results: [{ name: "No Geo School", types: ["school"] }],
+      results: [{ name: "No Geo School", types: ["primary_school"] }],
     }),
   ).toBeNull();
+});
+
+test("REGRESSION (live walk): a 'Scuba Center' tagged generic `school` never wins", () => {
+  // The exact shape that beat the v2 filter on Home B: a scuba center Google tags
+  // with the bare `school` type sits nearest, a real elementary is farther. The
+  // scuba center must be skipped and the real school returned.
+  const scubaNearest = {
+    status: "OK",
+    results: [
+      place(
+        "Minneapolis Scuba Center",
+        ["school", "point_of_interest", "establishment"],
+        44.9061,
+        -93.3161,
+      ),
+      place(
+        "Burroughs Community School",
+        ["primary_school", "school", "point_of_interest", "establishment"],
+        44.915,
+        -93.3,
+      ),
+    ],
+  };
+  expect(parseNearestSchool(scubaNearest)?.name).toBe("Burroughs Community School");
+
+  // And if the scuba center is the ONLY nearby "school", show empty, not the scuba.
+  const scubaOnly = {
+    status: "OK",
+    results: [
+      place("Minneapolis Scuba Center", ["school", "point_of_interest"], 44.9, -93.3),
+    ],
+  };
+  expect(parseNearestSchool(scubaOnly)).toBeNull();
 });
 
 /* ---- nearestPlaceChip: end-to-end for schools + regression for others ----- */
@@ -170,8 +208,8 @@ test("schools chip resolves to the real school, not the nearer yoga studio", asy
   expect(chip?.category).toBe("schools");
   expect(chip?.label).toBe("Lake Harriet Community School");
   expect(chip?.value).toBe(formatMiles(haversineMeters(HOME, REAL_SCHOOL.geometry.location)));
-  // School layer writes under a bumped v2 cache key so a stale loose chip can't survive.
-  expect(kvImpl.keys.some((k) => k.startsWith("btb:place:v2:schools:"))).toBe(true);
+  // School layer writes under a bumped v3 cache key so a stale loose chip can't survive.
+  expect(kvImpl.keys.some((k) => k.startsWith("btb:place:v3:schools:"))).toBe(true);
 });
 
 test("schools chip is empty (null) when nothing nearby qualifies", async () => {
@@ -203,9 +241,9 @@ test("REGRESSION: coffee/parks/grocery keep nearest-result behavior on v1 cache"
   });
   expect(chip?.category).toBe("coffee");
   expect(chip?.label).toBe("Nearest Cafe");
-  // Non-school layers stay on the v1 cache key (untouched).
+  // Non-school layers stay on the v1 cache key (untouched by the school bumps).
   expect(kvImpl.keys.some((k) => k.startsWith("btb:place:v1:coffee:"))).toBe(true);
-  expect(kvImpl.keys.some((k) => k.includes("v2"))).toBe(false);
+  expect(kvImpl.keys.some((k) => k.includes("v3"))).toBe(false);
   // And the shared nearest-result parser is unchanged for non-schools.
   expect(parseNearestPlace(cafeResp)?.name).toBe("Nearest Cafe");
 });
