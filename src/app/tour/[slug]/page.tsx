@@ -4,6 +4,7 @@ import { notFound } from "next/navigation";
 import { fetchHandout } from "@/lib/share-urls";
 import { isBuyerTourBriefEnabled } from "@/lib/config/buyer-tour-brief";
 import { isBuyerTourBriefV1Enabled } from "@/lib/config/buyer-tour-brief-v1";
+import { isBuyerTourAnalyticsEnabled } from "@/lib/config/buyer-tour-analytics";
 import { isGreatSchoolsEnabled } from "@/lib/config/greatschools";
 import {
   hasGreatSchoolsKey,
@@ -115,6 +116,8 @@ export default async function TourPage({ params }: PageProps) {
       payload={payload}
       schoolSection={schoolSection}
       v1={isBuyerTourBriefV1Enabled()}
+      analytics={isBuyerTourAnalyticsEnabled()}
+      slug={slug}
     />
   );
 }
