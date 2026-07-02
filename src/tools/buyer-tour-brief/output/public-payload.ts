@@ -25,8 +25,10 @@ import {
   isProximityCategory,
   type BuyerTourAgent,
   type BuyerTourDraft,
+  type CommuteAnchor,
   type Home,
   type ProximityCategory,
+  type ProximityChip,
 } from "../engine/types";
 
 export const BUYER_TOUR_HANDOUT_TYPE = "buyer-tour" as const;
@@ -406,4 +408,81 @@ export function clampBuyerTourPublicPayload(
   const schoolLayer = projBool(r.schoolLayer);
   if (schoolLayer !== undefined) payload.schoolLayer = schoolLayer;
   return payload;
+}
+
+/**
+ * Reconstruct an editable agent-private draft FROM a published public payload
+ * (BUYER_TOUR_BUILDER_V2 reopen). The primary reopen path is the local draft the
+ * builder autosaved when it published (full fidelity, carries the publishedSlug for
+ * update-in-place). This is the FALLBACK for a tour with no local draft — published
+ * from another device, or after the browser's storage was cleared — so the agent can
+ * still open it from the "your buyer tours" list and re-publish.
+ *
+ * Fidelity note: the public payload is the privacy boundary, so two agent-PRIVATE
+ * bits were dropped at publish and cannot be recovered here — the commute anchor's
+ * raw ADDRESS (only its label + coordinate survive) and the per-chip `editedByAgent`
+ * bookkeeping flag (reconstructed chips are treated as agent-authored so a later
+ * "Pull proximity" merge keeps them). Everything buyer-facing round-trips.
+ */
+export function draftFromPublicPayload(
+  payload: BuyerTourPublicPayload,
+): BuyerTourDraft {
+  const homes: Home[] = payload.homes.map((h, i): Home => {
+    const proximity: ProximityChip[] = (h.proximityAll ?? h.proximity).map(
+      (c): ProximityChip => ({
+        category: c.category,
+        label: c.label,
+        value: c.value,
+        // No `editedByAgent` in the public chip — treat a reconstructed chip as
+        // agent-authored so a re-pull merges rather than clobbers it.
+        editedByAgent: true,
+      }),
+    );
+    const home: Home = {
+      id: `reopened-${h.stop}-${i}`,
+      address: h.address,
+      whyOnList: h.whyOnList,
+      watchFor: h.watchFor,
+      proximity,
+    };
+    if (h.lat !== undefined && h.lng !== undefined) {
+      home.lat = h.lat;
+      home.lng = h.lng;
+    }
+    if (h.price !== undefined) home.price = h.price;
+    if (h.beds !== undefined) home.beds = h.beds;
+    if (h.baths !== undefined) home.baths = h.baths;
+    if (h.sqft !== undefined) home.sqft = h.sqft;
+    if (h.photoUrl) home.photoUrl = h.photoUrl;
+    return home;
+  });
+
+  const draft: BuyerTourDraft = {
+    buyerName: payload.buyerName,
+    tourDate: payload.tourDate,
+    priorities: [...payload.priorities],
+    buyerPriorities: [...payload.buyerPriorities],
+    homes,
+  };
+  if (payload.startTime) draft.startTime = payload.startTime;
+  if (payload.length) draft.length = payload.length;
+  if (payload.meetingPoint) draft.meetingPoint = payload.meetingPoint;
+  if (payload.agentNote) draft.agentNote = payload.agentNote;
+  if (payload.schoolLayer !== undefined) draft.schoolLayer = payload.schoolLayer;
+  if (payload.commuteAnchor) {
+    // Raw address was dropped at publish (agent-private) — carry label + coord only.
+    const anchor: CommuteAnchor = {
+      label: payload.commuteAnchor.label,
+      address: "",
+    };
+    if (
+      payload.commuteAnchor.lat !== undefined &&
+      payload.commuteAnchor.lng !== undefined
+    ) {
+      anchor.lat = payload.commuteAnchor.lat;
+      anchor.lng = payload.commuteAnchor.lng;
+    }
+    draft.commuteAnchor = anchor;
+  }
+  return draft;
 }

@@ -340,19 +340,34 @@ export function clampBuyerTourDraft(
  * Which required inputs a draft is still missing (the publish gate). Mirrors the
  * seller route's `describeMissingRequiredInputs` discipline: the server names the
  * field so a publish rejection is never opaque.
+ *
+ * `requireWhy` (default TRUE = today's builder / BUYER_TOUR_BUILDER_V2 OFF): each
+ * home's `whyOnList` is required to publish. When the V2 builder is on the publish
+ * route passes `requireWhy: false` (Lever 3) so a tour can publish with addresses
+ * only — the "why" is strongly encouraged in the UI and easy to add later via the
+ * reopen/edit flow, but no longer HARD-blocks publish. The address stays required in
+ * both modes: a home with no address cannot publish (no map pin, no card anchor).
+ * Defaulting to `true` keeps every existing caller byte-identical.
  */
-export function describeMissingBuyerTourInputs(draft: BuyerTourDraft): string[] {
+export function describeMissingBuyerTourInputs(
+  draft: BuyerTourDraft,
+  opts: { requireWhy?: boolean } = {},
+): string[] {
+  const { requireWhy = true } = opts;
   const missing: string[] = [];
   if (!draft.buyerName.trim()) missing.push("buyer name");
   if (!draft.tourDate.trim()) missing.push("tour date");
   if (draft.homes.length < MIN_HOMES) {
     missing.push(`at least ${MIN_HOMES} homes`);
   }
-  // Every home needs an address (the map pin + card anchor) and a reason it's on
-  // the list (the agent's thinking is the hero).
+  // Every home needs an address (the map pin + card anchor). The reason it's on the
+  // list (the agent's thinking is the hero) is required unless the V2 builder has
+  // softened it.
   draft.homes.forEach((h, i) => {
     if (!h.address.trim()) missing.push(`home ${i + 1} address`);
-    if (!h.whyOnList.trim()) missing.push(`home ${i + 1} why it's on the list`);
+    if (requireWhy && !h.whyOnList.trim()) {
+      missing.push(`home ${i + 1} why it's on the list`);
+    }
   });
   return missing;
 }

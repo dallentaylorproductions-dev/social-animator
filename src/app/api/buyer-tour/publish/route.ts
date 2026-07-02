@@ -1,6 +1,7 @@
 import { NextResponse } from "next/server";
 import { auth } from "@/lib/auth";
 import { isBuyerTourBriefEnabled } from "@/lib/config/buyer-tour-brief";
+import { isBuyerTourBuilderV2Enabled } from "@/lib/config/buyer-tour-builder-v2";
 import { publishHandout, updateHandout, getHandoutRecord } from "@/lib/share-urls";
 import {
   clampBuyerTourDraft,
@@ -71,7 +72,12 @@ export async function POST(req: Request): Promise<NextResponse> {
   // with the SAME helper the builder uses, so the server can't disagree about what
   // "complete" means.
   const draft = clampBuyerTourDraft(body.draft);
-  const missing = describeMissingBuyerTourInputs(draft);
+  // Lever 3 (BUYER_TOUR_BUILDER_V2): when the V2 builder is on, a tour may publish
+  // with addresses only — the per-home "why" is encouraged but no longer required.
+  // Flag off = today's behavior (why required), so the gate stays byte-identical.
+  const missing = describeMissingBuyerTourInputs(draft, {
+    requireWhy: !isBuyerTourBuilderV2Enabled(),
+  });
   if (missing.length > 0) {
     console.warn(
       `[buyer-tour/publish] rejected, required fields missing: ${missing.join(", ")}`,
