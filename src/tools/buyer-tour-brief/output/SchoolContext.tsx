@@ -83,9 +83,11 @@ export function SchoolContext({
                 data-testid={`btb-school-row-${letter}`}
               >
                 <div className="min-w-0 flex-1 py-[17px] pl-4 pr-3.5">
-                  <div className="mb-[5px] inline-flex items-center gap-1.5 text-[10.5px] font-bold text-[#42514E]">
+                  {/* Caption on its OWN line (block-level flex, not inline-flex) so the
+                      school-name link below never runs onto the same line as it. */}
+                  <div className="mb-[5px] flex w-fit items-center gap-1.5 text-[10.5px] font-bold text-[#42514E]">
                     <span
-                      className="flex h-[17px] w-[17px] items-center justify-center rounded-[5px] text-[10.5px] font-extrabold text-white"
+                      className="flex h-[17px] w-[17px] flex-none items-center justify-center rounded-[5px] text-[10.5px] font-extrabold text-white"
                       style={{ background: accent }}
                     >
                       {letter}
@@ -93,21 +95,23 @@ export function SchoolContext({
                     Nearest school
                   </div>
 
+                  {/* The school name is its own distinct, tappable line. Inline anchor so
+                      long names wrap cleanly with the underline following each line. */}
                   {school.profileUrl ? (
                     <a
                       href={school.profileUrl}
                       {...GS_LINK}
-                      className="text-[15px] font-bold text-[#16211F] no-underline [border-bottom:1px_solid_rgba(15,23,42,.22)] hover:[border-bottom-color:#16211F]"
+                      className="text-[15px] font-bold leading-[1.3] text-[#16211F] no-underline [border-bottom:1px_solid_rgba(15,23,42,.22)] hover:[border-bottom-color:#16211F]"
                     >
                       {school.name}
                     </a>
                   ) : (
-                    <span className="text-[15px] font-bold text-[#16211F]">
+                    <span className="text-[15px] font-bold leading-[1.3] text-[#16211F]">
                       {school.name}
                     </span>
                   )}
 
-                  <div className="mt-[3px] text-[11.5px] leading-[1.4] text-[#7C8A86]">
+                  <div className="mt-[5px] text-[11.5px] leading-[1.45] text-[#7C8A86]">
                     {schoolSubline(school)}
                   </div>
 
