@@ -1,6 +1,7 @@
 import { auth } from "@/lib/auth";
 import { hasActiveSubscription } from "@/lib/subscription";
 import { isDevAccessGranted } from "@/lib/dev-access";
+import { isBuyerTourBuilderV2Enabled } from "@/lib/config/buyer-tour-builder-v2";
 import { NextResponse } from "next/server";
 
 /**
@@ -34,8 +35,20 @@ export default auth(async (req) => {
     return NextResponse.next();
   }
 
-  const isLoggedIn = !!req.auth;
   const { pathname, search } = req.nextUrl;
+
+  // Buyer Tour Brief builder (BUYER_TOUR_BUILDER_V2, Lever 2). The route is in the
+  // matcher so the middleware runs on it, but the auth gate only applies when V2 is
+  // ON. When the flag is OFF we early-return before the identity redirect, so
+  // `/buyer-tour` behaves EXACTLY as today (byte-identical: no sign-in gate — the
+  // publish/enrich APIs still enforce their own auth). When ON, it falls through to
+  // the identity gate below; the subscription bypass list adds `/buyer-tour` so it is
+  // identity-only (no paywall — this is a dark beta tool).
+  if (pathname.startsWith("/buyer-tour") && !isBuyerTourBuilderV2Enabled()) {
+    return NextResponse.next();
+  }
+
+  const isLoggedIn = !!req.auth;
 
   if (!isLoggedIn) {
     const callbackUrl = encodeURIComponent(pathname + search);
@@ -49,6 +62,14 @@ export default auth(async (req) => {
     pathname.startsWith("/paywall") ||
     pathname.startsWith("/api/checkout")
   ) {
+    return NextResponse.next();
+  }
+
+  // Buyer Tour Brief builder is identity-only when V2 is on: sign-in required
+  // (handled by the identity gate above), but no paywall — a dark beta tool that
+  // should not be entangled with billing. (Reached only when the V2 flag is on;
+  // flag-off already early-returned before the identity gate.)
+  if (pathname.startsWith("/buyer-tour")) {
     return NextResponse.next();
   }
 
@@ -86,6 +107,11 @@ export const config = {
     // /dashboard inside the page; the matcher only adds the identity gate.)
     "/studio/:path*",
     "/studio",
+    // Buyer Tour Brief builder (BUYER_TOUR_BUILDER_V2). Present in the matcher so the
+    // middleware can gate it when the flag is on; the middleware body early-returns
+    // (byte-identical to today) when the flag is off. Identity-only (no paywall).
+    "/buyer-tour/:path*",
+    "/buyer-tour",
     "/paywall/:path*",
     "/api/checkout",
     "/api/checkout/:path*",

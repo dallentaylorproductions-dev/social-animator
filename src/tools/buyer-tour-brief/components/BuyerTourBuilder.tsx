@@ -14,10 +14,15 @@
  * Photos go through the shared Blob upload field (hosted URL, never base64).
  */
 
-import { useCallback, useRef, useState } from "react";
+import { useCallback, useEffect, useRef, useState } from "react";
 import { ImageUploadField } from "@/components/ImageUploadField";
 import { loadBrandSettings } from "@/lib/brand";
 import { tourPageUrl } from "@/lib/public-url";
+import {
+  formatCurrency,
+  formatNumberWithCommas,
+  stripToDigits,
+} from "@/components/inputs/formatHelpers";
 import {
   EMPTY_BUYER_TOUR_DRAFT,
   MAX_HOMES,
@@ -62,6 +67,19 @@ const field =
 const labelCls =
   "block text-[10px] uppercase tracking-[0.15em] text-neutral-500 mb-1.5";
 
+/**
+ * Snapshot of the builder's live state, reported to a parent via `onStateChange`
+ * (BUYER_TOUR_BUILDER_V2). The V2 workspace uses it to drive the live preview and to
+ * autosave the in-progress draft. `undefined` in today's builder → the effect is a
+ * no-op and nothing is reported (byte-identical).
+ */
+export interface BuyerTourBuilderState {
+  draft: BuyerTourDraft;
+  anchorLabel: string;
+  anchorAddress: string;
+  publishedSlug: string | null;
+}
+
 export interface BuyerTourBuilderProps {
   /**
    * Whether the GreatSchools "School context" toggle is offered (GREATSCHOOLS_ENABLED,
@@ -78,27 +96,73 @@ export interface BuyerTourBuilderProps {
    * When true, a calm "How your buyer engaged" block appears once the tour is published.
    */
   analyticsAvailable?: boolean;
+  /* ---- BUYER_TOUR_BUILDER_V2 opt-ins (all default to today's exact behavior) ---- */
+  /**
+   * Render WITHOUT the full-screen dark `<main>` shell so the builder can sit inside
+   * the V2 workspace's left column. Default false → today's standalone `<main>` layout
+   * (byte-identical).
+   */
+  embedded?: boolean;
+  /** Seed the draft (V2 resume/reopen). Default undefined → today's empty 3-home draft. */
+  initialDraft?: BuyerTourDraft;
+  /** Seed the commute-anchor fields (V2 reopen). Default undefined → empty. */
+  initialAnchor?: { label: string; address: string };
+  /** Seed the published slug so the button reads "Update live page" (V2 reopen). */
+  initialSlug?: string | null;
+  /** Report live state up for the preview + autosave (V2). Default undefined → no-op. */
+  onStateChange?: (state: BuyerTourBuilderState) => void;
+  /**
+   * Format the price + sqft inputs as the flagship does ($735,000 / 2,840) while
+   * storing the clean number (Lever 4). Default false → today's plain number inputs.
+   */
+  formatNumbers?: boolean;
+  /**
+   * Soften the per-home "why" copy to "encouraged, not required" (Lever 3 UI half; the
+   * publish gate itself is softened server-side). Default false → today's copy.
+   */
+  softWhy?: boolean;
 }
 
 export function BuyerTourBuilder({
   schoolLayerAvailable = false,
   analyticsAvailable = false,
+  embedded = false,
+  initialDraft,
+  initialAnchor,
+  initialSlug = null,
+  onStateChange,
+  formatNumbers = false,
+  softWhy = false,
 }: BuyerTourBuilderProps = {}) {
-  const [draft, setDraft] = useState<BuyerTourDraft>(() => ({
-    ...EMPTY_BUYER_TOUR_DRAFT,
-    // Priority defaults pre-checked (often zero clicks); agent can toggle.
-    priorities: ["schools", "commute", "parks"],
-    homes: [newHome(), newHome(), newHome()],
-  }));
+  const [draft, setDraft] = useState<BuyerTourDraft>(
+    () =>
+      initialDraft ?? {
+        ...EMPTY_BUYER_TOUR_DRAFT,
+        // Priority defaults pre-checked (often zero clicks); agent can toggle.
+        priorities: ["schools", "commute", "parks"],
+        homes: [newHome(), newHome(), newHome()],
+      },
+  );
   const [copied, setCopied] = useState(false);
-  const [anchorLabel, setAnchorLabel] = useState("");
-  const [anchorAddress, setAnchorAddress] = useState("");
+  const [anchorLabel, setAnchorLabel] = useState(
+    () => initialAnchor?.label ?? initialDraft?.commuteAnchor?.label ?? "",
+  );
+  const [anchorAddress, setAnchorAddress] = useState(
+    () => initialAnchor?.address ?? initialDraft?.commuteAnchor?.address ?? "",
+  );
   const [pulling, setPulling] = useState(false);
   const [pullNote, setPullNote] = useState<string | null>(null);
   const [publishing, setPublishing] = useState(false);
-  const [publishedSlug, setPublishedSlug] = useState<string | null>(null);
+  const [publishedSlug, setPublishedSlug] = useState<string | null>(initialSlug);
   const [error, setError] = useState<string | null>(null);
-  const slugRef = useRef<string | null>(null);
+  const slugRef = useRef<string | null>(initialSlug);
+
+  // BUYER_TOUR_BUILDER_V2: report live state to the workspace for the live preview and
+  // autosave. No-op (and no DOM change) in today's builder, where onStateChange is
+  // undefined — so flag-off stays byte-identical.
+  useEffect(() => {
+    onStateChange?.({ draft, anchorLabel, anchorAddress, publishedSlug });
+  }, [onStateChange, draft, anchorLabel, anchorAddress, publishedSlug]);
 
   const patch = useCallback((p: Partial<BuyerTourDraft>) => {
     setDraft((d) => ({ ...d, ...p }));
@@ -300,9 +364,20 @@ export function BuyerTourBuilder({
 
   const enoughHomes = draft.homes.filter((h) => h.address.trim()).length;
 
+  // BUYER_TOUR_BUILDER_V2: in embedded mode the workspace owns the page shell, so the
+  // builder renders as a plain scrollable column (no full-bleed dark `<main>`, no
+  // fixed max width). Default (standalone) keeps today's exact `<main>` layout.
+  const Shell = embedded ? "div" : "main";
+  const shellClass = embedded
+    ? "text-neutral-100"
+    : "min-h-screen bg-neutral-950 text-neutral-100";
+  const containerClass = embedded
+    ? "w-full px-1 py-2"
+    : "mx-auto w-full max-w-2xl px-4 py-8";
+
   return (
-    <main className="min-h-screen bg-neutral-950 text-neutral-100">
-      <div className="mx-auto w-full max-w-2xl px-4 py-8">
+    <Shell className={shellClass}>
+      <div className={containerClass}>
         <h1 className="text-2xl font-semibold">Buyer Tour Brief</h1>
         <p className="mt-1 text-sm text-neutral-400">
           Build a prepared, narrated showing-day page for one buyer. Manual input
@@ -600,25 +675,56 @@ export function BuyerTourBuilder({
               </div>
 
               <div className="grid grid-cols-2 gap-3 sm:grid-cols-4">
-                {(["price", "beds", "baths", "sqft"] as const).map((k) => (
-                  <div key={k}>
-                    <label className={labelCls}>{k}</label>
-                    <input
-                      type="number"
-                      min={0}
-                      className={field}
-                      value={home[k] ?? ""}
-                      onChange={(e) =>
-                        patchHome(home.id, {
-                          [k]:
-                            e.target.value === ""
-                              ? undefined
-                              : Number(e.target.value),
-                        } as Partial<Home>)
-                      }
-                    />
-                  </div>
-                ))}
+                {(["price", "beds", "baths", "sqft"] as const).map((k) => {
+                  // Lever 4 (V2): price/sqft display formatted while storing a clean
+                  // number, reusing the flagship's formatters. Default (formatNumbers
+                  // off) renders today's plain number input — byte-identical.
+                  const formatted =
+                    formatNumbers && (k === "price" || k === "sqft");
+                  if (formatted) {
+                    const raw = home[k] === undefined ? "" : String(home[k]);
+                    const display =
+                      k === "price"
+                        ? formatCurrency(raw)
+                        : formatNumberWithCommas(raw);
+                    return (
+                      <div key={k}>
+                        <label className={labelCls}>{k}</label>
+                        <input
+                          type="text"
+                          inputMode="numeric"
+                          className={field}
+                          value={display}
+                          onChange={(e) => {
+                            const digits = stripToDigits(e.target.value);
+                            patchHome(home.id, {
+                              [k]: digits === "" ? undefined : Number(digits),
+                            } as Partial<Home>);
+                          }}
+                        />
+                      </div>
+                    );
+                  }
+                  return (
+                    <div key={k}>
+                      <label className={labelCls}>{k}</label>
+                      <input
+                        type="number"
+                        min={0}
+                        className={field}
+                        value={home[k] ?? ""}
+                        onChange={(e) =>
+                          patchHome(home.id, {
+                            [k]:
+                              e.target.value === ""
+                                ? undefined
+                                : Number(e.target.value),
+                          } as Partial<Home>)
+                        }
+                      />
+                    </div>
+                  );
+                })}
               </div>
 
               <ImageUploadField
@@ -635,7 +741,14 @@ export function BuyerTourBuilder({
               />
 
               <div>
-                <label className={labelCls}>Why it&apos;s on the list</label>
+                <label className={labelCls}>
+                  Why it&apos;s on the list
+                  {softWhy && (
+                    <span className="ml-2 lowercase tracking-normal text-neutral-500">
+                      recommended
+                    </span>
+                  )}
+                </label>
                 <textarea
                   className={`${field} min-h-[60px]`}
                   placeholder="Single level like you wanted, and the kitchen was redone last year."
@@ -645,6 +758,12 @@ export function BuyerTourBuilder({
                   }
                   data-testid={`btb-home-${i + 1}-why`}
                 />
+                {softWhy && !home.whyOnList.trim() && (
+                  <p className="mt-1 text-[11px] text-neutral-500">
+                    You can publish without this and add it later, but a one-line
+                    reason is what makes the tour feel prepared.
+                  </p>
+                )}
               </div>
               <div>
                 <label className={labelCls}>What to watch for</label>
@@ -773,6 +892,6 @@ export function BuyerTourBuilder({
           )}
         </section>
       </div>
-    </main>
+    </Shell>
   );
 }
