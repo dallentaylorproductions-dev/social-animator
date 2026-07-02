@@ -17,7 +17,10 @@ import {
   clampBuyerTourPublicPayload,
   toBuyerTourPublicPayload,
 } from "../src/tools/buyer-tour-brief/output/public-payload";
-import type { BuyerTourDraft } from "../src/tools/buyer-tour-brief/engine/types";
+import {
+  clampBuyerTourDraft,
+  type BuyerTourDraft,
+} from "../src/tools/buyer-tour-brief/engine/types";
 
 const S = {
   anchorAddress: "PRIVATE_SENTINEL_ANCHOR_ADDRESS",
@@ -237,6 +240,34 @@ test.describe("buyer-tour public-payload allow-list", () => {
         priorities: [],
         homes: [],
         schoolLayer: 1,
+      }).schoolLayer,
+    ).toBeUndefined();
+  });
+
+  test("schoolLayer survives the publish SEAM: clampBuyerTourDraft → toBuyerTourPublicPayload (on true, absent when off)", () => {
+    // The publish route clamps the WIRE draft through clampBuyerTourDraft BEFORE
+    // projecting, so the true end-to-end path is the composition of both. A prior
+    // regression dropped schoolLayer HERE (the draft clamp omitted it) even though
+    // the direct-projection test above was green — this locks the whole seam.
+    const publish = (wire: Partial<BuyerTourDraft>) =>
+      toBuyerTourPublicPayload(clampBuyerTourDraft(wire), {});
+
+    // Toggle ON → true rides the wire, survives the draft clamp, projects as true.
+    expect(publish({ ...maxedDraft(), schoolLayer: true }).schoolLayer).toBe(true);
+
+    // Toggle OFF (field absent) → stays absent (default off).
+    const off = { ...maxedDraft() };
+    delete off.schoolLayer;
+    expect(publish(off).schoolLayer).toBeUndefined();
+
+    // Explicit false on the wire → off (absent), never a stored `false` from the draft clamp.
+    expect(publish({ ...maxedDraft(), schoolLayer: false }).schoolLayer).toBeUndefined();
+
+    // A tampered truthy non-boolean on the wire must NOT become true through the seam.
+    expect(
+      publish({
+        ...maxedDraft(),
+        schoolLayer: "true" as unknown as boolean,
       }).schoolLayer,
     ).toBeUndefined();
   });

@@ -327,6 +327,12 @@ export function clampBuyerTourDraft(
   if (agentNote) draft.agentNote = agentNote;
   const commuteAnchor = clampCommuteAnchor(r.commuteAnchor);
   if (commuteAnchor) draft.commuteAnchor = commuteAnchor;
+  // Carry the GreatSchools "School context" opt-in through the boundary. Only a real
+  // `true` persists (mirrors `projBool` in the public payload): absent / false / a
+  // tampered non-boolean all mean off, so the field stays absent → default OFF. The
+  // publish route clamps the wire draft through HERE before projecting, so omitting
+  // this drops the toggle server-side even when the client sent schoolLayer: true.
+  if (r.schoolLayer === true) draft.schoolLayer = true;
   return draft;
 }
 
