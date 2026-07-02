@@ -52,13 +52,55 @@ const CACHE_TTL_SECONDS = 30 * 24 * 60 * 60;
 const METERS_PER_MILE = 1609.344;
 
 /** The Places `type` we query per factual layer. `commute` has no Places query —
- *  it is a Distance Matrix call to the anchor. */
+ *  it is a Distance Matrix call to the anchor. `school` is the umbrella school type
+ *  (it also surfaces `primary_school` / `secondary_school`); the accuracy work is in
+ *  the post-fetch qualification filter below, not the query. */
 const PLACES_TYPE: Record<Exclude<ProximityCategory, "commute">, string> = {
   schools: "school",
   parks: "park",
   coffee: "cafe",
   grocery: "supermarket",
 };
+
+/** Google Place `types` that positively identify a real school. `school` is the
+ *  umbrella (covers K-12); the others are the specific real-school types. A
+ *  preschool/daycare counts as a real school per the v0 product decision. */
+const SCHOOL_TYPES = new Set([
+  "school",
+  "primary_school",
+  "secondary_school",
+  "preschool",
+]);
+
+/** Types that mark a place as NOT a school even when Google also tags it `school`
+ *  — the yoga / scuba / gym "schools" and tutoring/spa storefronts that made the
+ *  layer pick "0.1 mi to Thai Yoga Bodywork". Any of these present → rejected.
+ *  NOTE: `place_of_worship` is deliberately NOT here — a parochial/religious K-12
+ *  school legitimately carries it, and a bare meditation/zen center is already
+ *  excluded by carrying no school type at all. */
+const NON_SCHOOL_TYPES = new Set([
+  "gym",
+  "health",
+  "spa",
+  "beauty_salon",
+  "storage",
+]);
+
+/**
+ * Does a Places result's `types` array identify an ACTUAL school (not a loosely
+ * school-tagged non-school like a yoga studio or a scuba center)? Pure.
+ *
+ * A result qualifies iff it carries at least one real school type AND carries no
+ * disqualifying non-school type. A place with only `point_of_interest` /
+ * `establishment` (no school type) never qualifies.
+ */
+export function isQualifyingSchool(types: unknown): boolean {
+  if (!Array.isArray(types)) return false;
+  const t = types.filter((x): x is string => typeof x === "string");
+  if (!t.some((x) => SCHOOL_TYPES.has(x))) return false;
+  if (t.some((x) => NON_SCHOOL_TYPES.has(x))) return false;
+  return true;
+}
 
 export type EnrichErrorCode = "key-missing" | "invalid-address";
 
@@ -214,6 +256,36 @@ export function parseNearestPlace(
 }
 
 /**
+ * Read the nearest QUALIFYING school from a Places response — the first result (the
+ * list is `rankby=distance`, so first-qualifying IS nearest-qualifying) whose
+ * `types` pass {@link isQualifyingSchool}. Skips yoga/scuba/gym "schools" and any
+ * result missing a name or coordinate. Returns null when nothing qualifies, so the
+ * layer shows a graceful empty rather than a wrong result. FACTS ONLY: name +
+ * location (never a rating). */
+export function parseNearestSchool(
+  raw: unknown,
+): { name: string; location: LatLng } | null {
+  if (!raw || typeof raw !== "object") return null;
+  const r = raw as Record<string, unknown>;
+  if (r.status !== "OK" || !Array.isArray(r.results)) return null;
+  for (const item of r.results) {
+    const res = (item && typeof item === "object" ? item : {}) as Record<
+      string,
+      unknown
+    >;
+    if (!isQualifyingSchool(res.types)) continue;
+    const name = typeof res.name === "string" ? res.name.trim() : "";
+    const geometry = res.geometry as Record<string, unknown> | undefined;
+    const location = geometry?.location as Record<string, unknown> | undefined;
+    if (!name || !location) continue;
+    const { lat, lng } = location;
+    if (!isFiniteNumber(lat) || !isFiniteNumber(lng)) continue;
+    return { name, location: { lat, lng } };
+  }
+  return null;
+}
+
+/**
  * Nearest place of a factual category to a home. Returns a `{label, value}` chip
  * (place name + straight-line distance) or null. `rankby=distance` returns the
  * closest first; the distance is computed haversine from the home (no extra call).
@@ -226,7 +298,11 @@ export async function nearestPlaceChip(
 ): Promise<DerivedChip | null> {
   const store: MapsKv = deps.kvImpl ?? kv;
   const doFetch = deps.fetchImpl ?? fetch;
-  const cacheKey = `btb:place:v1:${category}:${home.lat.toFixed(4)},${home.lng.toFixed(4)}`;
+  // `schools` moved to v2 when the qualification filter landed, so a chip cached
+  // under the old loose logic (e.g. a yoga studio) can never be served again. The
+  // other four layers are unchanged, so they keep their v1 cache.
+  const version = category === "schools" ? "v2" : "v1";
+  const cacheKey = `btb:place:${version}:${category}:${home.lat.toFixed(4)},${home.lng.toFixed(4)}`;
   try {
     const cached = await store.get<DerivedChip>(cacheKey);
     if (cached && cached.label && cached.value) return cached;
@@ -238,7 +314,11 @@ export async function nearestPlaceChip(
   url.searchParams.set("rankby", "distance");
   url.searchParams.set("type", PLACES_TYPE[category]);
   url.searchParams.set("key", apiKey);
-  const nearest = parseNearestPlace(await fetchJson(url.toString(), doFetch));
+  const raw = await fetchJson(url.toString(), doFetch);
+  // Schools: pick the nearest result that is an ACTUAL school; the other layers keep
+  // the nearest result of their type unchanged.
+  const nearest =
+    category === "schools" ? parseNearestSchool(raw) : parseNearestPlace(raw);
   if (!nearest) return null;
   const chip: DerivedChip = {
     category,
