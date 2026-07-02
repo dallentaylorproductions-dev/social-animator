@@ -42,6 +42,9 @@ import { stopLetter } from "./buyer-tour-v1";
 import { QuickReadComparison } from "./QuickReadComparison";
 import { NearbyExpander } from "./NearbyExpander";
 import { PinSummaryCard } from "./PinSummaryCard";
+import { EngagementTracker } from "./EngagementTracker";
+import { trackEngagement } from "./engagement-client";
+import { isHomeLetter } from "../engine/engagement";
 
 /**
  * The mock's system serif stack (Iowan / Palatino / Georgia). Deliberately a SYSTEM
@@ -354,6 +357,8 @@ export function BuyerTourPage({
   payload,
   schoolSection,
   v1 = false,
+  analytics = false,
+  slug,
 }: {
   payload: BuyerTourPublicPayload;
   /**
@@ -369,6 +374,15 @@ export function BuyerTourPage({
    * comparison spine, A/B/C identity, the pin summary card, and per-home expanders.
    */
   v1?: boolean;
+  /**
+   * BUYER_TOUR_ANALYTICS — first-party engagement instrumentation. `false` (default)
+   * mounts NOTHING: no tracker, no events, page byte-identical. `true` mounts the
+   * null-rendering `EngagementTracker` island (needs `slug`) which fires fire-and-
+   * forget funnel beacons. Adds ZERO markup either way.
+   */
+  analytics?: boolean;
+  /** The tour slug — the engagement key. Present on /tour/[slug]; absent in preview. */
+  slug?: string;
 }) {
   const reduced = useReducedMotion();
 
@@ -428,8 +442,16 @@ export function BuyerTourPage({
   // the "controls act on the map only, never hijack scroll" rule (mock 2h).
   const onPinTap = useCallback(
     (stop: number) => {
-      if (v1) setActivePin(stop);
-      else jumpToStop(stop);
+      // Fire-and-forget engagement (no-op when analytics is off / uninitialized).
+      const letter = stopLetter(stop);
+      trackEngagement("map_pin_tapped", isHomeLetter(letter) ? letter : undefined);
+      if (v1) {
+        trackEngagement(
+          "pin_summary_opened",
+          isHomeLetter(letter) ? letter : undefined,
+        );
+        setActivePin(stop);
+      } else jumpToStop(stop);
     },
     [v1, jumpToStop],
   );
@@ -468,6 +490,9 @@ export function BuyerTourPage({
       className="min-h-screen bg-[#ECE6DB] text-[#16211F] [overflow-x:hidden]"
       data-testid="buyer-tour-page"
     >
+      {/* First-party engagement instrumentation (BUYER_TOUR_ANALYTICS). Renders NULL —
+          adds no markup; only mounted when analytics is on, so off = byte-identical. */}
+      {analytics && <EngagementTracker slug={slug} enabled={analytics} />}
       <div className="mx-auto w-full max-w-[480px] bg-[#FBF8F3]">
         {/* ---------- top bar ---------- */}
         <div className="flex items-center justify-between border-b border-[#EAE3D8] bg-white px-6 py-4">

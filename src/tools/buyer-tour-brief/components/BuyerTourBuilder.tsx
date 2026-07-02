@@ -31,6 +31,7 @@ import {
 } from "../engine/types";
 import { mergeEnrichedProximity } from "../engine/proximity-merge";
 import { LAYER_LABELS } from "../output/copy";
+import { EngagementReadout } from "./EngagementReadout";
 
 let homeSeq = 0;
 function newHome(): Home {
@@ -70,10 +71,18 @@ export interface BuyerTourBuilderProps {
    * fetch happens at render on /tour/[slug], never here.
    */
   schoolLayerAvailable?: boolean;
+  /**
+   * Whether the per-tour engagement readout is offered (BUYER_TOUR_ANALYTICS, resolved
+   * SERVER-SIDE in the /buyer-tour route and passed down). Default false so the readout
+   * stays dark when the flag is off; the client never reads the server-only flag itself.
+   * When true, a calm "How your buyer engaged" block appears once the tour is published.
+   */
+  analyticsAvailable?: boolean;
 }
 
 export function BuyerTourBuilder({
   schoolLayerAvailable = false,
+  analyticsAvailable = false,
 }: BuyerTourBuilderProps = {}) {
   const [draft, setDraft] = useState<BuyerTourDraft>(() => ({
     ...EMPTY_BUYER_TOUR_DRAFT,
@@ -758,6 +767,9 @@ export function BuyerTourBuilder({
                 {copied ? "Copied" : "Copy link"}
               </button>
             </div>
+          )}
+          {analyticsAvailable && publishedSlug && (
+            <EngagementReadout slug={publishedSlug} />
           )}
         </section>
       </div>

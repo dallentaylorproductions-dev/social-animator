@@ -1,6 +1,7 @@
 import { notFound } from "next/navigation";
 import { isBuyerTourBriefEnabled } from "@/lib/config/buyer-tour-brief";
 import { isGreatSchoolsEnabled } from "@/lib/config/greatschools";
+import { isBuyerTourAnalyticsEnabled } from "@/lib/config/buyer-tour-analytics";
 import { BuyerTourBuilder } from "@/tools/buyer-tour-brief/components/BuyerTourBuilder";
 
 /**
@@ -20,11 +21,20 @@ import { BuyerTourBuilder } from "@/tools/buyer-tour-brief/components/BuyerTourB
  * toggle is not even handed to the builder — byte-identical to today. See
  * isGreatSchoolsEnabled for the flag's semantics; the live fetch stays at render on
  * /tour/[slug], never in this builder.
+ *
+ * BUYER_TOUR_ANALYTICS is read the same way and passed as `analyticsAvailable`, so the
+ * calm per-tour engagement readout appears after publish only when analytics is on —
+ * byte-identical to today when the flag is dark.
  */
 
 export const dynamic = "force-dynamic";
 
 export default function BuyerTourBuilderPage() {
   if (!isBuyerTourBriefEnabled()) notFound();
-  return <BuyerTourBuilder schoolLayerAvailable={isGreatSchoolsEnabled()} />;
+  return (
+    <BuyerTourBuilder
+      schoolLayerAvailable={isGreatSchoolsEnabled()}
+      analyticsAvailable={isBuyerTourAnalyticsEnabled()}
+    />
+  );
 }
